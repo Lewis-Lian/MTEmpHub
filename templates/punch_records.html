@@ -1,15 +1,19 @@
 {% extends 'base.html' %}
-{% block title %}考勤数据查询{% endblock %}
+{% block title %}打卡数据查询{% endblock %}
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">考勤数据查询</h1>
-    <p class="page-subtitle">按账套与员工范围查询最终考勤汇总数据。</p>
+    <h1 class="page-title">员工打卡数据查询</h1>
+    <p class="page-subtitle">按账套和员工查询打卡明细，支持原始刷卡与上下班视图。</p>
   </div>
 </div>
 
 <div class="row g-3">
-  <div class="col-md-4">
+  <div class="col-md-3">
+    <label class="form-label">账套</label>
+    <select class="form-select" id="accountSetSelect"></select>
+  </div>
+  <div class="col-md-5">
     <label class="form-label">员工</label>
     <div class="employee-lookup" id="employeeLookup">
       <div class="input-group input-group-sm">
@@ -22,25 +26,8 @@
       <div class="employee-float-list" id="employeeQuickList"></div>
     </div>
   </div>
-  <div class="col-md-3">
-    <label class="form-label">账套</label>
-    <select class="form-select" id="accountSetSelect"></select>
-  </div>
-  <div class="col-md-2">
-    <label class="form-label">显示选项</label>
-    <div class="d-flex flex-column gap-2 pt-1">
-      <label class="form-check-label small d-inline-flex align-items-center gap-2">
-        <input class="form-check-input m-0" type="checkbox" id="showLeaveCounts">
-        显示请假（次数）
-      </label>
-      <label class="form-check-label small d-inline-flex align-items-center gap-2">
-        <input class="form-check-input m-0" type="checkbox" id="showLeaveDurations">
-        显示请假（时长）
-      </label>
-    </div>
-  </div>
-  <div class="col-md-3 d-flex align-items-end gap-2">
-    <button class="btn btn-primary w-100" id="refreshBtn">查询</button>
+  <div class="col-md-4 d-flex align-items-end gap-2">
+    <button class="btn btn-primary w-100" id="queryBtn">查询</button>
     <button class="btn btn-outline-success w-100" id="downloadBtn">下载XLSX</button>
   </div>
 </div>
@@ -110,15 +97,42 @@
 </div>
 
 <div class="card mt-4">
-  <div class="card-header">最终数据工作表</div>
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span>打卡明细</span>
+    <div class="d-flex gap-3">
+      <label class="form-check-label small">
+        <input class="form-check-input me-1" type="checkbox" id="toggleRawPunch" checked>
+        显示原始刷卡数据
+      </label>
+      <label class="form-check-label small">
+        <input class="form-check-input me-1" type="checkbox" id="toggleInOutPunch">
+        显示上班/下班打卡数据
+      </label>
+    </div>
+  </div>
   <div class="table-responsive">
-    <table class="table table-sm table-striped mb-0" id="finalDataTable">
-      <thead id="finalDataHead"></thead>
-      <tbody id="finalDataBody"></tbody>
+    <table class="table table-sm table-striped mb-0">
+      <thead>
+        <tr>
+          <th>日期</th>
+          <th>员工编号</th>
+          <th>员工姓名</th>
+          <th>部门</th>
+          <th class="col-raw-punch">原始打卡数据</th>
+          <th class="col-inout-punch">上班打卡</th>
+          <th class="col-inout-punch">下班打卡</th>
+          <th>打卡次数</th>
+          <th>实出勤小时</th>
+          <th>迟到分钟</th>
+          <th>早退分钟</th>
+          <th>异常原因</th>
+        </tr>
+      </thead>
+      <tbody id="punchTableBody"></tbody>
     </table>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/punch_records.js') }}"></script>
 {% endblock %}

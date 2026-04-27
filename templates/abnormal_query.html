@@ -1,10 +1,10 @@
 {% extends 'base.html' %}
-{% block title %}考勤数据查询{% endblock %}
+{% block title %}员工异常查询{% endblock %}
 {% block content %}
 <div class="page-header">
   <div>
-    <h1 class="page-title">考勤数据查询</h1>
-    <p class="page-subtitle">按账套与员工范围查询最终考勤汇总数据。</p>
+    <h1 class="page-title">员工异常查询</h1>
+    <p class="page-subtitle">统计账套内每位员工的异常考勤次数（按日判定）。</p>
   </div>
 </div>
 
@@ -26,21 +26,8 @@
     <label class="form-label">账套</label>
     <select class="form-select" id="accountSetSelect"></select>
   </div>
-  <div class="col-md-2">
-    <label class="form-label">显示选项</label>
-    <div class="d-flex flex-column gap-2 pt-1">
-      <label class="form-check-label small d-inline-flex align-items-center gap-2">
-        <input class="form-check-input m-0" type="checkbox" id="showLeaveCounts">
-        显示请假（次数）
-      </label>
-      <label class="form-check-label small d-inline-flex align-items-center gap-2">
-        <input class="form-check-input m-0" type="checkbox" id="showLeaveDurations">
-        显示请假（时长）
-      </label>
-    </div>
-  </div>
   <div class="col-md-3 d-flex align-items-end gap-2">
-    <button class="btn btn-primary w-100" id="refreshBtn">查询</button>
+    <button class="btn btn-primary w-100" id="queryBtn">查询</button>
     <button class="btn btn-outline-success w-100" id="downloadBtn">下载XLSX</button>
   </div>
 </div>
@@ -110,15 +97,22 @@
 </div>
 
 <div class="card mt-4">
-  <div class="card-header">最终数据工作表</div>
+  <div class="card-header">员工异常考勤汇总</div>
   <div class="table-responsive">
-    <table class="table table-sm table-striped mb-0" id="finalDataTable">
-      <thead id="finalDataHead"></thead>
-      <tbody id="finalDataBody"></tbody>
+    <table class="table table-sm table-striped mb-0">
+      <thead>
+        <tr>
+          <th>部门名称</th>
+          <th>人员编号</th>
+          <th>人员姓名</th>
+          <th>异常考勤次数</th>
+        </tr>
+      </thead>
+      <tbody id="abnormalTableBody"></tbody>
     </table>
   </div>
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/abnormal_query.js') }}"></script>
 {% endblock %}
