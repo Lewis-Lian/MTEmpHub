@@ -40,7 +40,7 @@
   {% endwith %}
 
   <section class="query-workspace">
-    <div class="query-metric-grid">
+    <div class="query-metric-grid" data-enable-metric-toggle="1">
       {% with label="已选员工", value_id="metricSelectedEmployees", value="0", sub_id="metricSelectedEmployeesSub", sub="当前未选择员工" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="当前账套", value_id="metricAccountSet", value="未选择", value_class="dashboard-metric-text", sub="异常按当前月度账套内日记录统计" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="异常总次数", value_id="metricAbnormalTotal", value="0", sub_id="metricAbnormalTotalSub", sub="点击查询后更新" %}{% include "partials/query/metric_card.html" %}{% endwith %}

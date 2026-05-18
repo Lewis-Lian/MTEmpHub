@@ -155,8 +155,11 @@
           </div>
         </div>
         <div class="row g-2 align-items-end mb-3">
-          <div class="col-lg-10">
+          <div class="col-lg-8">
             <div class="small text-muted" id="employeeFilterMeta">显示全部员工</div>
+          </div>
+          <div class="col-lg-2">
+            <button class="btn btn-sm btn-outline-secondary w-100" id="clearEmployeeFilterContentBtn" type="button">清除筛选内容</button>
           </div>
           <div class="col-lg-2">
             <button class="btn btn-sm btn-outline-secondary w-100" id="clearEmployeeFilterBtn" type="button">清空筛选</button>
@@ -246,6 +249,80 @@
           </thead>
           <tbody id="employeeTableBody"></tbody>
         </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editEmployeeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">编辑员工</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editEmployeeForm">
+          <input type="hidden" name="id">
+          <div class="mb-2">
+            <label class="form-label">人员编号</label>
+            <input class="form-control" name="emp_no" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">人员姓名</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">部门名称</label>
+            <div class="employee-lookup" id="editEmployeeDeptLookup">
+              <div class="input-group input-group-sm">
+                <input class="form-control" id="editEmployeeDeptInput" placeholder="选择部门" autocomplete="off">
+                <button class="btn btn-outline-secondary" id="openEditEmployeeDeptPickerBtn" type="button" title="选择部门">
+                  <span class="employee-picker-icon" aria-hidden="true">⎇</span>
+                </button>
+              </div>
+              <input type="hidden" id="editEmployeeDeptId">
+              <div class="employee-float-list" id="editEmployeeDeptQuickList"></div>
+            </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">班次编号</label>
+            <select class="form-select" name="shift_no">
+              <option value="">不绑定</option>
+              {% for s in shifts %}
+              <option value="{{ s.shift_no }}">{{ s.shift_no }} - {{ s.shift_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input" type="checkbox" name="is_manager" id="editEmployeeIsManager">
+            <label class="form-check-label" for="editEmployeeIsManager">管理人员</label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="is_nursing" id="editEmployeeIsNursing">
+            <label class="form-check-label" for="editEmployeeIsNursing">哺乳假</label>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">员工考勤统计来源</label>
+            <select class="form-select" name="employee_stats_attendance_source">
+              <option value="employee">员工考勤源文件取值</option>
+              <option value="manager">管理人员考勤源文件取值</option>
+              <option value="auto_fallback">自动回退</option>
+            </select>
+          </div>
+          <div class="mb-2">
+            <label class="form-label">管理人员考勤统计来源</label>
+            <select class="form-select" name="manager_stats_attendance_source">
+              <option value="manager">管理人员考勤源文件取值</option>
+              <option value="employee">员工考勤源文件取值</option>
+              <option value="auto_fallback">自动回退</option>
+            </select>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button class="btn btn-primary" id="saveEmployeeBtn" type="button">保存</button>
       </div>
     </div>
   </div>
