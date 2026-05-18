@@ -44,7 +44,7 @@
   {% endwith %}
 
   <section class="query-workspace">
-    <div class="query-metric-grid">
+    <div class="query-metric-grid" data-enable-metric-toggle="1">
       {% with label="已选员工", value_id="metricSelectedEmployees", value="0", sub_id="metricSelectedEmployeesSub", sub="当前未选择员工" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="当前账套", value_id="metricAccountSet", value="未选择", value_class="dashboard-metric-text", sub="查询时按所选月度账套取数" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="结果记录", value_id="metricResultRows", value="0", sub_id="metricResultRowsSub", sub="点击查询后更新" %}{% include "partials/query/metric_card.html" %}{% endwith %}

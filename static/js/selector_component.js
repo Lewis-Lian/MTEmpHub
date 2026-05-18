@@ -40,6 +40,35 @@
     return { map, children };
   }
 
+  function collectDeptScopeIdsFromHierarchy(hierarchy, rootDeptId, includeChildren = true) {
+    const root = String(rootDeptId || "");
+    if (!root) return null;
+    const result = new Set([root]);
+    if (!includeChildren) return result;
+    const stack = [root];
+    while (stack.length) {
+      const node = stack.pop();
+      const children = hierarchy.children.get(node) || [];
+      children.forEach((childId) => {
+        if (result.has(childId)) return;
+        result.add(childId);
+        stack.push(childId);
+      });
+    }
+    return result;
+  }
+
+  function deptHasChildren(hierarchy, deptId) {
+    const id = String(deptId || "");
+    if (!id) return false;
+    return (hierarchy.children.get(id) || []).length > 0;
+  }
+
+  async function promptIncludeChildren() {
+    if (!window.AppDialog || typeof window.AppDialog.confirm !== "function") return false;
+    return window.AppDialog.confirm("该部门包含下级部门，是否同时包含子部门人员？", "选择范围");
+  }
+
   function createSingleSelectTreeLookup(options) {
     const opts = options || {};
     const contexts = Array.isArray(opts.contexts) ? opts.contexts : [];
@@ -290,6 +319,8 @@
     let expandedDeptIds = new Set();
     let inputEditing = false;
     let quickSearchKeyword = "";
+    let scopedCandidateIds = new Set();
+    let hasScopedCandidates = false;
 
     function rows() {
       return Array.from(pickerListEl.querySelectorAll(".employee-picker-row"));
@@ -423,30 +454,38 @@
       quickListEl.innerHTML = html;
     }
 
-    function collectDeptScopeIds(rootDeptId) {
-      const root = String(rootDeptId || "");
-      if (!root) return null;
-      const result = new Set([root]);
-      const stack = [root];
-      while (stack.length) {
-        const node = stack.pop();
-        const children = deptHierarchy.children.get(node) || [];
-        children.forEach((childId) => {
-          if (result.has(childId)) return;
-          result.add(childId);
-          stack.push(childId);
-        });
-      }
-      return result;
+    function getCheckedIds() {
+      return new Set(
+        items()
+          .filter((item) => item.checked)
+          .map((item) => String(item.dataset.id || "").trim())
+          .filter(Boolean)
+      );
+    }
+
+    function collectEmployeeIdsByDept(scopeDeptIds) {
+      if (!scopeDeptIds || !scopeDeptIds.size) return new Set();
+      return new Set(
+        rows()
+          .filter((row) => scopeDeptIds.has(String(row.dataset.deptId || "")))
+          .map((row) => String(row.dataset.id || "").trim())
+          .filter(Boolean)
+      );
+    }
+
+    function setDeptCandidates(scopeDeptIds) {
+      const nextIds = collectEmployeeIdsByDept(scopeDeptIds);
+      getCheckedIds().forEach((id) => nextIds.add(id));
+      scopedCandidateIds = nextIds;
+      hasScopedCandidates = true;
     }
 
     function applyPickerFilter() {
       const keyword = normalizeText(pickerSearchEl.value);
-      const scope = currentPickerDept ? collectDeptScopeIds(currentPickerDept) : null;
       rows().forEach((row) => {
         const key = normalizeText(row.dataset.key || "");
-        const deptId = String(row.dataset.deptId || "");
-        const deptMatch = !scope || scope.has(deptId);
+        const rowId = String(row.dataset.id || "");
+        const deptMatch = !hasScopedCandidates || scopedCandidateIds.has(rowId);
         const keywordMatch = !keyword || key.includes(keyword);
         row.classList.toggle("d-none", !(deptMatch && keywordMatch));
       });
@@ -508,10 +547,12 @@
       renderDeptTree();
     }
 
-    pickerDeptEl.addEventListener("click", (e) => {
+    pickerDeptEl.addEventListener("click", async (e) => {
       const allBtn = e.target.closest(".dept-tree-all");
       if (allBtn) {
         currentPickerDept = "";
+        scopedCandidateIds = new Set();
+        hasScopedCandidates = false;
         renderDeptTree();
         applyPickerFilter();
         return;
@@ -527,7 +568,14 @@
       }
       const labelBtn = e.target.closest(".dept-tree-label");
       if (labelBtn) {
-        currentPickerDept = String(labelBtn.dataset.deptId || "");
+        const deptId = String(labelBtn.dataset.deptId || "");
+        if (!deptId) return;
+        const includeChildren = deptHasChildren(deptHierarchy, deptId)
+          ? await promptIncludeChildren()
+          : false;
+        const scopeDeptIds = collectDeptScopeIdsFromHierarchy(deptHierarchy, deptId, includeChildren);
+        setDeptCandidates(scopeDeptIds);
+        currentPickerDept = deptId;
         renderDeptTree();
         applyPickerFilter();
       }
@@ -560,6 +608,8 @@
       hideQuickList();
       syncSelectedState();
       currentPickerDept = "";
+      scopedCandidateIds = new Set();
+      hasScopedCandidates = false;
       pickerSearchEl.value = "";
       renderDeptTree();
       applyPickerFilter();
@@ -677,7 +727,9 @@
     let activeCtx = null;
     let selectedIds = new Set();
     let groupedRootIds = new Set();
-    let deptFilter = "";
+    let activeDeptId = "";
+    let scopedCandidateIds = new Set();
+    let hasScopedCandidates = false;
 
     function getCtxIds(ctx) {
       return uniqueIds((ctx.hiddenEl.value || "").split(","));
@@ -741,21 +793,21 @@
       ].join("");
     }
 
-    function collectDeptScopeIds(rootDeptId) {
-      const root = String(rootDeptId || "");
-      if (!root) return null;
-      const result = new Set([root]);
-      const stack = [root];
-      while (stack.length) {
-        const node = stack.pop();
-        const children = hierarchy.children.get(node) || [];
-        children.forEach((childId) => {
-          if (result.has(childId)) return;
-          result.add(childId);
-          stack.push(childId);
-        });
-      }
-      return result;
+    function collectEmployeeIdsByDept(scopeDeptIds) {
+      if (!scopeDeptIds || !scopeDeptIds.size) return new Set();
+      return new Set(
+        getEmployees()
+          .filter((row) => scopeDeptIds.has(String(getEmpDeptId(row) || "")))
+          .map((row) => String(getEmpId(row) || ""))
+          .filter(Boolean)
+      );
+    }
+
+    function setDeptCandidates(scopeDeptIds) {
+      const nextIds = collectEmployeeIdsByDept(scopeDeptIds);
+      selectedIds.forEach((id) => nextIds.add(id));
+      scopedCandidateIds = nextIds;
+      hasScopedCandidates = true;
     }
 
     function syncSelectVisibleState() {
@@ -791,14 +843,14 @@
 
     function renderDeptTree() {
       const roots = hierarchy.children.get("") || [];
-      let html = `<button type="button" class="list-group-item list-group-item-action dept-tree-all ${deptFilter ? "" : "active"}" data-id="">全部部门</button>`;
+      let html = `<button type="button" class="list-group-item list-group-item-action dept-tree-all ${activeDeptId ? "" : "active"}" data-id="">全部部门</button>`;
       const walk = (id, level) => {
         const node = hierarchy.map.get(String(id));
         if (!node) return;
         const children = hierarchy.children.get(String(id)) || [];
         const hasChildren = children.length > 0;
         const isExpanded = expanded.has(String(id));
-        const isActive = String(deptFilter) === String(id);
+        const isActive = String(activeDeptId) === String(id);
         html += `
           <div class="dept-tree-row ${isActive ? "active" : ""}" data-id="${id}" style="--dept-level:${level}">
             <button type="button" class="dept-tree-toggle ${hasChildren ? "" : "is-empty"}" data-toggle-id="${id}">${hasChildren ? (isExpanded ? "▾" : "▸") : ""}</button>
@@ -815,11 +867,10 @@
 
     function renderList() {
       const keyword = normalizeText(searchEl ? searchEl.value : "");
-      const scope = deptFilter ? collectDeptScopeIds(deptFilter) : null;
       const rows = getEmployees().filter((row) => {
         const key = normalizeText(`${getEmpCode(row)} ${getEmpName(row)} ${getEmpDeptName(row)}`);
-        const deptId = String(getEmpDeptId(row) || "");
-        return (!keyword || key.includes(keyword)) && (!scope || scope.has(deptId));
+        const empId = String(getEmpId(row) || "");
+        return (!keyword || key.includes(keyword)) && (!hasScopedCandidates || scopedCandidateIds.has(empId));
       });
       listEl.innerHTML = rows.length
         ? rows.map((row) => {
@@ -839,7 +890,9 @@
     function openPicker(ctx) {
       activeCtx = ctx;
       selectedIds = new Set(getCtxIds(ctx));
-      deptFilter = "";
+      activeDeptId = "";
+      scopedCandidateIds = new Set();
+      hasScopedCandidates = false;
       expanded = new Set();
       if (searchEl) searchEl.value = "";
       renderDeptTree();
@@ -898,10 +951,12 @@
 
     contexts.forEach(bindContext);
 
-    deptTreeEl.addEventListener("click", (e) => {
+    deptTreeEl.addEventListener("click", async (e) => {
       const allBtn = e.target.closest(".dept-tree-all");
       if (allBtn) {
-        deptFilter = "";
+        activeDeptId = "";
+        scopedCandidateIds = new Set();
+        hasScopedCandidates = false;
         renderDeptTree();
         renderList();
         return;
@@ -917,7 +972,14 @@
       }
       const labelBtn = e.target.closest(".dept-tree-label");
       if (!labelBtn) return;
-      deptFilter = String(labelBtn.dataset.id || "");
+      const deptId = String(labelBtn.dataset.id || "");
+      if (!deptId) return;
+      const includeChildren = deptHasChildren(hierarchy, deptId)
+        ? await promptIncludeChildren()
+        : false;
+      const scopeDeptIds = collectDeptScopeIdsFromHierarchy(hierarchy, deptId, includeChildren);
+      setDeptCandidates(scopeDeptIds);
+      activeDeptId = deptId;
       renderDeptTree();
       renderList();
     });

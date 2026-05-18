@@ -877,6 +877,34 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertIn('id="applyUserFiltersBtn"', html)
         self.assertIn('id="resetUserFiltersBtn"', html)
 
+    def test_employees_page_renders_filter_clear_and_edit_modal(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "employees_page_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            id=1,
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/admin/employees/manage"):
+            g.current_user = admin_user
+            html = render_template("admin/employees.html", shifts=[])
+
+        self.assertIn("员工筛选器", html)
+        self.assertIn('id="employeeManageFilterInput"', html)
+        self.assertIn('id="clearEmployeeFilterBtn"', html)
+        self.assertIn('id="clearEmployeeFilterContentBtn"', html)
+        self.assertIn('id="editEmployeeModal"', html)
+        self.assertIn('id="editEmployeeForm"', html)
+        self.assertIn('id="saveEmployeeBtn"', html)
+
     def test_authenticated_shell_renders_enterprise_navigation(self) -> None:
         project_root = os.path.dirname(os.path.dirname(__file__))
         app = Flask(
@@ -909,6 +937,58 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertIn("主数据", html)
         self.assertIn("修正中心", html)
         self.assertIn("系统设置", html)
+
+    def test_authenticated_shell_renders_tab_workspace_markup(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "enterprise_shell_tab_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/employee/dashboard"):
+            g.current_user = admin_user
+            html = render_template("dashboard.html", employees=[])
+
+        self.assertIn('id="appTabBar"', html)
+        self.assertIn('id="appTabList"', html)
+        self.assertIn('id="appTabWorkspace"', html)
+        self.assertIn('id="appTabFrames"', html)
+        self.assertIn('id="appTabInitialPane"', html)
+        self.assertIn('data-tab-enabled="1"', html)
+        self.assertIn("static/js/app_tabs.js", html)
+        self.assertIn('data-tab-refresh-template="1"', html)
+
+    def test_embedded_tab_view_omits_global_navigation(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "enterprise_embedded_tab_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/employee/dashboard?__tab=1"):
+            g.current_user = admin_user
+            html = render_template("dashboard.html", employees=[])
+
+        self.assertNotIn("app-sidebar", html)
+        self.assertNotIn("top-nav", html)
+        self.assertIn('data-embedded-tab="1"', html)
+        self.assertIn("query-page-shell", html)
 
     def test_authenticated_shell_hides_restricted_modules_for_readonly_user(self) -> None:
         project_root = os.path.dirname(os.path.dirname(__file__))
@@ -1256,18 +1336,19 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         base_html = (project_root / "templates/base.html").read_text(encoding="utf-8")
         toggle_js = (project_root / "static/js/metric_section_toggle.js").read_text(encoding="utf-8")
         style_css = (project_root / "static/css/style.css").read_text(encoding="utf-8")
+        dashboard_html = (project_root / "templates/dashboard.html").read_text(encoding="utf-8")
+        module_home_html = (project_root / "templates/module_home.html").read_text(encoding="utf-8")
 
         self.assertIn("js/metric_section_toggle.js", base_html)
-        self.assertIn('collect(".query-metric-grid")', toggle_js)
-        self.assertNotIn('collect(".manager-home-metric-grid")', toggle_js)
-        self.assertNotIn('collect(".module-summary-grid")', toggle_js)
-        self.assertIn("summary-card.dashboard-metric-card", toggle_js)
+        self.assertIn("[data-enable-metric-toggle='1']", toggle_js)
         self.assertIn('.top-nav-actions', toggle_js)
         self.assertIn(".top-nav-user", toggle_js)
         self.assertIn("展开卡片", toggle_js)
         self.assertIn("收起卡片", toggle_js)
         self.assertIn(".top-nav-metric-toggle", style_css)
         self.assertIn(".metric-toggle-target.is-collapsed", style_css)
+        self.assertIn('data-enable-metric-toggle="1"', dashboard_html)
+        self.assertNotIn('data-enable-metric-toggle="1"', module_home_html)
 
     def test_global_tables_support_sticky_header_and_sorting(self) -> None:
         project_root = Path(__file__).resolve().parent.parent
@@ -1358,6 +1439,11 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         account_res = self.client.get("/module/account")
         self.assertEqual(account_res.status_code, 200)
         self.assertIn("/admin/dashboard", account_res.get_data(as_text=True))
+
+    def test_module_home_redirect_preserves_embedded_tab_flag(self) -> None:
+        res = self.client.get("/module/home?__tab=1", follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(res.headers["Location"].endswith("/employee/home?__tab=1"))
 
     def test_module_home_rejects_inaccessible_module(self) -> None:
         with self.app.app_context():

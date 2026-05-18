@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const selectAll = document.getElementById("selectAllEmployees");
   const clearSelectionBtn = document.getElementById("clearSelectionBtn");
   const clearEmployeeFilterBtn = document.getElementById("clearEmployeeFilterBtn");
+  const clearEmployeeFilterContentBtn = document.getElementById("clearEmployeeFilterContentBtn");
   const exportFilteredEmployeesBtn = document.getElementById("exportFilteredEmployeesBtn");
   const employeeFilterMeta = document.getElementById("employeeFilterMeta");
   const employeeTypeFilter = document.getElementById("employeeTypeFilter");
@@ -25,6 +26,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const batchDeptInlineLookup = document.getElementById("batchDeptInlineLookup");
   const applyBatchBtn = document.getElementById("applyBatchBtn");
   const createShiftSelect = createForm.querySelector('[name="shift_no"]');
+  const editForm = document.getElementById("editEmployeeForm");
+  const editModal = editForm ? new bootstrap.Modal(document.getElementById("editEmployeeModal")) : null;
+  const saveEmployeeBtn = document.getElementById("saveEmployeeBtn");
+  const editShiftSelect = editForm ? editForm.querySelector('[name="shift_no"]') : null;
   const createEmployeeIsManager = document.getElementById("createEmployeeIsManager");
   const createEmployeeAttendanceSourceSelect = createForm.querySelector('[name="employee_stats_attendance_source"]');
   const createManagerAttendanceSourceSelect = createForm.querySelector('[name="manager_stats_attendance_source"]');
@@ -58,6 +63,13 @@ document.addEventListener("DOMContentLoaded", () => {
       hiddenEl: document.getElementById("createEmployeeDeptId"),
       triggerEl: document.getElementById("openCreateEmployeeDeptPickerBtn"),
       quickEl: document.getElementById("createEmployeeDeptQuickList"),
+    },
+    edit: {
+      lookupEl: document.getElementById("editEmployeeDeptLookup"),
+      inputEl: document.getElementById("editEmployeeDeptInput"),
+      hiddenEl: document.getElementById("editEmployeeDeptId"),
+      triggerEl: document.getElementById("openEditEmployeeDeptPickerBtn"),
+      quickEl: document.getElementById("editEmployeeDeptQuickList"),
     },
     batch: {
       lookupEl: document.getElementById("batchDeptInlineLookup"),
@@ -140,6 +152,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function getSelectedIds() {
     return Array.from(selectedEmployeeIds);
+  }
+
+  function employeeById(id) {
+    return employees.find((employee) => Number(employee.id) === Number(id)) || null;
   }
 
   function getFilteredEmployees() {
@@ -239,7 +255,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${managerAttendanceSourceText}</td>
         <td>${employee.dept_name || "-"}</td>
         <td>${shiftText}</td>
-        <td><button class="btn btn-sm btn-outline-danger delete-single-btn" data-id="${employee.id}">删除</button></td>
+        <td class="d-flex gap-1">
+          <button class="btn btn-sm btn-outline-primary edit-single-btn" data-id="${employee.id}">编辑</button>
+          <button class="btn btn-sm btn-outline-danger delete-single-btn" data-id="${employee.id}">删除</button>
+        </td>
       `;
       tableBody.appendChild(tr);
     }
@@ -267,6 +286,16 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
     if (current && shifts.find((s) => s.shift_no === current)) {
       createShiftSelect.value = current;
+    }
+
+    if (editShiftSelect) {
+      const editCurrent = editShiftSelect.value;
+      editShiftSelect.innerHTML = `<option value="">不绑定</option>` + shifts
+        .map((s) => `<option value="${s.shift_no}">${s.shift_no} - ${s.shift_name}</option>`)
+        .join("");
+      if (editCurrent && shifts.find((s) => s.shift_no === editCurrent)) {
+        editShiftSelect.value = editCurrent;
+      }
     }
 
     const batchCurrent = batchShiftValue.value;
@@ -464,13 +493,31 @@ document.addEventListener("DOMContentLoaded", () => {
   tableBody.addEventListener("click", async (e) => {
     const target = e.target;
     if (!(target instanceof HTMLButtonElement)) return;
-    if (!target.classList.contains("delete-single-btn")) return;
     const id = Number(target.dataset.id);
-    if (!(await window.AppDialog.confirm("确认删除该员工吗？", "删除员工"))) return;
-    const ok = await applyBatch("delete", "", [id]);
-    if (ok) {
-      selectedEmployeeIds.delete(id);
-      await loadEmployees();
+    const employee = employeeById(id);
+    if (!employee) return;
+
+    if (target.classList.contains("edit-single-btn")) {
+      editForm.querySelector('[name="id"]').value = String(employee.id);
+      editForm.querySelector('[name="emp_no"]').value = employee.emp_no || "";
+      editForm.querySelector('[name="name"]').value = employee.name || "";
+      editForm.querySelector('[name="shift_no"]').value = employee.shift_no || "";
+      editForm.querySelector('[name="is_manager"]').checked = Boolean(employee.is_manager);
+      editForm.querySelector('[name="is_nursing"]').checked = Boolean(employee.is_nursing);
+      editForm.querySelector('[name="employee_stats_attendance_source"]').value = employee.employee_stats_attendance_source || "employee";
+      editForm.querySelector('[name="manager_stats_attendance_source"]').value = employee.manager_stats_attendance_source || "manager";
+      deptPicker.setValue(deptLookupContexts.edit, employee.dept_id || "");
+      editModal?.show();
+      return;
+    }
+
+    if (target.classList.contains("delete-single-btn")) {
+      if (!(await window.AppDialog.confirm("确认删除该员工吗？", "删除员工"))) return;
+      const ok = await applyBatch("delete", "", [id]);
+      if (ok) {
+        selectedEmployeeIds.delete(id);
+        await loadEmployees();
+      }
     }
   });
 
@@ -482,6 +529,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (managerAttendanceSourceFilter) managerAttendanceSourceFilter.value = "";
     renderRows();
   });
+
+  if (clearEmployeeFilterContentBtn) {
+    clearEmployeeFilterContentBtn.addEventListener("click", () => {
+      employeeFilter.setValue(employeeFilterContext, []);
+      renderRows();
+    });
+  }
 
   employeeFilterContext.inputEl.addEventListener("input", renderRows);
   if (employeeTypeFilter) employeeTypeFilter.addEventListener("change", renderRows);
@@ -647,6 +701,38 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (createEmployeeIsManager) {
     createEmployeeIsManager.addEventListener("change", syncCreateAttendanceSourceMode);
+  }
+
+  if (saveEmployeeBtn) {
+    saveEmployeeBtn.addEventListener("click", async () => {
+      const id = Number(editForm.querySelector('[name="id"]').value || 0);
+      if (!id) {
+        window.AppDialog.alert("未找到待编辑员工");
+        return;
+      }
+      const payload = {
+        emp_no: editForm.querySelector('[name="emp_no"]').value.trim(),
+        name: editForm.querySelector('[name="name"]').value.trim(),
+        dept_name: deptNameById(deptLookupContexts.edit.hiddenEl.value),
+        shift_no: editForm.querySelector('[name="shift_no"]').value,
+        is_manager: editForm.querySelector('[name="is_manager"]').checked,
+        is_nursing: editForm.querySelector('[name="is_nursing"]').checked,
+        employee_stats_attendance_source: editForm.querySelector('[name="employee_stats_attendance_source"]').value,
+        manager_stats_attendance_source: editForm.querySelector('[name="manager_stats_attendance_source"]').value,
+      };
+      const res = await fetch(`/admin/employees/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        window.AppDialog.alert(data.error || "更新失败", "更新失败");
+        return;
+      }
+      editModal?.hide();
+      await loadEmployees();
+    });
   }
 
   syncCreateAttendanceSourceMode();

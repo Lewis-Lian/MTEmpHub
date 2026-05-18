@@ -94,18 +94,23 @@ window.AppToast = (() => {
     const container = document.getElementById("appToastContainer");
     if (!container) return;
     const toastEl = document.createElement("div");
-    const borderClass = type === "danger" ? "border-danger" : (type === "warning" ? "border-warning" : "border-success");
     const titleText = title || (type === "danger" ? "失败" : (type === "warning" ? "提示" : "成功"));
-    toastEl.className = `toast align-items-center border ${borderClass}`;
+    const toneClass = type === "danger"
+      ? "app-toast-danger"
+      : (type === "warning" ? "app-toast-warning" : "app-toast-success");
+    toastEl.className = `toast app-toast ${toneClass}`;
     toastEl.setAttribute("role", "alert");
     toastEl.setAttribute("aria-live", "assertive");
     toastEl.setAttribute("aria-atomic", "true");
     toastEl.innerHTML = `
-      <div class="toast-header">
-        <strong class="me-auto">${titleText}</strong>
+      <div class="toast-header app-toast-header">
+        <div class="app-toast-title-wrap">
+          <span class="app-toast-dot" aria-hidden="true"></span>
+          <strong class="me-auto">${titleText}</strong>
+        </div>
         <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
       </div>
-      <div class="toast-body" style="white-space: pre-line; max-height: 240px; overflow-y: auto;">${String(message || "")}</div>
+      <div class="toast-body app-toast-body" style="white-space: pre-line; max-height: 240px; overflow-y: auto;">${String(message || "")}</div>
     `;
     container.appendChild(toastEl);
     const toast = bootstrap.Toast.getOrCreateInstance(toastEl, { autohide: false });

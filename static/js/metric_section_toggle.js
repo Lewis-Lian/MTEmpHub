@@ -1,4 +1,6 @@
 document.addEventListener("DOMContentLoaded", () => {
+  if (!document.querySelector("[data-enable-metric-toggle='1']")) return;
+
   const targets = [];
   const seen = new Set();
 

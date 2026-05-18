@@ -30,7 +30,7 @@
   {% endwith %}
 
   <section class="query-workspace">
-    <div class="query-metric-grid">
+    <div class="query-metric-grid" data-enable-metric-toggle="1">
       {% with label="统计年度", value_id="managerAnnualLeaveQueryMetricYear", value="-", value_class="dashboard-metric-text", sub="按年度查看管理人员年休" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="人员记录", value_id="managerAnnualLeaveQueryMetricRows", value="0", sub_id="managerAnnualLeaveQueryMetricRowsSub", sub="点击查询后更新" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="当前状态", value_id="managerAnnualLeaveQueryMetricStatus", value="等待查询", value_class="dashboard-metric-text", sub="只读查询，不提供修改入口" %}{% include "partials/query/metric_card.html" %}{% endwith %}

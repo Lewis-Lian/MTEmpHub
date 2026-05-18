@@ -56,7 +56,7 @@
     </div>
   </div>
 
-  <div class="query-metric-grid">
+  <div class="query-metric-grid" data-enable-metric-toggle="1">
     {% with label="已选员工", value_id="metricSelectedEmployees", value="0", sub_id="metricSelectedEmployeesSub", sub="当前未选择员工" %}{% include "partials/query/metric_card.html" %}{% endwith %}
     {% with label="当前账套", value_id="metricAccountSet", value="-", value_class="dashboard-metric-text", sub="下载时按所选月度账套取数" %}{% include "partials/query/metric_card.html" %}{% endwith %}
     {% with label="可用报表", value_id="metricAvailableReports", value="2", sub="考勤数据 + 打卡数据" %}{% include "partials/query/metric_card.html" %}{% endwith %}
