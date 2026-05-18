@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import urllib.parse
+from datetime import date
 from types import SimpleNamespace
 
 import openpyxl
@@ -11,6 +12,7 @@ from flask import Flask, g, render_template
 
 from models import db
 from models.account_set import AccountSet
+from models.daily_record import DailyRecord
 from models.department import Department
 from models.employee import Employee
 from models.manager_month_stat import ManagerMonthStat
@@ -257,6 +259,46 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(rows[0]["override"]["attendance_days"], 20.0)
         self.assertEqual(rows[0]["override"]["injury_days"], 1.0)
         self.assertEqual(rows[0]["override"]["remark"], "经理修正")
+
+    def test_employee_final_data_uses_override_attendance_days(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                DailyRecord(
+                    emp_id=self.employee_id,
+                    record_date=date(2026, 5, 6),
+                    actual_hours=8,
+                    check_in_times=["08:00"],
+                    check_out_times=["17:00"],
+                    employee_payload={
+                        "actual_hours": 8,
+                        "check_in_times": ["08:00"],
+                        "check_out_times": ["17:00"],
+                        "expected_hours": 8,
+                        "absent_hours": 0,
+                        "leave_hours": 0,
+                        "overtime_hours": 0,
+                        "late_minutes": 0,
+                        "early_leave_minutes": 0,
+                    },
+                )
+            )
+            db.session.commit()
+
+        self.client.put(
+            "/admin/employee-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "attendance_days": "3",
+                "remark": "查询修正",
+            },
+        )
+
+        res = self.client.get(f"/employee/api/final-data?month=2026-05&emp_id={self.employee_id}")
+        self.assertEqual(res.status_code, 200)
+        rows = res.get_json()["rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0][3], 3.0)
 
     def test_attendance_override_pages_default_to_active_account_set_month(self) -> None:
         employee_res = self.client.get("/admin/employee-attendance-overrides")
@@ -1552,6 +1594,24 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                 source = path.read_text(encoding="utf-8")
                 self.assertIn("未手动选择时，默认查询当前账号下全部可见员工", source)
                 self.assertNotIn("请先选择员工", source)
+
+    def test_selector_component_supports_clearing_selected_lookup_values(self) -> None:
+        project_root = Path(__file__).resolve().parent.parent
+        source = (project_root / "static/js/selector_component.js").read_text(encoding="utf-8")
+
+        self.assertIn("employee-lookup-clear", source)
+        self.assertIn("clearSelectedValue()", source)
+        self.assertIn("clearButtonEl.addEventListener(\"click\"", source)
+        self.assertIn("selectedIds.clear()", source)
+        self.assertIn("groupedRootIds.clear()", source)
+        self.assertIn("persistCheckedSelection();\n        syncSelectedState();", source)
+
+    def test_lookup_styles_define_clear_button(self) -> None:
+        project_root = Path(__file__).resolve().parent.parent
+        source = (project_root / "static/css/style.css").read_text(encoding="utf-8")
+
+        self.assertIn(".employee-lookup-clear", source)
+        self.assertIn(".employee-lookup.has-clear", source)
 
     def test_accounts_filter_uses_account_profile_name_and_department_fields(self) -> None:
         project_root = Path(__file__).resolve().parent.parent

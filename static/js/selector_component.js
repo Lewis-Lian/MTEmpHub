@@ -69,6 +69,37 @@
     return window.AppDialog.confirm("该部门包含下级部门，是否同时包含子部门人员？", "选择范围");
   }
 
+  function ensureLookupClearButton(ctx) {
+    if (ctx.clearButtonEl) return ctx.clearButtonEl;
+    const existing = ctx.lookupEl.querySelector(":scope .employee-lookup-clear");
+    if (existing) {
+      ctx.clearButtonEl = existing;
+      return existing;
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-outline-secondary employee-lookup-clear d-none";
+    button.setAttribute("aria-label", "清空已选内容");
+    button.textContent = "×";
+    const triggerEl = ctx.triggerEl || ctx.openBtn;
+    const triggerParent = triggerEl ? triggerEl.parentElement : null;
+    if (triggerParent && triggerParent === ctx.inputEl.parentElement) {
+      triggerParent.insertBefore(button, triggerEl);
+    } else if (ctx.inputEl.parentElement) {
+      ctx.inputEl.parentElement.appendChild(button);
+    } else {
+      ctx.lookupEl.appendChild(button);
+    }
+    ctx.clearButtonEl = button;
+    return button;
+  }
+
+  function syncLookupClearButton(ctx, hasValue) {
+    const button = ensureLookupClearButton(ctx);
+    button.classList.toggle("d-none", !hasValue);
+    ctx.lookupEl.classList.toggle("has-clear", hasValue);
+  }
+
   function createSingleSelectTreeLookup(options) {
     const opts = options || {};
     const contexts = Array.isArray(opts.contexts) ? opts.contexts : [];
@@ -104,10 +135,17 @@
       ctx.hiddenEl.value = value;
       if (!value) {
         ctx.inputEl.value = "";
+        syncLookupClearButton(ctx, false);
         return;
       }
       const entity = entityById(value);
       ctx.inputEl.value = entity ? entity.name : "";
+      syncLookupClearButton(ctx, true);
+    }
+
+    function clearSelectedValue(ctx) {
+      setValue(ctx, emptyId);
+      hideQuickList(ctx);
     }
 
     function renderQuickList(ctx) {
@@ -222,6 +260,10 @@
         hideQuickList(ctx);
       });
       const triggerEl = ctx.triggerEl || ctx.openBtn;
+      const clearButtonEl = ensureLookupClearButton(ctx);
+      clearButtonEl.addEventListener("click", () => {
+        clearSelectedValue(ctx);
+      });
       if (!triggerEl) return;
       triggerEl.addEventListener("click", () => {
         hideQuickList(ctx);
@@ -341,6 +383,15 @@
       hiddenEl.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
+    function clearSelectedValue() {
+      setSelectedIds([]);
+      inputEditing = false;
+      quickSearchKeyword = "";
+      inputEl.value = "";
+      hideQuickList();
+      syncSelectedState();
+    }
+
     function selectedNamesFromChecked() {
       return rows()
         .filter((row) => row.querySelector(".employee-picker-item")?.checked)
@@ -405,6 +456,7 @@
       renderSelectedPanel();
       syncVisibleSelectAllState();
       if (!inputEditing) applyInputSummary();
+      syncLookupClearButton({ lookupEl, inputEl, openBtn }, ids.size > 0);
     }
 
     function showQuickList() {
@@ -629,6 +681,10 @@
       renderQuickList();
       showQuickList();
     });
+    const clearButtonEl = ensureLookupClearButton({ lookupEl, inputEl, openBtn });
+    clearButtonEl.addEventListener("click", () => {
+      clearSelectedValue();
+    });
 
     quickListEl.addEventListener("mousedown", (e) => e.preventDefault());
     quickListEl.addEventListener("click", (e) => {
@@ -645,6 +701,7 @@
           if (box) box.checked = !allSelected;
         });
         persistCheckedSelection();
+        syncSelectedState();
         renderSelectedPanel();
         renderQuickList();
         showQuickList();
@@ -657,6 +714,7 @@
       if (!box) return;
       box.checked = !box.checked;
       persistCheckedSelection();
+      syncSelectedState();
       renderSelectedPanel();
       renderQuickList();
       showQuickList();
@@ -746,6 +804,12 @@
         .map((id) => getEmpName(employeeById(id) || {}))
         .filter(Boolean);
       ctx.inputEl.value = names.length ? (names.length <= 2 ? names.join("，") : `${names.slice(0, 2).join("，")} 等 ${names.length} 人`) : "";
+      syncLookupClearButton(ctx, normalized.length > 0);
+    }
+
+    function clearSelectedValue(ctx) {
+      setValue(ctx, []);
+      hideQuickList(ctx);
     }
 
     function showQuickList(ctx) {
@@ -941,6 +1005,10 @@
         showQuickList(ctx);
       });
       const triggerEl = ctx.triggerEl || ctx.openBtn;
+      const clearButtonEl = ensureLookupClearButton(ctx);
+      clearButtonEl.addEventListener("click", () => {
+        clearSelectedValue(ctx);
+      });
       if (triggerEl) {
         triggerEl.addEventListener("click", () => {
           hideQuickList(ctx);
@@ -1228,6 +1296,15 @@
         .map((id) => entityById(id)?.name || "")
         .filter(Boolean);
       ctx.inputEl.value = names.length ? (names.length <= 2 ? names.join("，") : `${names.slice(0, 2).join("，")} 等 ${names.length} 项`) : "";
+      syncLookupClearButton(ctx, normalized.length > 0);
+    }
+
+    function clearSelectedValue(ctx) {
+      ctx.hiddenEl.value = "";
+      ensureGroupHidden(ctx).value = "";
+      ctx.inputEl.value = "";
+      hideQuickList(ctx);
+      syncLookupClearButton(ctx, false);
     }
 
     function getCtxIds(ctx) {
@@ -1392,6 +1469,10 @@
         showQuickList(ctx);
       });
       const triggerEl = ctx.triggerEl || ctx.openBtn;
+      const clearButtonEl = ensureLookupClearButton(ctx);
+      clearButtonEl.addEventListener("click", () => {
+        clearSelectedValue(ctx);
+      });
       if (!triggerEl) return;
       triggerEl.addEventListener("click", () => {
         hideQuickList(ctx);

@@ -22,6 +22,7 @@ from models.annual_leave import AnnualLeave
 from models.monthly_report import MonthlyReport
 from models.account_set import AccountSet
 from models.manager_month_stat import ManagerMonthStat
+from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, UserEmployeeAssignment, UserDepartmentAssignment
 from services.attendance_service import AttendanceService
 from services.attendance_source_service import (
@@ -703,6 +704,13 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
     rows: list[list[object]] = []
     date_range = _month_date_range(month)
     datetime_range = _month_datetime_range(month)
+    overrides = {
+        row.emp_id: row
+        for row in EmployeeAttendanceOverride.query.filter(
+            EmployeeAttendanceOverride.month == month,
+            EmployeeAttendanceOverride.emp_id.in_(emp_ids),
+        ).all()
+    }
 
     daily_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT) if date_range else {}
 
@@ -738,6 +746,14 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
             if _punch_count(r) == 2 and 2 <= (day_work_stats[idx][0]) < 5.1
         )
         work_hours = round(sum(x[0] for x in day_work_stats), 2)
+        override = overrides.get(employee.id)
+        if override:
+            if override.attendance_days is not None:
+                attendance_days = round(float(override.attendance_days or 0), 2)
+            if override.work_hours is not None:
+                work_hours = round(float(override.work_hours or 0), 2)
+            if override.half_days is not None:
+                half_days = int(override.half_days or 0)
 
         row = [
             employee.department.dept_name if employee.department else "",
