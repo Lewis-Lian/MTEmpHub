@@ -1,4 +1,20 @@
-const managerMonthKeys = ["prev_dec", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12"];
+const managerOvertimeMonthKeys = ["prev_dec", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12"];
+const managerOvertimeMonthLabels = {
+  prev_dec: "前年累积天数",
+  m1: "1月",
+  m2: "2月",
+  m3: "3月",
+  m4: "4月",
+  m5: "5月",
+  m6: "6月",
+  m7: "7月",
+  m8: "8月",
+  m9: "9月",
+  m10: "10月",
+  m11: "11月",
+  m12: "12月",
+};
+
 let overtimeColumnStates = {};
 
 function showOvertimeMessage(title, message) {
@@ -15,11 +31,18 @@ function monthValue(value) {
   return value === null || value === undefined ? "" : value;
 }
 
-function numericInput(key, value) {
-  const state = overtimeColumnStates[key] || "editable";
-  const disabled = state === "locked" ? "disabled" : "";
-  const title = state === "locked" ? 'title="该月份账套已锁定"' : (state === "missing_account_set" ? 'title="该月份暂无账套，不受封账控制"' : "");
-  return `<input class="form-control form-control-sm" data-field="${key}" data-lock-state="${state}" type="text" inputmode="decimal" value="${monthValue(value)}" ${disabled} ${title}>`;
+function selectedManagerIds() {
+  const value = document.getElementById("selectedEmpIds").value.trim();
+  if (!value) return [];
+  const seen = new Set();
+  return value
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => {
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
 }
 
 function monthKeyValue(year, key) {
@@ -31,7 +54,7 @@ async function monthStateMapForYear(year, includePrevDec = false) {
   const res = await fetch("/admin/account-sets");
   const rows = await res.json();
   const map = {};
-  const keys = includePrevDec ? managerMonthKeys : managerMonthKeys.filter((key) => key !== "prev_dec");
+  const keys = includePrevDec ? managerOvertimeMonthKeys : managerOvertimeMonthKeys.filter((key) => key !== "prev_dec");
   keys.forEach((key) => {
     const month = monthKeyValue(year, key);
     const row = Array.isArray(rows) ? rows.find((item) => item.month === month) : null;
@@ -54,77 +77,128 @@ function applyOvertimeLockState(columnStates, year) {
     if (state === "missing_account_set") missingMonths.push(month);
   });
   const notice = document.getElementById("managerOvertimeLockNotice");
-  if (lockedMonths.length || missingMonths.length) {
-    notice.className = "small mt-2 text-muted";
-    const parts = [];
-    if (lockedMonths.length) parts.push(`已锁定：${lockedMonths.join("、")}`);
-    if (missingMonths.length) parts.push(`暂无账套：${missingMonths.join("、")}（仍可编辑）`);
-    notice.textContent = parts.join("；");
-  } else {
-    notice.className = "small mt-2 text-muted";
-    notice.textContent = "当前年度相关账套未锁定，可保存和导入";
-  }
+  const parts = [];
+  if (lockedMonths.length) parts.push(`已锁定：${lockedMonths.join("、")}`);
+  if (missingMonths.length) parts.push(`暂无账套：${missingMonths.join("、")}（仍可编辑）`);
+  notice.textContent = parts.join("；") || "当前年度相关账套未锁定，可导入并通过弹窗保存";
 }
 
-function updateOvertimeMetrics(rowCount = null, status = null) {
-  const year = document.getElementById("managerOvertimeYear").value || String(new Date().getFullYear());
-  document.getElementById("managerOvertimeMetricYear").textContent = year;
-  if (rowCount !== null) {
-    document.getElementById("managerOvertimeMetricRows").textContent = String(rowCount);
-    document.getElementById("managerOvertimeMetricRowsSub").textContent = rowCount ? `当前展示 ${rowCount} 人` : "当前条件无数据";
-  }
-  if (status !== null) {
-    document.getElementById("managerOvertimeMetricStatus").textContent = status;
-    const metaEl = document.getElementById("managerOvertimeMeta");
-    if (metaEl) metaEl.textContent = status;
-  }
+function yearTotal(row) {
+  return managerOvertimeMonthKeys.reduce((sum, key) => sum + Number(row[key] || 0), 0);
 }
 
-function overtimeRowHtml(row) {
-  const monthCells = managerMonthKeys.map((key) => `<td>${numericInput(key, row[key])}</td>`).join("");
-  return `
-    <tr data-emp-id="${row.emp_id}">
-      <td>${row.dept_name || ""}</td>
-      <td>${row.name || ""}</td>
-      ${monthCells}
-      <td>${monthValue(row.remaining)}</td>
-      <td><input class="form-control form-control-sm" data-field="remark" value="${row.remark || ""}"></td>
-    </tr>
-  `;
+function renderEditInputs(row) {
+  return managerOvertimeMonthKeys
+    .map((key) => {
+      const state = overtimeColumnStates[key] || "editable";
+      const disabled = state === "locked" ? "disabled" : "";
+      const title = state === "locked"
+        ? 'title="该月份账套已锁定"'
+        : (state === "missing_account_set" ? 'title="该月份暂无账套，不受封账控制"' : "");
+      return `<td><input class="form-control form-control-sm" data-field="${key}" type="text" inputmode="decimal" value="${monthValue(row[key])}" ${disabled} ${title}></td>`;
+    })
+    .join("");
 }
 
-async function loadManagerOvertime() {
-  const year = document.getElementById("managerOvertimeYear").value;
-  const query = new URLSearchParams();
-  if (year) query.set("year", year);
-  const [res, columnStates] = await Promise.all([
-    fetch(`/admin/manager-overtime/records?${query.toString()}`),
-    monthStateMapForYear(year, true),
-  ]);
-  const rows = await res.json();
-  const body = document.getElementById("managerOvertimeBody");
-  if (!Array.isArray(rows) || !rows.length) {
-    body.innerHTML = '<tr><td class="text-muted" colspan="17">暂无数据</td></tr>';
-    applyOvertimeLockState(columnStates, year);
-    updateOvertimeMetrics(0, "当前条件无数据");
-    return;
+document.addEventListener("DOMContentLoaded", async () => {
+  const employeeSelector = window.SelectorComponent.createEmployeeSelector();
+  const yearInput = document.getElementById("managerOvertimeYear");
+  const fileInput = document.getElementById("managerOvertimeImportFile");
+  const listBody = document.getElementById("managerOvertimeListBody");
+  const editModal = bootstrap.Modal.getOrCreateInstance(document.getElementById("managerOvertimeEditModal"));
+  const editForm = document.getElementById("managerOvertimeEditForm");
+  const editBody = document.getElementById("managerOvertimeEditBody");
+  const editRemark = document.getElementById("managerOvertimeEditRemark");
+  const editMeta = document.getElementById("managerOvertimeEditMeta");
+  const editSaveBtn = document.getElementById("managerOvertimeEditSaveBtn");
+
+  let rows = [];
+  let activeEmpId = null;
+
+  function renderList() {
+    if (!rows.length) {
+      listBody.innerHTML = '<tr><td class="text-muted" colspan="7">当前条件无数据</td></tr>';
+      return;
+    }
+    listBody.innerHTML = rows
+      .map((row) => `
+        <tr${Number(activeEmpId) === Number(row.emp_id) ? ' class="table-primary"' : ""}>
+          <td>${row.dept_name || ""}</td>
+          <td>${row.name || ""}</td>
+          <td>${monthValue(row.prev_dec) || 0}</td>
+          <td>${yearTotal(row)}</td>
+          <td>${monthValue(row.remaining) || 0}</td>
+          <td>${row.remark || ""}</td>
+          <td><button class="btn btn-sm btn-outline-primary edit-btn" data-id="${row.emp_id}" type="button">编辑</button></td>
+        </tr>
+      `)
+      .join("");
   }
-  body.innerHTML = rows.map(overtimeRowHtml).join("");
-  applyOvertimeLockState(columnStates, year);
-  updateOvertimeMetrics(rows.length, `共 ${rows.length} 人`);
-}
 
-async function saveManagerOvertime() {
-  const year = document.getElementById("managerOvertimeYear").value || String(new Date().getFullYear());
-  const rows = [...document.querySelectorAll("#managerOvertimeBody tr[data-emp-id]")];
-  const warnings = new Set();
-  for (const rowEl of rows) {
-    const payload = {
-      emp_id: rowEl.dataset.empId,
-      year,
-    };
-    rowEl.querySelectorAll("[data-field]").forEach((el) => {
-      payload[el.dataset.field] = el.value;
+  function currentRow(empId) {
+    return rows.find((row) => Number(row.emp_id) === Number(empId)) || null;
+  }
+
+  function openEditModal(empId) {
+    const row = currentRow(empId);
+    if (!row) {
+      showOvertimeMessage("未找到记录", "未找到待编辑的管理人员记录");
+      return;
+    }
+    activeEmpId = row.emp_id;
+    editForm.elements.emp_id.value = row.emp_id;
+    editMeta.textContent = `${row.name || ""} / ${yearInput.value || ""}`;
+    editBody.innerHTML = `
+      <tr>
+        ${renderEditInputs(row)}
+        <td>${monthValue(row.remaining) || 0}</td>
+      </tr>
+    `;
+    editRemark.value = row.remark || "";
+    editSaveBtn.disabled = false;
+    renderList();
+    editModal.show();
+  }
+
+  function selectedListQuery() {
+    const year = yearInput.value;
+    const ids = selectedManagerIds();
+    if (!year || !ids.length) {
+      showOvertimeMessage("查询条件不足", "请选择年份和管理人员");
+      return null;
+    }
+    return { year, ids };
+  }
+
+  async function loadManagerOvertime() {
+    const selected = selectedListQuery();
+    if (!selected) return;
+    const query = new URLSearchParams({ year: selected.year, emp_ids: selected.ids.join(",") });
+    const [res, columnStates] = await Promise.all([
+      fetch(`/admin/manager-overtime/records?${query.toString()}`),
+      monthStateMapForYear(selected.year, true),
+    ]);
+    const data = await res.json();
+    if (!res.ok) {
+      showOvertimeMessage("查询失败", data.error || "查询失败");
+      return;
+    }
+    rows = Array.isArray(data) ? data : [];
+    activeEmpId = null;
+    applyOvertimeLockState(columnStates, selected.year);
+    renderList();
+  }
+
+  async function saveManagerOvertime() {
+    const empId = Number(editForm.elements.emp_id.value || 0);
+    const year = yearInput.value || String(new Date().getFullYear());
+    if (!empId) {
+      showOvertimeMessage("无法保存", "请先选择要编辑的管理人员");
+      return;
+    }
+    const payload = { emp_id: empId, year, remark: editRemark.value };
+    editBody.querySelectorAll("[data-field]").forEach((input) => {
+      payload[input.dataset.field] = input.value;
     });
     const res = await fetch("/admin/manager-overtime/records", {
       method: "PUT",
@@ -136,53 +210,53 @@ async function saveManagerOvertime() {
       showOvertimeMessage("保存失败", data.error || "保存失败");
       return;
     }
-    if (data.warning) warnings.add(data.warning);
+    if (data.warning) {
+      showOvertimeMessage("部分月份未保存", data.warning);
+    }
+    await loadManagerOvertime();
+    openEditModal(empId);
   }
-  if (warnings.size) {
-    showOvertimeMessage("部分月份未保存", [...warnings].join("\n"));
-  }
-  updateOvertimeMetrics(rows.length, `已保存 ${rows.length} 人`);
-  loadManagerOvertime();
-}
 
-async function importManagerOvertime() {
-  const year = document.getElementById("managerOvertimeYear").value || String(new Date().getFullYear());
-  const fileInput = document.getElementById("managerOvertimeImportFile");
-  if (!fileInput.files.length) {
-    showOvertimeMessage("请选择文件", "请选择要导入的Excel文件");
-    return;
+  async function importManagerOvertime() {
+    const year = yearInput.value || String(new Date().getFullYear());
+    if (!fileInput.files.length) {
+      showOvertimeMessage("请选择文件", "请选择要导入的Excel文件");
+      return;
+    }
+    const form = new FormData();
+    form.append("year", year);
+    form.append("file", fileInput.files[0]);
+    const res = await fetch("/admin/manager-overtime/import", { method: "POST", body: form });
+    const data = await res.json();
+    if (!res.ok) {
+      showOvertimeMessage("导入失败", data.error || "导入失败");
+      return;
+    }
+    fileInput.value = "";
+    await loadManagerOvertime();
+    const warnings = data.warning ? `\n${data.warning}` : "";
+    const errorText = data.error_count ? `\n失败 ${data.error_count} 条：\n${data.errors.join("\n")}` : "";
+    if (warnings || errorText) {
+      showOvertimeMessage("导入结果", `已导入 ${data.imported} 人${warnings}${errorText}`);
+    }
   }
-  const form = new FormData();
-  form.append("year", year);
-  form.append("file", fileInput.files[0]);
-  const res = await fetch("/admin/manager-overtime/import", {
-    method: "POST",
-    body: form,
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    showOvertimeMessage("导入失败", data.error || "导入失败");
-    return;
-  }
-  const warnings = data.warning ? `\n${data.warning}` : "";
-  const errorText = data.error_count ? `，失败 ${data.error_count} 条：\n${data.errors.join("\n")}` : "";
-  updateOvertimeMetrics(data.imported || 0, `已导入 ${data.imported} 人`);
-  fileInput.value = "";
-  await loadManagerOvertime();
-  if (errorText || warnings) showOvertimeMessage("导入结果", `已导入 ${data.imported} 人${warnings}${errorText}`);
-}
 
-document.addEventListener("DOMContentLoaded", () => {
-  const yearInput = document.getElementById("managerOvertimeYear");
-  yearInput.value = String(new Date().getFullYear());
-  updateOvertimeMetrics(0, "等待查询");
+  await employeeSelector.init();
+  if (!yearInput.value) {
+    yearInput.value = String(new Date().getFullYear());
+  }
   applyOvertimeLockState({}, yearInput.value);
-  yearInput.addEventListener("input", () => updateOvertimeMetrics(null, "等待查询"));
+
   document.getElementById("managerOvertimeQueryBtn").addEventListener("click", loadManagerOvertime);
-  document.getElementById("managerOvertimeSaveBtn").addEventListener("click", saveManagerOvertime);
   document.getElementById("managerOvertimeImportBtn").addEventListener("click", importManagerOvertime);
   document.getElementById("managerOvertimeExportBtn").addEventListener("click", () => {
-    const year = document.getElementById("managerOvertimeYear").value || String(new Date().getFullYear());
+    const year = yearInput.value || String(new Date().getFullYear());
     window.location.href = `/admin/manager-overtime/export?year=${encodeURIComponent(year)}`;
   });
+  listBody.addEventListener("click", (event) => {
+    const target = event.target.closest(".edit-btn");
+    if (!target) return;
+    openEditModal(target.dataset.id);
+  });
+  editSaveBtn.addEventListener("click", saveManagerOvertime);
 });

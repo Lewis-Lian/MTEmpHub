@@ -95,13 +95,34 @@ def _require_model(model, ident):
     return row
 
 
-def _manager_scope_employees():
+def _requested_emp_ids() -> list[int]:
+    raw_values = request.args.getlist("emp_ids")
+    if not raw_values:
+        raw = (request.args.get("emp_ids") or "").strip()
+        raw_values = raw.split(",") if raw else []
+    seen: set[int] = set()
+    emp_ids: list[int] = []
+    for raw in raw_values:
+        for part in str(raw or "").split(","):
+            text = part.strip()
+            if not text or not text.isdigit():
+                continue
+            emp_id = int(text)
+            if emp_id in seen:
+                continue
+            seen.add(emp_id)
+            emp_ids.append(emp_id)
+    return emp_ids
+
+
+def _manager_scope_employees(emp_ids: list[int] | None = None):
+    query = Employee.query.filter(Employee.is_manager.is_(True))
+    if emp_ids is not None:
+        if not emp_ids:
+            return []
+        query = query.filter(Employee.id.in_(emp_ids))
     return _unique_employees(
-        (
-        Employee.query.filter(Employee.is_manager.is_(True))
-        .order_by(Employee.dept_id.asc(), Employee.emp_no.asc(), Employee.name.asc())
-        .all()
-        )
+        query.order_by(Employee.dept_id.asc(), Employee.emp_no.asc(), Employee.name.asc()).all()
     )
 
 
@@ -888,13 +909,21 @@ def departments_page():
 @admin_bp.route("/manager-overtime")
 @admin_required
 def manager_overtime_page():
-    return render_template("admin/manager_overtime.html")
+    return render_template(
+        "admin/manager_overtime.html",
+        employees=_manager_scope_employees(),
+        default_year=datetime.now().year,
+    )
 
 
 @admin_bp.route("/manager-annual-leave")
 @admin_required
 def manager_annual_leave_page():
-    return render_template("admin/manager_annual_leave.html")
+    return render_template(
+        "admin/manager_annual_leave.html",
+        employees=_manager_scope_employees(),
+        default_year=datetime.now().year,
+    )
 
 
 @admin_bp.route("/shifts", methods=["POST"])
@@ -1012,7 +1041,7 @@ def departments_list():
 @admin_required
 def manager_overtime_records():
     year = request.args.get("year", type=int) or datetime.now().year
-    return jsonify(_manager_month_rows(_manager_overtime_values(year), "剩余调休天数"))
+    return jsonify(_manager_month_rows(_manager_overtime_values(year, _requested_emp_ids() or None), "剩余调休天数"))
 
 
 @admin_bp.route("/manager-overtime/records", methods=["PUT"])
@@ -1050,8 +1079,8 @@ def _manager_export_months(year: int) -> list[tuple[str, str]]:
     return months
 
 
-def _manager_base_month_values() -> dict[str, dict[str, object]]:
-    employees = _manager_scope_employees()
+def _manager_base_month_values(emp_ids: list[int] | None = None) -> dict[str, dict[str, object]]:
+    employees = _manager_scope_employees(emp_ids)
     return {
         employee.name: {
             "emp_id": employee.id,
@@ -1251,6 +1280,39 @@ def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, obj
         "applied": applied,
         "history": _history_rows_for_month("manager", month),
     }, 200
+
+
+def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
+    if not emp_ids:
+        return {"rows": [], "month": month}, 200
+    employees = {
+        employee.id: employee
+        for employee in Employee.query.filter(
+            Employee.id.in_(emp_ids),
+            Employee.is_manager.is_(True),
+        ).all()
+    }
+    overrides = {
+        row.emp_id: row
+        for row in ManagerAttendanceOverride.query.filter(
+            ManagerAttendanceOverride.month == month,
+            ManagerAttendanceOverride.emp_id.in_(emp_ids),
+        ).all()
+    }
+    rows: list[dict[str, object]] = []
+    for emp_id in emp_ids:
+        employee = employees.get(emp_id)
+        if not employee:
+            continue
+        rows.append(
+            {
+                "employee": _serialize_employee(employee),
+                "automatic": _manager_attendance_row(emp_id, month, include_overrides=False),
+                "override": _manager_attendance_override_payload(overrides.get(emp_id)),
+                "applied": _manager_attendance_row(emp_id, month, include_overrides=True),
+            }
+        )
+    return {"rows": rows, "month": month}, 200
 
 
 def _nullable_float(data: dict[str, object], key: str) -> tuple[float | None, str | None]:
@@ -1590,16 +1652,16 @@ def _import_manager_stat_file(stat_type: str, year: int):
     return jsonify(response)
 
 
-def _manager_overtime_values(year: int) -> dict[str, dict[str, object]]:
-    values_by_name = _manager_base_month_values()
+def _manager_overtime_values(year: int, emp_ids: list[int] | None = None) -> dict[str, dict[str, object]]:
+    values_by_name = _manager_base_month_values(emp_ids)
     for values in values_by_name.values():
         values["remaining"] = 0
     _apply_saved_manager_stats(values_by_name, year, "overtime")
     return values_by_name
 
 
-def _manager_annual_leave_values(year: int) -> dict[str, dict[str, object]]:
-    values_by_name = _manager_base_month_values()
+def _manager_annual_leave_values(year: int, emp_ids: list[int] | None = None) -> dict[str, dict[str, object]]:
+    values_by_name = _manager_base_month_values(emp_ids)
     for values in values_by_name.values():
         values["remaining"] = 12
     _apply_saved_manager_stats(values_by_name, year, "annual_leave")
@@ -1712,7 +1774,13 @@ def _export_manager_annual_leave_workbook(year: int):
 @admin_required
 def manager_annual_leave_records():
     year = request.args.get("year", type=int) or datetime.now().year
-    return jsonify(_manager_month_rows(_manager_annual_leave_values(year), "剩余年休天数", _annual_leave_value_keys()))
+    return jsonify(
+        _manager_month_rows(
+            _manager_annual_leave_values(year, _requested_emp_ids() or None),
+            "剩余年休天数",
+            _annual_leave_value_keys(),
+        )
+    )
 
 
 @admin_bp.route("/manager-annual-leave/records", methods=["PUT"])
@@ -2198,6 +2266,46 @@ def _employee_override_response(emp_id: int, month: str) -> tuple[dict[str, obje
         "applied": applied,
         "history": _history_rows_for_month("employee", month),
     }, 200
+
+
+def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
+    if not emp_ids:
+        return {"rows": [], "month": month}, 200
+    employees = {
+        employee.id: employee
+        for employee in Employee.query.filter(
+            Employee.id.in_(emp_ids),
+            Employee.is_manager.is_(False),
+        ).all()
+    }
+    overrides = {
+        row.emp_id: row
+        for row in EmployeeAttendanceOverride.query.filter(
+            EmployeeAttendanceOverride.month == month,
+            EmployeeAttendanceOverride.emp_id.in_(emp_ids),
+        ).all()
+    }
+    rows: list[dict[str, object]] = []
+    for emp_id in emp_ids:
+        employee = employees.get(emp_id)
+        if not employee:
+            continue
+        override = overrides.get(emp_id)
+        override_data = _employee_override_values(override)
+        automatic = _employee_automatic_row(emp_id, month)
+        applied: dict[str, object] = {}
+        if automatic:
+            for field in _EMPLOYEE_OVERRIDE_FIELDS:
+                applied[field] = override_data[field] if override_data[field] is not None else automatic.get(field)
+        rows.append(
+            {
+                "employee": _serialize_employee(employee),
+                "automatic": automatic,
+                "override": _employee_override_payload(override),
+                "applied": applied,
+            }
+        )
+    return {"rows": rows, "month": month}, 200
 
 
 @admin_bp.route("/")

@@ -201,6 +201,63 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         names = {row["employee_name"] for row in rows}
         self.assertEqual(names, {"员工甲", "员工乙"})
 
+    def test_employee_override_list_returns_selected_employees(self) -> None:
+        self.client.put(
+            "/admin/employee-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "attendance_days": "2",
+                "work_hours": "15.5",
+                "remark": "员工甲修正",
+            },
+        )
+        self.client.put(
+            "/admin/employee-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_b_id,
+                "attendance_days": "4",
+                "half_days": "1",
+                "remark": "员工乙修正",
+            },
+        )
+
+        res = self.client.get(
+            f"/admin/employee-attendance-overrides/list?month=2026-05&emp_ids={self.employee_id},{self.employee_b_id}"
+        )
+        self.assertEqual(res.status_code, 200)
+        rows = res.get_json()["rows"]
+        self.assertEqual(len(rows), 2)
+        self.assertEqual([row["employee"]["emp_no"] for row in rows], ["E001", "E002"])
+        self.assertEqual(rows[0]["override"]["attendance_days"], 2.0)
+        self.assertEqual(rows[0]["override"]["work_hours"], 15.5)
+        self.assertEqual(rows[0]["override"]["remark"], "员工甲修正")
+        self.assertEqual(rows[1]["override"]["attendance_days"], 4.0)
+        self.assertEqual(rows[1]["override"]["half_days"], 1)
+        self.assertEqual(rows[1]["override"]["remark"], "员工乙修正")
+
+    def test_manager_override_list_returns_selected_employees(self) -> None:
+        self.client.put(
+            "/admin/manager-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.manager_id,
+                "attendance_days": "20",
+                "injury_days": "1",
+                "remark": "经理修正",
+            },
+        )
+
+        res = self.client.get(f"/admin/manager-attendance-overrides/list?month=2026-05&emp_ids={self.manager_id}")
+        self.assertEqual(res.status_code, 200)
+        rows = res.get_json()["rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["employee"]["emp_no"], "M001")
+        self.assertEqual(rows[0]["override"]["attendance_days"], 20.0)
+        self.assertEqual(rows[0]["override"]["injury_days"], 1.0)
+        self.assertEqual(rows[0]["override"]["remark"], "经理修正")
+
     def test_attendance_override_pages_default_to_active_account_set_month(self) -> None:
         employee_res = self.client.get("/admin/employee-attendance-overrides")
         self.assertEqual(employee_res.status_code, 200)
@@ -232,6 +289,8 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(rules["/admin/users/batch"], {"POST"})
         self.assertEqual(rules["/admin/users/<int:user_id>"], {"DELETE", "PUT"})
         self.assertEqual(rules["/admin/employee-attendance-overrides/record"], {"DELETE", "GET", "PUT"})
+        self.assertEqual(rules["/admin/employee-attendance-overrides/list"], {"GET"})
+        self.assertEqual(rules["/admin/manager-attendance-overrides/list"], {"GET"})
         self.assertEqual(rules["/admin/manager-attendance-overrides/import"], {"POST"})
         self.assertEqual(rules["/admin/departments/import"], {"POST"})
         self.assertEqual(rules["/admin/departments/template"], {"GET"})
@@ -674,6 +733,52 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertIn("1月", headers)
         self.assertIn("剩余年休天数", headers)
 
+    def test_manager_overtime_records_support_employee_filter(self) -> None:
+        with self.app.app_context():
+            manager_b = Employee(emp_no="M002", name="经理乙", dept_id=self.dept_id, is_manager=True)
+            db.session.add(manager_b)
+            db.session.commit()
+            manager_b_id = manager_b.id
+
+        self.client.put(
+            "/admin/manager-overtime/records",
+            json={"emp_id": self.manager_id, "year": 2026, "prev_dec": "1.5", "m1": "2", "remark": "经理甲加班"},
+        )
+        self.client.put(
+            "/admin/manager-overtime/records",
+            json={"emp_id": manager_b_id, "year": 2026, "prev_dec": "3", "m1": "4", "remark": "经理乙加班"},
+        )
+
+        res = self.client.get(f"/admin/manager-overtime/records?year=2026&emp_ids={self.manager_id}")
+        self.assertEqual(res.status_code, 200)
+        rows = res.get_json()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["emp_id"], self.manager_id)
+        self.assertEqual(rows[0]["remark"], "经理甲加班")
+
+    def test_manager_annual_leave_records_support_employee_filter(self) -> None:
+        with self.app.app_context():
+            manager_b = Employee(emp_no="M003", name="经理丙", dept_id=self.dept_id, is_manager=True)
+            db.session.add(manager_b)
+            db.session.commit()
+            manager_b_id = manager_b.id
+
+        self.client.put(
+            "/admin/manager-annual-leave/records",
+            json={"emp_id": self.manager_id, "year": 2026, "m1": "1", "m2": "2", "remark": "经理甲年休"},
+        )
+        self.client.put(
+            "/admin/manager-annual-leave/records",
+            json={"emp_id": manager_b_id, "year": 2026, "m1": "3", "m2": "4", "remark": "经理丙年休"},
+        )
+
+        res = self.client.get(f"/admin/manager-annual-leave/records?year=2026&emp_ids={self.manager_id}")
+        self.assertEqual(res.status_code, 200)
+        rows = res.get_json()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["emp_id"], self.manager_id)
+        self.assertEqual(rows[0]["remark"], "经理甲年休")
+
     def test_manager_overtime_import_defaults_year_when_omitted(self) -> None:
         res = self.client.post("/admin/manager-overtime/import")
         self.assertEqual(res.status_code, 400)
@@ -876,6 +981,130 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertIn('id="filterAdminRole"', html)
         self.assertIn('id="applyUserFiltersBtn"', html)
         self.assertIn('id="resetUserFiltersBtn"', html)
+
+    def test_employee_override_page_renders_list_table(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "employee_override_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            id=1,
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/admin/employee-attendance-overrides"):
+            g.current_user = admin_user
+            html = render_template("admin/employee_attendance_overrides.html", employees=[], default_month="2026-05")
+
+        self.assertIn("修正列表", html)
+        self.assertIn('id="employeeAttendanceOverrideListBody"', html)
+        self.assertIn('id="employeeAttendanceOverrideTableEmpty"', html)
+        self.assertIn('id="employeeAttendanceOverrideEditModal"', html)
+        self.assertIn('id="employeeAttendanceOverrideEditForm"', html)
+        self.assertIn('id="employeeAttendanceOverrideEditSaveBtn"', html)
+        self.assertNotIn('id="employeeAttendanceOverrideClearBtn"', html)
+        self.assertNotIn('id="employeeAttendanceOverrideBody"', html)
+        self.assertNotIn('id="employeeAttendanceOverrideRemark"', html)
+
+    def test_manager_override_page_renders_list_table(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "manager_override_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            id=1,
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/admin/manager-attendance-overrides"):
+            g.current_user = admin_user
+            html = render_template("admin/manager_attendance_overrides.html", employees=[], default_month="2026-05")
+
+        self.assertIn("修正列表", html)
+        self.assertIn('id="managerAttendanceOverrideListBody"', html)
+        self.assertIn('id="managerAttendanceOverrideTableEmpty"', html)
+        self.assertIn('id="managerAttendanceOverrideEditModal"', html)
+        self.assertIn('id="managerAttendanceOverrideEditForm"', html)
+        self.assertIn('id="managerAttendanceOverrideEditSaveBtn"', html)
+        self.assertNotIn('id="managerAttendanceOverrideClearBtn"', html)
+        self.assertNotIn('id="managerAttendanceOverrideBody"', html)
+        self.assertNotIn('id="managerAttendanceOverrideRemark"', html)
+
+    def test_manager_overtime_page_renders_filter_list_and_edit_modal(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "manager_overtime_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            id=1,
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/admin/manager-overtime"):
+            g.current_user = admin_user
+            html = render_template("admin/manager_overtime.html", employees=[], default_year=2026)
+
+        self.assertIn("人员筛选", html)
+        self.assertIn('id="managerOvertimeListBody"', html)
+        self.assertIn('id="managerOvertimeEditModal"', html)
+        self.assertIn('id="managerOvertimeEditForm"', html)
+        self.assertIn('id="managerOvertimeEditSaveBtn"', html)
+        self.assertNotIn("统计年度", html)
+        self.assertNotIn("人员记录", html)
+        self.assertNotIn("维护月份", html)
+        self.assertNotIn("当前状态", html)
+        self.assertNotIn('id="managerOvertimeBody"', html)
+        self.assertNotIn('id="managerOvertimeSaveBtn"', html)
+
+    def test_manager_annual_leave_page_renders_filter_list_and_edit_modal(self) -> None:
+        project_root = os.path.dirname(os.path.dirname(__file__))
+        app = Flask(
+            "manager_annual_leave_render_test",
+            template_folder=os.path.join(project_root, "templates"),
+            static_folder=os.path.join(project_root, "static"),
+        )
+        register_routes(app)
+
+        admin_user = SimpleNamespace(
+            id=1,
+            username="admin",
+            role="admin",
+            has_any_page_access=lambda _keys: True,
+            can_access_page=lambda _key: True,
+        )
+        with app.test_request_context("/admin/manager-annual-leave"):
+            g.current_user = admin_user
+            html = render_template("admin/manager_annual_leave.html", employees=[], default_year=2026)
+
+        self.assertIn("人员筛选", html)
+        self.assertIn('id="managerAnnualLeaveListBody"', html)
+        self.assertIn('id="managerAnnualLeaveEditModal"', html)
+        self.assertIn('id="managerAnnualLeaveEditForm"', html)
+        self.assertIn('id="managerAnnualLeaveEditSaveBtn"', html)
+        self.assertNotIn("统计年度", html)
+        self.assertNotIn("人员记录", html)
+        self.assertNotIn("维护月份", html)
+        self.assertNotIn("当前状态", html)
+        self.assertNotIn('id="managerAnnualLeaveBody"', html)
+        self.assertNotIn('id="managerAnnualLeaveSaveBtn"', html)
 
     def test_employees_page_renders_filter_clear_and_edit_modal(self) -> None:
         project_root = os.path.dirname(os.path.dirname(__file__))

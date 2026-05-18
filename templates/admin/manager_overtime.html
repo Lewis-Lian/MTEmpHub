@@ -1,57 +1,38 @@
 {% extends 'base.html' %}
 {% block title %}加班信息{% endblock %}
-{% block page_intro %}按年度查询管理人员加班调休统计。{% endblock %}
+{% block page_intro %}按年度查询并维护管理人员加班调休统计。{% endblock %}
 {% block content %}
-<div class="row g-3 mb-3">
-  <div class="col-md-6 col-xl-3">
-    <div class="summary-card dashboard-metric-card">
-      <div class="dashboard-metric-label">统计年度</div>
-      <div class="dashboard-metric-value dashboard-metric-text" id="managerOvertimeMetricYear">-</div>
-      <div class="dashboard-metric-sub">按年度维护管理人员调休</div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="summary-card dashboard-metric-card">
-      <div class="dashboard-metric-label">人员记录</div>
-      <div class="dashboard-metric-value" id="managerOvertimeMetricRows">0</div>
-      <div class="dashboard-metric-sub" id="managerOvertimeMetricRowsSub">点击查询后更新</div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="summary-card dashboard-metric-card">
-      <div class="dashboard-metric-label">维护月份</div>
-      <div class="dashboard-metric-value">13</div>
-      <div class="dashboard-metric-sub">含前年累积与 1-12 月</div>
-    </div>
-  </div>
-  <div class="col-md-6 col-xl-3">
-    <div class="summary-card dashboard-metric-card">
-      <div class="dashboard-metric-label">当前状态</div>
-      <div class="dashboard-metric-value dashboard-metric-text" id="managerOvertimeMetricStatus">等待查询</div>
-      <div class="dashboard-metric-sub">支持导入、编辑、保存、导出</div>
-    </div>
-  </div>
-</div>
-
 <div class="card mb-4 manager-info-panel">
   <div class="card-header d-flex justify-content-between align-items-center">
     <span>查询条件</span>
-    <span class="small text-muted">年度筛选、Excel 导入导出与批量保存</span>
+    <span class="small text-muted">按年度和人员筛选后查看列表，通过弹窗维护单人整年数据</span>
   </div>
   <div class="card-body">
     <div class="row g-3 align-items-end">
       <div class="col-lg-2 col-md-4">
         <label class="form-label">年份</label>
-        <input class="form-control" type="number" id="managerOvertimeYear" min="2000" max="2100">
+        <input class="form-control" type="number" id="managerOvertimeYear" min="2000" max="2100" value="{{ default_year or '' }}">
       </div>
-      <div class="col-lg-6 col-md-8">
-        <label class="form-label">主要操作</label>
-        <div class="manager-info-actions">
-          <button class="btn btn-primary" id="managerOvertimeQueryBtn">查询</button>
-          <button class="btn btn-outline-primary" id="managerOvertimeSaveBtn">保存修改</button>
-          <button class="btn btn-outline-success" id="managerOvertimeExportBtn">导出XLSX</button>
+      <div class="col-lg-5 col-md-8">
+        <label class="form-label">人员筛选</label>
+        <div class="employee-lookup" id="employeeLookup">
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control form-control-sm" id="empSearchInput" placeholder="搜索员工编号/姓名" autocomplete="off">
+            <button class="btn btn-outline-secondary employee-picker-trigger" type="button" id="openEmployeePickerBtn" title="选择管理人员">
+              <span class="employee-picker-icon" aria-hidden="true">👤</span>
+            </button>
+          </div>
+          <input type="hidden" id="selectedEmpIds">
+          <div class="employee-float-list" id="employeeQuickList"></div>
         </div>
-        <div class="small text-muted mt-2" id="managerOvertimeLockNotice">请选择年份后查询</div>
+      </div>
+      <div class="col-lg-5">
+        <label class="form-label">主要操作</label>
+        <div class="manager-info-actions d-flex gap-2 flex-wrap">
+          <button class="btn btn-primary" id="managerOvertimeQueryBtn" type="button">查询</button>
+          <button class="btn btn-outline-success" id="managerOvertimeExportBtn" type="button">导出XLSX</button>
+        </div>
+        <div class="small text-muted mt-2" id="managerOvertimeLockNotice">请选择年份和人员后查询</div>
       </div>
     </div>
     <div class="row g-3 align-items-end mt-1">
@@ -59,7 +40,7 @@
         <label class="form-label">导入文件</label>
         <div class="manager-info-import">
           <input class="form-control" type="file" id="managerOvertimeImportFile" accept=".xlsx">
-          <button class="btn btn-outline-warning" id="managerOvertimeImportBtn">导入</button>
+          <button class="btn btn-outline-warning" id="managerOvertimeImportBtn" type="button">导入</button>
           <a class="btn btn-outline-secondary" href="/admin/manager-overtime/template">下载示例</a>
         </div>
       </div>
@@ -67,10 +48,74 @@
   </div>
 </div>
 
+<div class="modal fade employee-picker-modal" id="employeePickerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">选择管理人员</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3 employee-picker-layout">
+          <div class="col-lg-7 d-flex flex-column gap-2">
+            <div class="employee-picker-panel employee-picker-tree">
+              <div class="employee-picker-panel-title">部门树</div>
+              <div class="list-group employee-dept-list" id="employeePickerDeptList"></div>
+            </div>
+            <div class="employee-picker-panel employee-picker-candidates">
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <label class="form-check-label small d-inline-flex align-items-center gap-1 text-nowrap">
+                  <input class="form-check-input m-0" type="checkbox" id="employeePickerSelectVisible">
+                  全选
+                </label>
+                <input type="text" class="form-control form-control-sm" id="employeePickerSearchInput" placeholder="搜索员工编号/姓名">
+              </div>
+              <div class="employee-picker-list" id="employeePickerList">
+                {% for e in employees %}
+                <label
+                  class="employee-picker-row"
+                  data-id="{{ e.id }}"
+                  data-name="{{ e.name }}"
+                  data-key="{{ e.emp_no }} {{ e.name }}"
+                  data-dept-id="{{ e.dept_id if e.dept_id else '' }}"
+                  data-parent-id="{{ e.department.parent_id if e.department and e.department.parent_id else '' }}"
+                  data-dept-name="{{ e.department.dept_name if e.department else '未分配部门' }}"
+                >
+                  <input class="form-check-input employee-picker-item" type="checkbox" value="{{ e.id }}" data-id="{{ e.id }}">
+                  <span class="employee-picker-main">{{ e.emp_no }} - {{ e.name }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-5">
+            <div class="employee-picker-panel employee-picker-selected-wrap">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="employee-picker-panel-title mb-0">已选人员</div>
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge text-bg-light border" id="employeePickerSelectedCount">已选 0 人</span>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="employeePickerClearBtn">清空</button>
+                </div>
+              </div>
+              <div class="employee-selected-list" id="employeePickerSelectedList">
+                <div class="employee-selected-empty">暂无已选人员</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-primary" id="employeePickerConfirmBtn">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="card table-wrap-tight">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <span>管理人员加班调休明细</span>
-    <span class="small text-muted">单元格可直接编辑，保存后重新计算剩余调休</span>
+    <span>管理人员加班列表</span>
+    <span class="small text-muted">一行一人展示当前年度汇总，点击编辑维护整年月份数据</span>
   </div>
   <div class="table-responsive manager-info-table">
     <table class="table table-sm table-striped mb-0 align-middle">
@@ -78,27 +123,67 @@
         <tr>
           <th>部门</th>
           <th>姓名</th>
-          <th>前年累积天数</th>
-          <th>1月</th>
-          <th>2月</th>
-          <th>3月</th>
-          <th>4月</th>
-          <th>5月</th>
-          <th>6月</th>
-          <th>7月</th>
-          <th>8月</th>
-          <th>9月</th>
-          <th>10月</th>
-          <th>11月</th>
-          <th>12月</th>
+          <th>前年累积</th>
+          <th>本年合计</th>
           <th>剩余调休天数</th>
           <th>备注</th>
+          <th>操作</th>
         </tr>
       </thead>
-      <tbody id="managerOvertimeBody">
-        <tr><td class="text-muted" colspan="17">请点击查询</td></tr>
+      <tbody id="managerOvertimeListBody">
+        <tr><td class="text-muted" colspan="7">请点击查询</td></tr>
       </tbody>
     </table>
+  </div>
+</div>
+
+<div class="modal fade" id="managerOvertimeEditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title">编辑管理人员加班</h5>
+          <div class="small text-muted" id="managerOvertimeEditMeta">请选择列表中的管理人员进行编辑</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="managerOvertimeEditForm" class="hide-table-pager">
+          <input type="hidden" name="emp_id">
+          <div class="table-responsive manager-info-table">
+            <table class="table table-sm table-striped mb-0 align-middle">
+              <thead>
+                <tr>
+                  <th>前年累积天数</th>
+                  <th>1月</th>
+                  <th>2月</th>
+                  <th>3月</th>
+                  <th>4月</th>
+                  <th>5月</th>
+                  <th>6月</th>
+                  <th>7月</th>
+                  <th>8月</th>
+                  <th>9月</th>
+                  <th>10月</th>
+                  <th>11月</th>
+                  <th>12月</th>
+                  <th>剩余调休天数</th>
+                </tr>
+              </thead>
+              <tbody id="managerOvertimeEditBody"></tbody>
+            </table>
+          </div>
+          <div class="mt-3">
+            <label class="form-label" for="managerOvertimeEditRemark">备注</label>
+            <textarea class="form-control" id="managerOvertimeEditRemark" name="remark" rows="3" placeholder="可填写备注"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline-secondary" data-bs-dismiss="modal" type="button">取消</button>
+        <button class="btn btn-primary" id="managerOvertimeEditSaveBtn" type="button">保存修改</button>
+      </div>
+    </div>
   </div>
 </div>
 
