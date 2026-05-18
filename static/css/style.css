@@ -2834,6 +2834,23 @@ h5,
   position: relative;
 }
 
+.employee-lookup.has-clear .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.employee-lookup-clear {
+  min-width: 34px;
+  padding: 0 10px;
+  font-size: 18px;
+  line-height: 1;
+  color: #667085;
+}
+
+.employee-lookup-clear:hover {
+  color: #1f2937;
+}
+
 .employee-picker-trigger {
   min-width: 42px;
 }
