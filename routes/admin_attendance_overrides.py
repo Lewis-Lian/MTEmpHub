@@ -8,6 +8,26 @@ from flask import jsonify, render_template, request
 from routes.auth import admin_required
 
 
+def _requested_emp_ids() -> list[int]:
+    raw_values = request.args.getlist("emp_ids")
+    if not raw_values:
+        raw = (request.args.get("emp_ids") or "").strip()
+        raw_values = raw.split(",") if raw else []
+    emp_ids: list[int] = []
+    seen: set[int] = set()
+    for raw in raw_values:
+        for part in str(raw or "").split(","):
+            text = part.strip()
+            if not text or not text.isdigit():
+                continue
+            emp_id = int(text)
+            if emp_id in seen:
+                continue
+            seen.add(emp_id)
+            emp_ids.append(emp_id)
+    return emp_ids
+
+
 def register_admin_attendance_override_routes(admin_bp) -> None:
     from . import admin as admin_module
 
@@ -30,6 +50,15 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
         if not emp_id or not month:
             return jsonify({"error": "请选择管理人员和有效月份"}), 400
         payload, status = admin_module._manager_attendance_response(emp_id, month)
+        return jsonify(payload), status
+
+    @admin_bp.route("/manager-attendance-overrides/list", methods=["GET"])
+    @admin_required
+    def manager_attendance_override_list():
+        month = admin_module._validate_month(request.args.get("month"))
+        if not month:
+            return jsonify({"error": "请选择有效月份"}), 400
+        payload, status = admin_module._manager_attendance_list_response(_requested_emp_ids(), month)
         return jsonify(payload), status
 
     @admin_bp.route("/manager-attendance-overrides/record", methods=["PUT"])
@@ -268,6 +297,15 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
         if not emp_id or not month:
             return jsonify({"error": "请选择员工和有效月份"}), 400
         payload, status = admin_module._employee_override_response(emp_id, month)
+        return jsonify(payload), status
+
+    @admin_bp.route("/employee-attendance-overrides/list", methods=["GET"])
+    @admin_required
+    def employee_attendance_override_list():
+        month = admin_module._validate_month(request.args.get("month"))
+        if not month:
+            return jsonify({"error": "请选择有效月份"}), 400
+        payload, status = admin_module._employee_override_list_response(_requested_emp_ids(), month)
         return jsonify(payload), status
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["PUT"])
