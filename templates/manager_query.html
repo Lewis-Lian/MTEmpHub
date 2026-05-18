@@ -40,7 +40,7 @@
   {% endwith %}
 
   <section class="query-workspace">
-    <div class="query-metric-grid">
+    <div class="query-metric-grid" data-enable-metric-toggle="1">
       {% with label="当前账套", value_id="managerMetricAccountSet", value="未选择", value_class="dashboard-metric-text", sub="查询时按所选月度账套取数" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="厂休天数", value_id="managerMetricFactoryRest", value="0", sub="本月厂休天数" %}{% include "partials/query/metric_card.html" %}{% endwith %}
       {% with label="福利天数", value_id="managerMetricBenefitDays", value="0", sub="用于管理人员汇总计算" %}{% include "partials/query/metric_card.html" %}{% endwith %}

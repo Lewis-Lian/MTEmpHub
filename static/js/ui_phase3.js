@@ -54,8 +54,10 @@
 
   function applyStickyOffset() {
     const nav = document.querySelector(".top-nav");
-    const h = nav ? nav.getBoundingClientRect().height : 60;
-    document.documentElement.style.setProperty("--table-sticky-top", `${Math.ceil(h) + 8}px`);
+    const tabBar = document.querySelector(".app-tab-bar");
+    const navHeight = nav ? nav.getBoundingClientRect().height : 60;
+    const tabBarHeight = tabBar ? tabBar.getBoundingClientRect().height : 0;
+    document.documentElement.style.setProperty("--table-sticky-top", `${Math.ceil(navHeight + tabBarHeight) + 8}px`);
   }
 
   document.addEventListener("DOMContentLoaded", () => {

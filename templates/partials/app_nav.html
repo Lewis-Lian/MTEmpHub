@@ -3,6 +3,8 @@
   <a
     class="app-top-module {% if module.icon_key %}has-icon {% endif %}{% if app_nav.current_module and app_nav.current_module.slug == module.slug %}is-active{% endif %}"
     href="{{ module.home_href }}"
+    data-tab-link="1"
+    data-tab-title="{{ module.label }}"
   >
     {% if module.icon_key %}
     <span class="app-side-icon app-top-module-icon icon-{{ module.icon_key|replace('_', '-') }}" aria-hidden="true"></span>
@@ -19,6 +21,8 @@
       class="app-side-link {% if request.path == entry.href or request.path.startswith(entry.href ~ '/') %}is-active{% endif %}"
       href="{{ entry.href }}"
       title="{{ entry.label }}"
+      data-tab-link="1"
+      data-tab-title="{{ entry.label }}"
     >
       <span class="app-side-icon icon-{{ entry.key|replace('_', '-') }}" aria-hidden="true"></span>
       <span class="app-side-label">{{ entry.label }}</span>
@@ -32,6 +36,8 @@
   <a
     class="module-bottom-link {% if app_nav.current_module and app_nav.current_module.slug == module.slug %}is-active{% endif %}"
     href="{{ module.home_href }}"
+    data-tab-link="1"
+    data-tab-title="{{ module.label }}"
   >
     {% if module.icon_key %}
     <span class="app-side-icon module-bottom-icon icon-{{ module.icon_key|replace('_', '-') }}" aria-hidden="true"></span>
