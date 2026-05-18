@@ -2826,6 +2826,10 @@ h5,
   padding-bottom: 3px;
 }
 
+.hide-table-pager > .table-pager {
+  display: none !important;
+}
+
 .employee-lookup {
   position: relative;
 }
