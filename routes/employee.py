@@ -1630,6 +1630,14 @@ def _manager_template_title(month: str) -> str:
     return f"{_manager_template_month_text(month)}份考勤记录"
 
 
+def _apply_manager_department_header_style(ws, row_idx: int, template_row_idx: int = MANAGER_TEMPLATE_FIRST_DATA_ROW) -> None:
+    source = ws.cell(template_row_idx, 1)
+    target = ws.cell(row_idx, 1)
+    target._style = copy(source._style)
+    if source.number_format:
+        target.number_format = source.number_format
+
+
 def _clear_manager_template_merges(
     ws,
     start_row: int = MANAGER_TEMPLATE_FIRST_DATA_ROW,
@@ -1731,6 +1739,7 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
                 merge_ranges.append((group_start_row, row_idx - 1))
             group_start_row = row_idx
             previous_dept_name = dept_name
+            _apply_manager_department_header_style(ws, row_idx)
             ws.cell(row_idx, 1).value = dept_name
 
         values = _manager_template_values(item, include_actual_attendance_days)
