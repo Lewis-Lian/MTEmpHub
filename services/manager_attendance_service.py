@@ -415,9 +415,14 @@ def _manager_schedule_late_minutes(employee_id: int, month: str) -> int:
         result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
         if "迟到" not in result:
             continue
-        total += _raw_minutes(raw, "迟到时长", "严重迟到时长") or _raw_minutes(
-            nested_raw, "迟到时长", "严重迟到时长"
+        day_minutes = (
+            _raw_minutes(raw, "迟到时长", "严重迟到时长")
+            or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
+            or int(row.late_minutes or 0)
         )
+        if day_minutes >= 30:
+            continue
+        total += day_minutes
     return total
 
 
