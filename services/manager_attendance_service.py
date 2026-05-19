@@ -29,7 +29,7 @@ MANAGER_HEADERS = [
     "事/病假",
     "工伤",
     "出差",
-    "婚/丧假",
+    "婚假",
     "丧假",
     "迟到\\早退",
     "汇总",
@@ -574,6 +574,7 @@ def build_manager_rows(
 
         rows.append(
             {
+                "emp_id": employee.id,
                 "dept_name": employee.department.dept_name if employee.department else "",
                 "name": employee.name,
                 "attendance_days": attendance_days,
