@@ -83,11 +83,16 @@ async function loadAccountSets() {
 
 async function queryAbnormalData(employeeSelector) {
   const { query } = buildQuery(employeeSelector);
-  const res = await fetch(`/employee/api/abnormal-attendance?${query.toString()}`);
-  const data = await res.json();
-  const rows = Array.isArray(data) ? data : [];
-  renderRows(rows);
-  updateAbnormalMetrics(employeeSelector, rows);
+  await window.AppQueryProgress.with(document.getElementById("abnormalMeta"), {
+    label: "查询中",
+    detail: "正在统计异常考勤结果",
+  }, async () => {
+    const res = await fetch(`/employee/api/abnormal-attendance?${query.toString()}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : [];
+    renderRows(rows);
+    updateAbnormalMetrics(employeeSelector, rows);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

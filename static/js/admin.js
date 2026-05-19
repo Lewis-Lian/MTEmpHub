@@ -87,23 +87,39 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
   }
 
-  async function loadAccountSetImports() {
+  function withImportsProgress(detail, task) {
+    return window.AppQueryProgress.with(accountSetImportsBody, {
+      label: "处理中",
+      detail,
+    }, task);
+  }
+
+  async function loadAccountSetImports(showProgress = true) {
     const id = currentAccountSetId();
     if (!id) {
       renderImports([]);
       return;
     }
-    const res = await fetch(`/admin/account-sets/${id}/imports`);
-    const data = await res.json();
-    renderImports(Array.isArray(data) ? data : []);
+    const runner = async () => {
+      const res = await fetch(`/admin/account-sets/${id}/imports`);
+      const data = await res.json();
+      renderImports(Array.isArray(data) ? data : []);
+    };
+    if (!showProgress) {
+      await runner();
+      return;
+    }
+    await withImportsProgress("正在加载账套导入记录", runner);
   }
 
   async function loadAccountSets() {
-    const res = await fetch("/admin/account-sets");
-    const data = await res.json();
-    accountSets = Array.isArray(data) ? data : [];
-    renderAccountSets();
-    await loadAccountSetImports();
+    await withImportsProgress("正在加载账套与导入记录", async () => {
+      const res = await fetch("/admin/account-sets");
+      const data = await res.json();
+      accountSets = Array.isArray(data) ? data : [];
+      renderAccountSets();
+      await loadAccountSetImports(false);
+    });
   }
 
   createAccountSetForm.addEventListener("submit", async (e) => {
@@ -255,19 +271,20 @@ document.addEventListener("DOMContentLoaded", () => {
     importRawBtn.disabled = true;
     importRawBtn.textContent = "上传中...";
     try {
-      const res = await fetch("/admin/import/raw-files", { method: "POST", body: formData });
-      const data = await res.json();
-      const results = Array.isArray(data.results) ? data.results : [];
-      const failedRows = results.filter((x) => x.status !== "ok");
+      await withImportsProgress("正在上传原始文件并刷新结果", async () => {
+        const res = await fetch("/admin/import/raw-files", { method: "POST", body: formData });
+        const data = await res.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+        const failedRows = results.filter((x) => x.status !== "ok");
 
-      if (res.ok && failedRows.length === 0 && (data.failed || 0) === 0) {
-        window.AppToast.success("上传成功，已归档到账套。", "上传成功");
-      } else {
-        const details = failedRows.map((x, i) => `${i + 1}. ${x.file || "未知文件"}: ${x.error || "上传失败"}`);
-        window.AppToast.error(`上传失败，错误明细：\n${details.join("\n")}`, "上传失败");
-      }
-      await loadAccountSets();
-      await loadAccountSetImports();
+        if (res.ok && failedRows.length === 0 && (data.failed || 0) === 0) {
+          window.AppToast.success("上传成功，已归档到账套。", "上传成功");
+        } else {
+          const details = failedRows.map((x, i) => `${i + 1}. ${x.file || "未知文件"}: ${x.error || "上传失败"}`);
+          window.AppToast.error(`上传失败，错误明细：\n${details.join("\n")}`, "上传失败");
+        }
+        await loadAccountSets();
+      });
     } catch (err) {
       window.AppToast.error(err?.message || "网络或服务异常", "上传失败");
     } finally {
@@ -286,34 +303,34 @@ document.addEventListener("DOMContentLoaded", () => {
     calculateManagerBtn.disabled = true;
     button.textContent = "计算中...";
     try {
-      const res = await fetch(`/admin/account-sets/${accountSetId}/calculate?mode=${encodeURIComponent(mode)}`, { method: "POST" });
-      const data = await res.json();
-      const results = Array.isArray(data.results) ? data.results : [];
-      const failedRows = results.filter((x) => x.status !== "ok");
-      const summaryLines = results.map((x, i) => {
-        const r = x.result || {};
-        const imported = r.imported ?? 0;
-        const total = r.total_rows ?? "-";
-        const skipped = r.skipped ?? "-";
-        const unknown = r.skipped_unknown_employee ?? "-";
-        return `${i + 1}. ${x.file || "未知文件"}: 导入${imported} / 原始${total} / 跳过${skipped} / 未匹配员工${unknown}`;
-      });
-      const sync = data.manager_stats_sync || null;
-      if (sync) {
-        summaryLines.push(`管理人员加班/年休回写: 加班${sync.overtime_synced || 0}人 / 年休${sync.annual_leave_synced || 0}人 / 失败${sync.error_count || 0}条`);
-        if (Array.isArray(sync.errors) && sync.errors.length) {
-          summaryLines.push(`回写失败明细:\n${sync.errors.join("\n")}`);
+      await withImportsProgress(`正在执行${label}`, async () => {
+        const res = await fetch(`/admin/account-sets/${accountSetId}/calculate?mode=${encodeURIComponent(mode)}`, { method: "POST" });
+        const data = await res.json();
+        const results = Array.isArray(data.results) ? data.results : [];
+        const failedRows = results.filter((x) => x.status !== "ok");
+        const summaryLines = results.map((x, i) => {
+          const r = x.result || {};
+          const imported = r.imported ?? 0;
+          const total = r.total_rows ?? "-";
+          const skipped = r.skipped ?? "-";
+          const unknown = r.skipped_unknown_employee ?? "-";
+          return `${i + 1}. ${x.file || "未知文件"}: 导入${imported} / 原始${total} / 跳过${skipped} / 未匹配员工${unknown}`;
+        });
+        const sync = data.manager_stats_sync || null;
+        if (sync) {
+          summaryLines.push(`管理人员加班/年休回写: 加班${sync.overtime_synced || 0}人 / 年休${sync.annual_leave_synced || 0}人 / 失败${sync.error_count || 0}条`);
+          if (Array.isArray(sync.errors) && sync.errors.length) {
+            summaryLines.push(`回写失败明细:\n${sync.errors.join("\n")}`);
+          }
         }
-      }
-
-      if (res.ok && failedRows.length === 0) {
-        window.AppToast.success(`${label}成功`, label);
-      } else {
-        const details = failedRows.map((x, i) => `${i + 1}. ${x.file || "未知文件"}: ${x.error || "计算失败"}`);
-        window.AppToast.error(`${label}失败，错误明细：\n${details.join("\n")}\n\n已处理统计：\n${summaryLines.join("\n")}`, label);
-      }
-      await loadAccountSets();
-      await loadAccountSetImports();
+        if (res.ok && failedRows.length === 0) {
+          window.AppToast.success(`${label}成功`, label);
+        } else {
+          const details = failedRows.map((x, i) => `${i + 1}. ${x.file || "未知文件"}: ${x.error || "计算失败"}`);
+          window.AppToast.error(`${label}失败，错误明细：\n${details.join("\n")}\n\n已处理统计：\n${summaryLines.join("\n")}`, label);
+        }
+        await loadAccountSets();
+      });
     } catch (err) {
       window.AppToast.error(err?.message || "网络或服务异常", `${label}失败`);
     } finally {

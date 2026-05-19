@@ -109,13 +109,18 @@ function currentAccountSetRow() {
 
 async function queryManagerAttendance(employeeSelector) {
   const query = buildManagerQuery(employeeSelector);
-  const res = await fetch(`/employee/api/manager-attendance?${query.toString()}`);
-  const data = await res.json();
-  lastManagerResult = {
-    headers: Array.isArray(data.headers) ? data.headers : [],
-    rows: Array.isArray(data.rows) ? data.rows : [],
-  };
-  renderManagerRows(lastManagerResult.headers, lastManagerResult.rows);
+  await window.AppQueryProgress.with(document.getElementById("managerQueryMeta"), {
+    label: "计算中",
+    detail: "正在生成管理人员考勤汇总",
+  }, async () => {
+    const res = await fetch(`/employee/api/manager-attendance?${query.toString()}`);
+    const data = await res.json();
+    lastManagerResult = {
+      headers: Array.isArray(data.headers) ? data.headers : [],
+      rows: Array.isArray(data.rows) ? data.rows : [],
+    };
+    renderManagerRows(lastManagerResult.headers, lastManagerResult.rows);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

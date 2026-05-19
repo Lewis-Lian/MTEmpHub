@@ -7,6 +7,7 @@ from datetime import date, datetime, time, timedelta
 import math
 import re
 from io import BytesIO
+from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request, g, send_file
 from sqlalchemy.orm import joinedload
@@ -42,6 +43,7 @@ from utils.helpers import overlap_duration_days
 
 
 employee_bp = Blueprint("employee", __name__, url_prefix="/employee")
+MANAGER_ATTENDANCE_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "export_templates" / "manager_attendance.xlsx"
 
 
 FINAL_HEADERS = [
@@ -1589,10 +1591,46 @@ def manager_department_hours_export_api():
     )
 
 
+def _copy_manager_template_row_style(ws, source_row_idx: int, target_row_idx: int) -> None:
+    if source_row_idx == target_row_idx:
+        return
+    for col_idx in range(1, ws.max_column + 1):
+        source = ws.cell(source_row_idx, col_idx)
+        target = ws.cell(target_row_idx, col_idx)
+        target._style = copy(source._style)
+        if source.number_format:
+            target.number_format = source.number_format
+    ws.row_dimensions[target_row_idx].height = ws.row_dimensions[source_row_idx].height
+
+
+def _clear_manager_template_merges(ws, start_row: int = 2) -> None:
+    for merged_range in list(ws.merged_cells.ranges):
+        if merged_range.min_col == 1 and merged_range.max_col == 1 and merged_range.max_row >= start_row:
+            ws.unmerge_cells(str(merged_range))
+
+
+def _manager_template_values(item: dict[str, object], include_actual_attendance_days: bool) -> list[object]:
+    return [
+        item.get("name", ""),
+        item.get("attendance_days", 0),
+        *([item.get("actual_attendance_days", 0)] if include_actual_attendance_days else []),
+        item.get("personal_sick_days", 0),
+        item.get("injury_days", 0),
+        item.get("business_trip_days", 0),
+        item.get("marriage_days", 0),
+        item.get("funeral_days", 0),
+        item.get("late_early_minutes", 0),
+        item.get("summary", ""),
+        item.get("benefit_days", 0),
+        item.get("overtime_change", 0),
+        item.get("remark", ""),
+    ]
+
+
 def _fill_manager_template(ws, rows: list[dict[str, object]], include_actual_attendance_days: bool = True) -> None:
     headers = manager_headers(include_actual_attendance_days)
 
-    if include_actual_attendance_days and ws.max_column == len(MANAGER_HEADERS) - 2 and ws.cell(1, 4).value == "事/病假":
+    if include_actual_attendance_days and ws.max_column == len(MANAGER_HEADERS) - 1 and ws.cell(1, 4).value == "事/病假":
         ws.insert_cols(4)
         for row_idx in range(1, ws.max_row + 1):
             source = ws.cell(row_idx, 3)
@@ -1614,54 +1652,50 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], include_actual_att
     for col_idx, header in enumerate(headers, start=1):
         ws.cell(1, col_idx).value = header
 
-    by_name = {str(row.get("name", "")).strip(): row for row in rows}
-    filled_names: set[str] = set()
+    first_data_row = 2
+    _clear_manager_template_merges(ws, first_data_row)
+    template_last_row = max(ws.max_row, first_data_row)
+    template_style_row = template_last_row
+    current_data_rows = max(ws.max_row - first_data_row + 1, 0)
+    required_data_rows = len(rows)
 
-    for row_idx in range(2, ws.max_row + 1):
-        name = str(ws.cell(row_idx, 2).value or "").strip()
-        if not name or name not in by_name:
-            continue
-        item = by_name[name]
-        values = [
-            item.get("attendance_days", 0),
-            *([item.get("actual_attendance_days", 0)] if include_actual_attendance_days else []),
-            item.get("personal_sick_days", 0),
-            item.get("injury_days", 0),
-            item.get("business_trip_days", 0),
-            item.get("marriage_days", 0),
-            item.get("funeral_days", 0),
-            item.get("late_early_minutes", 0),
-            item.get("summary", ""),
-            item.get("benefit_days", 0),
-            item.get("overtime_change", 0),
-            item.get("remark", ""),
-        ]
-        for offset, value in enumerate(values, start=3):
-            ws.cell(row_idx, offset).value = value
-        filled_names.add(name)
+    if required_data_rows < current_data_rows:
+        ws.delete_rows(first_data_row + required_data_rows, current_data_rows - required_data_rows)
 
-    for item in rows:
-        name = str(item.get("name", "")).strip()
-        if not name or name in filled_names:
-            continue
-        ws.append(
-            [
-                item.get("dept_name", ""),
-                name,
-                item.get("attendance_days", 0),
-                *([item.get("actual_attendance_days", 0)] if include_actual_attendance_days else []),
-                item.get("personal_sick_days", 0),
-                item.get("injury_days", 0),
-                item.get("business_trip_days", 0),
-                item.get("marriage_days", 0),
-                item.get("funeral_days", 0),
-                item.get("late_early_minutes", 0),
-                item.get("summary", ""),
-                item.get("benefit_days", 0),
-                item.get("overtime_change", 0),
-                item.get("remark", ""),
-            ]
-        )
+    if required_data_rows > current_data_rows:
+        for target_row_idx in range(ws.max_row + 1, first_data_row + required_data_rows):
+            ws.append([None] * ws.max_column)
+            _copy_manager_template_row_style(ws, template_style_row, target_row_idx)
+
+    for row_idx in range(first_data_row, ws.max_row + 1):
+        for col_idx in range(1, len(headers) + 1):
+            ws.cell(row_idx, col_idx).value = None
+
+    previous_dept_name = None
+    group_start_row = None
+    merge_ranges: list[tuple[int, int]] = []
+
+    for offset, item in enumerate(rows, start=0):
+        row_idx = first_data_row + offset
+        dept_name = str(item.get("dept_name", "") or "").strip()
+
+        if dept_name != previous_dept_name:
+            if group_start_row is not None and row_idx - 1 > group_start_row:
+                merge_ranges.append((group_start_row, row_idx - 1))
+            group_start_row = row_idx
+            previous_dept_name = dept_name
+            ws.cell(row_idx, 1).value = dept_name
+
+        values = _manager_template_values(item, include_actual_attendance_days)
+        for col_idx, value in enumerate(values, start=2):
+            ws.cell(row_idx, col_idx).value = value
+
+    if group_start_row is not None and ws.max_row > group_start_row:
+        merge_ranges.append((group_start_row, ws.max_row))
+
+    for start_row, end_row in merge_ranges:
+        if end_row > start_row:
+            ws.merge_cells(start_row=start_row, start_column=1, end_row=end_row, end_column=1)
 
 
 @employee_bp.route("/api/manager-attendance/export", methods=["GET"])
@@ -1676,9 +1710,8 @@ def manager_attendance_export_api():
     rows = build_manager_rows(options, emp_ids)
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
 
-    template_path = "/home/lewis/文档/考勤/管理人员最终输出输出模板.xlsx"
-    if os.path.exists(template_path):
-        wb = openpyxl.load_workbook(template_path)
+    if MANAGER_ATTENDANCE_TEMPLATE_PATH.exists():
+        wb = openpyxl.load_workbook(MANAGER_ATTENDANCE_TEMPLATE_PATH)
         ws = wb.active
         _fill_manager_template(ws, rows, include_actual_attendance_days)
     else:

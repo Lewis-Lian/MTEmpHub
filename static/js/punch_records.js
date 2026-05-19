@@ -12,6 +12,18 @@ async function loadAccountSets() {
     .join("");
 }
 
+function getVisiblePunchHeaders() {
+  const headers = ["日期", "员工编号", "员工姓名", "部门"];
+  if (document.getElementById("toggleRawPunch").checked) {
+    headers.push("原始打卡数据");
+  }
+  if (document.getElementById("toggleInOutPunch").checked) {
+    headers.push("上班打卡", "下班打卡");
+  }
+  headers.push("打卡次数", "实出勤小时", "迟到分钟", "早退分钟", "异常原因");
+  return headers;
+}
+
 function updatePunchMetrics(employeeSelector, rows = null) {
   const ids = employeeSelector.getSelectedIds();
   const accountSetSelect = document.getElementById("accountSetSelect");
@@ -91,16 +103,22 @@ function buildQuery(employeeSelector) {
   const query = new URLSearchParams();
   if (month) query.set("month", month);
   ids.forEach((id) => query.append("emp_ids", id));
+  query.set("punch_headers", getVisiblePunchHeaders().join(","));
   return { query, selectedCount: ids.length };
 }
 
 async function queryPunchRecords(employeeSelector) {
   const { query } = buildQuery(employeeSelector);
-  const res = await fetch(`/employee/api/punch-records?${query.toString()}`);
-  const data = await res.json();
-  const rows = Array.isArray(data) ? data : [];
-  renderRows(rows);
-  updatePunchMetrics(employeeSelector, rows);
+  await window.AppQueryProgress.with(document.getElementById("punchMeta"), {
+    label: "查询中",
+    detail: "正在加载打卡明细",
+  }, async () => {
+    const res = await fetch(`/employee/api/punch-records?${query.toString()}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : [];
+    renderRows(rows);
+    updatePunchMetrics(employeeSelector, rows);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

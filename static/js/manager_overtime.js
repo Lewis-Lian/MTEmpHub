@@ -174,19 +174,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selected = selectedListQuery();
     if (!selected) return;
     const query = new URLSearchParams({ year: selected.year, emp_ids: selected.ids.join(",") });
-    const [res, columnStates] = await Promise.all([
-      fetch(`/admin/manager-overtime/records?${query.toString()}`),
-      monthStateMapForYear(selected.year, true),
-    ]);
-    const data = await res.json();
-    if (!res.ok) {
-      showOvertimeMessage("查询失败", data.error || "查询失败");
-      return;
-    }
-    rows = Array.isArray(data) ? data : [];
-    activeEmpId = null;
-    applyOvertimeLockState(columnStates, selected.year);
-    renderList();
+    await window.AppQueryProgress.with(listBody, {
+      label: "查询中",
+      detail: "正在加载管理人员加班列表",
+    }, async () => {
+      const [res, columnStates] = await Promise.all([
+        fetch(`/admin/manager-overtime/records?${query.toString()}`),
+        monthStateMapForYear(selected.year, true),
+      ]);
+      const data = await res.json();
+      if (!res.ok) {
+        showOvertimeMessage("查询失败", data.error || "查询失败");
+        return;
+      }
+      rows = Array.isArray(data) ? data : [];
+      activeEmpId = null;
+      applyOvertimeLockState(columnStates, selected.year);
+      renderList();
+    });
   }
 
   async function saveManagerOvertime() {
@@ -215,6 +220,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     await loadManagerOvertime();
     openEditModal(empId);
+    window.AppToast.success("加班修正已保存", "保存成功");
   }
 
   async function importManagerOvertime() {
