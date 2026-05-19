@@ -349,6 +349,54 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(ws["B3"].value, "经理甲")
         self.assertEqual(ws["B4"].value, "经理乙")
 
+    def test_fill_manager_template_applies_department_header_style_to_new_group_start(self) -> None:
+        wb = openpyxl.load_workbook(self._manager_template_path())
+        ws = wb.active
+
+        _fill_manager_template(
+            ws,
+            [
+                {
+                    "dept_name": "行政部",
+                    "name": "经理甲",
+                    "attendance_days": 20,
+                    "personal_sick_days": 0,
+                    "injury_days": 0,
+                    "business_trip_days": 0,
+                    "marriage_days": 0,
+                    "funeral_days": 0,
+                    "late_early_minutes": 0,
+                    "summary": "",
+                    "benefit_days": 0,
+                    "overtime_change": 0,
+                    "remark": "",
+                },
+                {
+                    "dept_name": "财务部",
+                    "name": "经理乙",
+                    "attendance_days": 21,
+                    "personal_sick_days": 0,
+                    "injury_days": 0,
+                    "business_trip_days": 0,
+                    "marriage_days": 0,
+                    "funeral_days": 0,
+                    "late_early_minutes": 0,
+                    "summary": "",
+                    "benefit_days": 0,
+                    "overtime_change": 0,
+                    "remark": "",
+                },
+            ],
+            "2026-05",
+            include_actual_attendance_days=False,
+        )
+
+        self.assertEqual(ws["A4"].value, "财务部")
+        self.assertEqual(ws["A4"].alignment.text_rotation, 255)
+        self.assertEqual(ws["A4"].alignment.horizontal, "center")
+        self.assertEqual(ws["A4"].alignment.vertical, "center")
+        self.assertTrue(ws["A4"].font.bold)
+
     def test_fill_manager_template_extends_new_rows_with_template_style(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
         ws = wb.active
