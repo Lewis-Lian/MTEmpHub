@@ -78,8 +78,14 @@ window.AppDialog = (() => {
     alert(message, title = "提示") {
       return open({ type: "alert", title, message });
     },
-    confirm(message, title = "确认") {
-      return open({ type: "confirm", title, message });
+    confirm(message, title = "确认", options = {}) {
+      return open({
+        type: "confirm",
+        title,
+        message,
+        confirmText: options.confirmText || "确定",
+        cancelText: options.cancelText || "取消",
+      });
     },
     prompt(message, defaultValue = "", title = "请输入", inputLabel = "输入内容") {
       return open({ type: "prompt", title, message, defaultValue, inputLabel });

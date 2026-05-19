@@ -1,8 +1,28 @@
+import os
+import tempfile
 import unittest
 
-from datetime import datetime
+from datetime import date, datetime
 
-from services.manager_attendance_service import normalize_days
+from flask import Flask
+
+from models import db
+from models.annual_leave import AnnualLeave
+from models.attendance_override_history import AttendanceOverrideHistory
+from models.daily_record import DailyRecord
+from models.department import Department
+from models.employee import Employee
+from models.employee_attendance_override import EmployeeAttendanceOverride
+from models.employee_shift import EmployeeShiftAssignment
+from models.leave import LeaveRecord
+from models.manager_attendance_override import ManagerAttendanceOverride
+from models.manager_month_stat import ManagerMonthStat
+from models.monthly_report import MonthlyReport
+from models.overtime import OvertimeRecord
+from models.shift import Shift
+from models.user import User
+from models.user import UserDepartmentAssignment, UserEmployeeAssignment
+from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows, normalize_days
 from utils.helpers import overlap_duration_days
 
 
@@ -37,6 +57,80 @@ class OverlapDurationDaysTests(unittest.TestCase):
         self.assertAlmostEqual(may_days, 0.70833, places=5)
         self.assertEqual(normalize_days(april_days), 23.0)
         self.assertEqual(normalize_days(may_days), 1.0)
+
+
+class ManagerLateSummaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-attendance.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="品质部")
+            manager = Employee(emp_no="M001", name="吴利蓉", is_manager=True)
+            db.session.add_all([dept, manager])
+            db.session.flush()
+            manager.dept_id = dept.id
+            db.session.add(
+                MonthlyReport(
+                    emp_id=manager.id,
+                    report_month="2026-04",
+                    manager_raw_data={"出勤天数": 23, "迟到时长": 6},
+                )
+            )
+            db.session.add_all(
+                [
+                    DailyRecord(
+                        emp_id=manager.id,
+                        record_date=date(2026, 4, 18),
+                        late_minutes=3,
+                        raw_data={"上班1打卡结果": "迟到", "迟到时长": 3},
+                        manager_payload={
+                            "late_minutes": 3,
+                            "early_leave_minutes": 0,
+                            "raw_data": {"上班1打卡结果": "迟到", "迟到时长": 3},
+                        },
+                    ),
+                    DailyRecord(
+                        emp_id=manager.id,
+                        record_date=date(2026, 4, 30),
+                        late_minutes=3,
+                        raw_data={"上班1打卡结果": "迟到", "迟到时长": 3},
+                        manager_payload={
+                            "late_minutes": 3,
+                            "early_leave_minutes": 0,
+                            "raw_data": {"上班1打卡结果": "迟到", "迟到时长": 3},
+                        },
+                    ),
+                ]
+            )
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def test_manager_summary_counts_late_minutes_from_nested_manager_raw_data(self) -> None:
+        with self.app.app_context():
+            rows = build_manager_rows(
+                ManagerAttendanceOptions(month="2026-04", factory_rest_days=7.0),
+                [self.manager_id],
+            )
+
+        self.assertEqual(rows[0]["late_early_minutes"], 6)
+        self.assertEqual(rows[0]["summary"], "6元")
 
 
 if __name__ == "__main__":
