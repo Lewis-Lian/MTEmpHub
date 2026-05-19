@@ -1606,6 +1606,17 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertIn("groupedRootIds.clear()", source)
         self.assertIn("persistCheckedSelection();\n        syncSelectedState();", source)
 
+    def test_selector_component_single_select_include_children_prompt_uses_include_exclude_buttons(self) -> None:
+        project_root = Path(__file__).resolve().parent.parent
+        dialog_source = (project_root / "static/js/app_dialog.js").read_text(encoding="utf-8")
+        selector_source = (project_root / "static/js/selector_component.js").read_text(encoding="utf-8")
+
+        self.assertIn("confirm(message, title = \"确认\", options = {})", dialog_source)
+        self.assertIn("confirmText: options.confirmText || \"确定\"", dialog_source)
+        self.assertIn("cancelText: options.cancelText || \"取消\"", dialog_source)
+        self.assertIn("confirmText: \"包含\"", selector_source)
+        self.assertIn("cancelText: \"不包含\"", selector_source)
+
     def test_lookup_styles_define_clear_button(self) -> None:
         project_root = Path(__file__).resolve().parent.parent
         source = (project_root / "static/css/style.css").read_text(encoding="utf-8")

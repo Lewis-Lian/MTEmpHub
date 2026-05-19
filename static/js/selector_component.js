@@ -66,7 +66,10 @@
 
   async function promptIncludeChildren() {
     if (!window.AppDialog || typeof window.AppDialog.confirm !== "function") return false;
-    return window.AppDialog.confirm("该部门包含下级部门，是否同时包含子部门人员？", "选择范围");
+    return window.AppDialog.confirm("该部门包含下级部门，是否同时包含子部门人员？", "选择范围", {
+      confirmText: "包含",
+      cancelText: "不包含",
+    });
   }
 
   function ensureLookupClearButton(ctx) {

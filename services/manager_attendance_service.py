@@ -410,11 +410,14 @@ def _manager_schedule_late_minutes(employee_id: int, month: str) -> int:
     total = 0
     for row in rows:
         raw = row.raw_data if isinstance(row.raw_data, dict) else {}
+        nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
         # Only check 上班1 (上午) for late
-        result = str(raw.get("上班1打卡结果") or "")
+        result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
         if "迟到" not in result:
             continue
-        total += _raw_minutes(raw, "迟到时长", "严重迟到时长")
+        total += _raw_minutes(raw, "迟到时长", "严重迟到时长") or _raw_minutes(
+            nested_raw, "迟到时长", "严重迟到时长"
+        )
     return total
 
 
