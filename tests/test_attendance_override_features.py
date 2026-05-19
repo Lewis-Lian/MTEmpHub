@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import urllib.parse
+from zipfile import ZipFile
 from datetime import date
 from types import SimpleNamespace
 
@@ -267,7 +268,18 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(rows[0]["override"]["remark"], "经理修正")
 
     def test_manager_attendance_template_is_stored_in_repo(self) -> None:
-        self.assertTrue(self._manager_template_path().exists())
+        template_path = self._manager_template_path()
+        self.assertTrue(template_path.exists())
+
+        wb = openpyxl.load_workbook(template_path)
+        ws = wb.active
+        self.assertEqual(ws.print_title_rows, "$1:$2")
+        self.assertTrue(ws.print_options.horizontalCentered)
+
+        with ZipFile(template_path) as zf:
+            sheet_xml = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        self.assertIn("<oddFooter>", sheet_xml)
+        self.assertIn("第 &amp;P 页，共 &amp;N 页", sheet_xml)
 
     def test_fill_manager_template_clears_unused_sample_rows(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
@@ -498,6 +510,13 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(ws["A4"].border.left.style, "thin")
         self.assertEqual(ws["A4"].border.right.style, "thin")
         self.assertEqual(ws["A4"].border.bottom.style, "thin")
+        self.assertEqual(ws.print_title_rows, "$1:$2")
+        self.assertTrue(ws.print_options.horizontalCentered)
+
+        with ZipFile(io.BytesIO(res.data)) as zf:
+            sheet_xml = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
+        self.assertIn("<oddFooter>", sheet_xml)
+        self.assertIn("第 &amp;P 页，共 &amp;N 页", sheet_xml)
 
     def test_employee_final_data_uses_override_attendance_days(self) -> None:
         with self.app.app_context():

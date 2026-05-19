@@ -8,6 +8,7 @@ import math
 import re
 from io import BytesIO
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import Blueprint, jsonify, render_template, request, g, send_file
 from sqlalchemy.orm import joinedload
@@ -1630,6 +1631,49 @@ def _manager_template_title(month: str) -> str:
     return f"{_manager_template_month_text(month)}份考勤记录"
 
 
+def _extract_template_header_footer_xml(template_path: Path) -> str | None:
+    try:
+        with ZipFile(template_path) as zf:
+            sheet_xml = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
+    except (KeyError, OSError):
+        return None
+
+    start = sheet_xml.find("<headerFooter")
+    if start < 0:
+        return None
+    end = sheet_xml.find("</headerFooter>", start)
+    if end < 0:
+        return None
+    return sheet_xml[start : end + len("</headerFooter>")]
+
+
+def _apply_sheet_header_footer_xml(workbook_bytes: bytes, header_footer_xml: str | None) -> bytes:
+    if not header_footer_xml:
+        return workbook_bytes
+
+    source = BytesIO(workbook_bytes)
+    target = BytesIO()
+    with ZipFile(source) as src_zip, ZipFile(target, "w", compression=ZIP_DEFLATED) as dst_zip:
+        for info in src_zip.infolist():
+            data = src_zip.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                sheet_xml = data.decode("utf-8")
+                start = sheet_xml.find("<headerFooter")
+                if start >= 0:
+                    end = sheet_xml.find("</headerFooter>", start)
+                    if end >= 0:
+                        sheet_xml = (
+                            sheet_xml[:start]
+                            + header_footer_xml
+                            + sheet_xml[end + len("</headerFooter>") :]
+                        )
+                else:
+                    sheet_xml = sheet_xml.replace("</worksheet>", f"{header_footer_xml}</worksheet>")
+                data = sheet_xml.encode("utf-8")
+            dst_zip.writestr(info, data)
+    return target.getvalue()
+
+
 def _apply_manager_department_header_style(ws, row_idx: int, template_row_idx: int = MANAGER_TEMPLATE_FIRST_DATA_ROW) -> None:
     source = ws.cell(template_row_idx, 1)
     target = ws.cell(row_idx, 1)
@@ -1820,6 +1864,7 @@ def manager_attendance_template_export_api():
         wb = openpyxl.load_workbook(MANAGER_ATTENDANCE_TEMPLATE_PATH)
         ws = wb.active
         _fill_manager_template(ws, rows, options.month, include_actual_attendance_days)
+        header_footer_xml = _extract_template_header_footer_xml(MANAGER_ATTENDANCE_TEMPLATE_PATH)
     else:
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -1827,12 +1872,13 @@ def manager_attendance_template_export_api():
         ws.append(manager_headers(include_actual_attendance_days))
         for row in rows_as_table(rows, include_actual_attendance_days):
             ws.append(row)
+        header_footer_xml = None
 
     output = BytesIO()
     wb.save(output)
-    output.seek(0)
+    output_bytes = _apply_sheet_header_footer_xml(output.getvalue(), header_footer_xml)
     return send_file(
-        output,
+        BytesIO(output_bytes),
         as_attachment=True,
         download_name=f"管理人员考勤查询_{options.month}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
