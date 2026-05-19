@@ -132,6 +132,51 @@ class ManagerLateSummaryTests(unittest.TestCase):
         self.assertEqual(rows[0]["late_early_minutes"], 6)
         self.assertEqual(rows[0]["summary"], "6元")
 
+    def test_manager_summary_ignores_single_day_late_minutes_when_day_reaches_thirty(self) -> None:
+        with self.app.app_context():
+            record = DailyRecord.query.filter_by(emp_id=self.manager_id, record_date=date(2026, 4, 18)).first()
+            record.late_minutes = 30
+            record.raw_data = {"上班1打卡结果": "迟到", "迟到时长": 30}
+            record.manager_payload = {
+                "late_minutes": 30,
+                "early_leave_minutes": 0,
+                "raw_data": {"上班1打卡结果": "迟到", "迟到时长": 30},
+            }
+            monthly = MonthlyReport.query.filter_by(emp_id=self.manager_id, report_month="2026-04").first()
+            monthly.manager_raw_data = {"出勤天数": 23, "迟到时长": 33}
+            db.session.commit()
+
+            rows = build_manager_rows(
+                ManagerAttendanceOptions(month="2026-04", factory_rest_days=7.0),
+                [self.manager_id],
+            )
+
+        self.assertEqual(rows[0]["late_early_minutes"], 3)
+        self.assertEqual(rows[0]["summary"], "3元")
+
+    def test_manager_summary_ignores_all_late_penalty_when_every_late_day_reaches_thirty(self) -> None:
+        with self.app.app_context():
+            for record_date in (date(2026, 4, 18), date(2026, 4, 30)):
+                record = DailyRecord.query.filter_by(emp_id=self.manager_id, record_date=record_date).first()
+                record.late_minutes = 30
+                record.raw_data = {"上班1打卡结果": "迟到", "迟到时长": 30}
+                record.manager_payload = {
+                    "late_minutes": 30,
+                    "early_leave_minutes": 0,
+                    "raw_data": {"上班1打卡结果": "迟到", "迟到时长": 30},
+                }
+            monthly = MonthlyReport.query.filter_by(emp_id=self.manager_id, report_month="2026-04").first()
+            monthly.manager_raw_data = {"出勤天数": 23, "迟到时长": 60}
+            db.session.commit()
+
+            rows = build_manager_rows(
+                ManagerAttendanceOptions(month="2026-04", factory_rest_days=7.0),
+                [self.manager_id],
+            )
+
+        self.assertEqual(rows[0]["late_early_minutes"], 0)
+        self.assertEqual(rows[0]["summary"], "")
+
 
 if __name__ == "__main__":
     unittest.main()
