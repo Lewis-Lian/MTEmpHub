@@ -199,3 +199,93 @@ class AppTabsE2ETests(unittest.TestCase):
 
           self.assertEqual(page.locator(".app-tab-button.is-active").get_attribute("title"), "员工考勤数据查询")
           browser.close()
+
+    def test_query_result_panel_shows_progress_overlay_during_request(self) -> None:
+        with sync_playwright() as p:
+          browser = p.chromium.launch()
+          page = browser.new_page()
+          self.login_and_open_dashboard(page)
+
+          def delayed_final_data(route):
+              time.sleep(0.6)
+              route.fulfill(
+                  status=200,
+                  content_type="application/json",
+                  body='{"headers":["姓名"],"rows":[["员工甲"]]}',
+              )
+
+          page.route("**/employee/api/final-data?*", delayed_final_data)
+          page.click("#refreshBtn")
+          page.wait_for_selector(".query-progress-overlay.is-visible")
+
+          self.assertIn("查询中", page.locator(".query-progress-label").text_content())
+          self.assertIn("正在加载结果", page.locator(".query-progress-detail").text_content())
+
+          page.wait_for_function("""
+            () => !document.querySelector('.query-progress-overlay.is-visible')
+          """)
+          self.assertEqual(page.text_content("#finalDataMeta").strip(), "共返回 1 条记录")
+          browser.close()
+
+    def test_toast_auto_hide_pauses_on_hover_and_resumes_after_leave(self) -> None:
+        with sync_playwright() as p:
+          browser = p.chromium.launch()
+          page = browser.new_page()
+          self.login_and_open_dashboard(page)
+
+          page.evaluate("""
+            () => {
+              let now = 0;
+              let nextId = 1;
+              const tasks = new Map();
+              const originalSetTimeout = window.setTimeout.bind(window);
+              const originalClearTimeout = window.clearTimeout.bind(window);
+
+              window.__toastClock = {
+                advance(ms) {
+                  now += ms;
+                  const ready = Array.from(tasks.entries())
+                    .filter(([, task]) => task.runAt <= now)
+                    .sort((a, b) => a[1].runAt - b[1].runAt);
+                  ready.forEach(([id, task]) => {
+                    tasks.delete(id);
+                    task.fn();
+                  });
+                },
+                restore() {
+                  window.setTimeout = originalSetTimeout;
+                  window.clearTimeout = originalClearTimeout;
+                },
+              };
+
+              window.setTimeout = (fn, delay = 0, ...args) => {
+                const id = nextId++;
+                tasks.set(id, { fn: () => fn(...args), runAt: now + Number(delay || 0) });
+                return id;
+              };
+              window.clearTimeout = (id) => {
+                tasks.delete(id);
+              };
+
+              bootstrap.Toast.Default.animation = false;
+            }
+          """)
+
+          page.evaluate("""() => window.AppToast.success("测试消息", "测试标题")""")
+          page.wait_for_selector(".app-toast")
+
+          page.evaluate("""() => window.__toastClock.advance(9000)""")
+          self.assertEqual(page.locator(".app-toast").count(), 1)
+
+          page.dispatch_event(".app-toast", "mouseenter")
+          page.evaluate("""() => window.__toastClock.advance(5000)""")
+          self.assertEqual(page.locator(".app-toast").count(), 1)
+
+          page.dispatch_event(".app-toast", "mouseleave")
+          page.evaluate("""() => window.__toastClock.advance(900)""")
+          self.assertEqual(page.locator(".app-toast").count(), 1)
+
+          page.evaluate("""() => window.__toastClock.advance(200)""")
+          page.wait_for_function("() => document.querySelectorAll('.app-toast').length === 0")
+          page.evaluate("""() => window.__toastClock.restore()""")
+          browser.close()

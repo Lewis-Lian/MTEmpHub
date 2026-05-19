@@ -46,25 +46,30 @@ function updateDashboardMetrics(employeeSelector, resultRows = null) {
 
 async function loadFinalData(employeeSelector) {
   const { query } = buildFinalDataQuery(employeeSelector);
-  const res = await fetch(`/employee/api/final-data?${query.toString()}`);
-  const data = await res.json();
-  const headers = Array.isArray(data.headers) ? data.headers : [];
-  const rows = Array.isArray(data.rows) ? data.rows : [];
+  await window.AppQueryProgress.with(document.getElementById("finalDataMeta"), {
+    label: "查询中",
+    detail: "正在加载结果",
+  }, async () => {
+    const res = await fetch(`/employee/api/final-data?${query.toString()}`);
+    const data = await res.json();
+    const headers = Array.isArray(data.headers) ? data.headers : [];
+    const rows = Array.isArray(data.rows) ? data.rows : [];
 
-  document.getElementById("finalDataHead").innerHTML = headers.length
-    ? `<tr>${headers.map((h) => `<th>${h || "-"}</th>`).join("")}</tr>`
-    : "<tr><th>无可展示字段</th></tr>";
+    document.getElementById("finalDataHead").innerHTML = headers.length
+      ? `<tr>${headers.map((h) => `<th>${h || "-"}</th>`).join("")}</tr>`
+      : "<tr><th>无可展示字段</th></tr>";
 
-  if (!rows.length) {
-    document.getElementById("finalDataBody").innerHTML = `<tr><td class="text-muted" colspan="${Math.max(headers.length, 1)}">暂无数据</td></tr>`;
-    updateDashboardMetrics(employeeSelector, 0);
-    return;
-  }
+    if (!rows.length) {
+      document.getElementById("finalDataBody").innerHTML = `<tr><td class="text-muted" colspan="${Math.max(headers.length, 1)}">暂无数据</td></tr>`;
+      updateDashboardMetrics(employeeSelector, 0);
+      return;
+    }
 
-  document.getElementById("finalDataBody").innerHTML = rows
-    .map((row) => `<tr>${headers.map((_, i) => `<td>${row[i] ?? ""}</td>`).join("")}</tr>`)
-    .join("");
-  updateDashboardMetrics(employeeSelector, rows.length);
+    document.getElementById("finalDataBody").innerHTML = rows
+      .map((row) => `<tr>${headers.map((_, i) => `<td>${row[i] ?? ""}</td>`).join("")}</tr>`)
+      .join("");
+    updateDashboardMetrics(employeeSelector, rows.length);
+  });
 }
 
 function setFinalDataIdleState() {
