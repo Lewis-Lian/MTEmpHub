@@ -133,6 +133,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     query.set("show_actual_attendance_days", shouldShowActualAttendanceDays() ? "1" : "0");
     window.location.href = `/employee/api/manager-attendance/export?${query.toString()}`;
   });
+  document.getElementById("managerTemplateDownloadBtn").addEventListener("click", () => {
+    const query = buildManagerQuery(employeeSelector);
+    query.set("show_actual_attendance_days", shouldShowActualAttendanceDays() ? "1" : "0");
+    window.location.href = `/employee/api/manager-attendance/export-template?${query.toString()}`;
+  });
   document.getElementById("showActualAttendanceDaysToggle").addEventListener("change", () => {
     renderManagerRows(lastManagerResult.headers, lastManagerResult.rows);
   });

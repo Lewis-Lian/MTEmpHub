@@ -292,12 +292,15 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                     "remark": "",
                 }
             ],
+            "2026-05",
             include_actual_attendance_days=False,
         )
 
-        self.assertEqual(ws["A2"].value, "行政部")
-        self.assertEqual(ws["B2"].value, "经理甲")
-        self.assertIsNone(ws["B3"].value)
+        self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
+        self.assertEqual(ws["J109"].value, "2026年5月")
+        self.assertEqual(ws["A3"].value, "行政部")
+        self.assertEqual(ws["B3"].value, "经理甲")
+        self.assertIsNone(ws["B4"].value)
 
     def test_fill_manager_template_groups_department_name_once(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
@@ -337,13 +340,14 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                     "remark": "",
                 },
             ],
+            "2026-05",
             include_actual_attendance_days=False,
         )
 
-        self.assertEqual(ws["A2"].value, "行政部")
-        self.assertIsNone(ws["A3"].value)
-        self.assertEqual(ws["B2"].value, "经理甲")
-        self.assertEqual(ws["B3"].value, "经理乙")
+        self.assertEqual(ws["A3"].value, "行政部")
+        self.assertIsNone(ws["A4"].value)
+        self.assertEqual(ws["B3"].value, "经理甲")
+        self.assertEqual(ws["B4"].value, "经理乙")
 
     def test_fill_manager_template_extends_new_rows_with_template_style(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
@@ -369,13 +373,15 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                 }
             )
 
-        _fill_manager_template(ws, rows, include_actual_attendance_days=False)
+        _fill_manager_template(ws, rows, "2026-05", include_actual_attendance_days=False)
 
-        self.assertEqual(ws.max_row, 106)
+        self.assertEqual(ws.max_row, 111)
         self.assertEqual(ws["B105"]._style, ws["B104"]._style)
-        self.assertEqual(ws["M106"]._style, ws["M104"]._style)
+        self.assertEqual(ws["M106"]._style, ws["M105"]._style)
+        self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
+        self.assertEqual(ws["J111"].value, "2026年5月")
 
-    def test_manager_attendance_export_uses_grouped_template_layout(self) -> None:
+    def test_manager_attendance_export_returns_plain_table_layout(self) -> None:
         with self.app.app_context():
             extra_manager = Employee(emp_no="M002", name="经理乙", dept_id=self.dept_id, is_manager=True)
             db.session.add(extra_manager)
@@ -388,20 +394,62 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             )
             db.session.commit()
 
-        res = self.client.get("/employee/api/manager-attendance/export?month=2026-05")
+        res = self.client.get("/employee/api/manager-attendance/export?month=2026-05&show_actual_attendance_days=1")
         self.assertEqual(res.status_code, 200)
         wb = openpyxl.load_workbook(io.BytesIO(res.data))
         ws = wb.active
 
         self.assertEqual(ws.title, "管理人员查询")
         self.assertEqual(
-            [ws.cell(1, col_idx).value for col_idx in range(1, 14)],
-            ["部   门", "姓名", "出勤天数", "事/病假", "工伤", "出差", "婚/丧假", "丧假", "迟到\\早退", "汇总", "福利天数", "加班变化", "备注"],
+            [ws.cell(1, col_idx).value for col_idx in range(1, 15)],
+            ["部   门", "姓名", "出勤天数", "实际出勤天数", "事/病假", "工伤", "出差", "婚假", "丧假", "迟到\\早退", "汇总", "福利天数", "加班变化", "备注"],
         )
         self.assertEqual(ws["A2"].value, "行政部")
         self.assertEqual(ws["B2"].value, "经理甲")
-        self.assertIsNone(ws["A3"].value)
+        self.assertEqual(ws["A3"].value, "行政部")
         self.assertEqual(ws["B3"].value, "经理乙")
+
+    def test_manager_attendance_template_export_uses_grouped_template_layout(self) -> None:
+        with self.app.app_context():
+            child = Department(dept_no="D002", dept_name="财务核算组", parent_id=self.dept_id)
+            db.session.add(child)
+            db.session.flush()
+            extra_manager = Employee(emp_no="M002", name="经理乙", dept_id=child.id, is_manager=True)
+            db.session.add(extra_manager)
+            db.session.flush()
+            db.session.add_all(
+                [
+                    MonthlyReport(emp_id=self.manager_id, report_month="2026-05", manager_raw_data={"出勤天数": 20}),
+                    MonthlyReport(emp_id=extra_manager.id, report_month="2026-05", manager_raw_data={"出勤天数": 21}),
+                ]
+            )
+            db.session.commit()
+
+        res = self.client.get("/employee/api/manager-attendance/export-template?month=2026-05")
+        self.assertEqual(res.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(res.data))
+        ws = wb.active
+
+        self.assertEqual(ws.title, "管理人员查询")
+        self.assertEqual(
+            [ws.cell(2, col_idx).value for col_idx in range(1, 14)],
+            ["部   门", "姓名", "出勤天数", "事/病假", "工伤", "出差", "婚假", "丧假", "迟到\\早退", "汇总", "福利天数", "加班变化", "备注"],
+        )
+        self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
+        self.assertEqual(ws["J109"].value, "2026年5月")
+        self.assertEqual(ws["A3"].value, "行政部")
+        self.assertEqual(ws["B3"].value, "经理甲")
+        self.assertIsNone(ws["A4"].value)
+        self.assertEqual(ws["B4"].value, "经理乙")
+        self.assertEqual(ws["A3"].alignment.text_rotation, 255)
+        self.assertEqual(ws["A3"].alignment.horizontal, "center")
+        self.assertEqual(ws["A3"].alignment.vertical, "center")
+        self.assertEqual(ws["A3"].border.left.style, "thin")
+        self.assertEqual(ws["A3"].border.right.style, "thin")
+        self.assertEqual(ws["A3"].border.top.style, "thin")
+        self.assertEqual(ws["A4"].border.left.style, "thin")
+        self.assertEqual(ws["A4"].border.right.style, "thin")
+        self.assertEqual(ws["A4"].border.bottom.style, "thin")
 
     def test_employee_final_data_uses_override_attendance_days(self) -> None:
         with self.app.app_context():
