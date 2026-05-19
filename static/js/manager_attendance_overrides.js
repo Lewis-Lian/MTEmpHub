@@ -184,21 +184,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selected = selectedListQuery();
     if (!selected) return;
     const query = new URLSearchParams({ month: selected.month, emp_ids: selected.ids.join(",") });
-    const [res, accountSet] = await Promise.all([
-      fetch(`/admin/manager-attendance-overrides/list?${query.toString()}`),
-      accountSetLockState(selected.month),
-    ]);
-    const data = await res.json();
-    if (!res.ok) {
-      window.AppDialog.alert(data.error || "查询失败", "查询失败");
-      return;
-    }
-    currentAccountSet = accountSet;
-    activeEditEmpId = null;
-    overrideRows = Array.isArray(data.rows) ? data.rows : [];
-    renderListRows();
-    updateLockNotice();
-    updateAttendanceOverrideMetrics(`已查询 ${overrideRows.length} 人`);
+    await window.AppQueryProgress.with(listBody, {
+      label: "查询中",
+      detail: "正在加载管理人员修正列表",
+    }, async () => {
+      const [res, accountSet] = await Promise.all([
+        fetch(`/admin/manager-attendance-overrides/list?${query.toString()}`),
+        accountSetLockState(selected.month),
+      ]);
+      const data = await res.json();
+      if (!res.ok) {
+        window.AppDialog.alert(data.error || "查询失败", "查询失败");
+        return;
+      }
+      currentAccountSet = accountSet;
+      activeEditEmpId = null;
+      overrideRows = Array.isArray(data.rows) ? data.rows : [];
+      renderListRows();
+      updateLockNotice();
+      updateAttendanceOverrideMetrics(`已查询 ${overrideRows.length} 人`);
+    });
   }
 
   async function saveManagerAttendanceOverride() {

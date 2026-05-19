@@ -42,9 +42,14 @@ async function loadAnnualLeaveQuery() {
   const query = new URLSearchParams();
   if (year) query.set("year", year);
   ids.forEach((id) => query.append("emp_ids", id));
-  const res = await fetch(`/employee/api/manager-annual-leave-query?${query.toString()}`);
-  const data = await res.json();
-  renderAnnualLeaveQuery(Array.isArray(data.headers) ? data.headers : [], Array.isArray(data.rows) ? data.rows : []);
+  await window.AppQueryProgress.with(document.getElementById("managerAnnualLeaveQueryMeta"), {
+    label: "查询中",
+    detail: "正在加载管理人员年休结果",
+  }, async () => {
+    const res = await fetch(`/employee/api/manager-annual-leave-query?${query.toString()}`);
+    const data = await res.json();
+    renderAnnualLeaveQuery(Array.isArray(data.headers) ? data.headers : [], Array.isArray(data.rows) ? data.rows : []);
+  });
 }
 
 let annualLeaveEmployeeSelector;

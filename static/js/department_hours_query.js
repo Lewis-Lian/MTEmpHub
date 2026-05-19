@@ -41,9 +41,14 @@ async function queryDepartmentHours() {
   const month = document.getElementById("accountSetSelect").value;
   const query = new URLSearchParams();
   if (month) query.set("month", month);
-  const res = await fetch(`/employee/api/department-hours?${query.toString()}`);
-  const data = await res.json();
-  renderRows(Array.isArray(data) ? data : []);
+  await window.AppQueryProgress.with(document.getElementById("departmentHoursMeta"), {
+    label: "计算中",
+    detail: "正在汇总部门月度工时",
+  }, async () => {
+    const res = await fetch(`/employee/api/department-hours?${query.toString()}`);
+    const data = await res.json();
+    renderRows(Array.isArray(data) ? data : []);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

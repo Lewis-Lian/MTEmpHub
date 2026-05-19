@@ -42,9 +42,14 @@ async function loadOvertimeQuery() {
   const query = new URLSearchParams();
   if (year) query.set("year", year);
   ids.forEach((id) => query.append("emp_ids", id));
-  const res = await fetch(`/employee/api/manager-overtime-query?${query.toString()}`);
-  const data = await res.json();
-  renderOvertimeQuery(Array.isArray(data.headers) ? data.headers : [], Array.isArray(data.rows) ? data.rows : []);
+  await window.AppQueryProgress.with(document.getElementById("managerOvertimeQueryMeta"), {
+    label: "查询中",
+    detail: "正在加载管理人员加班结果",
+  }, async () => {
+    const res = await fetch(`/employee/api/manager-overtime-query?${query.toString()}`);
+    const data = await res.json();
+    renderOvertimeQuery(Array.isArray(data.headers) ? data.headers : [], Array.isArray(data.rows) ? data.rows : []);
+  });
 }
 
 let overtimeEmployeeSelector;

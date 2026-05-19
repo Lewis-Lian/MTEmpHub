@@ -94,7 +94,7 @@ window.AppDialog = (() => {
 })();
 
 window.AppToast = (() => {
-  const AUTO_HIDE_DELAY_MS = 3000;
+  const AUTO_HIDE_DELAY_MS = 10000;
 
   function show(message, type = "success", title = "") {
     const container = document.getElementById("appToastContainer");
@@ -120,21 +120,44 @@ window.AppToast = (() => {
     `;
     container.appendChild(toastEl);
     const toast = bootstrap.Toast.getOrCreateInstance(toastEl, { autohide: false });
-    let timerId = window.setTimeout(() => {
+    let remainingMs = AUTO_HIDE_DELAY_MS;
+    let timerId = null;
+    let startedAt = 0;
+
+    function clearTimer() {
+      if (!timerId) return;
+      window.clearTimeout(timerId);
       timerId = null;
-      toast.hide();
-    }, AUTO_HIDE_DELAY_MS);
-    toastEl.addEventListener("mouseenter", () => {
-      if (timerId) {
-        window.clearTimeout(timerId);
+    }
+
+    function startTimer(delay) {
+      remainingMs = Math.max(0, Number(delay || 0));
+      startedAt = Date.now();
+      clearTimer();
+      timerId = window.setTimeout(() => {
         timerId = null;
+        remainingMs = 0;
+        toast.hide();
+      }, remainingMs);
+    }
+
+    function pauseTimer() {
+      if (!timerId) return;
+      remainingMs = Math.max(0, remainingMs - (Date.now() - startedAt));
+      clearTimer();
+    }
+
+    startTimer(remainingMs);
+    toastEl.addEventListener("mouseenter", () => {
+      pauseTimer();
+    });
+    toastEl.addEventListener("mouseleave", () => {
+      if (!timerId && remainingMs > 0) {
+        startTimer(remainingMs);
       }
     });
     toastEl.addEventListener("hidden.bs.toast", () => {
-      if (timerId) {
-        window.clearTimeout(timerId);
-        timerId = null;
-      }
+      clearTimer();
       toastEl.remove();
     });
     toast.show();
@@ -150,6 +173,63 @@ window.AppToast = (() => {
     warning(message, title = "提示") {
       show(message, "warning", title);
     },
+  };
+})();
+
+window.AppQueryProgress = (() => {
+  function resolvePanel(target) {
+    if (!target) return null;
+    if (typeof target === "string") {
+      return document.querySelector(target);
+    }
+    if (target.classList?.contains("query-result-panel") || target.classList?.contains("card")) {
+      return target;
+    }
+    return target.closest?.(".query-result-panel, .card") || null;
+  }
+
+  function resolveOverlay(panel) {
+    return panel?.querySelector?.("[data-query-progress-overlay]") || null;
+  }
+
+  function show(target, options = {}) {
+    const panel = resolvePanel(target);
+    const overlay = resolveOverlay(panel);
+    if (!panel || !overlay) return null;
+    const labelEl = overlay.querySelector(".query-progress-label");
+    const detailEl = overlay.querySelector(".query-progress-detail");
+    if (labelEl) labelEl.textContent = options.label || "查询中";
+    if (detailEl) detailEl.textContent = options.detail || "正在加载结果";
+    panel.classList.add("has-query-progress");
+    panel.setAttribute("aria-busy", "true");
+    overlay.classList.add("is-visible");
+    overlay.setAttribute("aria-hidden", "false");
+    return panel;
+  }
+
+  function hide(target) {
+    const panel = resolvePanel(target);
+    const overlay = resolveOverlay(panel);
+    if (!panel || !overlay) return;
+    panel.classList.remove("has-query-progress");
+    panel.setAttribute("aria-busy", "false");
+    overlay.classList.remove("is-visible");
+    overlay.setAttribute("aria-hidden", "true");
+  }
+
+  async function withProgress(target, options, task) {
+    show(target, options);
+    try {
+      return await task();
+    } finally {
+      hide(target);
+    }
+  }
+
+  return {
+    show,
+    hide,
+    with: withProgress,
   };
 })();
 
