@@ -13,7 +13,7 @@ import openpyxl
 from flask import Flask, g, render_template
 
 from models import db
-from models.account_set import AccountSet
+from models.account_set import AccountSet, AccountSetFactoryRestDay
 from models.daily_record import DailyRecord
 from models.department import Department
 from models.employee import Employee
@@ -21,7 +21,9 @@ from models.manager_month_stat import ManagerMonthStat
 from models.monthly_report import MonthlyReport
 from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, HOME_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, User
 from routes import register_routes
+from routes.admin import _factory_rest_unit, _manager_attendance_options
 from routes.employee import _fill_manager_template
+from services.bootstrap_service import ensure_schema_compatibility
 from utils.app_navigation import module_by_slug, nav_context, visible_modules
 
 
@@ -318,6 +320,85 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(ws["A3"].value, "行政部")
         self.assertEqual(ws["B3"].value, "经理甲")
         self.assertIsNone(ws["B4"].value)
+
+    def test_account_set_list_returns_factory_rest_entries_and_aggregated_factory_rest_days(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 0
+            db.session.add_all(
+                [
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 8),
+                        rest_period="full",
+                    ),
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 9),
+                        rest_period="am",
+                    ),
+                ]
+            )
+            db.session.commit()
+
+        res = self.client.get("/admin/account-sets")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(payload[0]["factory_rest_days"], 1.5)
+        self.assertEqual(
+            payload[0]["factory_rest_entries"],
+            [
+                {"date": "2026-04-08", "period": "full", "unit": 1.0},
+                {"date": "2026-04-09", "period": "am", "unit": 0.5},
+            ],
+        )
+
+    def test_account_set_list_without_factory_rest_entries_returns_legacy_factory_rest_days(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 2.0
+            db.session.commit()
+
+        res = self.client.get("/admin/account-sets")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(payload[0]["factory_rest_days"], 2.0)
+        self.assertEqual(payload[0]["factory_rest_entries"], [])
+
+    def test_manager_attendance_options_uses_aggregated_factory_rest_days(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 0
+            db.session.add_all(
+                [
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 8),
+                        rest_period="full",
+                    ),
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 9),
+                        rest_period="am",
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            options = _manager_attendance_options("2026-05")
+            self.assertEqual(options.factory_rest_days, 1.5)
+
+    def test_factory_rest_unit_rejects_unknown_period(self) -> None:
+        with self.assertRaises(ValueError):
+            _factory_rest_unit("invalid")
+
+    def test_ensure_schema_compatibility_is_idempotent_for_factory_rest_table(self) -> None:
+        with self.app.app_context():
+            ensure_schema_compatibility()
+            ensure_schema_compatibility()
 
     def test_fill_manager_template_groups_department_name_once(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
