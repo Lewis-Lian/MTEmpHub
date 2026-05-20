@@ -21,7 +21,7 @@ from models.employee import (
 from models.employee_shift import EmployeeShiftAssignment
 from models.shift import Shift
 from models.daily_record import DailyRecord
-from models.account_set import AccountSet, AccountSetImport
+from models.account_set import AccountSet, AccountSetFactoryRestDay, AccountSetImport
 from models.overtime import OvertimeRecord
 from models.annual_leave import AnnualLeave
 from models.manager_month_stat import ManagerMonthStat
@@ -365,6 +365,32 @@ def _department_matches_original_identity(
     )
 
 
+def _factory_rest_unit(period: str) -> float:
+    if period == "full":
+        return 1.0
+    if period in {"am", "pm"}:
+        return 0.5
+    raise ValueError(f"Unsupported factory rest period: {period}")
+
+
+def _effective_factory_rest_days(account_set: AccountSet | None) -> float:
+    if account_set is None:
+        return 0
+
+    if not account_set.factory_rest_entries:
+        return (account_set.factory_rest_days or 0)
+
+    return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
+
+
+def _serialize_factory_rest_entry(row: AccountSetFactoryRestDay) -> dict:
+    return {
+        "date": row.rest_date.isoformat() if row.rest_date else None,
+        "period": row.rest_period,
+        "unit": _factory_rest_unit(row.rest_period),
+    }
+
+
 def _serialize_account_set(row: AccountSet) -> dict:
     success_count = 0
     error_count = 0
@@ -380,6 +406,15 @@ def _serialize_account_set(row: AccountSet) -> dict:
         if item.created_at and (latest_import_at is None or item.created_at > latest_import_at):
             latest_import_at = item.created_at
 
+    factory_rest_entries = sorted(
+        row.factory_rest_entries,
+        key=lambda item: (
+            item.rest_date.isoformat() if item.rest_date else "",
+            item.rest_period or "",
+        ),
+    )
+    serialized_factory_rest_entries = [_serialize_factory_rest_entry(item) for item in factory_rest_entries]
+
     return {
         "id": row.id,
         "month": row.month,
@@ -388,7 +423,8 @@ def _serialize_account_set(row: AccountSet) -> dict:
         "is_locked": bool(row.is_locked),
         "locked_at": row.locked_at.isoformat() if row.locked_at else None,
         "locked_by": row.locked_by,
-        "factory_rest_days": row.factory_rest_days or 0,
+        "factory_rest_days": _effective_factory_rest_days(row),
+        "factory_rest_entries": serialized_factory_rest_entries,
         "monthly_benefit_days": row.monthly_benefit_days or 0,
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "imports_count": len(row.imports),
@@ -854,7 +890,7 @@ def calculate_account_set(account_set_id: int):
         try:
             manager_options = ManagerAttendanceOptions(
                 month=row.month,
-                factory_rest_days=row.factory_rest_days or 0,
+                factory_rest_days=_effective_factory_rest_days(row),
                 monthly_benefit_days=row.monthly_benefit_days or 0,
             )
             manager_rows = build_manager_rows(manager_options, sync_month_stats=True)
@@ -1126,7 +1162,7 @@ def _validate_manager_month_stat(stat_type: str, year: int, values: dict[str, fl
                 return "年休每月使用不能超过 3 天"
             month = _month_for_stat_key(year, key)
             account_set = AccountSet.query.filter_by(month=month).first()
-            factory_rest_days = (account_set.factory_rest_days if account_set else 0) or 0
+            factory_rest_days = _effective_factory_rest_days(account_set)
             if factory_rest_days + value > 7:
                 return f"{month} 厂休+年休不能超过 7 天"
 
@@ -1246,7 +1282,7 @@ def _manager_attendance_options(month: str) -> ManagerAttendanceOptions:
     account = AccountSet.query.filter_by(month=month).first()
     return ManagerAttendanceOptions(
         month=month,
-        factory_rest_days=(account.factory_rest_days if account else 0) or 0,
+        factory_rest_days=_effective_factory_rest_days(account),
         monthly_benefit_days=(account.monthly_benefit_days if account else 0) or 0,
     )
 
