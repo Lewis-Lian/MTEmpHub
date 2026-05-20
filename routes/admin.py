@@ -383,6 +383,53 @@ def _effective_factory_rest_days(account_set: AccountSet | None) -> float:
     return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
 
 
+def _parse_factory_rest_entries(entries: object, month: str) -> list[dict[str, object]]:
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        raise ValueError("厂休明细格式不正确")
+
+    normalized: list[dict[str, object]] = []
+    seen_dates: set[str] = set()
+    month_prefix = f"{month}-"
+    for item in entries:
+        if not isinstance(item, dict):
+            raise ValueError("厂休明细格式不正确")
+        date_text = str(item.get("date") or "").strip()
+        period = str(item.get("period") or "").strip()
+        if not date_text.startswith(month_prefix):
+            raise ValueError("厂休日期必须属于当前账套月份")
+        try:
+            rest_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("厂休日期格式不正确") from exc
+        try:
+            _factory_rest_unit(period)
+        except ValueError as exc:
+            raise ValueError("厂休时段仅支持 full/am/pm") from exc
+        if rest_date.isoformat() in seen_dates:
+            raise ValueError("同一天只能设置一个厂休时段")
+        seen_dates.add(rest_date.isoformat())
+        normalized.append({"date": rest_date, "period": period})
+    return normalized
+
+
+def _replace_factory_rest_entries(account_set: AccountSet, entries: list[dict[str, object]]) -> float:
+    account_set.factory_rest_entries.clear()
+    total = 0.0
+    for item in entries:
+        period = str(item["period"])
+        account_set.factory_rest_entries.append(
+            AccountSetFactoryRestDay(
+                rest_date=item["date"],
+                rest_period=period,
+            )
+        )
+        total += _factory_rest_unit(period)
+    account_set.factory_rest_days = total
+    return total
+
+
 def _serialize_factory_rest_entry(row: AccountSetFactoryRestDay) -> dict:
     return {
         "date": row.rest_date.isoformat() if row.rest_date else None,
@@ -729,12 +776,16 @@ def list_account_sets():
 def create_account_set():
     data = request.json or {}
     month = (data.get("month") or "").strip()
-    factory_rest_days = request.json.get("factory_rest_days", 0) if request.json else 0
-    monthly_benefit_days = request.json.get("monthly_benefit_days", 0) if request.json else 0
+    factory_rest_days = data.get("factory_rest_days", 0)
+    monthly_benefit_days = data.get("monthly_benefit_days", 0)
     if not month or len(month) != 7:
         return jsonify({"error": "month is required in YYYY-MM format"}), 400
     if AccountSet.query.filter_by(month=month).first():
         return jsonify({"error": "该月份账套已存在"}), 400
+    try:
+        entries = _parse_factory_rest_entries(data.get("factory_rest_entries"), month)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     row = AccountSet(
         month=month,
@@ -745,6 +796,8 @@ def create_account_set():
     if AccountSet.query.count() == 0:
         row.is_active = True
     db.session.add(row)
+    if "factory_rest_entries" in data:
+        _replace_factory_rest_entries(row, entries)
     db.session.commit()
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
@@ -757,7 +810,14 @@ def update_account_set(account_set_id: int):
     if locked_error:
         return locked_error
     data = request.json or {}
-    row.factory_rest_days = float(data.get("factory_rest_days") or 0)
+    if "factory_rest_entries" in data:
+        try:
+            entries = _parse_factory_rest_entries(data.get("factory_rest_entries"), row.month)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        _replace_factory_rest_entries(row, entries)
+    elif "factory_rest_days" in data:
+        row.factory_rest_days = float(data.get("factory_rest_days") or 0)
     row.monthly_benefit_days = float(data.get("monthly_benefit_days") or 0)
     db.session.commit()
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})

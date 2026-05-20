@@ -16,8 +16,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const accountSetResult = document.getElementById("accountSetResult");
   const accountSetImportsBody = document.getElementById("accountSetImportsBody");
   const accountSetLockNotice = document.getElementById("accountSetLockNotice");
+  const factoryRestCalendar = document.getElementById("factoryRestCalendar");
 
   let accountSets = [];
+  let factoryRestEntries = [];
+  let factoryRestEntriesDirty = false;
+  const FACTORY_REST_PERIOD_ORDER = ["", "am", "pm", "full"];
   window.AppFeedback.setResult(accountSetResult, "", "muted");
 
   function currentAccountSetId() {
@@ -29,12 +33,121 @@ document.addEventListener("DOMContentLoaded", () => {
     return accountSets.find((x) => Number(x.id) === id) || null;
   }
 
+  function factoryRestUnit(period) {
+    if (period === "full") return 1;
+    if (period === "am" || period === "pm") return 0.5;
+    return 0;
+  }
+
+  function syncFactoryRestDaysInput(fallbackValue = null) {
+    const total = factoryRestEntries.reduce((sum, item) => sum + factoryRestUnit(item.period), 0);
+    if (factoryRestEntries.length === 0 && fallbackValue !== null) {
+      factoryRestDaysInput.value = String(fallbackValue || 0);
+      return;
+    }
+    factoryRestDaysInput.value = String(total);
+  }
+
+  function factoryRestEntriesByDate() {
+    return new Map(factoryRestEntries.map((item) => [item.date, item.period]));
+  }
+
+  function nextFactoryRestPeriod(period) {
+    const currentIndex = FACTORY_REST_PERIOD_ORDER.indexOf(period || "");
+    return FACTORY_REST_PERIOD_ORDER[(currentIndex + 1) % FACTORY_REST_PERIOD_ORDER.length];
+  }
+
+  function factoryRestButtonClass(period) {
+    if (period === "full") return "btn-danger";
+    if (period === "am" || period === "pm") return "btn-warning";
+    return "btn-outline-secondary";
+  }
+
+  function factoryRestButtonText(day, period) {
+    if (period === "full") return `${day} 全天`;
+    if (period === "am") return `${day} 上午`;
+    if (period === "pm") return `${day} 下午`;
+    return `${day} 非厂休`;
+  }
+
+  function updateFactoryRestEntry(dateText) {
+    const row = currentAccountSet();
+    factoryRestEntriesDirty = true;
+    const entryMap = factoryRestEntriesByDate();
+    const nextPeriod = nextFactoryRestPeriod(entryMap.get(dateText) || "");
+    if (!nextPeriod) {
+      factoryRestEntries = factoryRestEntries.filter((item) => item.date !== dateText);
+    } else {
+      const nextEntry = { date: dateText, period: nextPeriod };
+      let replaced = false;
+      factoryRestEntries = factoryRestEntries.map((item) => {
+        if (item.date !== dateText) {
+          return item;
+        }
+        replaced = true;
+        return nextEntry;
+      });
+      if (!replaced) {
+        factoryRestEntries = [...factoryRestEntries, nextEntry];
+      }
+    }
+    factoryRestEntries.sort((a, b) => a.date.localeCompare(b.date));
+    renderFactoryRestCalendar();
+    syncFactoryRestDaysInput(row ? row.factory_rest_days || 0 : 0);
+  }
+
+  function renderFactoryRestCalendar() {
+    const row = currentAccountSet();
+    if (!row) {
+      factoryRestCalendar.innerHTML = `<div class="small text-muted">请选择账套后设置厂休明细</div>`;
+      return;
+    }
+
+    const monthText = String(row.month || "");
+    const parts = monthText.split("-");
+    const year = Number(parts[0] || 0);
+    const month = Number(parts[1] || 0);
+    if (!year || !month) {
+      factoryRestCalendar.innerHTML = `<div class="small text-danger">账套月份格式不正确，无法渲染厂休日期</div>`;
+      return;
+    }
+
+    const entryMap = factoryRestEntriesByDate();
+    const lastDay = new Date(year, month, 0).getDate();
+    const isLocked = Boolean(row.is_locked);
+    factoryRestCalendar.innerHTML = Array.from({ length: lastDay }, (_, index) => {
+      const day = index + 1;
+      const dateText = `${monthText}-${String(day).padStart(2, "0")}`;
+      const period = entryMap.get(dateText) || "";
+      return `
+        <button
+          type="button"
+          class="btn btn-sm ${factoryRestButtonClass(period)}"
+          data-date="${dateText}"
+          ${isLocked ? "disabled" : ""}
+        >${factoryRestButtonText(day, period)}</button>
+      `;
+    }).join("");
+
+    factoryRestCalendar.querySelectorAll("button[data-date]").forEach((button) => {
+      button.addEventListener("click", () => updateFactoryRestEntry(button.dataset.date || ""));
+    });
+  }
+
   function renderAccountSetParams() {
     const row = currentAccountSet();
+    factoryRestEntriesDirty = false;
+    factoryRestEntries = row
+      ? (Array.isArray(row.factory_rest_entries) ? row.factory_rest_entries : []).map((item) => ({
+        date: item.date,
+        period: item.period,
+      }))
+      : [];
     factoryRestDaysInput.value = row ? String(row.factory_rest_days || 0) : "0";
     monthlyBenefitDaysInput.value = row ? String(row.monthly_benefit_days || 0) : "0";
     const isLocked = Boolean(row?.is_locked);
-    factoryRestDaysInput.disabled = isLocked;
+    factoryRestDaysInput.readOnly = true;
+    factoryRestDaysInput.disabled = !row;
     monthlyBenefitDaysInput.disabled = isLocked;
     saveAccountSetParamsBtn.disabled = isLocked || !row;
     deleteAccountSetBtn.disabled = isLocked || !row;
@@ -47,6 +160,8 @@ document.addEventListener("DOMContentLoaded", () => {
     accountSetLockNotice.textContent = !row
       ? "请选择账套"
       : (isLocked ? "该账套已锁定，仅允许查看、设为当前和解锁。" : "该账套未锁定，可继续上传、计算和修改。");
+    renderFactoryRestCalendar();
+    syncFactoryRestDaysInput(row ? row.factory_rest_days || 0 : 0);
   }
 
   function renderAccountSets() {
@@ -149,13 +264,16 @@ document.addEventListener("DOMContentLoaded", () => {
       window.AppFeedback.setResult(accountSetResult, "请先选择账套", "danger");
       return;
     }
+    const payload = {
+      monthly_benefit_days: monthlyBenefitDaysInput.value || "0",
+    };
+    if (factoryRestEntriesDirty) {
+      payload.factory_rest_entries = factoryRestEntries;
+    }
     const res = await fetch(`/admin/account-sets/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        factory_rest_days: factoryRestDaysInput.value || "0",
-        monthly_benefit_days: monthlyBenefitDaysInput.value || "0",
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (!res.ok) {
