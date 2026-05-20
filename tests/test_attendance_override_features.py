@@ -395,6 +395,177 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _factory_rest_unit("invalid")
 
+    def test_create_account_set_accepts_factory_rest_entries_and_aggregates_days(self) -> None:
+        res = self.client.post(
+            "/admin/account-sets",
+            json={
+                "month": "2026-04",
+                "factory_rest_entries": [
+                    {"date": "2026-04-08", "period": "full"},
+                    {"date": "2026-04-09", "period": "pm"},
+                ],
+            },
+        )
+
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()["account_set"]
+        self.assertEqual(payload["factory_rest_days"], 1.5)
+        self.assertEqual(
+            payload["factory_rest_entries"],
+            [
+                {"date": "2026-04-08", "period": "full", "unit": 1.0},
+                {"date": "2026-04-09", "period": "pm", "unit": 0.5},
+            ],
+        )
+
+    def test_update_account_set_recalculates_factory_rest_days_from_entries(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={
+                "factory_rest_entries": [
+                    {"date": "2026-05-08", "period": "full"},
+                    {"date": "2026-05-09", "period": "am"},
+                    {"date": "2026-05-10", "period": "pm"},
+                ],
+                "monthly_benefit_days": "3",
+            },
+        )
+
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()["account_set"]
+        self.assertEqual(payload["factory_rest_days"], 2.0)
+        self.assertEqual(payload["monthly_benefit_days"], 3.0)
+        self.assertEqual(
+            payload["factory_rest_entries"],
+            [
+                {"date": "2026-05-08", "period": "full", "unit": 1.0},
+                {"date": "2026-05-09", "period": "am", "unit": 0.5},
+                {"date": "2026-05-10", "period": "pm", "unit": 0.5},
+            ],
+        )
+
+        with self.app.app_context():
+            account_set = db.session.get(AccountSet, account_set_id)
+            self.assertIsNotNone(account_set)
+            self.assertEqual(account_set.factory_rest_days, 2.0)
+            self.assertEqual(account_set.monthly_benefit_days, 3.0)
+            self.assertEqual(
+                [(item.rest_date.isoformat(), item.rest_period) for item in account_set.factory_rest_entries],
+                [("2026-05-08", "full"), ("2026-05-09", "am"), ("2026-05-10", "pm")],
+            )
+
+    def test_update_account_set_preserves_legacy_factory_rest_days_when_entries_not_submitted(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 2.0
+            account_set_id = account_set.id
+            db.session.commit()
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={"monthly_benefit_days": "4"},
+        )
+
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()["account_set"]
+        self.assertEqual(payload["factory_rest_days"], 2.0)
+        self.assertEqual(payload["factory_rest_entries"], [])
+        self.assertEqual(payload["monthly_benefit_days"], 4.0)
+
+        with self.app.app_context():
+            account_set = db.session.get(AccountSet, account_set_id)
+            self.assertIsNotNone(account_set)
+            self.assertEqual(account_set.factory_rest_days, 2.0)
+            self.assertEqual(account_set.monthly_benefit_days, 4.0)
+            self.assertEqual(account_set.factory_rest_entries, [])
+
+    def test_update_account_set_rejects_factory_rest_date_outside_month(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet(month="2026-04", name="2026-04 账套")
+            db.session.add(account_set)
+            db.session.commit()
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={"factory_rest_entries": [{"date": "2026-05-01", "period": "full"}]},
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("厂休日期必须属于当前账套月份", res.get_json()["error"])
+
+    def test_update_account_set_rejects_duplicate_factory_rest_dates(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet(month="2026-04", name="2026-04 账套")
+            db.session.add(account_set)
+            db.session.commit()
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={
+                "factory_rest_entries": [
+                    {"date": "2026-04-08", "period": "am"},
+                    {"date": "2026-04-08", "period": "pm"},
+                ]
+            },
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("同一天只能设置一个厂休时段", res.get_json()["error"])
+
+    def test_update_account_set_rejects_invalid_factory_rest_period(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet(month="2026-04", name="2026-04 账套")
+            db.session.add(account_set)
+            db.session.commit()
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={"factory_rest_entries": [{"date": "2026-04-08", "period": "invalid"}]},
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("厂休时段仅支持 full/am/pm", res.get_json()["error"])
+
+    def test_update_account_set_rejects_invalid_factory_rest_date_format(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet(month="2026-04", name="2026-04 账套")
+            db.session.add(account_set)
+            db.session.commit()
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={"factory_rest_entries": [{"date": "2026/04/08", "period": "full"}]},
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("厂休日期必须属于当前账套月份", res.get_json()["error"])
+
+    def test_update_account_set_rejects_factory_rest_entries_when_locked(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.is_locked = True
+            db.session.commit()
+            account_set_id = account_set.id
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={"factory_rest_entries": [{"date": "2026-05-08", "period": "full"}]},
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("账套已锁定", res.get_json()["error"])
+
     def test_ensure_schema_compatibility_is_idempotent_for_factory_rest_table(self) -> None:
         with self.app.app_context():
             ensure_schema_compatibility()
