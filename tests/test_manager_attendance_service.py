@@ -7,6 +7,7 @@ from datetime import date, datetime
 from flask import Flask
 
 from models import db
+from models.account_set import AccountSet, AccountSetFactoryRestDay
 from models.annual_leave import AnnualLeave
 from models.attendance_override_history import AttendanceOverrideHistory
 from models.daily_record import DailyRecord
@@ -176,6 +177,234 @@ class ManagerLateSummaryTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["late_early_minutes"], 0)
         self.assertEqual(rows[0]["summary"], "")
+
+
+class ManagerFactoryRestOverlapTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-factory-rest.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="行政部")
+            manager = Employee(emp_no="M001", name="练义炜", is_manager=True)
+            db.session.add_all([dept, manager])
+            db.session.flush()
+            manager.dept_id = dept.id
+
+            account_set = AccountSet(month="2026-04", name="2026-04 账套", factory_rest_days=1.5)
+            db.session.add(account_set)
+            db.session.flush()
+            db.session.add_all(
+                [
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 8),
+                        rest_period="full",
+                    ),
+                    AccountSetFactoryRestDay(
+                        account_set_id=account_set.id,
+                        rest_date=date(2026, 4, 9),
+                        rest_period="am",
+                    ),
+                ]
+            )
+            db.session.add(
+                MonthlyReport(
+                    emp_id=manager.id,
+                    report_month="2026-04",
+                    manager_raw_data={"出勤天数": 2},
+                )
+            )
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def _add_leave(
+        self,
+        leave_no: str,
+        leave_type: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> None:
+        db.session.add(
+            LeaveRecord(
+                emp_id=self.manager_id,
+                leave_no=leave_no,
+                leave_type=leave_type,
+                start_time=start_time,
+                end_time=end_time,
+            )
+        )
+        db.session.commit()
+
+    def _build_rows(self, month: str = "2026-04", factory_rest_days: float = 1.5) -> list[dict[str, object]]:
+        return build_manager_rows(
+            ManagerAttendanceOptions(month=month, factory_rest_days=factory_rest_days),
+            [self.manager_id],
+        )
+
+    def test_business_trip_days_subtracts_full_and_half_day_factory_rest_overlap(self) -> None:
+        with self.app.app_context():
+            self._add_leave(
+                "CC001",
+                "出差",
+                datetime(2026, 4, 8, 8, 0, 0),
+                datetime(2026, 4, 10, 17, 0, 0),
+            )
+
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["business_trip_days"], 1.5)
+        self.assertEqual(rows[0]["attendance_days"], 3.5)
+
+    def test_marriage_leave_afternoon_does_not_subtract_morning_factory_rest(self) -> None:
+        with self.app.app_context():
+            self._add_leave(
+                "HJ001",
+                "婚假",
+                datetime(2026, 4, 9, 13, 0, 0),
+                datetime(2026, 4, 9, 17, 0, 0),
+            )
+
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["marriage_days"], 0.5)
+        self.assertEqual(rows[0]["attendance_days"], 2.5)
+
+    def test_funeral_leave_clamps_to_zero_when_fully_covered_by_factory_rest(self) -> None:
+        with self.app.app_context():
+            self._add_leave(
+                "SJ001",
+                "丧假",
+                datetime(2026, 4, 8, 8, 0, 0),
+                datetime(2026, 4, 8, 17, 0, 0),
+            )
+
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["funeral_days"], 0.0)
+        self.assertEqual(rows[0]["attendance_days"], 2.0)
+
+    def test_business_trip_at_noon_boundary_only_subtracts_matching_half_day(self) -> None:
+        with self.app.app_context():
+            self._add_leave(
+                "CC002",
+                "出差",
+                datetime(2026, 4, 9, 8, 0, 0),
+                datetime(2026, 4, 9, 12, 0, 0),
+            )
+            morning_rows = self._build_rows()
+
+            LeaveRecord.query.filter_by(leave_no="CC002").delete()
+            db.session.commit()
+
+            self._add_leave(
+                "CC003",
+                "出差",
+                datetime(2026, 4, 9, 12, 0, 0),
+                datetime(2026, 4, 9, 17, 0, 0),
+            )
+            afternoon_rows = self._build_rows()
+
+        self.assertEqual(morning_rows[0]["business_trip_days"], 0.0)
+        self.assertEqual(afternoon_rows[0]["business_trip_days"], 0.5)
+
+    def test_cross_month_leave_only_subtracts_current_month_factory_rest_overlap(self) -> None:
+        with self.app.app_context():
+            may_account_set = AccountSet(month="2026-05", name="2026-05 账套", factory_rest_days=1.0)
+            db.session.add(may_account_set)
+            db.session.flush()
+            db.session.add(
+                AccountSetFactoryRestDay(
+                    account_set_id=may_account_set.id,
+                    rest_date=date(2026, 5, 1),
+                    rest_period="full",
+                )
+            )
+            db.session.add(
+                MonthlyReport(
+                    emp_id=self.manager_id,
+                    report_month="2026-05",
+                    manager_raw_data={"出勤天数": 1},
+                )
+            )
+            db.session.commit()
+
+            self._add_leave(
+                "CC004",
+                "出差",
+                datetime(2026, 4, 30, 8, 0, 0),
+                datetime(2026, 5, 2, 17, 0, 0),
+            )
+
+            rows = self._build_rows(month="2026-05", factory_rest_days=1.0)
+
+        self.assertEqual(rows[0]["business_trip_days"], 1.0)
+        self.assertEqual(rows[0]["attendance_days"], 2.0)
+
+    def test_injury_days_are_not_subtracted_by_factory_rest_overlap(self) -> None:
+        with self.app.app_context():
+            self._add_leave(
+                "GS001",
+                "工伤假",
+                datetime(2026, 4, 8, 8, 0, 0),
+                datetime(2026, 4, 8, 17, 0, 0),
+            )
+
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["injury_days"], 1.0)
+        self.assertEqual(rows[0]["attendance_days"], 2.0)
+
+    def test_business_trip_without_account_set_does_not_subtract_factory_rest_overlap(self) -> None:
+        with self.app.app_context():
+            AccountSetFactoryRestDay.query.delete()
+            AccountSet.query.delete()
+            db.session.commit()
+
+            self._add_leave(
+                "CC005",
+                "出差",
+                datetime(2026, 4, 8, 8, 0, 0),
+                datetime(2026, 4, 8, 17, 0, 0),
+            )
+
+            rows = self._build_rows(factory_rest_days=1.5)
+
+        self.assertEqual(rows[0]["business_trip_days"], 1.0)
+        self.assertEqual(rows[0]["attendance_days"], 3.0)
+
+    def test_business_trip_without_factory_rest_entries_does_not_subtract_factory_rest_overlap(self) -> None:
+        with self.app.app_context():
+            AccountSetFactoryRestDay.query.delete()
+            db.session.commit()
+
+            self._add_leave(
+                "CC006",
+                "出差",
+                datetime(2026, 4, 8, 8, 0, 0),
+                datetime(2026, 4, 8, 17, 0, 0),
+            )
+
+            rows = self._build_rows(factory_rest_days=1.5)
+
+        self.assertEqual(rows[0]["business_trip_days"], 1.0)
+        self.assertEqual(rows[0]["attendance_days"], 3.0)
 
 
 if __name__ == "__main__":

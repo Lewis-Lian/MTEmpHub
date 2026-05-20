@@ -3,9 +3,10 @@ from __future__ import annotations
 import calendar
 import math
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from models import db
+from models.account_set import AccountSet
 from models.employee import Employee
 from models.daily_record import DailyRecord
 from models.leave import LeaveRecord
@@ -226,6 +227,45 @@ def _leave_days_in_month(leave: LeaveRecord, month: str) -> float:
     return overlap_duration_days(leave.start_time, leave.end_time, start_dt, end_dt)
 
 
+def _factory_rest_periods_by_date(month: str) -> dict[date, set[str]]:
+    account_set = AccountSet.query.filter_by(month=month).first()
+    if not account_set:
+        return {}
+
+    periods_by_date: dict[date, set[str]] = {}
+    for entry in account_set.factory_rest_entries:
+        periods = periods_by_date.setdefault(entry.rest_date, set())
+        if entry.rest_period == "full":
+            periods.update({"am", "pm"})
+        elif entry.rest_period in {"am", "pm"}:
+            periods.add(entry.rest_period)
+    return periods_by_date
+
+
+def _day_periods_covered(start_dt: datetime, end_dt: datetime, day: date) -> set[str]:
+    day_start = datetime.combine(day, time.min)
+    noon = datetime.combine(day, time(hour=12))
+    next_day_start = datetime.combine(day + timedelta(days=1), time.min)
+    covered: set[str] = set()
+
+    if start_dt < noon and end_dt > day_start:
+        covered.add("am")
+    if start_dt < next_day_start and end_dt > noon:
+        covered.add("pm")
+    return covered
+
+
+def _factory_rest_overlap_days(leave: LeaveRecord, periods_by_date: dict[date, set[str]]) -> float:
+    if not periods_by_date:
+        return 0.0
+
+    overlap_days = 0.0
+    for rest_date, rest_periods in periods_by_date.items():
+        leave_periods = _day_periods_covered(leave.start_time, leave.end_time, rest_date)
+        overlap_days += 0.5 * len(rest_periods & leave_periods)
+    return _round2(overlap_days)
+
+
 def _manager_month_stat(employee_id: int, month: str, stat_type: str) -> ManagerMonthStat | None:
     year, _key = _stat_year_key(month)
     return ManagerMonthStat.query.filter_by(emp_id=employee_id, year=year, stat_type=stat_type).first()
@@ -444,6 +484,10 @@ def build_manager_rows(
     for employee in employees:
         raw = _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
+        factory_rest_periods_by_date = _factory_rest_periods_by_date(options.month)
+        # 日期级厂休重叠只能以账套厂休明细为准。
+        # 若当月没有账套或没有厂休明细，则无法判断具体重叠日期，本次计算不做重叠扣减。
+        can_subtract_factory_rest_overlap = bool(factory_rest_periods_by_date)
 
         # 哺乳假管理人员不计算迟到\早退
         if employee.is_nursing:
@@ -461,8 +505,11 @@ def build_manager_rows(
         funeral_days = 0.0
 
         for leave in _leave_rows(employee.id, options.month):
-            days = normalize_days(_leave_days_in_month(leave, options.month))
             bucket = _leave_bucket(leave.leave_type)
+            days = normalize_days(_leave_days_in_month(leave, options.month))
+            if can_subtract_factory_rest_overlap and bucket in {"business_trip", "marriage", "funeral"}:
+                overlap_days = _factory_rest_overlap_days(leave, factory_rest_periods_by_date)
+                days = max(_round2(days - overlap_days), 0.0)
             if bucket == "injury":
                 injury_days += days
             elif bucket == "business_trip":
