@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import urllib.parse
+import warnings
 from zipfile import ZipFile
 from datetime import date
 from types import SimpleNamespace
@@ -271,7 +272,10 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         template_path = self._manager_template_path()
         self.assertTrue(template_path.exists())
 
-        wb = openpyxl.load_workbook(template_path)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            wb = openpyxl.load_workbook(template_path)
+        self.assertEqual([str(item.message) for item in caught], [])
         ws = wb.active
         self.assertEqual(ws.print_title_rows, "$1:$2")
         self.assertTrue(ws.print_options.horizontalCentered)
@@ -284,6 +288,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
     def test_fill_manager_template_clears_unused_sample_rows(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
         ws = wb.active
+        current_month_text = __import__("datetime").datetime.now().strftime("%Y年%-m月")
 
         _fill_manager_template(
             ws,
@@ -304,12 +309,12 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                     "remark": "",
                 }
             ],
-            "2026-05",
+            "2026-04",
             include_actual_attendance_days=False,
         )
 
-        self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
-        self.assertEqual(ws["J109"].value, "2026年5月")
+        self.assertEqual(ws["A1"].value, "2026年4月份考勤记录")
+        self.assertEqual(ws["J109"].value, current_month_text)
         self.assertEqual(ws["A3"].value, "行政部")
         self.assertEqual(ws["B3"].value, "经理甲")
         self.assertIsNone(ws["B4"].value)
@@ -412,6 +417,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
     def test_fill_manager_template_extends_new_rows_with_template_style(self) -> None:
         wb = openpyxl.load_workbook(self._manager_template_path())
         ws = wb.active
+        current_month_text = __import__("datetime").datetime.now().strftime("%Y年%-m月")
 
         rows = []
         for index in range(105):
@@ -439,7 +445,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(ws["B105"]._style, ws["B104"]._style)
         self.assertEqual(ws["M106"]._style, ws["M105"]._style)
         self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
-        self.assertEqual(ws["J111"].value, "2026年5月")
+        self.assertEqual(ws["J111"].value, current_month_text)
 
     def test_manager_attendance_export_returns_plain_table_layout(self) -> None:
         with self.app.app_context():
@@ -487,8 +493,12 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
 
         res = self.client.get("/employee/api/manager-attendance/export-template?month=2026-05")
         self.assertEqual(res.status_code, 200)
-        wb = openpyxl.load_workbook(io.BytesIO(res.data))
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            wb = openpyxl.load_workbook(io.BytesIO(res.data))
+        self.assertEqual([str(item.message) for item in caught], [])
         ws = wb.active
+        current_month_text = __import__("datetime").datetime.now().strftime("%Y年%-m月")
 
         self.assertEqual(ws.title, "管理人员查询")
         self.assertEqual(
@@ -496,7 +506,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             ["部   门", "姓名", "出勤天数", "事/病假", "工伤", "出差", "婚假", "丧假", "迟到\\早退", "汇总", "福利天数", "加班变化", "备注"],
         )
         self.assertEqual(ws["A1"].value, "2026年5月份考勤记录")
-        self.assertEqual(ws["J109"].value, "2026年5月")
+        self.assertEqual(ws["J109"].value, current_month_text)
         self.assertEqual(ws["A3"].value, "行政部")
         self.assertEqual(ws["B3"].value, "经理甲")
         self.assertIsNone(ws["A4"].value)

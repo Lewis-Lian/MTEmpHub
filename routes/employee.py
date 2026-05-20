@@ -1631,6 +1631,10 @@ def _manager_template_title(month: str) -> str:
     return f"{_manager_template_month_text(month)}份考勤记录"
 
 
+def _manager_template_current_month_text() -> str:
+    return f"{datetime.now().year}年{datetime.now().month}月"
+
+
 def _extract_template_header_footer_xml(template_path: Path) -> str | None:
     try:
         with ZipFile(template_path) as zf:
@@ -1814,7 +1818,7 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
                     bottom=bottom_style if row_idx == end_row else middle_bottom_style,
                 )
 
-    ws.cell(date_row, 10).value = _manager_template_month_text(month)
+    ws.cell(date_row, 10).value = _manager_template_current_month_text()
     ws.print_area = f"A1:M{ws.max_row}"
 
 
