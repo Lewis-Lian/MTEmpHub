@@ -24,6 +24,12 @@ def ensure_default_admin() -> None:
 
 def ensure_schema_compatibility() -> None:
     inspector = inspect(db.engine)
+    table_names = set(inspector.get_table_names())
+
+    if "account_set_factory_rest_days" not in table_names:
+        from models.account_set import AccountSetFactoryRestDay
+
+        AccountSetFactoryRestDay.__table__.create(bind=db.engine, checkfirst=True)
 
     department_columns = _get_column_names(inspector, "departments")
     if department_columns is not None:

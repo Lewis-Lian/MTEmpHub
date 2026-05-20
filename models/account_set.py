@@ -19,6 +19,11 @@ class AccountSet(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     imports = db.relationship("AccountSetImport", back_populates="account_set", cascade="all, delete-orphan")
+    factory_rest_entries = db.relationship(
+        "AccountSetFactoryRestDay",
+        back_populates="account_set",
+        cascade="all, delete-orphan",
+    )
 
 
 class AccountSetImport(db.Model):
@@ -35,3 +40,19 @@ class AccountSetImport(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     account_set = db.relationship("AccountSet", back_populates="imports")
+
+
+class AccountSetFactoryRestDay(db.Model):
+    __tablename__ = "account_set_factory_rest_days"
+    __table_args__ = (
+        db.UniqueConstraint("account_set_id", "rest_date", "rest_period", name="uq_account_set_factory_rest_day"),
+        db.CheckConstraint("rest_period IN ('full', 'am', 'pm')", name="ck_account_set_factory_rest_period"),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    account_set_id = db.Column(db.Integer, db.ForeignKey("account_sets.id"), nullable=False, index=True)
+    rest_date = db.Column(db.Date, nullable=False, index=True)
+    rest_period = db.Column(db.String(20), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    account_set = db.relationship("AccountSet", back_populates="factory_rest_entries")
