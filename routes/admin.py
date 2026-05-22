@@ -21,7 +21,7 @@ from models.employee import (
 from models.employee_shift import EmployeeShiftAssignment
 from models.shift import Shift
 from models.daily_record import DailyRecord
-from models.account_set import AccountSet, AccountSetImport
+from models.account_set import AccountSet, AccountSetFactoryRestDay, AccountSetImport
 from models.overtime import OvertimeRecord
 from models.annual_leave import AnnualLeave
 from models.manager_month_stat import ManagerMonthStat
@@ -365,6 +365,113 @@ def _department_matches_original_identity(
     )
 
 
+def _factory_rest_unit(period: str) -> float:
+    if period == "full":
+        return 1.0
+    if period in {"am", "pm"}:
+        return 0.5
+    raise ValueError(f"Unsupported factory rest period: {period}")
+
+
+def _effective_factory_rest_days(account_set: AccountSet | None) -> float:
+    if account_set is None:
+        return 0
+
+    if not account_set.factory_rest_entries:
+        return (account_set.factory_rest_days or 0)
+
+    return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
+
+
+def _manager_factory_rest_days(account_set: AccountSet | None) -> float:
+    if account_set is None:
+        return 0
+    if not account_set.factory_rest_entries:
+        return 0
+    return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
+
+
+def _manager_factory_rest_requires_detail(account_set: AccountSet | None) -> bool:
+    if account_set is None:
+        return False
+    return not account_set.factory_rest_entries and float(account_set.factory_rest_days or 0) > 0
+
+
+def _parse_factory_rest_entries(entries: object, month: str) -> list[dict[str, object]]:
+    if entries is None:
+        return []
+    if not isinstance(entries, list):
+        raise ValueError("厂休明细格式不正确")
+
+    normalized: list[dict[str, object]] = []
+    seen_dates: set[str] = set()
+    month_prefix = f"{month}-"
+    for item in entries:
+        if not isinstance(item, dict):
+            raise ValueError("厂休明细格式不正确")
+        date_text = str(item.get("date") or "").strip()
+        period = str(item.get("period") or "").strip()
+        if not date_text.startswith(month_prefix):
+            raise ValueError("厂休日期必须属于当前账套月份")
+        try:
+            rest_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError("厂休日期格式不正确") from exc
+        try:
+            _factory_rest_unit(period)
+        except ValueError as exc:
+            raise ValueError("厂休时段仅支持 full/am/pm") from exc
+        if rest_date.isoformat() in seen_dates:
+            raise ValueError("同一天只能设置一个厂休时段")
+        seen_dates.add(rest_date.isoformat())
+        normalized.append({"date": rest_date, "period": period})
+    return normalized
+
+
+def _replace_factory_rest_entries(account_set: AccountSet, entries: list[dict[str, object]]) -> float:
+    account_set.factory_rest_entries.clear()
+    total = 0.0
+    for item in entries:
+        period = str(item["period"])
+        account_set.factory_rest_entries.append(
+            AccountSetFactoryRestDay(
+                rest_date=item["date"],
+                rest_period=period,
+            )
+        )
+        total += _factory_rest_unit(period)
+    account_set.factory_rest_days = total
+    return total
+
+
+def _validate_initial_factory_rest_entry_backfill(
+    account_set: AccountSet,
+    entries: list[dict[str, object]],
+) -> None:
+    if account_set.factory_rest_entries:
+        return
+
+    legacy_days = float(account_set.factory_rest_days or 0)
+    if legacy_days <= 0:
+        return
+
+    entry_total = sum(_factory_rest_unit(str(item["period"])) for item in entries)
+    if round(entry_total, 2) == round(legacy_days, 2):
+        return
+
+    raise ValueError(
+        f"首次补录厂休明细时，明细汇总必须等于原厂休天数 {legacy_days:g} 天，请一次性补齐全部明细后再保存"
+    )
+
+
+def _serialize_factory_rest_entry(row: AccountSetFactoryRestDay) -> dict:
+    return {
+        "date": row.rest_date.isoformat() if row.rest_date else None,
+        "period": row.rest_period,
+        "unit": _factory_rest_unit(row.rest_period),
+    }
+
+
 def _serialize_account_set(row: AccountSet) -> dict:
     success_count = 0
     error_count = 0
@@ -380,6 +487,15 @@ def _serialize_account_set(row: AccountSet) -> dict:
         if item.created_at and (latest_import_at is None or item.created_at > latest_import_at):
             latest_import_at = item.created_at
 
+    factory_rest_entries = sorted(
+        row.factory_rest_entries,
+        key=lambda item: (
+            item.rest_date.isoformat() if item.rest_date else "",
+            item.rest_period or "",
+        ),
+    )
+    serialized_factory_rest_entries = [_serialize_factory_rest_entry(item) for item in factory_rest_entries]
+
     return {
         "id": row.id,
         "month": row.month,
@@ -388,7 +504,8 @@ def _serialize_account_set(row: AccountSet) -> dict:
         "is_locked": bool(row.is_locked),
         "locked_at": row.locked_at.isoformat() if row.locked_at else None,
         "locked_by": row.locked_by,
-        "factory_rest_days": row.factory_rest_days or 0,
+        "factory_rest_days": _effective_factory_rest_days(row),
+        "factory_rest_entries": serialized_factory_rest_entries,
         "monthly_benefit_days": row.monthly_benefit_days or 0,
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "imports_count": len(row.imports),
@@ -693,12 +810,16 @@ def list_account_sets():
 def create_account_set():
     data = request.json or {}
     month = (data.get("month") or "").strip()
-    factory_rest_days = request.json.get("factory_rest_days", 0) if request.json else 0
-    monthly_benefit_days = request.json.get("monthly_benefit_days", 0) if request.json else 0
+    factory_rest_days = data.get("factory_rest_days", 0)
+    monthly_benefit_days = data.get("monthly_benefit_days", 0)
     if not month or len(month) != 7:
         return jsonify({"error": "month is required in YYYY-MM format"}), 400
     if AccountSet.query.filter_by(month=month).first():
         return jsonify({"error": "该月份账套已存在"}), 400
+    try:
+        entries = _parse_factory_rest_entries(data.get("factory_rest_entries"), month)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     row = AccountSet(
         month=month,
@@ -709,6 +830,8 @@ def create_account_set():
     if AccountSet.query.count() == 0:
         row.is_active = True
     db.session.add(row)
+    if "factory_rest_entries" in data:
+        _replace_factory_rest_entries(row, entries)
     db.session.commit()
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
@@ -721,7 +844,15 @@ def update_account_set(account_set_id: int):
     if locked_error:
         return locked_error
     data = request.json or {}
-    row.factory_rest_days = float(data.get("factory_rest_days") or 0)
+    if "factory_rest_entries" in data:
+        try:
+            entries = _parse_factory_rest_entries(data.get("factory_rest_entries"), row.month)
+            _validate_initial_factory_rest_entry_backfill(row, entries)
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        _replace_factory_rest_entries(row, entries)
+    elif "factory_rest_days" in data:
+        row.factory_rest_days = float(data.get("factory_rest_days") or 0)
     row.monthly_benefit_days = float(data.get("monthly_benefit_days") or 0)
     db.session.commit()
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
@@ -854,7 +985,7 @@ def calculate_account_set(account_set_id: int):
         try:
             manager_options = ManagerAttendanceOptions(
                 month=row.month,
-                factory_rest_days=row.factory_rest_days or 0,
+                factory_rest_days=_effective_factory_rest_days(row),
                 monthly_benefit_days=row.monthly_benefit_days or 0,
             )
             manager_rows = build_manager_rows(manager_options, sync_month_stats=True)
@@ -1126,7 +1257,7 @@ def _validate_manager_month_stat(stat_type: str, year: int, values: dict[str, fl
                 return "年休每月使用不能超过 3 天"
             month = _month_for_stat_key(year, key)
             account_set = AccountSet.query.filter_by(month=month).first()
-            factory_rest_days = (account_set.factory_rest_days if account_set else 0) or 0
+            factory_rest_days = _manager_factory_rest_days(account_set)
             if factory_rest_days + value > 7:
                 return f"{month} 厂休+年休不能超过 7 天"
 
@@ -1246,7 +1377,7 @@ def _manager_attendance_options(month: str) -> ManagerAttendanceOptions:
     account = AccountSet.query.filter_by(month=month).first()
     return ManagerAttendanceOptions(
         month=month,
-        factory_rest_days=(account.factory_rest_days if account else 0) or 0,
+        factory_rest_days=_manager_factory_rest_days(account),
         monthly_benefit_days=(account.monthly_benefit_days if account else 0) or 0,
     )
 

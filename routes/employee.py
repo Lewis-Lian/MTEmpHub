@@ -633,12 +633,32 @@ def _manager_emp_ids(emp_ids: list[int]) -> list[int]:
     return [emp_id for emp_id in emp_ids if emp_id in allowed]
 
 
+def _manager_factory_rest_days(account_set: AccountSet | None) -> float:
+    if account_set is None:
+        return 0.0
+    if not account_set.factory_rest_entries:
+        return 0.0
+    total = 0.0
+    for item in account_set.factory_rest_entries:
+        if item.rest_period == "full":
+            total += 1.0
+        elif item.rest_period in {"am", "pm"}:
+            total += 0.5
+    return total
+
+
+def _manager_factory_rest_requires_detail(account_set: AccountSet | None) -> bool:
+    if account_set is None:
+        return False
+    return not account_set.factory_rest_entries and float(account_set.factory_rest_days or 0) > 0
+
+
 def _manager_options() -> ManagerAttendanceOptions:
     month = _resolve_query_month()
     account_set = AccountSet.query.filter_by(month=month).first()
     return ManagerAttendanceOptions(
         month=month,
-        factory_rest_days=(account_set.factory_rest_days if account_set else 0.0) or 0.0,
+        factory_rest_days=_manager_factory_rest_days(account_set),
         monthly_benefit_days=(account_set.monthly_benefit_days if account_set else 0.0) or 0.0,
     )
 
@@ -973,7 +993,9 @@ def account_sets_api():
                 "month": r.month,
                 "name": r.name,
                 "is_active": r.is_active,
-                "factory_rest_days": r.factory_rest_days or 0,
+                "factory_rest_days": _manager_factory_rest_days(r),
+                "factory_rest_requires_detail": _manager_factory_rest_requires_detail(r),
+                "legacy_factory_rest_days": (r.factory_rest_days or 0),
                 "monthly_benefit_days": r.monthly_benefit_days or 0,
             }
             for r in rows
@@ -1062,7 +1084,7 @@ def home_manager_summary_api():
     rows = build_manager_rows(
         ManagerAttendanceOptions(
             month=month,
-            factory_rest_days=(account_set.factory_rest_days or 0.0),
+            factory_rest_days=_manager_factory_rest_days(account_set),
             monthly_benefit_days=(account_set.monthly_benefit_days or 0.0),
         ),
         [manager.id],
