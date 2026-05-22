@@ -23,7 +23,6 @@ from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.attendance_override_history import AttendanceOverrideHistory
 from models.account_set import AccountSet, AccountSetImport
 from routes import register_routes
-from services.bootstrap_service import initialize_database
 
 _compat_app: Flask | None = None
 
@@ -40,8 +39,6 @@ def create_app() -> Flask:
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     db.init_app(app)
-    with app.app_context():
-        initialize_database()
     Migrate(app, db)
     register_routes(app)
 
