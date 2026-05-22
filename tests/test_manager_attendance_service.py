@@ -131,7 +131,8 @@ class ManagerLateSummaryTests(unittest.TestCase):
             )
 
         self.assertEqual(rows[0]["late_early_minutes"], 6)
-        self.assertEqual(rows[0]["summary"], "6元")
+        self.assertEqual(rows[0]["personal_sick_days"], 7.0)
+        self.assertEqual(rows[0]["summary"], "扣7天，6元")
 
     def test_manager_summary_ignores_single_day_late_minutes_when_day_reaches_thirty(self) -> None:
         with self.app.app_context():
@@ -153,7 +154,8 @@ class ManagerLateSummaryTests(unittest.TestCase):
             )
 
         self.assertEqual(rows[0]["late_early_minutes"], 3)
-        self.assertEqual(rows[0]["summary"], "3元")
+        self.assertEqual(rows[0]["personal_sick_days"], 7.0)
+        self.assertEqual(rows[0]["summary"], "扣7天，3元")
 
     def test_manager_summary_ignores_all_late_penalty_when_every_late_day_reaches_thirty(self) -> None:
         with self.app.app_context():
@@ -176,7 +178,8 @@ class ManagerLateSummaryTests(unittest.TestCase):
             )
 
         self.assertEqual(rows[0]["late_early_minutes"], 0)
-        self.assertEqual(rows[0]["summary"], "")
+        self.assertEqual(rows[0]["personal_sick_days"], 7.0)
+        self.assertEqual(rows[0]["summary"], "扣7天")
 
 
 class ManagerFactoryRestOverlapTests(unittest.TestCase):
@@ -405,6 +408,16 @@ class ManagerFactoryRestOverlapTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["business_trip_days"], 1.0)
         self.assertEqual(rows[0]["attendance_days"], 3.0)
+
+    def test_factory_rest_days_without_factory_rest_entries_do_not_reduce_absence_gap(self) -> None:
+        with self.app.app_context():
+            AccountSetFactoryRestDay.query.delete()
+            db.session.commit()
+
+            rows = self._build_rows(factory_rest_days=1.5)
+
+        self.assertEqual(rows[0]["personal_sick_days"], 28.0)
+        self.assertEqual(rows[0]["overtime_change"], 0.0)
 
 
 if __name__ == "__main__":

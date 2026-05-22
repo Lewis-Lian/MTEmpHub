@@ -22,7 +22,7 @@ from models.monthly_report import MonthlyReport
 from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, HOME_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, User
 from routes import register_routes
 from routes.admin import _factory_rest_unit, _manager_attendance_options
-from routes.employee import _fill_manager_template
+from routes.employee import _fill_manager_template, _manager_options
 from services.bootstrap_service import ensure_schema_compatibility
 from utils.app_navigation import module_by_slug, nav_context, visible_modules
 
@@ -367,6 +367,20 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(payload[0]["factory_rest_days"], 2.0)
         self.assertEqual(payload[0]["factory_rest_entries"], [])
 
+    def test_employee_account_set_list_marks_legacy_factory_rest_days_as_requires_detail(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 2.0
+            db.session.commit()
+
+        res = self.client.get("/employee/api/account-sets")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(payload[0]["factory_rest_days"], 0)
+        self.assertTrue(payload[0]["factory_rest_requires_detail"])
+        self.assertEqual(payload[0]["legacy_factory_rest_days"], 2.0)
+
     def test_manager_attendance_options_uses_aggregated_factory_rest_days(self) -> None:
         with self.app.app_context():
             account_set = AccountSet.query.filter_by(month="2026-05").first()
@@ -390,6 +404,21 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
 
             options = _manager_attendance_options("2026-05")
             self.assertEqual(options.factory_rest_days, 1.5)
+
+    def test_manager_attendance_options_use_zero_for_legacy_factory_rest_days_without_detail(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 2.0
+            db.session.commit()
+
+        with self.app.test_request_context("/employee/api/manager-attendance?month=2026-05"):
+            options = _manager_options()
+            self.assertEqual(options.factory_rest_days, 0)
+
+        with self.app.app_context():
+            admin_options = _manager_attendance_options("2026-05")
+            self.assertEqual(admin_options.factory_rest_days, 0)
 
     def test_factory_rest_unit_rejects_unknown_period(self) -> None:
         with self.assertRaises(ValueError):
@@ -483,6 +512,33 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.assertIsNotNone(account_set)
             self.assertEqual(account_set.factory_rest_days, 2.0)
             self.assertEqual(account_set.monthly_benefit_days, 4.0)
+            self.assertEqual(account_set.factory_rest_entries, [])
+
+    def test_update_account_set_rejects_first_factory_rest_entry_backfill_when_total_differs_from_legacy_days(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            self.assertIsNotNone(account_set)
+            account_set.factory_rest_days = 2.0
+            account_set_id = account_set.id
+            db.session.commit()
+
+        res = self.client.put(
+            f"/admin/account-sets/{account_set_id}",
+            json={
+                "factory_rest_entries": [
+                    {"date": "2026-05-08", "period": "full"},
+                ]
+            },
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("首次补录厂休明细", res.get_json()["error"])
+        self.assertIn("明细汇总必须等于原厂休天数 2", res.get_json()["error"])
+
+        with self.app.app_context():
+            account_set = db.session.get(AccountSet, account_set_id)
+            self.assertIsNotNone(account_set)
+            self.assertEqual(account_set.factory_rest_days, 2.0)
             self.assertEqual(account_set.factory_rest_entries, [])
 
     def test_update_account_set_rejects_factory_rest_date_outside_month(self) -> None:
@@ -1385,6 +1441,29 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["emp_id"], self.manager_id)
         self.assertEqual(rows[0]["remark"], "经理甲年休")
+
+    def test_manager_annual_leave_save_ignores_legacy_factory_rest_days_without_detail(self) -> None:
+        with self.app.app_context():
+            may_account_set = AccountSet.query.filter_by(month="2026-05").first()
+            may_account_set.factory_rest_days = 6.0
+            db.session.commit()
+
+        res = self.client.put(
+            "/admin/manager-annual-leave/records",
+            json={"emp_id": self.manager_id, "year": 2026, "m5": "2", "remark": "旧账套年休"},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["status"], "ok")
+
+        with self.app.app_context():
+            stat = ManagerMonthStat.query.filter_by(
+                emp_id=self.manager_id,
+                year=2026,
+                stat_type="annual_leave",
+            ).first()
+            self.assertIsNotNone(stat)
+            self.assertEqual(stat.m5, 2.0)
+            self.assertEqual(stat.remaining, 10.0)
 
     def test_manager_overtime_import_defaults_year_when_omitted(self) -> None:
         res = self.client.post("/admin/manager-overtime/import")
