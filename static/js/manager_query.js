@@ -16,6 +16,8 @@ async function loadManagerAccountSets() {
         <option
           value="${x.month}"
           data-factory-rest-days="${x.factory_rest_days || 0}"
+          data-factory-rest-requires-detail="${x.factory_rest_requires_detail ? "1" : "0"}"
+          data-legacy-factory-rest-days="${x.legacy_factory_rest_days || 0}"
           data-monthly-benefit-days="${x.monthly_benefit_days || 0}"
           ${x.is_active ? "selected" : ""}
         >
@@ -39,6 +41,11 @@ function updateManagerMetrics(accountSetRow = null, resultRows = null) {
   const selectedOption = select.options[select.selectedIndex];
   const factoryRestDays = accountSetRow ? accountSetRow.factory_rest_days || 0 : 0;
   const benefitDays = accountSetRow ? accountSetRow.monthly_benefit_days || 0 : 0;
+  const requiresDetail = Boolean(accountSetRow && accountSetRow.factory_rest_requires_detail);
+  const legacyFactoryRestDays = accountSetRow ? accountSetRow.legacy_factory_rest_days || 0 : 0;
+  const detailMessage = requiresDetail
+    ? `该账套仍是旧厂休总数（${legacyFactoryRestDays} 天），请先在账套中心补录厂休明细后再按厂休参与管理人员考勤计算`
+    : "";
 
   document.getElementById("managerMetricAccountSet").textContent = selectedOption ? selectedOption.textContent.trim() : "未选择";
   document.getElementById("managerMetricFactoryRest").textContent = String(factoryRestDays);
@@ -47,13 +54,13 @@ function updateManagerMetrics(accountSetRow = null, resultRows = null) {
   if (resultRows === null) {
     document.getElementById("managerMetricResultRows").textContent = "0";
     document.getElementById("managerMetricResultRowsSub").textContent = "点击查询后更新";
-    document.getElementById("managerQueryMeta").textContent = "等待查询";
+    document.getElementById("managerQueryMeta").textContent = detailMessage || "等待查询";
     return;
   }
 
   document.getElementById("managerMetricResultRows").textContent = String(resultRows);
   document.getElementById("managerMetricResultRowsSub").textContent = resultRows ? `本次返回 ${resultRows} 条记录` : "当前条件无数据";
-  document.getElementById("managerQueryMeta").textContent = resultRows ? `共返回 ${resultRows} 条记录` : "当前条件无数据";
+  document.getElementById("managerQueryMeta").textContent = detailMessage || (resultRows ? `共返回 ${resultRows} 条记录` : "当前条件无数据");
 }
 
 function buildManagerQuery(employeeSelector = null) {
@@ -103,6 +110,8 @@ function currentAccountSetRow() {
   const select = document.getElementById("managerAccountSetSelect");
   return {
     factory_rest_days: Number(select.selectedOptions[0]?.dataset.factoryRestDays || 0),
+    factory_rest_requires_detail: select.selectedOptions[0]?.dataset.factoryRestRequiresDetail === "1",
+    legacy_factory_rest_days: Number(select.selectedOptions[0]?.dataset.legacyFactoryRestDays || 0),
     monthly_benefit_days: Number(select.selectedOptions[0]?.dataset.monthlyBenefitDays || 0),
   };
 }
