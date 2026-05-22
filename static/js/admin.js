@@ -17,11 +17,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const accountSetImportsBody = document.getElementById("accountSetImportsBody");
   const accountSetLockNotice = document.getElementById("accountSetLockNotice");
   const factoryRestCalendar = document.getElementById("factoryRestCalendar");
+  const factoryRestSummaryValue = document.getElementById("factoryRestSummaryValue");
+  const factoryRestStateBadge = document.getElementById("factoryRestStateBadge");
+  const factoryRestSelectedCount = document.getElementById("factoryRestSelectedCount");
 
   let accountSets = [];
   let factoryRestEntries = [];
   let factoryRestEntriesDirty = false;
-  const FACTORY_REST_PERIOD_ORDER = ["", "am", "pm", "full"];
+  const FACTORY_REST_PERIOD_ORDER = ["", "full", "am", "pm"];
+  const FACTORY_REST_WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
   window.AppFeedback.setResult(accountSetResult, "", "muted");
 
   function currentAccountSetId() {
@@ -43,9 +47,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const total = factoryRestEntries.reduce((sum, item) => sum + factoryRestUnit(item.period), 0);
     if (factoryRestEntries.length === 0 && fallbackValue !== null) {
       factoryRestDaysInput.value = String(fallbackValue || 0);
+      factoryRestSummaryValue.textContent = String(fallbackValue || 0);
+      factoryRestSelectedCount.textContent = "0 天";
       return;
     }
     factoryRestDaysInput.value = String(total);
+    factoryRestSummaryValue.textContent = String(total);
+    factoryRestSelectedCount.textContent = `${factoryRestEntries.length} 天`;
   }
 
   function factoryRestEntriesByDate() {
@@ -57,17 +65,25 @@ document.addEventListener("DOMContentLoaded", () => {
     return FACTORY_REST_PERIOD_ORDER[(currentIndex + 1) % FACTORY_REST_PERIOD_ORDER.length];
   }
 
-  function factoryRestButtonClass(period) {
-    if (period === "full") return "btn-danger";
-    if (period === "am" || period === "pm") return "btn-warning";
-    return "btn-outline-secondary";
+  function factoryRestCardClass(period) {
+    if (period === "full") return "factory-rest-day--full";
+    if (period === "am") return "factory-rest-day--am";
+    if (period === "pm") return "factory-rest-day--pm";
+    return "factory-rest-day--none";
   }
 
-  function factoryRestButtonText(day, period) {
-    if (period === "full") return `${day} 全天`;
-    if (period === "am") return `${day} 上午`;
-    if (period === "pm") return `${day} 下午`;
-    return `${day} 非厂休`;
+  function factoryRestStatusText(period) {
+    if (period === "full") return "全";
+    if (period === "am") return "上";
+    if (period === "pm") return "下";
+    return "无";
+  }
+
+  function factoryRestStatusTitle(period) {
+    if (period === "full") return "全天厂休";
+    if (period === "am") return "上午厂休";
+    if (period === "pm") return "下午厂休";
+    return "非厂休";
   }
 
   function updateFactoryRestEntry(dateText) {
@@ -99,7 +115,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function renderFactoryRestCalendar() {
     const row = currentAccountSet();
     if (!row) {
-      factoryRestCalendar.innerHTML = `<div class="small text-muted">请选择账套后设置厂休明细</div>`;
+      factoryRestCalendar.innerHTML = `<div class="factory-rest-empty">请选择账套后设置厂休明细</div>`;
       return;
     }
 
@@ -108,26 +124,43 @@ document.addEventListener("DOMContentLoaded", () => {
     const year = Number(parts[0] || 0);
     const month = Number(parts[1] || 0);
     if (!year || !month) {
-      factoryRestCalendar.innerHTML = `<div class="small text-danger">账套月份格式不正确，无法渲染厂休日期</div>`;
+      factoryRestCalendar.innerHTML = `<div class="factory-rest-empty factory-rest-empty--danger">账套月份格式不正确，无法渲染厂休日期</div>`;
       return;
     }
 
     const entryMap = factoryRestEntriesByDate();
     const lastDay = new Date(year, month, 0).getDate();
     const isLocked = Boolean(row.is_locked);
-    factoryRestCalendar.innerHTML = Array.from({ length: lastDay }, (_, index) => {
+    const firstWeekday = new Date(year, month - 1, 1).getDay();
+    const weekOffset = (firstWeekday + 6) % 7;
+    const weekdayHead = FACTORY_REST_WEEKDAY_LABELS
+      .map((label) => `<div class="factory-rest-weekday">${label}</div>`)
+      .join("");
+    const leadingBlanks = Array.from({ length: weekOffset }, () => `<div class="factory-rest-spacer" aria-hidden="true"></div>`).join("");
+    const dayCards = Array.from({ length: lastDay }, (_, index) => {
       const day = index + 1;
       const dateText = `${monthText}-${String(day).padStart(2, "0")}`;
       const period = entryMap.get(dateText) || "";
       return `
         <button
           type="button"
-          class="btn btn-sm ${factoryRestButtonClass(period)}"
+          class="factory-rest-day ${factoryRestCardClass(period)}"
           data-date="${dateText}"
+          title="${dateText} ${factoryRestStatusTitle(period)}"
           ${isLocked ? "disabled" : ""}
-        >${factoryRestButtonText(day, period)}</button>
+        >
+          <span class="factory-rest-day-number">${day}</span>
+          <span class="factory-rest-day-state">${factoryRestStatusText(period)}</span>
+        </button>
       `;
     }).join("");
+    factoryRestCalendar.innerHTML = `
+      <div class="factory-rest-grid">
+        ${weekdayHead}
+        ${leadingBlanks}
+        ${dayCards}
+      </div>
+    `;
 
     factoryRestCalendar.querySelectorAll("button[data-date]").forEach((button) => {
       button.addEventListener("click", () => updateFactoryRestEntry(button.dataset.date || ""));
@@ -160,6 +193,8 @@ document.addEventListener("DOMContentLoaded", () => {
     accountSetLockNotice.textContent = !row
       ? "请选择账套"
       : (isLocked ? "该账套已锁定，仅允许查看、设为当前和解锁。" : "该账套未锁定，可继续上传、计算和修改。");
+    factoryRestStateBadge.className = `factory-rest-state-badge ${!row ? "" : (isLocked ? "factory-rest-state-badge--locked" : "factory-rest-state-badge--editable")}`;
+    factoryRestStateBadge.textContent = !row ? "请选择账套" : (isLocked ? "已锁定" : "可编辑");
     renderFactoryRestCalendar();
     syncFactoryRestDaysInput(row ? row.factory_rest_days || 0 : 0);
   }
