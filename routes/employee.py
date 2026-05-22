@@ -4,7 +4,6 @@ import os
 from collections import defaultdict
 from copy import copy
 from datetime import date, datetime, time, timedelta
-import math
 import re
 from io import BytesIO
 from pathlib import Path
@@ -37,6 +36,7 @@ from services.manager_attendance_service import (
     ManagerAttendanceOptions,
     build_manager_rows,
     manager_headers,
+    normalize_days,
     rows_as_table,
 )
 from routes.auth import login_required, page_permission_required
@@ -172,16 +172,7 @@ def _leave_bucket(value: str | None) -> str | None:
 
 
 def _normalized_leave_days(duration: float | int | None) -> float:
-    value = float(duration or 0)
-    if value <= 0:
-        return 0.0
-    int_days = math.floor(value)
-    frac = value - int_days
-    if frac > 0.17:
-        return float(int_days + 1)
-    if frac > 0.08:
-        return float(int_days) + 0.5
-    return float(int_days)
+    return normalize_days(duration)
 
 
 def _leave_days_in_month(record: LeaveRecord, month: str) -> float:
