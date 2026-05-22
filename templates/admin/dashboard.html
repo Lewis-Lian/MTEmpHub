@@ -34,10 +34,32 @@
               <input type="number" class="form-control form-control-sm" id="monthlyBenefitDaysInput" min="0" step="0.5" value="0">
             </div>
           </div>
-          <div class="mb-2">
-            <label class="form-label small mb-1">厂休日期明细</label>
-            <div class="small text-muted mb-2">点击日期按“非厂休 → 上午 → 下午 → 全天 → 非厂休”循环切换，系统会自动汇总厂休天数。</div>
-            <div id="factoryRestCalendar" class="d-flex flex-wrap gap-1"></div>
+          <div class="factory-rest-panel mb-2">
+            <div class="factory-rest-panel-head">
+              <div>
+                <div class="factory-rest-panel-kicker">厂休配置</div>
+                <label class="form-label mb-1 factory-rest-panel-title">厂休日期明细</label>
+              </div>
+              <span id="factoryRestStateBadge" class="factory-rest-state-badge">请选择账套</span>
+            </div>
+            <div class="factory-rest-summary-card">
+              <div>
+                <div class="factory-rest-summary-label">本月汇总</div>
+                <div class="factory-rest-summary-value"><span id="factoryRestSummaryValue">0</span><span class="factory-rest-summary-unit">天</span></div>
+              </div>
+              <div class="factory-rest-summary-meta">
+                <div><span class="factory-rest-summary-meta-label">已选日期</span><span id="factoryRestSelectedCount">0 天</span></div>
+                <div><span class="factory-rest-summary-meta-label">切换方式</span><span>非厂休 / 全天 / 上午 / 下午</span></div>
+              </div>
+            </div>
+            <div class="factory-rest-panel-note">点击日期卡片按“非厂休 → 全天 → 上午 → 下午 → 非厂休”循环切换，系统会自动汇总厂休天数。</div>
+            <div class="factory-rest-legend" aria-hidden="true">
+              <span class="factory-rest-legend-item"><span class="factory-rest-legend-dot factory-rest-legend-dot--none"></span>非厂休</span>
+              <span class="factory-rest-legend-item"><span class="factory-rest-legend-dot factory-rest-legend-dot--am"></span>上午</span>
+              <span class="factory-rest-legend-item"><span class="factory-rest-legend-dot factory-rest-legend-dot--pm"></span>下午</span>
+              <span class="factory-rest-legend-item"><span class="factory-rest-legend-dot factory-rest-legend-dot--full"></span>全天</span>
+            </div>
+            <div id="factoryRestCalendar" class="factory-rest-calendar"></div>
           </div>
           <div class="toolbar">
             <button class="btn btn-outline-primary btn-sm" id="saveAccountSetParamsBtn" type="button">保存参数</button>
