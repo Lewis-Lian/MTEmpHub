@@ -27,12 +27,17 @@
           <div class="row g-2 mb-2">
             <div class="col-6">
               <label class="form-label small mb-1">本月厂休天数</label>
-              <input type="number" class="form-control form-control-sm" id="factoryRestDaysInput" min="0" step="0.5" value="0">
+              <input type="number" class="form-control form-control-sm" id="factoryRestDaysInput" min="0" step="0.5" value="0" readonly>
             </div>
             <div class="col-6">
               <label class="form-label small mb-1">本月可用福利天数</label>
               <input type="number" class="form-control form-control-sm" id="monthlyBenefitDaysInput" min="0" step="0.5" value="0">
             </div>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1">厂休日期明细</label>
+            <div class="small text-muted mb-2">点击日期按“非厂休 → 上午 → 下午 → 全天 → 非厂休”循环切换，系统会自动汇总厂休天数。</div>
+            <div id="factoryRestCalendar" class="d-flex flex-wrap gap-1"></div>
           </div>
           <div class="toolbar">
             <button class="btn btn-outline-primary btn-sm" id="saveAccountSetParamsBtn" type="button">保存参数</button>
