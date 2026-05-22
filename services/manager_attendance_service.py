@@ -266,6 +266,10 @@ def _factory_rest_overlap_days(leave: LeaveRecord, periods_by_date: dict[date, s
     return _round2(overlap_days)
 
 
+def _factory_rest_days_from_periods(periods_by_date: dict[date, set[str]]) -> float:
+    return _round2(sum(0.5 * len(periods) for periods in periods_by_date.values()))
+
+
 def _manager_month_stat(employee_id: int, month: str, stat_type: str) -> ManagerMonthStat | None:
     year, _key = _stat_year_key(month)
     return ManagerMonthStat.query.filter_by(emp_id=employee_id, year=year, stat_type=stat_type).first()
@@ -485,6 +489,7 @@ def build_manager_rows(
         raw = _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
         factory_rest_periods_by_date = _factory_rest_periods_by_date(options.month)
+        factory_rest_days = _factory_rest_days_from_periods(factory_rest_periods_by_date)
         # 日期级厂休重叠只能以账套厂休明细为准。
         # 若当月没有账套或没有厂休明细，则无法判断具体重叠日期，本次计算不做重叠扣减。
         can_subtract_factory_rest_overlap = bool(factory_rest_periods_by_date)
@@ -568,7 +573,7 @@ def build_manager_rows(
         absence_gap = _round2(
             month_days
             - attendance_days
-            - options.factory_rest_days
+            - factory_rest_days
         )
 
         if absence_gap < 0:
@@ -591,7 +596,7 @@ def build_manager_rows(
 
             # Step 2: use benefit days (annual leave, from remaining, with constraints)
             remaining_after_overtime = _round2(max(absence_gap - used_overtime, 0.0))
-            available_benefit = _compute_benefit_used(employee.id, options.month, options.factory_rest_days)
+            available_benefit = _compute_benefit_used(employee.id, options.month, factory_rest_days)
             benefit_for_deduction = min(remaining_after_overtime, available_benefit) if remaining_after_overtime > 0 else 0.0
             used_benefit = _round2(benefit_for_deduction)
 

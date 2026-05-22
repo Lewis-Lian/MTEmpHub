@@ -383,6 +383,20 @@ def _effective_factory_rest_days(account_set: AccountSet | None) -> float:
     return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
 
 
+def _manager_factory_rest_days(account_set: AccountSet | None) -> float:
+    if account_set is None:
+        return 0
+    if not account_set.factory_rest_entries:
+        return 0
+    return sum(_factory_rest_unit(item.rest_period) for item in account_set.factory_rest_entries)
+
+
+def _manager_factory_rest_requires_detail(account_set: AccountSet | None) -> bool:
+    if account_set is None:
+        return False
+    return not account_set.factory_rest_entries and float(account_set.factory_rest_days or 0) > 0
+
+
 def _parse_factory_rest_entries(entries: object, month: str) -> list[dict[str, object]]:
     if entries is None:
         return []
@@ -428,6 +442,26 @@ def _replace_factory_rest_entries(account_set: AccountSet, entries: list[dict[st
         total += _factory_rest_unit(period)
     account_set.factory_rest_days = total
     return total
+
+
+def _validate_initial_factory_rest_entry_backfill(
+    account_set: AccountSet,
+    entries: list[dict[str, object]],
+) -> None:
+    if account_set.factory_rest_entries:
+        return
+
+    legacy_days = float(account_set.factory_rest_days or 0)
+    if legacy_days <= 0:
+        return
+
+    entry_total = sum(_factory_rest_unit(str(item["period"])) for item in entries)
+    if round(entry_total, 2) == round(legacy_days, 2):
+        return
+
+    raise ValueError(
+        f"首次补录厂休明细时，明细汇总必须等于原厂休天数 {legacy_days:g} 天，请一次性补齐全部明细后再保存"
+    )
 
 
 def _serialize_factory_rest_entry(row: AccountSetFactoryRestDay) -> dict:
@@ -813,6 +847,7 @@ def update_account_set(account_set_id: int):
     if "factory_rest_entries" in data:
         try:
             entries = _parse_factory_rest_entries(data.get("factory_rest_entries"), row.month)
+            _validate_initial_factory_rest_entry_backfill(row, entries)
         except ValueError as exc:
             return jsonify({"error": str(exc)}), 400
         _replace_factory_rest_entries(row, entries)
@@ -1222,7 +1257,7 @@ def _validate_manager_month_stat(stat_type: str, year: int, values: dict[str, fl
                 return "年休每月使用不能超过 3 天"
             month = _month_for_stat_key(year, key)
             account_set = AccountSet.query.filter_by(month=month).first()
-            factory_rest_days = _effective_factory_rest_days(account_set)
+            factory_rest_days = _manager_factory_rest_days(account_set)
             if factory_rest_days + value > 7:
                 return f"{month} 厂休+年休不能超过 7 天"
 
@@ -1342,7 +1377,7 @@ def _manager_attendance_options(month: str) -> ManagerAttendanceOptions:
     account = AccountSet.query.filter_by(month=month).first()
     return ManagerAttendanceOptions(
         month=month,
-        factory_rest_days=_effective_factory_rest_days(account),
+        factory_rest_days=_manager_factory_rest_days(account),
         monthly_benefit_days=(account.monthly_benefit_days if account else 0) or 0,
     )
 
