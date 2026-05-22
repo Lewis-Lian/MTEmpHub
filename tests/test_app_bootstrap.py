@@ -44,6 +44,25 @@ class AppBootstrapTests(unittest.TestCase):
                     db.create_all()
                     self.assertIsNone(User.query.filter_by(username="admin").first())
 
+    def test_create_app_does_not_run_db_create_all_implicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'no-init.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                app_module = self._load_app_module()
+
+                with mock.patch.object(db, "create_all") as create_all:
+                    app_module.create_app()
+
+                self.assertEqual(create_all.call_count, 0)
+
     def test_health_endpoint_reports_ok_status(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
@@ -105,6 +124,46 @@ class AppBootstrapTests(unittest.TestCase):
                     self.assertIsNotNone(admin)
                     self.assertEqual(admin.role, "admin")
                     self.assertTrue(admin.check_password("admin123"))
+
+    def test_init_db_command_runs_initialize_database_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'init-db.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                manage_module = self._load_manage_module()
+
+                with mock.patch.object(manage_module, "initialize_database") as initialize_database:
+                    result = manage_module.app.test_cli_runner().invoke(args=["init-db"])
+
+                self.assertEqual(result.exit_code, 0, result.output)
+                initialize_database.assert_called_once_with()
+
+    def test_upgrade_legacy_schema_command_runs_schema_compatibility_explicitly(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'legacy-upgrade.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                manage_module = self._load_manage_module()
+
+                with mock.patch.object(manage_module, "ensure_schema_compatibility") as ensure_schema_compatibility:
+                    result = manage_module.app.test_cli_runner().invoke(args=["upgrade-legacy-schema"])
+
+                self.assertEqual(result.exit_code, 0, result.output)
+                ensure_schema_compatibility.assert_called_once_with()
 
     def test_ensure_default_admin_leaves_existing_admin_unchanged(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

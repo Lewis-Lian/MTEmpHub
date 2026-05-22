@@ -8,6 +8,7 @@ from typing import Any
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, g
 import openpyxl
+from sqlalchemy.orm import joinedload, selectinload
 
 from models import db
 from models.department import Department
@@ -160,8 +161,13 @@ def _convert_uploaded_xls_to_xlsx(xls_path: str) -> str | None:
     return xlsx_path if os.path.exists(xlsx_path) else None
 
 
-def _serialize_user(user: User) -> dict:
-    profile_department = db.session.get(Department, user.profile_dept_id) if user.profile_dept_id else None
+def _serialize_user(user: User, profile_departments_by_id: dict[int, Department] | None = None) -> dict:
+    profile_department = None
+    if user.profile_dept_id:
+        if profile_departments_by_id is not None:
+            profile_department = profile_departments_by_id.get(user.profile_dept_id)
+        else:
+            profile_department = db.session.get(Department, user.profile_dept_id)
     return {
         "id": user.id,
         "username": user.username,
@@ -203,6 +209,18 @@ def _serialize_user(user: User) -> dict:
     }
 
 
+def _user_list_query():
+    return (
+        User.query.options(
+            selectinload(User.employee_assignments)
+            .joinedload(UserEmployeeAssignment.employee)
+            .joinedload(Employee.department),
+            selectinload(User.department_assignments).joinedload(UserDepartmentAssignment.department),
+        )
+        .order_by(User.id.desc())
+    )
+
+
 def _bind_user_profile_identity(user: User, emp_ids: list[int]) -> None:
     if user.profile_emp_no and user.profile_name and user.profile_dept_id:
         return
@@ -223,7 +241,7 @@ def _bind_user_profile_identity(user: User, emp_ids: list[int]) -> None:
 def _default_page_permissions_for_role(role: str) -> dict[str, bool]:
     if role == "admin":
         return {key: True for key in ALL_PAGE_PERMISSION_KEYS}
-    return {key: True for key in ALL_PAGE_PERMISSION_KEYS}
+    return {key: key in HOME_PAGE_PERMISSION_KEYS for key in ALL_PAGE_PERMISSION_KEYS}
 
 
 def _parse_page_permissions(data: dict | None, role: str, existing_user: User | None = None) -> dict[str, bool]:

@@ -1,6 +1,8 @@
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
+from unittest import mock
 
 from datetime import date, datetime
 
@@ -180,6 +182,65 @@ class ManagerLateSummaryTests(unittest.TestCase):
         self.assertEqual(rows[0]["late_early_minutes"], 0)
         self.assertEqual(rows[0]["personal_sick_days"], 7.0)
         self.assertEqual(rows[0]["summary"], "扣7天")
+
+
+class ManagerAttendanceBatchingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-batching.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="行政部")
+            db.session.add(dept)
+            db.session.flush()
+            manager_a = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            manager_b = Employee(emp_no="M002", name="经理乙", dept_id=dept.id, is_manager=True)
+            db.session.add_all([manager_a, manager_b])
+            db.session.commit()
+            self.manager_ids = [manager_a.id, manager_b.id]
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def test_build_manager_rows_batches_attendance_view_lookup_once_per_month(self) -> None:
+        rows_by_employee = {
+            self.manager_ids[0]: [
+                SimpleNamespace(
+                    raw_data={"上班1打卡结果": "迟到", "迟到时长": 5, "刷卡时间数据": "08:35"},
+                    late_minutes=5,
+                )
+            ],
+            self.manager_ids[1]: [
+                SimpleNamespace(
+                    raw_data={"上班1打卡结果": "正常", "刷卡时间数据": "08:01"},
+                    late_minutes=0,
+                )
+            ],
+        }
+
+        with self.app.app_context():
+            with mock.patch(
+                "services.manager_attendance_service.attendance_views_by_employee",
+                return_value=rows_by_employee,
+            ) as attendance_lookup:
+                rows = build_manager_rows(ManagerAttendanceOptions(month="2026-04"), self.manager_ids)
+
+        self.assertEqual(attendance_lookup.call_count, 1)
+        attendance_lookup.assert_called_once()
+        self.assertEqual(len(rows), 2)
 
 
 class ManagerFactoryRestOverlapTests(unittest.TestCase):

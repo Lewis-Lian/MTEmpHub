@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from flask import has_app_context
 from sqlalchemy import func
 
 from models import db
@@ -26,17 +27,28 @@ def _month_date_range(month: str) -> tuple[date, date] | None:
     return start, date(start.year, start.month + 1, 1)
 
 
+def _get_employee(emp_id: int) -> Employee | None:
+    if has_app_context():
+        return db.session.get(Employee, emp_id)
+
+    query = getattr(Employee, "query", None)
+    getter = getattr(query, "get", None)
+    if callable(getter):
+        return getter(emp_id)
+    return None
+
+
 class AttendanceService:
     @staticmethod
     def monthly_summary(emp_id: int, month: str) -> dict:
-        employee = db.session.get(Employee, emp_id)
+        employee = _get_employee(emp_id)
         if not employee:
             return empty_monthly_summary()
         return batch_monthly_summaries(month, [employee], EMPLOYEE_STATS_CONTEXT).get(emp_id, empty_monthly_summary())
 
     @staticmethod
     def yearly_summary(emp_id: int, year: int) -> dict:
-        employee = db.session.get(Employee, emp_id)
+        employee = _get_employee(emp_id)
         actual_hours = 0.0
         absent_hours = 0.0
         overtime_hours = 0.0

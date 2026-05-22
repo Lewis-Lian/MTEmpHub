@@ -82,8 +82,19 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_bp.route("/users", methods=["GET"])
     @admin_required
     def users_list():
-        users = admin_module.User.query.order_by(admin_module.User.id.desc()).all()
-        return jsonify([admin_module._serialize_user(user) for user in users])
+        users = admin_module._user_list_query().all()
+        profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
+        profile_departments_by_id = {}
+        if profile_dept_ids:
+            profile_departments_by_id = {
+                row.id: row
+                for row in admin_module.Department.query.filter(
+                    admin_module.Department.id.in_(profile_dept_ids)
+                ).all()
+            }
+        return jsonify(
+            [admin_module._serialize_user(user, profile_departments_by_id=profile_departments_by_id) for user in users]
+        )
 
     @admin_bp.route("/users", methods=["POST"])
     @admin_required

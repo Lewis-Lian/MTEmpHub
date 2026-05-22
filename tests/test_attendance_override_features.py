@@ -11,6 +11,7 @@ from types import SimpleNamespace
 
 import openpyxl
 from flask import Flask, g, render_template
+from sqlalchemy import event
 
 from models import db
 from models.account_set import AccountSet, AccountSetFactoryRestDay
@@ -985,6 +986,39 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(target["employees"][0]["emp_no"], "M001")
         self.assertEqual(target["employees"][0]["name"], "经理甲")
         self.assertEqual(target["employees"][0]["dept_name"], "行政部")
+
+    def test_user_list_limits_select_queries_by_preloading_related_rows(self) -> None:
+        create_res = self.client.post(
+            "/admin/users",
+            json={
+                "username": "M001",
+                "password": "mt@123",
+                "role": "readonly",
+                "emp_ids": [self.manager_id],
+                "dept_ids": [self.dept_id],
+            },
+        )
+        self.assertEqual(create_res.status_code, 200)
+
+        statements: list[str] = []
+
+        def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
+            if statement.lstrip().lower().startswith("select"):
+                statements.append(statement)
+
+        with self.app.app_context():
+            event.listen(db.engine, "before_cursor_execute", before_cursor_execute)
+            try:
+                list_res = self.client.get("/admin/users")
+            finally:
+                event.remove(db.engine, "before_cursor_execute", before_cursor_execute)
+
+        self.assertEqual(list_res.status_code, 200)
+        self.assertLessEqual(
+            len(statements),
+            5,
+            f"/admin/users emitted too many SELECT statements: {len(statements)}\n" + "\n---\n".join(statements),
+        )
 
     def test_manager_batch_create_uses_emp_no_and_self_scope(self) -> None:
         res = self.client.post("/admin/users/manager-batch")

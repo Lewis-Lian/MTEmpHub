@@ -76,7 +76,7 @@ class User(db.Model):
 
         raw = self.page_permissions if isinstance(self.page_permissions, dict) else None
         if raw is None:
-            return {key: True for key in ALL_PAGE_PERMISSION_KEYS}
+            return {key: key in HOME_PAGE_PERMISSION_KEYS for key in ALL_PAGE_PERMISSION_KEYS}
 
         result = {}
         for key in ALL_PAGE_PERMISSION_KEYS:
