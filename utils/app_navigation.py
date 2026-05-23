@@ -283,3 +283,29 @@ def nav_context(user: Any, path: str) -> dict[str, Any]:
         "current_module": current_module,
         "current_entries": current_entries,
     }
+
+
+def nav_payload(user: Any) -> list[dict[str, Any]]:
+    payload: list[dict[str, Any]] = []
+    for module in visible_modules(user):
+        payload.append(
+            {
+                "slug": module["slug"],
+                "label": module["label"],
+                "short_label": module.get("short_label"),
+                "description": module.get("description"),
+                "icon_key": module.get("icon_key"),
+                "home_href": module.get("home_href"),
+                "entries": [
+                    {
+                        "key": entry["key"],
+                        "label": entry["label"],
+                        "href": entry["href"],
+                        "permission_key": entry.get("permission_key"),
+                        "description": entry.get("description"),
+                    }
+                    for entry in module.get("entries", [])
+                ],
+            }
+        )
+    return payload
