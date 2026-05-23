@@ -38,6 +38,7 @@ Thumbs.db
 # Build outputs
 build/
 dist/
+node_modules/
 *.egg-info/
 .worktrees/
 .superpowers/
