@@ -69,11 +69,19 @@ flask --app manage.py upgrade-legacy-schema
 ### 本地开发启动
 
 ```bash
+# 终端 1：后端 API
 python3 app.py
+
+# 终端 2：独立前端
+cd frontend
+npm install
+npm run dev
 ```
 
 注意：
 
+- 后端默认提供 `http://127.0.0.1:5000`
+- 前端默认提供 `http://127.0.0.1:5173`
 - `python3 app.py` 仅用于本地开发
 - 这会启动 Flask development server，不适合生产环境
 
@@ -106,6 +114,9 @@ flask --app manage.py upgrade-legacy-schema
 # 本地开发启动
 python3 app.py
 
+# 启动独立前端
+cd frontend && npm install && npm run dev
+
 # 生产启动
 python -m waitress --host=0.0.0.0 --port=5000 wsgi:app
 
@@ -127,12 +138,21 @@ python3 -m pytest -q
   路由与接口入口
 - `services/`
   业务逻辑、导入处理、统计汇总
+- `frontend/`
+  React/Vite 独立前端工程
 - `templates/`
-  页面模板
+  历史模板资源与导出模板
 - `tests/`
   回归测试与功能测试
 - `docs/`
   设计与计划文档
+
+## 前后端分离说明
+
+- 浏览器业务入口已经切换到独立前端，旧的 Flask 页面路由会重定向到前端地址
+- Flask 主要职责是提供 `/api/*`、登录态校验、导入导出与健康检查
+- 本地默认前端地址可通过 `FRONTEND_APP_URL` 或 `FRONTEND_ORIGIN` 调整
+- 生产环境建议将前端部署到独立站点，将后端作为 API 服务部署
 
 ## Excel 导入说明
 
