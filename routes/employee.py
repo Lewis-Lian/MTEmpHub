@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from flask import Blueprint, jsonify, render_template, request, g, send_file
+from flask import Blueprint, jsonify, redirect, render_template, request, g, send_file, url_for
 from sqlalchemy.orm import joinedload
 import openpyxl
 
@@ -39,7 +39,7 @@ from services.manager_attendance_service import (
     normalize_days,
     rows_as_table,
 )
-from routes.auth import login_required, page_permission_required
+from routes.auth import frontend_redirect, login_required, page_permission_required
 from utils.helpers import overlap_duration_days
 
 
@@ -898,77 +898,63 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
 @employee_bp.route("/dashboard")
 @page_permission_required("employee_dashboard")
 def dashboard():
-    emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no).all() if emp_ids else []
-    return render_template("dashboard.html", employees=employees)
+    return frontend_redirect("/employee/dashboard")
 
 
 @employee_bp.route("/home")
 @login_required
 def query_home_page():
     if not g.current_user.can_access_page("query_home"):
-        return render_template("login.html", error="暂无权限访问查询中心"), 403
-    return render_template("employee_home.html")
+        return redirect(url_for("auth.root"))
+    return frontend_redirect("/employee/home")
 
 
 @employee_bp.route("/manager-query")
 @page_permission_required("manager_query")
 def manager_query_page():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no).all() if emp_ids else []
-    return render_template("manager_query.html", employees=employees)
+    return frontend_redirect("/employee/manager-query")
 
 
 @employee_bp.route("/manager-overtime-query")
 @page_permission_required("manager_overtime_query")
 def manager_overtime_query_page():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all() if emp_ids else []
-    return render_template("manager_overtime_query.html", employees=employees)
+    return frontend_redirect("/employee/manager-overtime-query")
 
 
 @employee_bp.route("/manager-annual-leave-query")
 @page_permission_required("manager_annual_leave_query")
 def manager_annual_leave_query_page():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all() if emp_ids else []
-    return render_template("manager_annual_leave_query.html", employees=employees)
+    return frontend_redirect("/employee/manager-annual-leave-query")
 
 
 @employee_bp.route("/manager-department-hours-query")
 @page_permission_required("manager_department_hours_query")
 def manager_department_hours_query_page():
-    return render_template("manager_department_hours_query.html")
+    return frontend_redirect("/employee/manager-department-hours-query")
 
 
 @employee_bp.route("/abnormal-query")
 @page_permission_required("abnormal_query")
 def abnormal_query_page():
-    emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no).all() if emp_ids else []
-    return render_template("abnormal_query.html", employees=employees)
+    return frontend_redirect("/employee/abnormal-query")
 
 
 @employee_bp.route("/department-hours-query")
 @page_permission_required("department_hours_query")
 def department_hours_query_page():
-    return render_template("department_hours_query.html")
+    return frontend_redirect("/employee/department-hours-query")
 
 
 @employee_bp.route("/punch-records")
 @page_permission_required("punch_records")
 def punch_records_page():
-    emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no).all() if emp_ids else []
-    return render_template("punch_records.html", employees=employees)
+    return frontend_redirect("/employee/punch-records")
 
 
 @employee_bp.route("/summary-download")
 @page_permission_required("summary_download")
 def summary_download_page():
-    emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
-    employees = Employee.query.filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no).all() if emp_ids else []
-    return render_template("summary_download.html", employees=employees)
+    return frontend_redirect("/employee/summary-download")
 
 
 @employee_bp.route("/api/account-sets", methods=["GET"])

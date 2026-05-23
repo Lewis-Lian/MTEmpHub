@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from flask import g, jsonify, render_template, request
+from flask import g, jsonify, request
 
-from routes.auth import admin_required
+from routes.auth import admin_required, frontend_redirect
 
 
 def users_list_api():
@@ -43,22 +43,7 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_bp.route("/accounts")
     @admin_required
     def accounts_page():
-        return render_template(
-            "admin/accounts.html",
-            current_user_id=g.current_user.id,
-            home_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.HOME_PAGE_PERMISSION_KEYS
-            ],
-            manager_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.MANAGER_PAGE_PERMISSION_KEYS
-            ],
-            employee_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.EMPLOYEE_PAGE_PERMISSION_KEYS
-            ],
-        )
+        return frontend_redirect("/admin/accounts")
 
     @admin_bp.route("/users/readonly", methods=["POST"])
     @admin_required

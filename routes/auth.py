@@ -64,6 +64,27 @@ def _extract_token() -> str | None:
     return request.cookies.get(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
 
 
+def frontend_url(path: str) -> str:
+    if path.startswith("http://") or path.startswith("https://"):
+        return path
+    base_url = (
+        current_app.config.get("FRONTEND_APP_URL")
+        or current_app.config.get("FRONTEND_ORIGIN")
+        or "http://localhost:5173"
+    ).rstrip("/")
+    normalized_path = path if path.startswith("/") else f"/{path}"
+    return f"{base_url}{normalized_path}"
+
+
+def frontend_redirect(path: str):
+    target = frontend_url(path)
+    query_string = request.query_string.decode().strip()
+    if query_string:
+        separator = "&" if "?" in target else "?"
+        target = f"{target}{separator}{query_string}"
+    return redirect(target)
+
+
 def _landing_url_for_user(user: User) -> str:
     if user.role == "admin":
         return url_for("employee.query_home_page")
@@ -139,13 +160,13 @@ def root():
     if payload:
         user = db.session.get(User, payload["sub"])
         if user:
-            return redirect(_landing_url_for_user(user))
-    return redirect(url_for("auth.login_page"))
+            return redirect(frontend_url(_landing_url_for_user(user)))
+    return redirect(frontend_url("/login"))
 
 
 @auth_bp.route("/login", methods=["GET"])
 def login_page():
-    return render_template("login.html")
+    return redirect(frontend_url("/login"))
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -165,7 +186,7 @@ def login_post():
     if request.is_json:
         return jsonify({"token": token, "role": user.role, "username": user.username})
 
-    resp = make_response(redirect(_landing_url_for_user(user)))
+    resp = make_response(redirect(frontend_url(_landing_url_for_user(user))))
     cookie_kwargs = _session_cookie_kwargs(
         remember_me=str(remember_me).lower() in {"1", "true", "on", "yes"}
     )
@@ -205,7 +226,7 @@ def change_password_post():
 
 @auth_bp.route("/logout", methods=["POST", "GET"])
 def logout():
-    resp = make_response(redirect(url_for("auth.login_page")))
+    resp = make_response(redirect(frontend_url("/login")))
     resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
     return resp
 
