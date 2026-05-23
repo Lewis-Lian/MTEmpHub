@@ -22,7 +22,7 @@ from models.employee_shift import EmployeeShiftAssignment
 from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.attendance_override_history import AttendanceOverrideHistory
 from models.account_set import AccountSet, AccountSetImport
-from routes import register_routes
+from routes import configure_api_cors, register_routes
 
 _compat_app: Flask | None = None
 
@@ -40,6 +40,7 @@ def create_app() -> Flask:
 
     db.init_app(app)
     Migrate(app, db)
+    configure_api_cors(app)
     register_routes(app)
 
     @app.get("/health")

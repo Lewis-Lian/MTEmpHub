@@ -26,6 +26,18 @@ _DEFAULT_PAGE_ENDPOINTS = (
 )
 
 
+def _session_cookie_kwargs(*, remember_me: bool = False) -> dict:
+    cookie_kwargs = {
+        "httponly": True,
+        "samesite": current_app.config["SESSION_COOKIE_SAMESITE"],
+        "secure": current_app.config["SESSION_COOKIE_SECURE"],
+        "path": "/",
+    }
+    if remember_me:
+        cookie_kwargs["max_age"] = _REMEMBER_ME_SECONDS
+    return cookie_kwargs
+
+
 def _generate_token(user: User) -> str:
     now = datetime.now(tz=timezone.utc)
     payload = {
@@ -49,7 +61,7 @@ def _extract_token() -> str | None:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         return auth_header[7:]
-    return request.cookies.get("access_token")
+    return request.cookies.get(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
 
 
 def _landing_url_for_user(user: User) -> str:
@@ -79,7 +91,7 @@ def login_required(fn):
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Invalid token"}), 401
             resp = redirect(url_for("auth.login_page"))
-            resp.delete_cookie("access_token")
+            resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
             return resp
 
         user = db.session.get(User, payload["sub"])
@@ -154,10 +166,10 @@ def login_post():
         return jsonify({"token": token, "role": user.role, "username": user.username})
 
     resp = make_response(redirect(_landing_url_for_user(user)))
-    cookie_kwargs = {"httponly": True, "samesite": "Lax"}
-    if str(remember_me).lower() in {"1", "true", "on", "yes"}:
-        cookie_kwargs["max_age"] = _REMEMBER_ME_SECONDS
-    resp.set_cookie("access_token", token, **cookie_kwargs)
+    cookie_kwargs = _session_cookie_kwargs(
+        remember_me=str(remember_me).lower() in {"1", "true", "on", "yes"}
+    )
+    resp.set_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"), token, **cookie_kwargs)
     return resp
 
 
@@ -194,7 +206,7 @@ def change_password_post():
 @auth_bp.route("/logout", methods=["POST", "GET"])
 def logout():
     resp = make_response(redirect(url_for("auth.login_page")))
-    resp.delete_cookie("access_token")
+    resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
     return resp
 
 

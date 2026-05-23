@@ -9,6 +9,10 @@ class Config:
     SECRET_KEY = os.getenv("SECRET_KEY") or ("dev-secret-key" if APP_ENV != "production" else None)
     JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "12"))
     JWT_EXPIRES_DELTA = timedelta(hours=JWT_EXPIRES_HOURS)
+    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "access_token")
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+    SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     UPLOAD_FOLDER = os.getenv(
         "UPLOAD_FOLDER",
         os.path.join(os.path.dirname(__file__), "static", "uploads"),
