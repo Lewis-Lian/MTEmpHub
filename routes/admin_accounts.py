@@ -1,8 +1,26 @@
 from __future__ import annotations
 
-from flask import g, jsonify, render_template, request
+from flask import g, jsonify, request
 
-from routes.auth import admin_required
+from routes.auth import admin_required, frontend_redirect
+
+
+def users_list_api():
+    from . import admin as admin_module
+
+    users = admin_module._user_list_query().all()
+    profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
+    profile_departments_by_id = {}
+    if profile_dept_ids:
+        profile_departments_by_id = {
+            row.id: row
+            for row in admin_module.Department.query.filter(
+                admin_module.Department.id.in_(profile_dept_ids)
+            ).all()
+        }
+    return jsonify(
+        [admin_module._serialize_user(user, profile_departments_by_id=profile_departments_by_id) for user in users]
+    )
 
 
 def register_admin_account_routes(admin_bp) -> None:
@@ -25,22 +43,7 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_bp.route("/accounts")
     @admin_required
     def accounts_page():
-        return render_template(
-            "admin/accounts.html",
-            current_user_id=g.current_user.id,
-            home_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.HOME_PAGE_PERMISSION_KEYS
-            ],
-            manager_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.MANAGER_PAGE_PERMISSION_KEYS
-            ],
-            employee_page_permissions=[
-                {"key": key, "label": admin_module.PAGE_PERMISSION_LABELS[key]}
-                for key in admin_module.EMPLOYEE_PAGE_PERMISSION_KEYS
-            ],
-        )
+        return frontend_redirect("/admin/accounts")
 
     @admin_bp.route("/users/readonly", methods=["POST"])
     @admin_required
@@ -82,19 +85,7 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_bp.route("/users", methods=["GET"])
     @admin_required
     def users_list():
-        users = admin_module._user_list_query().all()
-        profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
-        profile_departments_by_id = {}
-        if profile_dept_ids:
-            profile_departments_by_id = {
-                row.id: row
-                for row in admin_module.Department.query.filter(
-                    admin_module.Department.id.in_(profile_dept_ids)
-                ).all()
-            }
-        return jsonify(
-            [admin_module._serialize_user(user, profile_departments_by_id=profile_departments_by_id) for user in users]
-        )
+        return users_list_api()
 
     @admin_bp.route("/users", methods=["POST"])
     @admin_required

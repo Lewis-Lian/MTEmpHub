@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from flask import Blueprint, abort, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, g
 
-from routes.auth import login_required
+from routes.auth import frontend_redirect, login_required
 from utils.app_navigation import module_by_slug, visible_entries
 
 
@@ -13,10 +13,7 @@ module_bp = Blueprint("module", __name__, url_prefix="/module")
 @login_required
 def module_home(slug: str):
     if slug == "home":
-        target = url_for("employee.query_home_page")
-        if request.args.get("__tab") == "1":
-            target = f"{target}?__tab=1"
-        return redirect(target)
+        return frontend_redirect("/employee/home")
 
     module = module_by_slug(slug)
     if not module:
@@ -25,7 +22,4 @@ def module_home(slug: str):
     entries = visible_entries(g.current_user, module)
     if not entries:
         abort(403)
-
-    module["entries"] = entries
-    module["home_href"] = f"/module/{module['slug']}"
-    return render_template("module_home.html", module=module, entries=entries)
+    return frontend_redirect(entries[0]["href"])
