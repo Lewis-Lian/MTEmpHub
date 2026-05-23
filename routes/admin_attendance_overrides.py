@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 
 import openpyxl
-from flask import jsonify, render_template, request
+from flask import jsonify, request
 
-from routes.auth import admin_required
+from routes.auth import admin_required, frontend_redirect
 
 
 def _requested_emp_ids() -> list[int]:
@@ -28,93 +28,182 @@ def _requested_emp_ids() -> list[int]:
     return emp_ids
 
 
+def manager_attendance_override_record_api():
+    from . import admin as admin_module
+
+    emp_id = request.args.get("emp_id", type=int) or 0
+    month = admin_module._validate_month(request.args.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择管理人员和有效月份"}), 400
+    payload, status = admin_module._manager_attendance_response(emp_id, month)
+    return jsonify(payload), status
+
+
+def manager_attendance_override_list_api():
+    from . import admin as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    payload, status = admin_module._manager_attendance_list_response(_requested_emp_ids(), month)
+    return jsonify(payload), status
+
+
+def save_manager_attendance_override_record_api():
+    from . import admin as admin_module
+
+    data = request.json or {}
+    emp_id = int(data.get("emp_id") or 0)
+    month = admin_module._validate_month(data.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择管理人员和有效月份"}), 400
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存管理人员考勤修正")
+    if locked_error:
+        return locked_error
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee or not employee.is_manager:
+        return jsonify({"error": "employee is not manager"}), 400
+
+    values: dict[str, float | int | None] = {}
+    for key in (
+        "attendance_days",
+        "injury_days",
+        "business_trip_days",
+        "marriage_days",
+        "funeral_days",
+    ):
+        value, error = admin_module._nullable_float(data, key)
+        if error:
+            return jsonify({"error": error}), 400
+        values[key] = value
+    late_value, error = admin_module._nullable_int(data, "late_early_minutes")
+    if error:
+        return jsonify({"error": error}), 400
+    values["late_early_minutes"] = late_value
+
+    row = admin_module.ManagerAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
+    before_values = admin_module._override_state_from_row(
+        row, admin_module._MANAGER_ATTENDANCE_OVERRIDE_FIELDS
+    )
+    after_values = dict(values)
+    after_values["remark"] = (data.get("remark") or "").strip()
+    if admin_module._has_override_state_changes(before_values, after_values):
+        if not row:
+            row = admin_module.ManagerAttendanceOverride(emp_id=emp_id, month=month)
+            admin_module.db.session.add(row)
+        for key, value in values.items():
+            setattr(row, key, value)
+        row.remark = after_values["remark"]
+        row.updated_by = admin_module.g.current_user.id
+        admin_module._record_override_history(
+            "manager", emp_id, month, "manual_save", before_values, after_values
+        )
+        admin_module.db.session.commit()
+
+    payload, status = admin_module._manager_attendance_response(emp_id, month)
+    return jsonify(payload), status
+
+
+def manager_attendance_override_history_api():
+    from . import admin as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    return jsonify({"rows": admin_module._history_rows_for_month("manager", month)})
+
+
+def employee_attendance_override_record_api():
+    from . import admin as admin_module
+
+    emp_id = request.args.get("emp_id", type=int) or 0
+    month = admin_module._validate_month(request.args.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择员工和有效月份"}), 400
+    payload, status = admin_module._employee_override_response(emp_id, month)
+    return jsonify(payload), status
+
+
+def employee_attendance_override_list_api():
+    from . import admin as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    payload, status = admin_module._employee_override_list_response(_requested_emp_ids(), month)
+    return jsonify(payload), status
+
+
+def save_employee_attendance_override_record_api():
+    from . import admin as admin_module
+
+    data = request.json or {}
+    emp_id = int(data.get("emp_id") or 0)
+    month = admin_module._validate_month(data.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择员工和有效月份"}), 400
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存员工考勤修正")
+    if locked_error:
+        return locked_error
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee or employee.is_manager:
+        return jsonify({"error": "员工不存在或是管理人员"}), 400
+
+    values: dict[str, float | int | None] = {}
+    for key in ("attendance_days", "work_hours"):
+        value, error = admin_module._nullable_float(data, key)
+        if error:
+            return jsonify({"error": error}), 400
+        values[key] = value
+    for key in ("half_days", "late_early_minutes"):
+        value, error = admin_module._nullable_int(data, key)
+        if error:
+            return jsonify({"error": error}), 400
+        values[key] = value
+
+    row = admin_module.EmployeeAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
+    updates = dict(values)
+    updates["remark"] = (data.get("remark") or "").strip()
+    if admin_module._apply_employee_override_updates(row, emp_id, month, updates, "manual_save"):
+        admin_module.db.session.commit()
+
+    payload, status = admin_module._employee_override_response(emp_id, month)
+    return jsonify(payload), status
+
+
+def employee_attendance_override_history_api():
+    from . import admin as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    return jsonify({"rows": admin_module._history_rows_for_month("employee", month)})
+
+
 def register_admin_attendance_override_routes(admin_bp) -> None:
     from . import admin as admin_module
 
     @admin_bp.route("/manager-attendance-overrides")
     @admin_required
     def manager_attendance_overrides_page():
-        employees = admin_module._manager_scope_employees()
-        active_account_set = admin_module.AccountSet.query.filter_by(is_active=True).first()
-        return render_template(
-            "admin/manager_attendance_overrides.html",
-            employees=employees,
-            default_month=active_account_set.month if active_account_set else "",
-        )
+        return frontend_redirect("/admin/manager-attendance-overrides")
 
     @admin_bp.route("/manager-attendance-overrides/record", methods=["GET"])
     @admin_required
     def manager_attendance_override_record():
-        emp_id = request.args.get("emp_id", type=int) or 0
-        month = admin_module._validate_month(request.args.get("month"))
-        if not emp_id or not month:
-            return jsonify({"error": "请选择管理人员和有效月份"}), 400
-        payload, status = admin_module._manager_attendance_response(emp_id, month)
-        return jsonify(payload), status
+        return manager_attendance_override_record_api()
 
     @admin_bp.route("/manager-attendance-overrides/list", methods=["GET"])
     @admin_required
     def manager_attendance_override_list():
-        month = admin_module._validate_month(request.args.get("month"))
-        if not month:
-            return jsonify({"error": "请选择有效月份"}), 400
-        payload, status = admin_module._manager_attendance_list_response(_requested_emp_ids(), month)
-        return jsonify(payload), status
+        return manager_attendance_override_list_api()
 
     @admin_bp.route("/manager-attendance-overrides/record", methods=["PUT"])
     @admin_required
     def save_manager_attendance_override_record():
-        data = request.json or {}
-        emp_id = int(data.get("emp_id") or 0)
-        month = admin_module._validate_month(data.get("month"))
-        if not emp_id or not month:
-            return jsonify({"error": "请选择管理人员和有效月份"}), 400
-        account_set = admin_module._account_set_for_month(month)
-        locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存管理人员考勤修正")
-        if locked_error:
-            return locked_error
-        employee = admin_module.db.session.get(admin_module.Employee, emp_id)
-        if not employee or not employee.is_manager:
-            return jsonify({"error": "employee is not manager"}), 400
-
-        values: dict[str, float | int | None] = {}
-        for key in (
-            "attendance_days",
-            "injury_days",
-            "business_trip_days",
-            "marriage_days",
-            "funeral_days",
-        ):
-            value, error = admin_module._nullable_float(data, key)
-            if error:
-                return jsonify({"error": error}), 400
-            values[key] = value
-        late_value, error = admin_module._nullable_int(data, "late_early_minutes")
-        if error:
-            return jsonify({"error": error}), 400
-        values["late_early_minutes"] = late_value
-
-        row = admin_module.ManagerAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
-        before_values = admin_module._override_state_from_row(
-            row, admin_module._MANAGER_ATTENDANCE_OVERRIDE_FIELDS
-        )
-        after_values = dict(values)
-        after_values["remark"] = (data.get("remark") or "").strip()
-        if admin_module._has_override_state_changes(before_values, after_values):
-            if not row:
-                row = admin_module.ManagerAttendanceOverride(emp_id=emp_id, month=month)
-                admin_module.db.session.add(row)
-            for key, value in values.items():
-                setattr(row, key, value)
-            row.remark = after_values["remark"]
-            row.updated_by = admin_module.g.current_user.id
-            admin_module._record_override_history(
-                "manager", emp_id, month, "manual_save", before_values, after_values
-            )
-            admin_module.db.session.commit()
-
-        payload, status = admin_module._manager_attendance_response(emp_id, month)
-        return jsonify(payload), status
+        return save_manager_attendance_override_record_api()
 
     @admin_bp.route("/manager-attendance-overrides/record", methods=["DELETE"])
     @admin_required
@@ -144,10 +233,7 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     @admin_bp.route("/manager-attendance-overrides/history", methods=["GET"])
     @admin_required
     def manager_attendance_override_history():
-        month = admin_module._validate_month(request.args.get("month"))
-        if not month:
-            return jsonify({"error": "请选择有效月份"}), 400
-        return jsonify({"rows": admin_module._history_rows_for_month("manager", month)})
+        return manager_attendance_override_history_api()
 
     @admin_bp.route("/manager-attendance-overrides/template", methods=["GET"])
     @admin_required
@@ -271,79 +357,22 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     @admin_bp.route("/employee-attendance-overrides")
     @admin_required
     def employee_attendance_overrides_page():
-        employees = admin_module._unique_employees(
-            (
-            admin_module.Employee.query.filter_by(is_manager=False)
-            .order_by(
-                admin_module.Employee.dept_id.asc(),
-                admin_module.Employee.emp_no.asc(),
-                admin_module.Employee.name.asc(),
-            )
-            .all()
-        )
-        )
-        active_account_set = admin_module.AccountSet.query.filter_by(is_active=True).first()
-        return render_template(
-            "admin/employee_attendance_overrides.html",
-            employees=employees,
-            default_month=active_account_set.month if active_account_set else "",
-        )
+        return frontend_redirect("/admin/employee-attendance-overrides")
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["GET"])
     @admin_required
     def employee_attendance_override_record():
-        emp_id = request.args.get("emp_id", type=int) or 0
-        month = admin_module._validate_month(request.args.get("month"))
-        if not emp_id or not month:
-            return jsonify({"error": "请选择员工和有效月份"}), 400
-        payload, status = admin_module._employee_override_response(emp_id, month)
-        return jsonify(payload), status
+        return employee_attendance_override_record_api()
 
     @admin_bp.route("/employee-attendance-overrides/list", methods=["GET"])
     @admin_required
     def employee_attendance_override_list():
-        month = admin_module._validate_month(request.args.get("month"))
-        if not month:
-            return jsonify({"error": "请选择有效月份"}), 400
-        payload, status = admin_module._employee_override_list_response(_requested_emp_ids(), month)
-        return jsonify(payload), status
+        return employee_attendance_override_list_api()
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["PUT"])
     @admin_required
     def save_employee_attendance_override_record():
-        data = request.json or {}
-        emp_id = int(data.get("emp_id") or 0)
-        month = admin_module._validate_month(data.get("month"))
-        if not emp_id or not month:
-            return jsonify({"error": "请选择员工和有效月份"}), 400
-        account_set = admin_module._account_set_for_month(month)
-        locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存员工考勤修正")
-        if locked_error:
-            return locked_error
-        employee = admin_module.db.session.get(admin_module.Employee, emp_id)
-        if not employee or employee.is_manager:
-            return jsonify({"error": "员工不存在或是管理人员"}), 400
-
-        values: dict[str, float | int | None] = {}
-        for key in ("attendance_days", "work_hours"):
-            value, error = admin_module._nullable_float(data, key)
-            if error:
-                return jsonify({"error": error}), 400
-            values[key] = value
-        for key in ("half_days", "late_early_minutes"):
-            value, error = admin_module._nullable_int(data, key)
-            if error:
-                return jsonify({"error": error}), 400
-            values[key] = value
-
-        row = admin_module.EmployeeAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
-        updates = dict(values)
-        updates["remark"] = (data.get("remark") or "").strip()
-        if admin_module._apply_employee_override_updates(row, emp_id, month, updates, "manual_save"):
-            admin_module.db.session.commit()
-
-        payload, status = admin_module._employee_override_response(emp_id, month)
-        return jsonify(payload), status
+        return save_employee_attendance_override_record_api()
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["DELETE"])
     @admin_required
@@ -369,10 +398,7 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     @admin_bp.route("/employee-attendance-overrides/history", methods=["GET"])
     @admin_required
     def employee_attendance_override_history():
-        month = admin_module._validate_month(request.args.get("month"))
-        if not month:
-            return jsonify({"error": "请选择有效月份"}), 400
-        return jsonify({"rows": admin_module._history_rows_for_month("employee", month)})
+        return employee_attendance_override_history_api()
 
     @admin_bp.route("/employee-attendance-overrides/template", methods=["GET"])
     @admin_required

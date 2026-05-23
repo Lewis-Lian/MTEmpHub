@@ -38,6 +38,10 @@ Thumbs.db
 # Build outputs
 build/
 dist/
+node_modules/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
 *.egg-info/
 .worktrees/
 .superpowers/
