@@ -930,15 +930,13 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(ws["D2"].value, 2)
 
     def test_attendance_override_pages_default_to_active_account_set_month(self) -> None:
-        employee_res = self.client.get("/admin/employee-attendance-overrides")
-        self.assertEqual(employee_res.status_code, 200)
-        employee_html = employee_res.get_data(as_text=True)
-        self.assertIn('id="employeeAttendanceOverrideMonth" value="2026-05"', employee_html)
+        employee_res = self.client.get("/admin/employee-attendance-overrides", follow_redirects=False)
+        self.assertEqual(employee_res.status_code, 302)
+        self.assertEqual(employee_res.headers["Location"], "http://localhost:5173/admin/employee-attendance-overrides")
 
-        manager_res = self.client.get("/admin/manager-attendance-overrides")
-        self.assertEqual(manager_res.status_code, 200)
-        manager_html = manager_res.get_data(as_text=True)
-        self.assertIn('id="managerAttendanceOverrideMonth" value="2026-05"', manager_html)
+        manager_res = self.client.get("/admin/manager-attendance-overrides", follow_redirects=False)
+        self.assertEqual(manager_res.status_code, 302)
+        self.assertEqual(manager_res.headers["Location"], "http://localhost:5173/admin/manager-attendance-overrides")
 
     def test_admin_route_extraction_modules_preserve_admin_contract(self) -> None:
         from routes.admin_accounts import register_admin_account_routes
@@ -2406,24 +2404,19 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
     def test_module_home_routes_render_accessible_entries(self) -> None:
         home_module_res = self.client.get("/module/home", follow_redirects=False)
         self.assertEqual(home_module_res.status_code, 302)
-        self.assertTrue(home_module_res.headers["Location"].endswith("/employee/home"))
+        self.assertEqual(home_module_res.headers["Location"], "http://localhost:5173/employee/home")
 
-        res = self.client.get("/module/query")
-        self.assertEqual(res.status_code, 200)
-        query_html = res.get_data(as_text=True)
-        self.assertIn("查询中心", query_html)
-        self.assertIn("/employee/dashboard", query_html)
-        self.assertIn("/employee/manager-query", query_html)
+        res = self.client.get("/module/query", follow_redirects=False)
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(res.headers["Location"], "http://localhost:5173/employee/dashboard")
 
-        home_res = self.client.get("/employee/home")
-        self.assertEqual(home_res.status_code, 200)
-        home_html = home_res.get_data(as_text=True)
-        self.assertIn("manager-home-shell", home_html)
-        self.assertIn("managerHomeAccountSetSelect", home_html)
+        home_res = self.client.get("/employee/home", follow_redirects=False)
+        self.assertEqual(home_res.status_code, 302)
+        self.assertEqual(home_res.headers["Location"], "http://localhost:5173/employee/home")
 
-        account_res = self.client.get("/module/account")
-        self.assertEqual(account_res.status_code, 200)
-        self.assertIn("/admin/dashboard", account_res.get_data(as_text=True))
+        account_res = self.client.get("/module/account", follow_redirects=False)
+        self.assertEqual(account_res.status_code, 302)
+        self.assertEqual(account_res.headers["Location"], "http://localhost:5173/admin/dashboard")
 
     def test_module_home_redirect_preserves_embedded_tab_flag(self) -> None:
         res = self.client.get("/module/home?__tab=1", follow_redirects=False)
@@ -2440,15 +2433,13 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         reader_client = self.app.test_client()
         reader_client.post("/login", data={"username": "reader", "password": "reader123"})
 
-        allowed = reader_client.get("/module/query")
-        self.assertEqual(allowed.status_code, 200)
-        self.assertIn("/employee/dashboard", allowed.get_data(as_text=True))
+        allowed = reader_client.get("/module/query", follow_redirects=False)
+        self.assertEqual(allowed.status_code, 302)
+        self.assertEqual(allowed.headers["Location"], "http://localhost:5173/employee/dashboard")
 
-        home = reader_client.get("/employee/home")
-        self.assertEqual(home.status_code, 200)
-        home_html = home.get_data(as_text=True)
-        self.assertIn("manager-home-shell", home_html)
-        self.assertNotIn("/employee/abnormal-query", home_html)
+        home = reader_client.get("/employee/home", follow_redirects=False)
+        self.assertEqual(home.status_code, 302)
+        self.assertEqual(home.headers["Location"], "http://localhost:5173/employee/home")
 
         denied = reader_client.get("/module/account")
         self.assertEqual(denied.status_code, 403)
@@ -2804,6 +2795,25 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.assertIsNotNone(production)
             self.assertEqual(admin.dept_no, "D002")
             self.assertEqual(production.dept_no, "D001")
+
+    def test_legacy_login_page_redirects_to_frontend_entry(self) -> None:
+        response = self.client.get("/login", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "http://localhost:5173/login")
+
+    def test_legacy_query_and_admin_pages_redirect_to_frontend_routes(self) -> None:
+        dashboard_response = self.client.get("/employee/dashboard", follow_redirects=False)
+        accounts_response = self.client.get("/admin/accounts", follow_redirects=False)
+
+        self.assertEqual(dashboard_response.status_code, 302)
+        self.assertEqual(dashboard_response.headers["Location"], "http://localhost:5173/employee/dashboard")
+        self.assertEqual(accounts_response.status_code, 302)
+        self.assertEqual(accounts_response.headers["Location"], "http://localhost:5173/admin/accounts")
+
+    def test_legacy_module_route_redirects_to_first_visible_frontend_entry(self) -> None:
+        response = self.client.get("/module/query", follow_redirects=False)
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.headers["Location"], "http://localhost:5173/employee/dashboard")
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ from models.user import (
 )
 from services.import_service import ImportService
 from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows
-from routes.auth import admin_required
+from routes.auth import admin_required, frontend_redirect
 from utils.helpers import parse_bool_zh
 
 
@@ -813,7 +813,7 @@ def _assign_employee_shift(employee: Employee, shift: Shift | None) -> None:
 @admin_bp.route("/dashboard")
 @admin_required
 def dashboard():
-    return render_template("admin/dashboard.html")
+    return frontend_redirect("/admin/dashboard")
 
 
 @admin_bp.route("/account-sets", methods=["GET"])
@@ -1039,40 +1039,31 @@ def calculate_account_set(account_set_id: int):
 @admin_bp.route("/employees/manage")
 @admin_required
 def employees_page():
-    shifts = Shift.query.order_by(Shift.shift_no.asc()).all()
-    return render_template("admin/employees.html", shifts=shifts)
+    return frontend_redirect("/admin/employees/manage")
 
 
 @admin_bp.route("/shifts/manage")
 @admin_required
 def shifts_page():
-    return render_template("admin/shifts.html")
+    return frontend_redirect("/admin/shifts/manage")
 
 
 @admin_bp.route("/departments/manage")
 @admin_required
 def departments_page():
-    return render_template("admin/departments.html")
+    return frontend_redirect("/admin/departments/manage")
 
 
 @admin_bp.route("/manager-overtime")
 @admin_required
 def manager_overtime_page():
-    return render_template(
-        "admin/manager_overtime.html",
-        employees=_manager_scope_employees(),
-        default_year=datetime.now().year,
-    )
+    return frontend_redirect("/admin/manager-overtime")
 
 
 @admin_bp.route("/manager-annual-leave")
 @admin_required
 def manager_annual_leave_page():
-    return render_template(
-        "admin/manager_annual_leave.html",
-        employees=_manager_scope_employees(),
-        default_year=datetime.now().year,
-    )
+    return frontend_redirect("/admin/manager-annual-leave")
 
 
 @admin_bp.route("/shifts", methods=["POST"])

@@ -3,9 +3,9 @@ from __future__ import annotations
 from datetime import datetime
 
 import openpyxl
-from flask import jsonify, render_template, request
+from flask import jsonify, request
 
-from routes.auth import admin_required
+from routes.auth import admin_required, frontend_redirect
 
 
 def _requested_emp_ids() -> list[int]:
@@ -188,13 +188,7 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     @admin_bp.route("/manager-attendance-overrides")
     @admin_required
     def manager_attendance_overrides_page():
-        employees = admin_module._manager_scope_employees()
-        active_account_set = admin_module.AccountSet.query.filter_by(is_active=True).first()
-        return render_template(
-            "admin/manager_attendance_overrides.html",
-            employees=employees,
-            default_month=active_account_set.month if active_account_set else "",
-        )
+        return frontend_redirect("/admin/manager-attendance-overrides")
 
     @admin_bp.route("/manager-attendance-overrides/record", methods=["GET"])
     @admin_required
@@ -363,23 +357,7 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     @admin_bp.route("/employee-attendance-overrides")
     @admin_required
     def employee_attendance_overrides_page():
-        employees = admin_module._unique_employees(
-            (
-            admin_module.Employee.query.filter_by(is_manager=False)
-            .order_by(
-                admin_module.Employee.dept_id.asc(),
-                admin_module.Employee.emp_no.asc(),
-                admin_module.Employee.name.asc(),
-            )
-            .all()
-        )
-        )
-        active_account_set = admin_module.AccountSet.query.filter_by(is_active=True).first()
-        return render_template(
-            "admin/employee_attendance_overrides.html",
-            employees=employees,
-            default_month=active_account_set.month if active_account_set else "",
-        )
+        return frontend_redirect("/admin/employee-attendance-overrides")
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["GET"])
     @admin_required
