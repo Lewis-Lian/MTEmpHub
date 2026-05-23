@@ -10,7 +10,7 @@ from datetime import date
 from types import SimpleNamespace
 
 import openpyxl
-from flask import Flask, g, render_template
+from flask import Flask as BaseFlask, g, render_template
 from sqlalchemy import event
 
 from models import db
@@ -26,6 +26,12 @@ from routes.admin import _factory_rest_unit, _manager_attendance_options
 from routes.employee import _fill_manager_template, _manager_options
 from services.bootstrap_service import ensure_schema_compatibility
 from utils.app_navigation import module_by_slug, nav_context, visible_modules
+
+
+class Flask(BaseFlask):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.config.setdefault("FRONTEND_ORIGIN", "http://localhost:5173")
 
 
 class AttendanceOverrideFeatureTests(unittest.TestCase):
@@ -47,6 +53,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             SQLALCHEMY_TRACK_MODIFICATIONS=False,
             JWT_EXPIRES_HOURS=12,
             JWT_EXPIRES_DELTA=__import__("datetime").timedelta(hours=12),
+            FRONTEND_ORIGIN="http://localhost:5173",
             UPLOAD_FOLDER=self.upload_dir,
         )
         os.makedirs(self.upload_dir, exist_ok=True)
