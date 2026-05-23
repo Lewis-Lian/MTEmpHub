@@ -9,14 +9,22 @@ from routes.employee import (
     _accessible_emp_ids,
     account_sets_api,
     abnormal_attendance_api,
+    abnormal_attendance_export_api,
     departments_api,
     department_hours_api,
+    department_hours_export_api,
     final_data_api,
+    final_data_export_api,
+    home_manager_summary_api,
     manager_annual_leave_query_api,
     manager_attendance_api,
+    manager_attendance_export_api,
+    manager_attendance_template_export_api,
     manager_department_hours_api,
+    manager_department_hours_export_api,
     manager_overtime_query_api,
     punch_records_api,
+    punch_records_export_api,
     summary_download_export_api,
 )
 from utils.app_navigation import nav_payload
@@ -83,10 +91,22 @@ def navigation():
     return jsonify({"modules": nav_payload(g.current_user)})
 
 
+@api_query_bp.get("/home-summary")
+@login_required
+def home_summary():
+    return home_manager_summary_api()
+
+
 @api_query_bp.get("/employee-dashboard")
 @page_permission_required("employee_dashboard")
 def employee_dashboard():
     return final_data_api()
+
+
+@api_query_bp.get("/employee-dashboard/export")
+@page_permission_required("employee_dashboard")
+def employee_dashboard_export():
+    return final_data_export_api()
 
 
 @api_query_bp.get("/abnormal")
@@ -95,10 +115,22 @@ def abnormal():
     return abnormal_attendance_api()
 
 
+@api_query_bp.get("/abnormal/export")
+@page_permission_required("abnormal_query")
+def abnormal_export():
+    return abnormal_attendance_export_api()
+
+
 @api_query_bp.get("/punch-records")
 @page_permission_required("punch_records")
 def punch_records():
     return punch_records_api()
+
+
+@api_query_bp.get("/punch-records/export")
+@page_permission_required("punch_records")
+def punch_records_export():
+    return punch_records_export_api()
 
 
 @api_query_bp.get("/department-hours")
@@ -107,10 +139,28 @@ def department_hours():
     return department_hours_api()
 
 
+@api_query_bp.get("/department-hours/export")
+@page_permission_required("department_hours_query")
+def department_hours_export():
+    return department_hours_export_api()
+
+
 @api_query_bp.get("/manager-attendance")
 @page_permission_required("manager_query")
 def manager_attendance():
     return manager_attendance_api()
+
+
+@api_query_bp.get("/manager-attendance/export")
+@page_permission_required("manager_query")
+def manager_attendance_export():
+    return manager_attendance_export_api()
+
+
+@api_query_bp.get("/manager-attendance/export-template")
+@page_permission_required("manager_query")
+def manager_attendance_export_template():
+    return manager_attendance_template_export_api()
 
 
 @api_query_bp.get("/manager-overtime")
@@ -129,6 +179,12 @@ def manager_annual_leave():
 @page_permission_required("manager_department_hours_query")
 def manager_department_hours():
     return manager_department_hours_api()
+
+
+@api_query_bp.get("/manager-department-hours/export")
+@page_permission_required("manager_department_hours_query")
+def manager_department_hours_export():
+    return manager_department_hours_export_api()
 
 
 @api_query_bp.get("/summary-download/export")

@@ -12,7 +12,7 @@ export class ApiError extends Error {
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
-type JsonBody = Record<string, unknown>;
+type JsonBody = object;
 type RequestBody = FormData | JsonBody | string | null;
 type RequestOptions = Omit<RequestInit, "body"> & {
   body?: RequestBody;
@@ -53,4 +53,8 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return payload as T;
+}
+
+export function buildApiUrl(path: string): string {
+  return `${API_BASE_URL}${path}`;
 }

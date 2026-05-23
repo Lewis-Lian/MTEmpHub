@@ -1,6 +1,13 @@
 import type { CSSProperties } from "react";
-import { Link, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { ApiError } from "../api/client";
 import { logout, type AuthUser } from "../api/auth";
+import { fetchNavigation } from "../api/query";
+import AppMenu from "../components/nav/AppMenu";
+import ErrorState from "../components/feedback/ErrorState";
+import LoadingState from "../components/feedback/LoadingState";
+import type { QueryNavigationModule } from "../types/query";
 
 interface AppShellProps {
   onLogout: (user: AuthUser | null) => void;
@@ -9,6 +16,38 @@ interface AppShellProps {
 
 export default function AppShell({ onLogout, user }: AppShellProps) {
   const navigate = useNavigate();
+  const [modules, setModules] = useState<QueryNavigationModule[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadNavigation() {
+      try {
+        const payload = await fetchNavigation();
+        if (!mounted) {
+          return;
+        }
+        setModules(payload.modules);
+        setError("");
+      } catch (caughtError) {
+        if (!mounted) {
+          return;
+        }
+        setError(caughtError instanceof ApiError ? caughtError.message : "导航加载失败");
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadNavigation();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function handleLogout() {
     await logout();
@@ -24,17 +63,17 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           <p style={metaStyle}>当前用户：{user.username}</p>
           <p style={metaStyle}>角色：{user.role}</p>
         </div>
-        <nav style={navStyle}>
-          <Link style={linkStyle} to="/employee/dashboard">
-            员工首页
-          </Link>
-        </nav>
+        {isLoading ? <div style={loadingHintStyle}>正在加载菜单...</div> : null}
+        {error ? <div style={errorHintStyle}>{error}</div> : null}
+        {!isLoading && !error ? <AppMenu modules={modules} /> : null}
         <button onClick={handleLogout} style={buttonStyle} type="button">
           退出登录
         </button>
       </aside>
       <main style={mainStyle}>
-        <Outlet />
+        {isLoading ? <LoadingState message="正在准备导航..." /> : null}
+        {error ? <ErrorState description={error} title="导航加载失败" /> : null}
+        {!isLoading && !error ? <Outlet /> : null}
       </main>
     </div>
   );
@@ -68,20 +107,6 @@ const metaStyle: CSSProperties = {
   fontSize: "14px",
 };
 
-const navStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "12px",
-};
-
-const linkStyle: CSSProperties = {
-  color: "inherit",
-  textDecoration: "none",
-  padding: "10px 12px",
-  border: "1px solid rgba(247, 244, 234, 0.25)",
-  borderRadius: "10px",
-};
-
 const buttonStyle: CSSProperties = {
   marginTop: "auto",
   border: "none",
@@ -95,4 +120,15 @@ const buttonStyle: CSSProperties = {
 
 const mainStyle: CSSProperties = {
   padding: "40px",
+};
+
+const loadingHintStyle: CSSProperties = {
+  color: "rgba(247, 244, 234, 0.76)",
+  fontSize: "14px",
+};
+
+const errorHintStyle: CSSProperties = {
+  color: "#fecaca",
+  fontSize: "14px",
+  lineHeight: 1.6,
 };
