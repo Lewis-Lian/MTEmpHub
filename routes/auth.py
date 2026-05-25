@@ -1,67 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from functools import wraps
 
-import jwt
-from flask import Blueprint, current_app, jsonify, redirect, render_template, request, url_for, make_response, g
+from flask import current_app, jsonify, redirect, request, g
 
 from models import db
-from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, HOME_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, User
-
-
-auth_bp = Blueprint("auth", __name__)
-_REMEMBER_ME_SECONDS = 30 * 24 * 60 * 60
-
-_DEFAULT_PAGE_ENDPOINTS = (
-    ("employee_dashboard", "employee.dashboard"),
-    ("abnormal_query", "employee.abnormal_query_page"),
-    ("punch_records", "employee.punch_records_page"),
-    ("department_hours_query", "employee.department_hours_query_page"),
-    ("manager_query", "employee.manager_query_page"),
-    ("manager_overtime_query", "employee.manager_overtime_query_page"),
-    ("manager_annual_leave_query", "employee.manager_annual_leave_query_page"),
-    ("manager_department_hours_query", "employee.manager_department_hours_query_page"),
-    ("summary_download", "employee.summary_download_page"),
-)
-
-
-def _session_cookie_kwargs(*, remember_me: bool = False) -> dict:
-    cookie_kwargs = {
-        "httponly": True,
-        "samesite": current_app.config["SESSION_COOKIE_SAMESITE"],
-        "secure": current_app.config["SESSION_COOKIE_SECURE"],
-        "path": "/",
-    }
-    if remember_me:
-        cookie_kwargs["max_age"] = _REMEMBER_ME_SECONDS
-    return cookie_kwargs
-
-
-def _generate_token(user: User) -> str:
-    now = datetime.now(tz=timezone.utc)
-    payload = {
-        "sub": str(user.id),
-        "username": user.username,
-        "role": user.role,
-        "iat": int(now.timestamp()),
-        "exp": int((now + current_app.config["JWT_EXPIRES_DELTA"]).timestamp()),
-    }
-    return jwt.encode(payload, current_app.config["SECRET_KEY"], algorithm="HS256")
-
-
-def _decode_token(token: str) -> dict | None:
-    try:
-        return jwt.decode(token, current_app.config["SECRET_KEY"], algorithms=["HS256"])
-    except jwt.InvalidTokenError:
-        return None
-
-
-def _extract_token() -> str | None:
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header[7:]
-    return request.cookies.get(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
+from models.user import User
+from routes.auth_helpers import decode_token, extract_token
 
 
 def frontend_url(path: str) -> str:
@@ -85,39 +30,30 @@ def frontend_redirect(path: str):
     return redirect(target)
 
 
-def _landing_url_for_user(user: User) -> str:
-    if user.role == "admin":
-        return url_for("employee.query_home_page")
-
-    if user.has_any_page_access((*HOME_PAGE_PERMISSION_KEYS, *MANAGER_PAGE_PERMISSION_KEYS, *EMPLOYEE_PAGE_PERMISSION_KEYS)):
-        return url_for("employee.query_home_page")
-
-    for page_key, endpoint in _DEFAULT_PAGE_ENDPOINTS:
-        if user.can_access_page(page_key):
-            return url_for(endpoint)
-    return url_for("auth.login_page")
-
-
 def login_required(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        token = _extract_token()
+        token = extract_token()
         if not token:
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Unauthorized"}), 401
-            return redirect(url_for("auth.login_page"))
+            return redirect(frontend_url("/login"))
 
-        payload = _decode_token(token)
+        payload = decode_token(token)
         if not payload:
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Invalid token"}), 401
-            resp = redirect(url_for("auth.login_page"))
+            resp = redirect(frontend_url("/login"))
             resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
             return resp
 
         user = db.session.get(User, payload["sub"])
         if not user:
-            return jsonify({"error": "User not found"}), 401
+            if request.path.startswith("/api/"):
+                return jsonify({"error": "User not found"}), 401
+            resp = redirect(frontend_url("/login"))
+            resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
+            return resp
         g.current_user = user
         return fn(*args, **kwargs)
 
@@ -131,7 +67,7 @@ def admin_required(fn):
         if g.current_user.role != "admin":
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Forbidden"}), 403
-            return redirect(url_for("employee.dashboard"))
+            return redirect(frontend_url("/employee/dashboard"))
         return fn(*args, **kwargs)
 
     return wrapper
@@ -146,98 +82,8 @@ def page_permission_required(page_key: str):
                 return fn(*args, **kwargs)
             if request.path.startswith("/api/"):
                 return jsonify({"error": "Forbidden"}), 403
-            return redirect(url_for("auth.root"))
+            return redirect(frontend_url("/"))
 
         return wrapper
 
     return decorator
-
-
-@auth_bp.route("/")
-def root():
-    token = _extract_token()
-    payload = _decode_token(token) if token else None
-    if payload:
-        user = db.session.get(User, payload["sub"])
-        if user:
-            return redirect(frontend_url(_landing_url_for_user(user)))
-    return redirect(frontend_url("/login"))
-
-
-@auth_bp.route("/login", methods=["GET"])
-def login_page():
-    return redirect(frontend_url("/login"))
-
-
-@auth_bp.route("/login", methods=["POST"])
-def login_post():
-    payload = request.get_json(silent=True) or {}
-    username = request.form.get("username") or payload.get("username")
-    password = request.form.get("password") or payload.get("password")
-    remember_me = request.form.get("remember_me") or payload.get("remember_me")
-
-    user = User.query.filter_by(username=username).first()
-    if not user or not user.check_password(password or ""):
-        if request.is_json:
-            return jsonify({"error": "用户名或密码错误"}), 401
-        return render_template("login.html", error="用户名或密码错误"), 401
-
-    token = _generate_token(user)
-    if request.is_json:
-        return jsonify({"token": token, "role": user.role, "username": user.username})
-
-    resp = make_response(redirect(frontend_url(_landing_url_for_user(user))))
-    cookie_kwargs = _session_cookie_kwargs(
-        remember_me=str(remember_me).lower() in {"1", "true", "on", "yes"}
-    )
-    resp.set_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"), token, **cookie_kwargs)
-    return resp
-
-
-@auth_bp.route("/change-password", methods=["GET"])
-def change_password_page():
-    return render_template("change_password.html", error=None, success=None)
-
-
-@auth_bp.route("/change-password", methods=["POST"])
-def change_password_post():
-    username = (request.form.get("username") or "").strip()
-    current_password = request.form.get("current_password") or ""
-    new_password = request.form.get("new_password") or ""
-    confirm_password = request.form.get("confirm_password") or ""
-
-    if not username:
-        return render_template("change_password.html", error="请输入用户名", success=None), 400
-
-    user = User.query.filter_by(username=username).first()
-    if not user or not user.check_password(current_password):
-        return render_template("change_password.html", error="用户不存在或原密码错误", success=None), 400
-
-    if not new_password:
-        return render_template("change_password.html", error="请输入新密码", success=None), 400
-
-    if new_password != confirm_password:
-        return render_template("change_password.html", error="两次输入的新密码不一致", success=None), 400
-
-    user.set_password(new_password)
-    db.session.commit()
-    return render_template("change_password.html", error=None, success="密码修改成功，请返回登录页重新登录")
-
-
-@auth_bp.route("/logout", methods=["POST", "GET"])
-def logout():
-    resp = make_response(redirect(frontend_url("/login")))
-    resp.delete_cookie(current_app.config.get("SESSION_COOKIE_NAME", "access_token"))
-    return resp
-
-
-@auth_bp.route("/api/me", methods=["GET"])
-@login_required
-def me():
-    return jsonify(
-        {
-            "id": g.current_user.id,
-            "username": g.current_user.username,
-            "role": g.current_user.role,
-        }
-    )

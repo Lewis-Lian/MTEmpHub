@@ -75,18 +75,13 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(payload["role"], "admin")
         self.assertTrue(payload["page_permissions"]["query_home"])
 
-    def test_page_login_uses_shared_cookie_config(self) -> None:
+    def test_legacy_login_endpoint_is_not_available(self) -> None:
         response = self.client.post(
             "/login",
             data={"username": "admin", "password": "admin123", "remember_me": "1"},
         )
-        cookie_header = response.headers.get("Set-Cookie", "")
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("api_access_token=", cookie_header)
-        self.assertIn("SameSite=None", cookie_header)
-        self.assertIn("Max-Age=2592000", cookie_header)
-        self.assertNotIn("Secure", cookie_header)
+        self.assertEqual(response.status_code, 404)
 
     def test_api_login_preflight_returns_cors_headers(self) -> None:
         response = self.client.open(

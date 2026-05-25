@@ -16,7 +16,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectTo = typeof location.state?.from === "string" ? location.state.from : "/employee/dashboard";
+  const redirectTo = typeof location.state?.from === "string" ? location.state.from : null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,7 +26,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     try {
       const user = await login({ username, password });
       onLogin(user);
-      navigate(redirectTo, { replace: true });
+      navigate(redirectTo ?? defaultLandingPath(user), { replace: true });
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : "登录失败，请稍后重试");
     } finally {
@@ -104,4 +104,8 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       </div>
     </div>
   );
+}
+
+function defaultLandingPath(user: AuthUser): string {
+  return user.role === "admin" ? "/admin/dashboard" : "/employee/home";
 }

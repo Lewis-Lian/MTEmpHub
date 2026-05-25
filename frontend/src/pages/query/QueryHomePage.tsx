@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
@@ -88,46 +87,89 @@ export default function QueryHomePage() {
     return <LoadingState message="正在准备查询首页..." />;
   }
 
+  const activeAccountSet = bootstrap.account_sets.find((accountSet) => accountSet.month === month) ?? null;
+  const metrics = Object.entries(summary ?? {});
+
   return (
-    <section style={pageStyle}>
-      <header style={heroStyle}>
-        <div>
-          <p style={tagStyle}>首页</p>
-          <h2 style={titleStyle}>管理人员首页概览</h2>
-          <p style={descriptionStyle}>围绕当前账号绑定的管理人员，展示本月考勤、福利假和调休余额概况。</p>
+    <section className="legacy-page-section">
+      <header className="legacy-page-header">
+        <div className="legacy-page-heading">
+          <p className="legacy-page-kicker">首页</p>
+          <h2 className="legacy-page-title">管理人员首页概览</h2>
+          <p className="legacy-page-description">围绕当前账号绑定的管理人员，查看本月考勤摘要、福利假与调休余额，并确认当前账套取数状态。</p>
         </div>
-        <label style={fieldStyle}>
-          <span style={fieldLabelStyle}>账套月份</span>
-          <select onChange={(event) => setMonth(event.target.value)} style={selectStyle} value={month}>
-            {bootstrap.account_sets.map((accountSet) => (
-              <option key={accountSet.id} value={accountSet.month}>
-                {accountSet.name}
-                {accountSet.is_active ? "（当前）" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="query-home-header-tools">
+          <label className="legacy-field legacy-header-field">
+            <span className="legacy-field-label">账套月份</span>
+            <select className="legacy-select" onChange={(event) => setMonth(event.target.value)} value={month}>
+              {bootstrap.account_sets.map((accountSet) => (
+                <option key={accountSet.id} value={accountSet.month}>
+                  {accountSet.name}
+                  {accountSet.is_active ? "（当前）" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <dl className="legacy-page-side-info">
+            <div className="legacy-page-side-item">
+              <dt>当前账套</dt>
+              <dd>{activeAccountSet?.name ?? "未选择"}</dd>
+            </div>
+            <div className="legacy-page-side-item">
+              <dt>统计状态</dt>
+              <dd>{isLoading ? "正在更新" : error ? "加载失败" : "已就绪"}</dd>
+            </div>
+          </dl>
+        </div>
       </header>
 
       {isLoading ? <LoadingState message="正在加载首页摘要..." /> : null}
       {error && !isLoading ? <ErrorState description={error} title="首页摘要加载失败" /> : null}
 
       {!isLoading && !error ? (
-        <>
-          <section style={managerCardStyle}>
-            <p style={managerLabelStyle}>当前管理人员</p>
-            <h3 style={managerTitleStyle}>{managerLabel || "未绑定管理人员"}</h3>
-            <p style={managerBodyStyle}>{message}</p>
+        <div className="query-home-workspace">
+          <section className="legacy-surface query-home-info-panel">
+            <div className="query-home-panel-head">
+              <div>
+                <p className="query-home-panel-kicker">管理人员信息</p>
+                <h3 className="query-home-panel-title">{managerLabel || "未绑定管理人员"}</h3>
+              </div>
+              <span className="query-home-status-tag">{activeAccountSet?.month || "未选择月份"}</span>
+            </div>
+            <div className="query-home-info-grid">
+              <div className="query-home-info-item">
+                <span className="query-home-info-label">取数账套</span>
+                <strong>{activeAccountSet?.name ?? "未选择"}</strong>
+              </div>
+              <div className="query-home-info-item">
+                <span className="query-home-info-label">统计范围</span>
+                <strong>当前月度考勤与假勤余额</strong>
+              </div>
+            </div>
+            <div className="query-home-message-box">
+              <p className="query-home-message-title">首页说明</p>
+              <p className="query-home-message-body">{message}</p>
+            </div>
           </section>
-          <section style={gridStyle}>
-            {Object.entries(summary ?? {}).map(([key, value]) => (
-              <article key={key} style={metricStyle}>
-                <p style={metricLabelStyle}>{formatMetricLabel(key)}</p>
-                <strong style={metricValueStyle}>{value ?? "-"}</strong>
-              </article>
-            ))}
+
+          <section className="legacy-surface query-home-metrics-panel">
+            <div className="query-home-panel-head">
+              <div>
+                <p className="query-home-panel-kicker">统计区</p>
+                <h3 className="query-home-panel-title">本月摘要</h3>
+              </div>
+              <span className="query-home-panel-meta">{metrics.length} 项指标</span>
+            </div>
+            <div className="query-home-metrics-grid">
+              {metrics.map(([key, value]) => (
+                <article key={key} className="query-home-metric-card">
+                  <p className="query-home-metric-label">{formatMetricLabel(key)}</p>
+                  <strong className="query-home-metric-value">{value ?? "-"}</strong>
+                </article>
+              ))}
+            </div>
           </section>
-        </>
+        </div>
       ) : null}
     </section>
   );
@@ -147,105 +189,3 @@ function formatMetricLabel(key: string): string {
   };
   return labels[key] ?? key;
 }
-
-const pageStyle: CSSProperties = {
-  display: "grid",
-  gap: "24px",
-};
-
-const heroStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  flexWrap: "wrap",
-};
-
-const tagStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const titleStyle: CSSProperties = {
-  margin: "10px 0 8px",
-  fontSize: "34px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: 0,
-  color: "#4b5d67",
-  lineHeight: 1.7,
-  maxWidth: "760px",
-};
-
-const fieldStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const fieldLabelStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "#183153",
-};
-
-const selectStyle: CSSProperties = {
-  borderRadius: "12px",
-  border: "1px solid #d7dfd4",
-  padding: "12px 14px",
-  background: "#fffdfa",
-};
-
-const managerCardStyle: CSSProperties = {
-  padding: "24px",
-  borderRadius: "28px",
-  background: "linear-gradient(135deg, #183153 0%, #2c4f5f 100%)",
-  color: "#f7f4ea",
-};
-
-const managerLabelStyle: CSSProperties = {
-  margin: 0,
-  color: "rgba(247, 244, 234, 0.7)",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const managerTitleStyle: CSSProperties = {
-  margin: "12px 0 10px",
-  fontSize: "28px",
-};
-
-const managerBodyStyle: CSSProperties = {
-  margin: 0,
-  lineHeight: 1.7,
-  color: "rgba(247, 244, 234, 0.86)",
-};
-
-const gridStyle: CSSProperties = {
-  display: "grid",
-  gap: "18px",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-};
-
-const metricStyle: CSSProperties = {
-  padding: "20px",
-  borderRadius: "24px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-};
-
-const metricLabelStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "14px",
-};
-
-const metricValueStyle: CSSProperties = {
-  display: "block",
-  marginTop: "12px",
-  fontSize: "28px",
-  color: "#183153",
-};

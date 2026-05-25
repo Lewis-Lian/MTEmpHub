@@ -1,19 +1,15 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 interface LoadingStateProps {
   message?: ReactNode;
 }
 
 export default function LoadingState({ message = "正在加载数据..." }: LoadingStateProps) {
-  return <div style={stateStyle}>{message}</div>;
+  return (
+    <section className="legacy-feedback-block legacy-loading-state" role="status">
+      <p className="legacy-feedback-kicker">系统提示</p>
+      <h2 className="legacy-feedback-title">正在处理</h2>
+      <p className="legacy-feedback-body">{message}</p>
+    </section>
+  );
 }
-
-const stateStyle: CSSProperties = {
-  minHeight: "220px",
-  display: "grid",
-  placeItems: "center",
-  borderRadius: "24px",
-  background: "#ffffff",
-  color: "#4b5d67",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-};
