@@ -18,7 +18,7 @@ from routes.admin_attendance_overrides import (
     manager_attendance_override_list_api,
     save_manager_attendance_override_record_api,
 )
-from routes.auth import admin_required
+from routes.auth_helpers import admin_required
 
 
 api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
