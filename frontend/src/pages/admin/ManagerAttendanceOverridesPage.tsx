@@ -169,6 +169,7 @@ export default function ManagerAttendanceOverridesPage() {
           </label>
 
           <EmployeePicker
+            departments={bootstrap.departments}
             employees={bootstrap.employees}
             filterMode="manager"
             label="管理人员范围"

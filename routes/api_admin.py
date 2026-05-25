@@ -1,13 +1,26 @@
-from flask import Blueprint, jsonify
+import os
+from datetime import datetime
+
+from flask import Blueprint, current_app, jsonify, request
 
 from models.department import Department
 from models.shift import Shift
 from routes.admin import (
+    AccountSet,
+    AccountSetImport,
+    activate_account_set,
+    calculate_account_set,
+    create_account_set,
+    delete_account_set,
     departments_list,
     employees_list,
+    list_account_sets,
     list_shifts,
+    lock_account_set,
     manager_annual_leave_records,
     manager_overtime_records,
+    update_account_set,
+    unlock_account_set,
 )
 from routes.admin_accounts import users_list_api
 from routes.admin_attendance_overrides import (
@@ -122,3 +135,159 @@ def manager_overtime():
 @admin_required
 def manager_annual_leave():
     return manager_annual_leave_records()
+
+
+@api_admin_bp.get("/account-sets")
+@admin_required
+def account_sets():
+    return list_account_sets()
+
+
+@api_admin_bp.post("/account-sets")
+@admin_required
+def account_sets_create():
+    return create_account_set()
+
+
+@api_admin_bp.put("/account-sets/<int:account_set_id>")
+@admin_required
+def account_sets_update(account_set_id: int):
+    return update_account_set(account_set_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/activate")
+@admin_required
+def account_sets_activate(account_set_id: int):
+    return activate_account_set(account_set_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/lock")
+@admin_required
+def account_sets_lock(account_set_id: int):
+    return lock_account_set(account_set_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/unlock")
+@admin_required
+def account_sets_unlock(account_set_id: int):
+    return unlock_account_set(account_set_id)
+
+
+@api_admin_bp.delete("/account-sets/<int:account_set_id>")
+@admin_required
+def account_sets_delete(account_set_id: int):
+    return delete_account_set(account_set_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/calculate")
+@admin_required
+def account_sets_calculate(account_set_id: int):
+    return calculate_account_set(account_set_id)
+
+
+@api_admin_bp.get("/account-sets/<int:account_set_id>/imports")
+@admin_required
+def account_set_imports(account_set_id: int):
+    from routes import admin as admin_module
+
+    row = admin_module._require_model(AccountSet, account_set_id)
+    records = (
+        AccountSetImport.query.filter_by(account_set_id=row.id)
+        .order_by(AccountSetImport.id.desc())
+        .all()
+    )
+    return jsonify(
+        [
+            {
+                "id": record.id,
+                "source_filename": record.source_filename,
+                "stored_path": record.stored_path,
+                "file_type": record.file_type,
+                "status": record.status,
+                "imported_count": record.imported_count,
+                "error_message": record.error_message,
+                "created_at": record.created_at.isoformat() if record.created_at else None,
+            }
+            for record in records
+        ]
+    )
+
+
+@api_admin_bp.post("/import/raw-files")
+@admin_required
+def import_raw_files():
+    from routes import admin as admin_module
+
+    account_set_id = request.form.get("account_set_id", type=int)
+    account_set = (
+        admin_module.db.session.get(AccountSet, account_set_id)
+        if account_set_id
+        else AccountSet.query.filter_by(is_active=True).first()
+    )
+    if not account_set:
+        return jsonify({"status": "error", "message": "请先创建并选择账套"}), 400
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "上传原始文件")
+    if locked_error:
+        return locked_error
+
+    uploaded_files = [file for file in request.files.getlist("files") if (file.filename or "").strip()]
+    if not uploaded_files:
+        return jsonify({"status": "error", "message": "请至少选择一个要上传的源文件"}), 400
+
+    results = []
+    success = 0
+    failed = 0
+    for file in uploaded_files:
+        filename = file.filename.strip()
+        file_type = admin_module._account_set_file_type(filename)
+        previous_record = AccountSetImport.query.filter_by(account_set_id=account_set.id, file_type=file_type).first()
+        replaced = previous_record is not None
+
+        if previous_record:
+            old_path = (previous_record.stored_path or "").strip()
+            if old_path and os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+            admin_module.db.session.delete(previous_record)
+            admin_module.db.session.flush()
+
+        account_set_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "account_sets", account_set.month)
+        os.makedirs(account_set_dir, exist_ok=True)
+        save_name = f"{int(datetime.now().timestamp())}_{filename}"
+        save_path = os.path.join(account_set_dir, save_name)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        file.save(save_path)
+
+        import_record = AccountSetImport(
+            account_set_id=account_set.id,
+            source_filename=filename,
+            stored_path=save_path,
+            file_type=file_type,
+            status="uploaded",
+            imported_count=0,
+        )
+        admin_module.db.session.add(import_record)
+
+        try:
+            success += 1
+            import_record.error_message = None
+            results.append({"file": filename, "status": "ok", "message": "replaced" if replaced else "uploaded"})
+        except Exception as exc:
+            failed += 1
+            import_record.status = "error"
+            import_record.error_message = str(exc)
+            results.append({"file": filename, "status": "error", "error": str(exc)})
+        admin_module.db.session.commit()
+
+    return jsonify(
+        {
+            "status": "ok" if failed == 0 else "partial",
+            "account_set": admin_module._serialize_account_set(account_set),
+            "total": len(uploaded_files),
+            "success": success,
+            "failed": failed,
+            "results": results,
+        }
+    )

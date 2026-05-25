@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap } from "../../api/query";
 import EmployeePicker from "../../components/query/EmployeePicker";
+import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
-import type { AccountSet, QueryBootstrap } from "../../types/query";
+import type { AccountSet, HeaderRowsResponse, QueryBootstrap } from "../../types/query";
 
 type FieldType = "month" | "year" | "employees";
 type PageKind = "headerRows" | "objectRows";
@@ -33,7 +34,11 @@ interface QueryPageProps {
   employeeFilterMode?: "all" | "manager" | "employee";
   options?: QueryOption[];
   columns?: QueryColumn[];
+  defaultSelectedOptions?: Record<string, boolean>;
   prepareQuery?: (query: URLSearchParams, state: QueryState) => void;
+  resolveColumns?: (state: QueryState) => QueryColumn[];
+  transformHeaderRows?: (payload: HeaderRowsResponse, state: QueryState) => HeaderRowsResponse;
+  transformObjectRows?: (rows: Record<string, unknown>[], state: QueryState) => Record<string, unknown>[];
 }
 
 interface QueryState {
@@ -54,7 +59,11 @@ export default function QueryPage({
   employeeFilterMode = "all",
   options = [],
   columns = [],
+  defaultSelectedOptions = {},
   prepareQuery,
+  resolveColumns,
+  transformHeaderRows,
+  transformObjectRows,
 }: QueryPageProps) {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -63,10 +72,12 @@ export default function QueryPage({
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
-  const [selectedOptions, setSelectedOptions] = useState<Record<string, boolean>>({});
-  const [tableHeaders, setTableHeaders] = useState<string[]>([]);
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, boolean>>(defaultSelectedOptions);
+  const [tableHeaders, setTableHeaders] = useState<string[]>(["暂无数据"]);
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
-  const [metaText, setMetaText] = useState("等待查询");
+  const [rawHeaderResult, setRawHeaderResult] = useState<HeaderRowsResponse | null>(null);
+  const [rawObjectRows, setRawObjectRows] = useState<Record<string, unknown>[]>([]);
+  const [hasQueried, setHasQueried] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -100,6 +111,21 @@ export default function QueryPage({
     };
   }, []);
 
+  useEffect(() => {
+    if (!hasQueried) {
+      return;
+    }
+
+    if (kind === "headerRows" && rawHeaderResult) {
+      applyHeaderResult(rawHeaderResult, currentState());
+      return;
+    }
+
+    if (kind === "objectRows") {
+      applyObjectResult(rawObjectRows, currentState());
+    }
+  }, [hasQueried, kind, rawHeaderResult, rawObjectRows, selectedOptions]);
+
   function currentState(): QueryState {
     return {
       selectedEmployeeIds,
@@ -107,6 +133,30 @@ export default function QueryPage({
       selectedYear,
       selectedOptions,
     };
+  }
+
+  function currentColumns(state: QueryState): QueryColumn[] {
+    return resolveColumns ? resolveColumns(state) : columns;
+  }
+
+  function applyHeaderResult(payload: HeaderRowsResponse, state: QueryState) {
+    const nextPayload = transformHeaderRows ? transformHeaderRows(payload, state) : payload;
+    setTableHeaders(nextPayload.headers.length ? nextPayload.headers : ["暂无数据"]);
+    setTableRows(Array.isArray(nextPayload.rows) ? nextPayload.rows : []);
+  }
+
+  function applyObjectResult(payload: Record<string, unknown>[], state: QueryState) {
+    const nextColumns = currentColumns(state);
+    const nextRowsSource = transformObjectRows ? transformObjectRows(payload, state) : payload;
+    setTableHeaders(nextColumns.length ? nextColumns.map((column) => column.label) : ["暂无数据"]);
+    setTableRows(
+      nextRowsSource.map((row) =>
+        nextColumns.map((column) => {
+          const value = row[column.key];
+          return column.format ? column.format(value, row) : stringifyCell(value);
+        }),
+      ),
+    );
   }
 
   function buildQueryFromState(state: QueryState): URLSearchParams {
@@ -134,33 +184,28 @@ export default function QueryPage({
 
   async function handleQuery() {
     setIsQuerying(true);
-    setMetaText("查询中...");
     setError("");
 
     try {
       const query = buildQueryFromState(currentState());
       if (kind === "headerRows") {
         const payload = await fetchHeaderRows(endpoint, query);
-        setTableHeaders(Array.isArray(payload.headers) ? payload.headers : []);
-        setTableRows(Array.isArray(payload.rows) ? payload.rows : []);
-        setMetaText(payload.rows.length ? `共返回 ${payload.rows.length} 条记录` : "当前条件无数据");
+        setRawHeaderResult(payload);
+        applyHeaderResult(payload, currentState());
       } else {
         const payload = await fetchObjectRows<Record<string, unknown>>(endpoint, query);
-        setTableHeaders(columns.map((column) => column.label));
-        setTableRows(
-          payload.map((row) =>
-            columns.map((column) => {
-              const value = row[column.key];
-              return column.format ? column.format(value, row) : stringifyCell(value);
-            }),
-          ),
-        );
-        setMetaText(payload.length ? `共返回 ${payload.length} 条记录` : "当前条件无数据");
+        setRawObjectRows(payload);
+        applyObjectResult(payload, currentState());
       }
+      setHasQueried(true);
     } catch (caughtError) {
       const nextError = caughtError instanceof ApiError ? caughtError.message : "查询失败，请稍后重试";
       setError(nextError);
-      setMetaText("查询失败");
+      setHasQueried(false);
+      setRawHeaderResult(null);
+      setRawObjectRows([]);
+      setTableHeaders(["暂无数据"]);
+      setTableRows([]);
     } finally {
       setIsQuerying(false);
     }
@@ -180,49 +225,34 @@ export default function QueryPage({
   }
 
   if (!bootstrap) {
-    return <ErrorState description="未能读取查询页基础数据。" />;
+    return <ErrorState description={`未能读取${title}基础数据。`} />;
   }
 
-  return (
-    <section className="legacy-page-section">
-      <header className="legacy-page-header">
-        <div className="legacy-page-heading">
-          <p className="legacy-page-kicker">查询中心</p>
-          <h2 className="legacy-page-title">{title}</h2>
-          <p className="legacy-page-description">{description}</p>
-        </div>
-        <dl className="legacy-page-side-info">
-          {fields.includes("month") ? (
-            <div className="legacy-page-side-item">
-              <dt>当前账套</dt>
-              <dd>{selectedMonth || "未选择"}</dd>
-            </div>
-          ) : null}
-          {fields.includes("employees") ? (
-            <div className="legacy-page-side-item">
-              <dt>员工范围</dt>
-              <dd>{selectedEmployeeIds.length ? `已选 ${selectedEmployeeIds.length} 人` : "全部"}</dd>
-            </div>
-          ) : null}
-          <div className="legacy-page-side-item">
-            <dt>结果状态</dt>
-            <dd>{isQuerying ? "查询中" : metaText}</dd>
-          </div>
-        </dl>
-      </header>
+  const queryTableEmptyText = hasQueried ? "暂无数据" : "请点击查询";
+  const employeeFieldLabel = employeeFilterMode === "manager" ? "管理人员" : "员工";
+  const employeePickerLabel = employeeFilterMode === "manager" ? "管理人员范围" : "员工范围";
 
-      <section className="legacy-surface legacy-form-surface">
-        <div className="legacy-panel-heading">
-          <div>
-            <h3 className="legacy-query-panel-title">查询条件</h3>
-            <p className="legacy-query-panel-description">请先设置筛选条件，再执行查询或导出。</p>
-          </div>
+  return (
+    <div className="query-page-shell">
+      <aside className="query-filter-rail">
+        <div className="query-filter-heading">
+          <span className="query-filter-kicker">Query Filters</span>
+          <h2>查询条件</h2>
+          <p>{description}</p>
         </div>
-        <div className="legacy-form-grid">
+
+        <div className="query-filter-body">
           {fields.includes("month") ? (
-            <label className="legacy-field">
-              <span className="legacy-field-label">账套月份</span>
-              <select className="legacy-select" onChange={(event) => setSelectedMonth(event.target.value)} value={selectedMonth}>
+            <div className="query-filter-field">
+              <label className="form-label">账套</label>
+              <select
+                className="form-select"
+                onChange={(event) => {
+                  setSelectedMonth(event.target.value);
+                  setHasQueried(false);
+                }}
+                value={selectedMonth}
+              >
                 {bootstrap.account_sets.map((accountSet) => (
                   <option key={accountSet.id} value={accountSet.month}>
                     {accountSet.name}
@@ -230,81 +260,92 @@ export default function QueryPage({
                   </option>
                 ))}
               </select>
-            </label>
+            </div>
           ) : null}
 
           {fields.includes("year") ? (
-            <label className="legacy-field">
-              <span className="legacy-field-label">年份</span>
+            <div className="query-filter-field">
+              <label className="form-label">年份</label>
               <input
-                className="legacy-input"
-                onChange={(event) => setSelectedYear(event.target.value)}
+                className="form-control"
+                onChange={(event) => {
+                  setSelectedYear(event.target.value);
+                  setHasQueried(false);
+                }}
                 type="number"
                 value={selectedYear}
               />
-            </label>
+            </div>
           ) : null}
 
           {fields.includes("employees") ? (
-            <EmployeePicker
-              employees={bootstrap.employees}
-              filterMode={employeeFilterMode}
-              onChange={setSelectedEmployeeIds}
-              selectedIds={selectedEmployeeIds}
-            />
+            <div className="query-filter-field">
+              <label className="form-label">{employeeFieldLabel}</label>
+              <EmployeePicker
+                departments={bootstrap.departments}
+                employees={bootstrap.employees}
+                filterMode={employeeFilterMode}
+                label={employeePickerLabel}
+                onChange={(ids) => {
+                  setSelectedEmployeeIds(ids);
+                  setHasQueried(false);
+                }}
+                selectedIds={selectedEmployeeIds}
+                showFieldChrome={false}
+              />
+            </div>
           ) : null}
-        </div>
 
-        {options.length ? (
-          <div className="legacy-options-row">
-            <span className="legacy-options-label">显示选项</span>
-            {options.map((option) => (
-              <label key={option.key} className="legacy-check-option">
-                <input
-                  checked={Boolean(selectedOptions[option.key])}
-                  onChange={(event) => {
-                    setSelectedOptions((current) => ({
-                      ...current,
-                      [option.key]: event.target.checked,
-                    }));
-                  }}
-                  type="checkbox"
-                />
-                <span>{option.label}</span>
-              </label>
-            ))}
+          {options.length ? (
+            <div className="query-filter-field">
+              <label className="form-label">显示选项</label>
+              <div className="dashboard-check-stack">
+                {options.map((option) => (
+                  <label key={option.key} className="dashboard-check-option">
+                    <input
+                      checked={Boolean(selectedOptions[option.key])}
+                      className="form-check-input m-0"
+                      onChange={(event) => {
+                        setSelectedOptions((current) => ({
+                          ...current,
+                          [option.key]: event.target.checked,
+                        }));
+                      }}
+                      type="checkbox"
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="query-filter-actions">
+            <button className="btn btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
+              {isQuerying ? "查询中..." : "查询"}
+            </button>
+            {exportPath ? (
+              <button className="btn btn-outline-success" onClick={() => handleDownload(exportPath)} type="button">
+                下载XLSX
+              </button>
+            ) : null}
+            {templateExportPath ? (
+              <button className="btn btn-outline-secondary" onClick={() => handleDownload(templateExportPath)} type="button">
+                按模板导出
+              </button>
+            ) : null}
           </div>
-        ) : null}
-
-        <div className="legacy-actions">
-          <button className="legacy-btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
-            {isQuerying ? "查询中..." : "查询"}
-          </button>
-          {exportPath ? (
-            <button className="legacy-btn-secondary" onClick={() => handleDownload(exportPath)} type="button">
-              下载结果
-            </button>
-          ) : null}
-          {templateExportPath ? (
-            <button className="legacy-btn-ghost" onClick={() => handleDownload(templateExportPath)} type="button">
-              下载模板
-            </button>
-          ) : null}
         </div>
+
         {error ? <p className="legacy-inline-error">{error}</p> : null}
-      </section>
+      </aside>
 
-      <section className="legacy-surface legacy-result-surface">
-        <div className="legacy-result-head">
-          <div>
-            <h3 className="legacy-result-title">查询结果</h3>
-            <p className="legacy-result-description">查询结果会按当前筛选条件在下方表格中展示。</p>
-          </div>
-          <span className="legacy-result-meta">{metaText}</span>
-        </div>
-        <QueryTable headers={tableHeaders} rows={tableRows} />
+      <section className="query-workspace">
+        <QueryResultPanel>
+          <QueryTable emptyText={queryTableEmptyText} headers={tableHeaders} rows={tableRows} />
+        </QueryResultPanel>
       </section>
-    </section>
+    </div>
   );
 }
 
