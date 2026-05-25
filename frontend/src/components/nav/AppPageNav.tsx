@@ -1,39 +1,18 @@
 import { NavLink } from "react-router-dom";
 import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/query";
 
-interface AppMenuProps {
+interface AppPageNavProps {
   currentEntry: QueryNavigationEntry | null;
   currentModule: QueryNavigationModule | null;
   modules: QueryNavigationModule[];
-  mode: "top" | "side";
 }
 
-export default function AppMenu({ currentEntry, currentModule, mode, modules }: AppMenuProps) {
+export default function AppPageNav({ currentEntry, currentModule, modules }: AppPageNavProps) {
   const sidebarEntries = currentModule?.entries ?? [];
 
-  if (mode === "top") {
-    return (
-      <nav className="app-top-modules" aria-label="模块导航">
-        {modules.map((module) => (
-          <NavLink
-            className={({ isActive }) =>
-              `app-top-module${
-                isActive || currentModule?.slug === module.slug ? " is-active" : ""
-              }`
-            }
-            key={module.slug}
-            to={module.home_href}
-          >
-            <span className="app-top-module-label">{module.label}</span>
-          </NavLink>
-        ))}
-      </nav>
-    );
-  }
-
   return (
-    <div className="app-menu-shell">
-      <div className="app-module-sidebar">
+    <div className="app-page-nav-shell">
+      <nav className="app-page-nav" aria-label="页面导航">
         <div className="app-sidebar-section">
           <p className="app-sidebar-caption">{currentModule?.label ?? "系统导航"}</p>
         </div>
@@ -41,9 +20,7 @@ export default function AppMenu({ currentEntry, currentModule, mode, modules }: 
           {sidebarEntries.map((entry) => (
             <NavLink
               className={({ isActive }) =>
-                `app-side-link${
-                  isActive || currentEntry?.key === entry.key ? " is-active" : ""
-                }`
+                `app-side-link${isActive || currentEntry?.key === entry.key ? " is-active" : ""}`
               }
               key={entry.key}
               to={entry.href}
@@ -53,7 +30,7 @@ export default function AppMenu({ currentEntry, currentModule, mode, modules }: 
             </NavLink>
           ))}
         </div>
-      </div>
+      </nav>
       <nav className="module-bottom-nav" aria-label="移动端模块导航">
         <div className="module-bottom-modules">
           {modules.map((module) => (
@@ -74,9 +51,7 @@ export default function AppMenu({ currentEntry, currentModule, mode, modules }: 
           {sidebarEntries.map((entry) => (
             <NavLink
               className={({ isActive }) =>
-                `app-side-link${
-                  isActive || currentEntry?.key === entry.key ? " is-active" : ""
-                }`
+                `app-side-link${isActive || currentEntry?.key === entry.key ? " is-active" : ""}`
               }
               key={`${entry.key}-bottom`}
               to={entry.href}

@@ -12,6 +12,16 @@ export default function DepartmentHoursPage() {
       exportPath="/api/query/department-hours/export"
       fields={["month"]}
       kind="objectRows"
+      transformObjectRows={(rows) => {
+        const totalHours = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
+        return [
+          ...rows,
+          {
+            dept_name: "总计工时",
+            total_hours: totalHours.toFixed(2),
+          },
+        ];
+      }}
       title="员工部门工时"
     />
   );
