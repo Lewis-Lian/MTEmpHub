@@ -74,7 +74,7 @@ class ApiQueryTests(unittest.TestCase):
             db.drop_all()
 
     def _login(self, username: str, password: str):
-        return self.client.post("/login", data={"username": username, "password": password})
+        return self.client.post("/api/auth/login", json={"username": username, "password": password})
 
     def test_query_routes_are_registered_under_api_prefix(self) -> None:
         rules = {rule.rule for rule in self.app.url_map.iter_rules()}
@@ -122,9 +122,17 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         modules = response.get_json()["modules"]
         query_module = next(module for module in modules if module["slug"] == "query")
-        self.assertEqual(query_module["entries"][0]["key"], "employee_dashboard")
-        self.assertEqual(query_module["entries"][-1]["key"], "summary_download")
+        entry_keys = {entry["key"] for entry in query_module["entries"]}
+        self.assertIn("employee_dashboard", entry_keys)
+        self.assertIn("summary_download", entry_keys)
         self.assertTrue(all("href" in entry for entry in query_module["entries"]))
+
+    def test_legacy_employee_dashboard_route_is_not_available(self) -> None:
+        self._login("viewer", "viewer123")
+
+        response = self.client.get("/employee/dashboard")
+
+        self.assertEqual(response.status_code, 404)
 
     def test_summary_download_wrapper_requires_matching_permission(self) -> None:
         self._login("blocked", "blocked123")

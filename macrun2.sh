@@ -5,12 +5,13 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
-BACKEND_HOST="${BACKEND_HOST:-${HOST:-127.0.0.1}}"
-BACKEND_PORT="${BACKEND_PORT:-${PORT:-5000}}"
+BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
+BACKEND_PORT="${BACKEND_PORT:-5000}"
 FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-VENV_DIR="${VENV_DIR:-.venv-local}"
-INSTALL_FRONTEND_DEPS="${INSTALL_FRONTEND_DEPS:-1}"
+VENV_DIR="${VENV_DIR:-.venv-mac2}"
+PYTHON_BIN="$VENV_DIR/bin/python3"
+PIP_BIN="$VENV_DIR/bin/pip"
 
 export FLASK_ENV="${FLASK_ENV:-development}"
 export FLASK_DEBUG="${FLASK_DEBUG:-1}"
@@ -44,41 +45,33 @@ if [ ! -d "$VENV_DIR" ]; then
     python3 -m venv "$VENV_DIR"
 fi
 
-if [ ! -f "$VENV_DIR/bin/activate" ]; then
-    echo "Cannot find virtualenv activation script under $VENV_DIR/bin." >&2
+if [ ! -x "$PYTHON_BIN" ]; then
+    echo "Python not found in $VENV_DIR. Remove the broken venv or set VENV_DIR to a valid one." >&2
     exit 1
 fi
 
-# shellcheck disable=SC1091
-source "$VENV_DIR/bin/activate"
-
-if ! python -m pip --version >/dev/null 2>&1; then
-    python -m ensurepip --upgrade
+if ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+    "$PYTHON_BIN" -m ensurepip --upgrade
 fi
 
-python -m pip install -r requirements.txt
+"$PIP_BIN" install -r requirements.txt
 
 if [ -f ".env.example" ] && [ ! -f ".env" ]; then
     cp .env.example .env
 fi
 
-mkdir -p instance static/uploads logs
-
-if [ "$INSTALL_FRONTEND_DEPS" = "1" ] && [ ! -d "frontend/node_modules" ]; then
+if [ ! -d "frontend/node_modules" ]; then
     (
         cd frontend
         npm install
     )
 fi
 
-python -c "from app import create_app; create_app(); print('Flask API bootstrap OK')"
-
 echo "后端 API 将启动在: http://${BACKEND_HOST}:${BACKEND_PORT}"
 echo "前端开发服务将启动在: http://${FRONTEND_HOST}:${FRONTEND_PORT}"
-echo "前端代理后端目标: ${VITE_BACKEND_TARGET}"
-echo "后端健康检查地址: http://${BACKEND_HOST}:${BACKEND_PORT}/health"
+echo "前端将通过代理访问后端: ${VITE_BACKEND_TARGET}"
 
-python -m flask --app app:app run --debug --host="$BACKEND_HOST" --port="$BACKEND_PORT" &
+"$PYTHON_BIN" -m flask --app app:app run --debug --host="$BACKEND_HOST" --port="$BACKEND_PORT" &
 BACKEND_PID=$!
 
 (

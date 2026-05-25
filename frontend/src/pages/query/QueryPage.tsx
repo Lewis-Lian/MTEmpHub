@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap } from "../../api/query";
@@ -79,7 +78,9 @@ export default function QueryPage({
           return;
         }
         setBootstrap(payload);
-        setSelectedMonth(pickDefaultMonth(payload.account_sets));
+        if (fields.includes("month")) {
+          setSelectedMonth(pickDefaultMonth(payload.account_sets));
+        }
         setError("");
       } catch (caughtError) {
         if (!mounted) {
@@ -183,26 +184,45 @@ export default function QueryPage({
   }
 
   return (
-    <section style={pageStyle}>
-      <header style={heroStyle}>
-        <div>
-          <p style={tagStyle}>查询中心</p>
-          <h2 style={titleStyle}>{title}</h2>
-          <p style={descriptionStyle}>{description}</p>
+    <section className="legacy-page-section">
+      <header className="legacy-page-header">
+        <div className="legacy-page-heading">
+          <p className="legacy-page-kicker">查询中心</p>
+          <h2 className="legacy-page-title">{title}</h2>
+          <p className="legacy-page-description">{description}</p>
         </div>
-        <div style={statsStyle}>
-          <span>账套：{selectedMonth || "未选择"}</span>
-          {fields.includes("employees") ? <span>已选员工：{selectedEmployeeIds.length || "全部"}</span> : null}
-          <span>状态：{isQuerying ? "查询中" : metaText}</span>
-        </div>
+        <dl className="legacy-page-side-info">
+          {fields.includes("month") ? (
+            <div className="legacy-page-side-item">
+              <dt>当前账套</dt>
+              <dd>{selectedMonth || "未选择"}</dd>
+            </div>
+          ) : null}
+          {fields.includes("employees") ? (
+            <div className="legacy-page-side-item">
+              <dt>员工范围</dt>
+              <dd>{selectedEmployeeIds.length ? `已选 ${selectedEmployeeIds.length} 人` : "全部"}</dd>
+            </div>
+          ) : null}
+          <div className="legacy-page-side-item">
+            <dt>结果状态</dt>
+            <dd>{isQuerying ? "查询中" : metaText}</dd>
+          </div>
+        </dl>
       </header>
 
-      <section style={panelStyle}>
-        <div style={filtersGridStyle}>
+      <section className="legacy-surface legacy-form-surface">
+        <div className="legacy-panel-heading">
+          <div>
+            <h3 className="legacy-query-panel-title">查询条件</h3>
+            <p className="legacy-query-panel-description">请先设置筛选条件，再执行查询或导出。</p>
+          </div>
+        </div>
+        <div className="legacy-form-grid">
           {fields.includes("month") ? (
-            <label style={fieldStyle}>
-              <span style={fieldLabelStyle}>账套月份</span>
-              <select onChange={(event) => setSelectedMonth(event.target.value)} style={selectStyle} value={selectedMonth}>
+            <label className="legacy-field">
+              <span className="legacy-field-label">账套月份</span>
+              <select className="legacy-select" onChange={(event) => setSelectedMonth(event.target.value)} value={selectedMonth}>
                 {bootstrap.account_sets.map((accountSet) => (
                   <option key={accountSet.id} value={accountSet.month}>
                     {accountSet.name}
@@ -214,11 +234,11 @@ export default function QueryPage({
           ) : null}
 
           {fields.includes("year") ? (
-            <label style={fieldStyle}>
-              <span style={fieldLabelStyle}>年份</span>
+            <label className="legacy-field">
+              <span className="legacy-field-label">年份</span>
               <input
+                className="legacy-input"
                 onChange={(event) => setSelectedYear(event.target.value)}
-                style={selectStyle}
                 type="number"
                 value={selectedYear}
               />
@@ -236,9 +256,10 @@ export default function QueryPage({
         </div>
 
         {options.length ? (
-          <div style={optionsStyle}>
+          <div className="legacy-options-row">
+            <span className="legacy-options-label">显示选项</span>
             {options.map((option) => (
-              <label key={option.key} style={optionLabelStyle}>
+              <label key={option.key} className="legacy-check-option">
                 <input
                   checked={Boolean(selectedOptions[option.key])}
                   onChange={(event) => {
@@ -255,28 +276,31 @@ export default function QueryPage({
           </div>
         ) : null}
 
-        <div style={actionsStyle}>
-          <button disabled={isQuerying} onClick={handleQuery} style={primaryButtonStyle} type="button">
+        <div className="legacy-actions">
+          <button className="legacy-btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
             {isQuerying ? "查询中..." : "查询"}
           </button>
           {exportPath ? (
-            <button onClick={() => handleDownload(exportPath)} style={secondaryButtonStyle} type="button">
+            <button className="legacy-btn-secondary" onClick={() => handleDownload(exportPath)} type="button">
               下载结果
             </button>
           ) : null}
           {templateExportPath ? (
-            <button onClick={() => handleDownload(templateExportPath)} style={ghostButtonStyle} type="button">
+            <button className="legacy-btn-ghost" onClick={() => handleDownload(templateExportPath)} type="button">
               下载模板
             </button>
           ) : null}
         </div>
-        {error ? <p style={errorStyle}>{error}</p> : null}
+        {error ? <p className="legacy-inline-error">{error}</p> : null}
       </section>
 
-      <section style={panelStyle}>
-        <div style={resultHeadStyle}>
-          <h3 style={resultTitleStyle}>查询结果</h3>
-          <span style={resultMetaStyle}>{metaText}</span>
+      <section className="legacy-surface legacy-result-surface">
+        <div className="legacy-result-head">
+          <div>
+            <h3 className="legacy-result-title">查询结果</h3>
+            <p className="legacy-result-description">查询结果会按当前筛选条件在下方表格中展示。</p>
+          </div>
+          <span className="legacy-result-meta">{metaText}</span>
         </div>
         <QueryTable headers={tableHeaders} rows={tableRows} />
       </section>
@@ -303,151 +327,3 @@ function stringifyCell(value: unknown): string | number {
   }
   return String(value);
 }
-
-const pageStyle: CSSProperties = {
-  display: "grid",
-  gap: "24px",
-};
-
-const heroStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  alignItems: "flex-start",
-  flexWrap: "wrap",
-};
-
-const tagStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const titleStyle: CSSProperties = {
-  margin: "10px 0 8px",
-  fontSize: "34px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: 0,
-  maxWidth: "720px",
-  color: "#4b5d67",
-  lineHeight: 1.7,
-};
-
-const statsStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-  padding: "18px 20px",
-  borderRadius: "20px",
-  background: "#f4efe4",
-  color: "#31444c",
-  minWidth: "220px",
-};
-
-const panelStyle: CSSProperties = {
-  padding: "24px",
-  borderRadius: "28px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-  display: "grid",
-  gap: "20px",
-};
-
-const filtersGridStyle: CSSProperties = {
-  display: "grid",
-  gap: "18px",
-};
-
-const fieldStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const fieldLabelStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "#183153",
-};
-
-const selectStyle: CSSProperties = {
-  borderRadius: "12px",
-  border: "1px solid #d7dfd4",
-  padding: "12px 14px",
-  background: "#fffdfa",
-};
-
-const optionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "14px",
-  flexWrap: "wrap",
-};
-
-const optionLabelStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "8px",
-  color: "#31444c",
-};
-
-const actionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-
-const primaryButtonStyle: CSSProperties = {
-  border: "none",
-  borderRadius: "12px",
-  padding: "12px 18px",
-  background: "#183153",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontWeight: 600,
-};
-
-const secondaryButtonStyle: CSSProperties = {
-  border: "1px solid #9bb39d",
-  borderRadius: "12px",
-  padding: "12px 18px",
-  background: "#edf4ed",
-  color: "#183153",
-  cursor: "pointer",
-  fontWeight: 600,
-};
-
-const ghostButtonStyle: CSSProperties = {
-  border: "1px solid #d8dfdc",
-  borderRadius: "12px",
-  padding: "12px 18px",
-  background: "#ffffff",
-  color: "#31444c",
-  cursor: "pointer",
-  fontWeight: 600,
-};
-
-const errorStyle: CSSProperties = {
-  margin: 0,
-  color: "#b42318",
-};
-
-const resultHeadStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "12px",
-  alignItems: "center",
-  flexWrap: "wrap",
-};
-
-const resultTitleStyle: CSSProperties = {
-  margin: 0,
-  color: "#183153",
-  fontSize: "20px",
-};
-
-const resultMetaStyle: CSSProperties = {
-  color: "#5c6f68",
-  fontSize: "14px",
-};

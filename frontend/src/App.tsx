@@ -45,15 +45,19 @@ export default function App() {
   }, []);
 
   if (isLoading) {
-    return <div style={loadingStyle}>正在初始化前端应用...</div>;
+    return (
+      <div className="legacy-page-center">
+        <div className="legacy-panel">正在初始化前端应用...</div>
+      </div>
+    );
   }
 
   if (initError) {
     return (
-      <div style={loadingStyle}>
-        <div style={errorCardStyle}>
-          <h1 style={errorTitleStyle}>前端初始化失败</h1>
-          <p style={errorBodyStyle}>{initError}</p>
+      <div className="legacy-page-center">
+        <div className="legacy-panel legacy-content-panel">
+          <h1 className="legacy-panel-title">前端初始化失败</h1>
+          <p className="legacy-panel-body">{initError}</p>
         </div>
       </div>
     );
@@ -61,30 +65,3 @@ export default function App() {
 
   return <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />;
 }
-
-const loadingStyle = {
-  minHeight: "100vh",
-  display: "grid",
-  placeItems: "center",
-  fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
-};
-
-const errorCardStyle = {
-  maxWidth: "420px",
-  padding: "24px 28px",
-  borderRadius: "20px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-  color: "#183153",
-};
-
-const errorTitleStyle = {
-  margin: "0 0 12px",
-  fontSize: "28px",
-};
-
-const errorBodyStyle = {
-  margin: 0,
-  lineHeight: 1.7,
-  color: "#4b5d67",
-};

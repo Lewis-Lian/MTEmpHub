@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAdminRows } from "../../api/admin";
@@ -67,13 +66,33 @@ export default function AdminResourcePage({ title, description, endpoint, column
   }
 
   return (
-    <section style={pageStyle}>
-      <header style={heroStyle}>
-        <p style={tagStyle}>后台管理</p>
-        <h2 style={titleStyle}>{title}</h2>
-        <p style={descriptionStyle}>{description}</p>
+    <section className="legacy-page-section">
+      <header className="legacy-page-header">
+        <div className="legacy-page-heading">
+          <p className="legacy-page-kicker">后台管理</p>
+          <h2 className="legacy-page-title">{title}</h2>
+          <p className="legacy-page-description">{description}</p>
+        </div>
+        <dl className="legacy-page-side-info">
+          <div className="legacy-page-side-item">
+            <dt>记录数量</dt>
+            <dd>{rows.length}</dd>
+          </div>
+          <div className="legacy-page-side-item">
+            <dt>加载状态</dt>
+            <dd>已就绪</dd>
+          </div>
+        </dl>
       </header>
-      <section style={panelStyle}>
+      <section className="legacy-surface admin-resource-panel">
+        <div className="admin-resource-panel-head">
+          <div>
+            <p className="admin-resource-panel-kicker">资源列表</p>
+            <p className="admin-resource-panel-title">{title}</p>
+            <p className="admin-resource-panel-description">下方表格展示当前后台资源记录，可结合左侧菜单继续切换到其它维护入口。</p>
+          </div>
+          <span className="admin-resource-panel-meta">共 {rows.length} 条记录</span>
+        </div>
         <QueryTable
           headers={columns.map((column) => column.label)}
           rows={rows.map((row) =>
@@ -96,40 +115,3 @@ export default function AdminResourcePage({ title, description, endpoint, column
     </section>
   );
 }
-
-const pageStyle: CSSProperties = {
-  display: "grid",
-  gap: "24px",
-};
-
-const heroStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-};
-
-const tagStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "34px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: 0,
-  color: "#4b5d67",
-  lineHeight: 1.7,
-};
-
-const panelStyle: CSSProperties = {
-  padding: "24px",
-  borderRadius: "28px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-};
