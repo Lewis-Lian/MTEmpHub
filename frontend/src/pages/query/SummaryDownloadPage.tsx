@@ -182,6 +182,7 @@ export default function SummaryDownloadPage() {
           </label>
 
           <EmployeePicker
+            departments={bootstrap.departments}
             employees={bootstrap.employees}
             filterMode="employee"
             onChange={setSelectedEmployeeIds}

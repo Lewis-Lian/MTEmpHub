@@ -17,3 +17,39 @@ export interface AdminBootstrap {
   departments: AdminDepartment[];
   shifts: AdminShift[];
 }
+
+export interface AdminAccountSetFactoryRestEntry {
+  date: string | null;
+  period: string;
+  unit: number;
+}
+
+export interface AdminAccountSet {
+  id: number;
+  month: string;
+  name: string;
+  is_active: boolean;
+  is_locked: boolean;
+  locked_at: string | null;
+  locked_by: number | null;
+  factory_rest_days: number;
+  factory_rest_entries: AdminAccountSetFactoryRestEntry[];
+  monthly_benefit_days: number;
+  created_at: string | null;
+  imports_count: number;
+  pending_count: number;
+  success_count: number;
+  error_count: number;
+  latest_import_at: string | null;
+}
+
+export interface AdminAccountSetImport {
+  id: number;
+  source_filename: string;
+  stored_path: string;
+  file_type: string;
+  status: string;
+  imported_count: number;
+  error_message: string | null;
+  created_at: string | null;
+}

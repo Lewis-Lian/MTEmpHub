@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { logout, type AuthUser } from "../api/auth";
 import { fetchNavigation } from "../api/query";
-import AppMenu from "../components/nav/AppMenu";
+import AppModuleNav from "../components/nav/AppModuleNav";
+import AppPageNav from "../components/nav/AppPageNav";
 import AppTabs, { type AppTabItem } from "../components/nav/AppTabs";
 import ErrorState from "../components/feedback/ErrorState";
 import LoadingState from "../components/feedback/LoadingState";
+import { findProtectedRoute } from "../router/protectedRoutes";
 import type { QueryNavigationModule } from "../types/query";
 
 interface AppShellProps {
@@ -21,24 +23,24 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [tabs, setTabs] = useState<AppTabItem[]>([]);
-  const [tabReloadKey, setTabReloadKey] = useState(0);
+  const [tabReloadKeys, setTabReloadKeys] = useState<Record<string, number>>({});
 
   const matchedNavigation = useMemo(() => {
     for (const module of modules) {
-      if (module.home_href === location.pathname) {
-        return {
-          module,
-          entry: null,
-          label: module.label,
-        };
-      }
-
       const matchedEntry = module.entries.find((entry) => entry.href === location.pathname);
       if (matchedEntry) {
         return {
           module,
           entry: matchedEntry,
           label: matchedEntry.label,
+        };
+      }
+
+      if (module.home_href === location.pathname) {
+        return {
+          module,
+          entry: null,
+          label: module.label,
         };
       }
     }
@@ -111,9 +113,10 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
 
   function handleRefreshTab(href: string) {
     navigate(href, { replace: true });
-    if (href === location.pathname) {
-      setTabReloadKey((current) => current + 1);
-    }
+    setTabReloadKeys((current) => ({
+      ...current,
+      [href]: (current[href] ?? 0) + 1,
+    }));
   }
 
   function handleCloseTab(href: string) {
@@ -130,6 +133,11 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     const fallbackTab = nextTabs[closingIndex] ?? nextTabs[closingIndex - 1] ?? null;
 
     setTabs(nextTabs);
+    setTabReloadKeys((currentKeys) => {
+      const nextKeys = { ...currentKeys };
+      delete nextKeys[href];
+      return nextKeys;
+    });
 
     if (href === location.pathname && fallbackTab) {
       navigate(fallbackTab.href);
@@ -141,15 +149,31 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
   const roleLabel = user.role === "admin" ? "管理员" : "只读用户";
 
   return (
-    <div className="app-layout">
+    <div className="app-layout app-shell-grid">
+      <aside className="app-sidebar">
+        <div className="app-sidebar-brand">
+          <h1>考勤系统</h1>
+          <p>当前模块：{currentModule?.label ?? "系统导航"}</p>
+          <p>当前用户：{user.username}</p>
+        </div>
+        {isLoading ? <div className="app-sidebar-hint">正在加载菜单...</div> : null}
+        {error ? <div className="app-sidebar-error">{error}</div> : null}
+        {!isLoading && !error ? (
+          <>
+            <AppModuleNav currentModule={currentModule} modules={modules} />
+            <AppPageNav
+              currentEntry={currentEntry}
+              currentModule={currentModule}
+              modules={modules}
+            />
+          </>
+        ) : null}
+        <button className="app-logout-button" onClick={handleLogout} type="button">
+          退出登录
+        </button>
+      </aside>
       <header className="top-nav">
         <div className="top-nav-inner">
-          <AppMenu
-            currentEntry={currentEntry}
-            currentModule={currentModule}
-            mode="top"
-            modules={modules}
-          />
           <div className="top-nav-actions">
             <div className="top-nav-user">
               <span className="top-nav-user-code">{user.username}</span>
@@ -162,44 +186,40 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           </div>
         </div>
       </header>
-      <div className="app-workspace">
-        <aside className="app-sidebar">
-          <div className="app-sidebar-brand">
-            <h1>考勤系统</h1>
-            <p>当前模块：{currentModule?.label ?? "系统导航"}</p>
-            <p>当前用户：{user.username}</p>
-          </div>
-          {isLoading ? <div className="app-sidebar-hint">正在加载菜单...</div> : null}
-          {error ? <div className="app-sidebar-error">{error}</div> : null}
-          {!isLoading && !error ? (
-            <AppMenu
-              currentEntry={currentEntry}
-              currentModule={currentModule}
-              mode="side"
-              modules={modules}
-            />
-          ) : null}
-          <button className="app-logout-button" onClick={handleLogout} type="button">
-            退出登录
-          </button>
-        </aside>
-        <main className="app-main">
-          {!isLoading && !error ? (
-            <AppTabs
-              currentPath={location.pathname}
-              onCloseTab={handleCloseTab}
-              onNavigate={handleNavigateTab}
-              onRefreshTab={handleRefreshTab}
-              tabs={tabs}
-            />
-          ) : null}
-          <div className="app-content">
-            {isLoading ? <LoadingState message="正在准备导航..." /> : null}
-            {error ? <ErrorState description={error} title="导航加载失败" /> : null}
-            {!isLoading && !error ? <Outlet key={`${location.pathname}:${tabReloadKey}`} /> : null}
-          </div>
-        </main>
-      </div>
+      <main className="app-main app-workspace app-workspace-frame">
+        {!isLoading && !error ? (
+          <AppTabs
+            currentPath={location.pathname}
+            onCloseTab={handleCloseTab}
+            onNavigate={handleNavigateTab}
+            onRefreshTab={handleRefreshTab}
+            tabs={tabs}
+          />
+        ) : null}
+        <div className="app-content">
+          {isLoading ? <LoadingState message="正在准备导航..." /> : null}
+          {error ? <ErrorState description={error} title="导航加载失败" /> : null}
+          {!isLoading && !error
+            ? tabs.map((tab) => {
+                const route = findProtectedRoute(tab.href);
+                if (!route) {
+                  return null;
+                }
+
+                const isActive = tab.href === location.pathname;
+                return (
+                  <div
+                    className={`app-tab-pane${isActive ? " is-active" : ""}`}
+                    hidden={!isActive}
+                    key={`${tab.href}:${tabReloadKeys[tab.href] ?? 0}`}
+                  >
+                    {route.element}
+                  </div>
+                );
+              })
+            : null}
+        </div>
+      </main>
     </div>
   );
 }
