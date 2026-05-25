@@ -67,7 +67,7 @@ class ApiAdminTests(unittest.TestCase):
             db.drop_all()
 
     def _login(self) -> None:
-        self.client.post("/login", data={"username": "admin", "password": "admin123"})
+        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
 
     def test_admin_routes_are_registered_under_api_prefix(self) -> None:
         rules = {rule.rule for rule in self.app.url_map.iter_rules()}
@@ -106,57 +106,84 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual([row["dept_no"] for row in payload["departments"]], ["D001"])
         self.assertEqual([row["shift_no"] for row in payload["shifts"]], ["S001"])
 
-    def test_admin_collection_wrappers_match_existing_json_routes(self) -> None:
+    def test_admin_collection_endpoints_return_expected_payloads(self) -> None:
         self._login()
 
-        self.assertEqual(
-            self.client.get("/api/admin/accounts").get_json(),
-            self.client.get("/admin/users").get_json(),
+        accounts_response = self.client.get("/api/admin/accounts")
+        employees_response = self.client.get("/api/admin/employees")
+        departments_response = self.client.get("/api/admin/departments")
+        shifts_response = self.client.get("/api/admin/shifts")
+        employee_override_response = self.client.get(
+            f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id}"
         )
-        self.assertEqual(
-            self.client.get("/api/admin/employees").get_json(),
-            self.client.get("/admin/employees").get_json(),
+        employee_history_response = self.client.get("/api/admin/employee-attendance-overrides/history?month=2026-05")
+        manager_override_response = self.client.get(
+            f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}"
         )
-        self.assertEqual(
-            self.client.get("/api/admin/departments").get_json(),
-            self.client.get("/admin/departments").get_json(),
+        manager_history_response = self.client.get("/api/admin/manager-attendance-overrides/history?month=2026-05")
+        manager_overtime_response = self.client.get(
+            f"/api/admin/manager-overtime?year=2026&emp_ids={self.manager_id}"
         )
-        self.assertEqual(
-            self.client.get("/api/admin/shifts").get_json(),
-            self.client.get("/admin/shifts").get_json(),
+        manager_annual_leave_response = self.client.get(
+            f"/api/admin/manager-annual-leave?year=2026&emp_ids={self.manager_id}"
         )
-        self.assertEqual(
-            self.client.get(
-                f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id}"
-            ).get_json(),
-            self.client.get(
-                f"/admin/employee-attendance-overrides/list?month=2026-05&emp_ids={self.employee_id}"
-            ).get_json(),
-        )
-        self.assertEqual(
-            self.client.get("/api/admin/employee-attendance-overrides/history?month=2026-05").get_json(),
-            self.client.get("/admin/employee-attendance-overrides/history?month=2026-05").get_json(),
-        )
-        self.assertEqual(
-            self.client.get(
-                f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}"
-            ).get_json(),
-            self.client.get(
-                f"/admin/manager-attendance-overrides/list?month=2026-05&emp_ids={self.manager_id}"
-            ).get_json(),
-        )
-        self.assertEqual(
-            self.client.get("/api/admin/manager-attendance-overrides/history?month=2026-05").get_json(),
-            self.client.get("/admin/manager-attendance-overrides/history?month=2026-05").get_json(),
-        )
-        self.assertEqual(
-            self.client.get(f"/api/admin/manager-overtime?year=2026&emp_ids={self.manager_id}").get_json(),
-            self.client.get(f"/admin/manager-overtime/records?year=2026&emp_ids={self.manager_id}").get_json(),
-        )
-        self.assertEqual(
-            self.client.get(f"/api/admin/manager-annual-leave?year=2026&emp_ids={self.manager_id}").get_json(),
-            self.client.get(f"/admin/manager-annual-leave/records?year=2026&emp_ids={self.manager_id}").get_json(),
-        )
+        accounts_payload = accounts_response.get_json()
+        employees_payload = employees_response.get_json()
+        departments_payload = departments_response.get_json()
+        shifts_payload = shifts_response.get_json()
+        employee_override_payload = employee_override_response.get_json()
+        employee_history_payload = employee_history_response.get_json()
+        manager_override_payload = manager_override_response.get_json()
+        manager_history_payload = manager_history_response.get_json()
+        manager_overtime_payload = manager_overtime_response.get_json()
+        manager_annual_leave_payload = manager_annual_leave_response.get_json()
+
+        self.assertEqual(accounts_response.status_code, 200)
+        self.assertIsInstance(accounts_payload, list)
+        self.assertIn("username", accounts_payload[0])
+        self.assertIn("role", accounts_payload[0])
+        self.assertEqual(accounts_payload[0]["username"], "admin")
+        self.assertEqual(employees_response.status_code, 200)
+        self.assertIsInstance(employees_payload, list)
+        self.assertIn("emp_no", employees_payload[0])
+        self.assertIn("name", employees_payload[0])
+        self.assertEqual(employees_payload[0]["emp_no"], "E001")
+        self.assertEqual(departments_response.status_code, 200)
+        self.assertIsInstance(departments_payload, list)
+        self.assertIn("dept_no", departments_payload[0])
+        self.assertIn("dept_name", departments_payload[0])
+        self.assertEqual(departments_payload[0]["dept_no"], "D001")
+        self.assertEqual(shifts_response.status_code, 200)
+        self.assertIsInstance(shifts_payload, list)
+        self.assertIn("shift_no", shifts_payload[0])
+        self.assertIn("shift_name", shifts_payload[0])
+        self.assertEqual(shifts_payload[0]["shift_no"], "S001")
+        self.assertEqual(employee_override_response.status_code, 200)
+        self.assertIn("rows", employee_override_payload)
+        self.assertIn("month", employee_override_payload)
+        self.assertIn("employee", employee_override_payload["rows"][0])
+        self.assertIn("override", employee_override_payload["rows"][0])
+        self.assertIn("applied", employee_override_payload["rows"][0])
+        self.assertEqual(employee_history_response.status_code, 200)
+        self.assertIn("rows", employee_history_payload)
+        self.assertEqual(employee_history_payload["rows"], [])
+        self.assertEqual(manager_override_response.status_code, 200)
+        self.assertIn("rows", manager_override_payload)
+        self.assertIn("month", manager_override_payload)
+        self.assertIn("employee", manager_override_payload["rows"][0])
+        self.assertIn("override", manager_override_payload["rows"][0])
+        self.assertIn("applied", manager_override_payload["rows"][0])
+        self.assertEqual(manager_history_response.status_code, 200)
+        self.assertIn("rows", manager_history_payload)
+        self.assertEqual(manager_history_payload["rows"], [])
+        self.assertEqual(manager_overtime_response.status_code, 200)
+        self.assertIsInstance(manager_overtime_payload, list)
+        self.assertIn("name", manager_overtime_payload[0])
+        self.assertIn("remark", manager_overtime_payload[0])
+        self.assertEqual(manager_annual_leave_response.status_code, 200)
+        self.assertIsInstance(manager_annual_leave_payload, list)
+        self.assertIn("name", manager_annual_leave_payload[0])
+        self.assertIn("remark", manager_annual_leave_payload[0])
 
     def test_admin_record_wrappers_reuse_existing_write_behavior(self) -> None:
         self._login()
@@ -192,11 +219,11 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual(manager_response.status_code, 200)
 
         employee_record = self.client.get(
-            f"/admin/employee-attendance-overrides/record?emp_id={self.employee_id}&month=2026-05"
-        ).get_json()
+            f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id}"
+        ).get_json()["rows"][0]
         manager_record = self.client.get(
-            f"/admin/manager-attendance-overrides/record?emp_id={self.manager_id}&month=2026-05"
-        ).get_json()
+            f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}"
+        ).get_json()["rows"][0]
         employee_history = self.client.get(
             "/api/admin/employee-attendance-overrides/history?month=2026-05"
         ).get_json()["rows"]
@@ -210,6 +237,13 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual(manager_record["override"]["remark"], "经理修正")
         self.assertEqual(employee_history[0]["action_type"], "manual_save")
         self.assertEqual(manager_history[0]["action_type"], "manual_save")
+
+    def test_legacy_admin_dashboard_route_is_not_available(self) -> None:
+        self._login()
+
+        response = self.client.get("/admin/dashboard")
+
+        self.assertEqual(response.status_code, 404)
 
 
 if __name__ == "__main__":

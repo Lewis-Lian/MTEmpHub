@@ -31,11 +31,13 @@ interface AppRouterProps {
 }
 
 export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRouterProps) {
+  const landingPath = user ? defaultLandingPath(user) : "/login";
+
   return (
     <BrowserRouter>
       <Routes>
         <Route
-          element={user ? <Navigate to="/employee/home" replace /> : <LoginPage onLogin={onLogin} />}
+          element={user ? <Navigate to={landingPath} replace /> : <LoginPage onLogin={onLogin} />}
           path="/login"
         />
         <Route element={<ProtectedRoute isLoading={isLoading} user={user} />}>
@@ -61,8 +63,12 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
             <Route element={<ManagerAnnualLeaveAdminPage />} path="/admin/manager-annual-leave" />
           </Route>
         </Route>
-        <Route element={<Navigate to={user ? "/employee/home" : "/login"} replace />} path="*" />
+        <Route element={<Navigate to={landingPath} replace />} path="*" />
       </Routes>
     </BrowserRouter>
   );
+}
+
+function defaultLandingPath(user: AuthUser): string {
+  return user.role === "admin" ? "/admin/dashboard" : "/employee/home";
 }

@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAdminBootstrap } from "../../api/admin";
@@ -50,78 +49,68 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <section style={pageStyle}>
-      <header style={heroStyle}>
-        <p style={tagStyle}>后台管理</p>
-        <h2 style={titleStyle}>账套与主数据入口</h2>
-        <p style={descriptionStyle}>React 前端已经接管后台入口。复杂编辑流程会在后续任务继续迁移，这里先保证独立前端下的导航与核心列表可用。</p>
+    <section className="legacy-page-section">
+      <header className="legacy-page-header">
+        <div className="legacy-page-heading">
+          <p className="legacy-page-kicker">后台管理</p>
+          <h2 className="legacy-page-title">账套与主数据入口</h2>
+          <p className="legacy-page-description">统一进入账套、主数据和后台资源维护入口，按当前菜单继续处理月度结算、基础数据和账号权限配置。</p>
+        </div>
+        <dl className="legacy-page-side-info">
+          <div className="legacy-page-side-item">
+            <dt>当前状态</dt>
+            <dd>后台入口已就绪</dd>
+          </div>
+          <div className="legacy-page-side-item">
+            <dt>资源概况</dt>
+            <dd>{departmentCount + shiftCount} 项基础资源</dd>
+          </div>
+        </dl>
       </header>
-      <section style={gridStyle}>
-        <article style={metricStyle}>
-          <p style={metricLabelStyle}>部门数量</p>
-          <strong style={metricValueStyle}>{departmentCount}</strong>
-        </article>
-        <article style={metricStyle}>
-          <p style={metricLabelStyle}>班次数量</p>
-          <strong style={metricValueStyle}>{shiftCount}</strong>
-        </article>
+      <section className="admin-dashboard-grid">
+        <section className="legacy-surface admin-dashboard-panel">
+          <div className="admin-dashboard-panel-head">
+            <div>
+              <p className="admin-dashboard-panel-kicker">资源概况</p>
+              <h3 className="admin-dashboard-panel-title">当前基础数据</h3>
+            </div>
+          </div>
+          <div className="admin-dashboard-stat-list">
+            <article className="admin-dashboard-stat-item">
+              <span className="admin-dashboard-stat-label">部门数量</span>
+              <strong className="admin-dashboard-stat-value">{departmentCount}</strong>
+              <p className="admin-dashboard-stat-note">用于员工归属、查询维度和月度汇总组织结构。</p>
+            </article>
+            <article className="admin-dashboard-stat-item">
+              <span className="admin-dashboard-stat-label">班次数量</span>
+              <strong className="admin-dashboard-stat-value">{shiftCount}</strong>
+              <p className="admin-dashboard-stat-note">用于排班、考勤计算和月度结算规则维护。</p>
+            </article>
+          </div>
+        </section>
+        <section className="legacy-surface admin-dashboard-panel">
+          <div className="admin-dashboard-panel-head">
+            <div>
+              <p className="admin-dashboard-panel-kicker">管理入口</p>
+              <h3 className="admin-dashboard-panel-title">后台工作区说明</h3>
+            </div>
+          </div>
+          <div className="admin-dashboard-entry-list">
+            <article className="admin-dashboard-entry-item">
+              <strong>账套与月度结算</strong>
+              <p>从左侧菜单进入账套、管理人员加班和年假入口，继续处理当前月度参数和结算数据。</p>
+            </article>
+            <article className="admin-dashboard-entry-item">
+              <strong>基础数据维护</strong>
+              <p>进入部门、班次、员工和账号页面，维护后台主数据与权限配置。</p>
+            </article>
+            <article className="admin-dashboard-entry-item">
+              <strong>修正与审核</strong>
+              <p>在对应后台资源页里查看覆盖记录、导入结果和异常修正情况。</p>
+            </article>
+          </div>
+        </section>
       </section>
     </section>
   );
 }
-
-const pageStyle: CSSProperties = {
-  display: "grid",
-  gap: "24px",
-};
-
-const heroStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-};
-
-const tagStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "34px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: 0,
-  color: "#4b5d67",
-  lineHeight: 1.7,
-  maxWidth: "820px",
-};
-
-const gridStyle: CSSProperties = {
-  display: "grid",
-  gap: "18px",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-};
-
-const metricStyle: CSSProperties = {
-  padding: "24px",
-  borderRadius: "28px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-};
-
-const metricLabelStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-};
-
-const metricValueStyle: CSSProperties = {
-  display: "block",
-  marginTop: "12px",
-  fontSize: "32px",
-  color: "#183153",
-};
