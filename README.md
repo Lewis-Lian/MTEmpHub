@@ -69,6 +69,12 @@ flask --app manage.py upgrade-legacy-schema
 ### 本地开发启动
 
 ```bash
+# 推荐：Mac 一键同时启动前后端
+chmod +x macrun2.sh
+./macrun2.sh
+
+# 或者手动分开启动
+
 # 终端 1：后端 API
 python3 app.py
 
@@ -82,6 +88,7 @@ npm run dev
 
 - 后端默认提供 `http://127.0.0.1:5000`
 - 前端默认提供 `http://127.0.0.1:5173`
+- `./macrun2.sh` 会自动准备 Python 虚拟环境、安装依赖，并同时启动 Flask API 和 Vite 前端
 - `python3 app.py` 仅用于本地开发
 - 这会启动 Flask development server，不适合生产环境
 
@@ -112,7 +119,7 @@ flask --app manage.py init-admin
 flask --app manage.py upgrade-legacy-schema
 
 # 本地开发启动
-python3 app.py
+./macrun2.sh
 
 # 启动独立前端
 cd frontend && npm install && npm run dev
@@ -149,8 +156,9 @@ python3 -m pytest -q
 
 ## 前后端分离说明
 
-- 浏览器业务入口已经切换到独立前端，旧的 Flask 页面路由会重定向到前端地址
-- Flask 主要职责是提供 `/api/*`、登录态校验、导入导出与健康检查
+- 浏览器业务入口只由 `frontend/` 独立前端提供
+- Flask 只提供 `/api/auth/*`、`/api/query/*`、`/api/admin/*` 与 `/health`
+- 后端不再提供 `/login`、`/employee/*`、`/admin/*`、`/module/*` 页面或兼容跳转
 - 本地默认前端地址可通过 `FRONTEND_APP_URL` 或 `FRONTEND_ORIGIN` 调整
 - 生产环境建议将前端部署到独立站点，将后端作为 API 服务部署
 
