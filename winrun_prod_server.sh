@@ -9,7 +9,8 @@ cd "$PROJECT_DIR"
 
 # 可通过环境变量覆盖的配置项
 HOST="${HOST:-0.0.0.0}"
-PORT="${PORT:-8000}"
+PORT="${PORT:-5000}"
+HEALTHCHECK_HOST="${HEALTHCHECK_HOST:-127.0.0.1}"
 THREADS="${THREADS:-8}"
 CHANNEL_TIMEOUT="${CHANNEL_TIMEOUT:-120}"
 VENV_DIR="${VENV_DIR:-.venv-win-prod}"
@@ -49,10 +50,8 @@ PYTHON_CMD="$(pick_python)"
 
 # 启动前校验核心文件完整性
 require_file "app.py"
+require_file "wsgi.py"
 require_file "requirements.txt"
-require_file "templates/base.html"
-require_file "templates/dashboard.html"
-require_file "templates/partials/app_nav.html"
 
 # 创建运行时所需的目录
 mkdir -p instance static/uploads "$LOG_DIR"
@@ -94,6 +93,9 @@ if [ -f ".env.example" ] && [ ! -f ".env" ]; then
     cp .env.example .env
 fi
 
+# 启动前做一次最小自检，确保 Flask API 能正常完成应用初始化
+python -c "from app import create_app; create_app(); print('Flask API bootstrap OK')"
+
 # 按时间戳生成日志文件，每次启动保留独立日志
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 LOG_FILE="$LOG_DIR/waitress_${TIMESTAMP}.log"
@@ -105,6 +107,7 @@ echo "Host   : $HOST"
 echo "Port   : $PORT"
 echo "Threads: $THREADS"
 echo "Logs   : $LOG_FILE"
+echo "Health : http://${HEALTHCHECK_HOST}:${PORT}/health"
 echo "Starting production server ..."
 
 # 使用 Waitress 启动生产服务器，输出同时写入日志文件和终端
@@ -113,4 +116,4 @@ python -m waitress \
     --port="$PORT" \
     --threads="$THREADS" \
     --channel-timeout="$CHANNEL_TIMEOUT" \
-    app:app 2>&1 | tee -a "$LOG_FILE"
+    wsgi:app 2>&1 | tee -a "$LOG_FILE"

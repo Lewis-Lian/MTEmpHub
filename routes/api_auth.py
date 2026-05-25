@@ -1,7 +1,7 @@
 from flask import Blueprint, current_app, g, jsonify, make_response, request
 
 from models.user import User
-from routes.auth import _generate_token, _session_cookie_kwargs, login_required
+from routes.auth_helpers import generate_token, login_required, session_cookie_kwargs
 
 
 api_auth_bp = Blueprint("api_auth", __name__, url_prefix="/api/auth")
@@ -16,7 +16,7 @@ def api_login():
     if not user or not user.check_password(password):
         return jsonify({"error": "用户名或密码错误"}), 401
 
-    token = _generate_token(user)
+    token = generate_token(user)
     response = make_response(
         jsonify(
             {
@@ -29,7 +29,7 @@ def api_login():
             }
         )
     )
-    response.set_cookie(current_app.config["SESSION_COOKIE_NAME"], token, **_session_cookie_kwargs())
+    response.set_cookie(current_app.config["SESSION_COOKIE_NAME"], token, **session_cookie_kwargs())
     return response
 
 

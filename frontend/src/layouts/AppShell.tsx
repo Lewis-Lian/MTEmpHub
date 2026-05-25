@@ -1,10 +1,10 @@
-import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { logout, type AuthUser } from "../api/auth";
 import { fetchNavigation } from "../api/query";
 import AppMenu from "../components/nav/AppMenu";
+import AppTabs, { type AppTabItem } from "../components/nav/AppTabs";
 import ErrorState from "../components/feedback/ErrorState";
 import LoadingState from "../components/feedback/LoadingState";
 import type { QueryNavigationModule } from "../types/query";
@@ -16,9 +16,35 @@ interface AppShellProps {
 
 export default function AppShell({ onLogout, user }: AppShellProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [modules, setModules] = useState<QueryNavigationModule[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [tabs, setTabs] = useState<AppTabItem[]>([]);
+  const [tabReloadKey, setTabReloadKey] = useState(0);
+
+  const matchedNavigation = useMemo(() => {
+    for (const module of modules) {
+      if (module.home_href === location.pathname) {
+        return {
+          module,
+          entry: null,
+          label: module.label,
+        };
+      }
+
+      const matchedEntry = module.entries.find((entry) => entry.href === location.pathname);
+      if (matchedEntry) {
+        return {
+          module,
+          entry: matchedEntry,
+          label: matchedEntry.label,
+        };
+      }
+    }
+
+    return null;
+  }, [location.pathname, modules]);
 
   useEffect(() => {
     let mounted = true;
@@ -29,10 +55,15 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
         if (!mounted) {
           return;
         }
-        setModules(payload.modules);
+        setModules(payload.modules.map(normalizeModuleHomeHref));
         setError("");
       } catch (caughtError) {
         if (!mounted) {
+          return;
+        }
+        if (caughtError instanceof ApiError && caughtError.status === 401) {
+          onLogout(null);
+          navigate("/login", { replace: true });
           return;
         }
         setError(caughtError instanceof ApiError ? caughtError.message : "导航加载失败");
@@ -49,86 +80,139 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (isLoading || error) {
+      return;
+    }
+
+    const nextTab: AppTabItem = {
+      href: location.pathname,
+      label: matchedNavigation?.label ?? "当前页面",
+    };
+
+    setTabs((currentTabs) => {
+      const existingIndex = currentTabs.findIndex((tab) => tab.href === nextTab.href);
+      if (existingIndex >= 0) {
+        return currentTabs.map((tab, index) => (index === existingIndex ? nextTab : tab));
+      }
+      return [...currentTabs, nextTab];
+    });
+  }, [error, isLoading, location.pathname, matchedNavigation]);
+
   async function handleLogout() {
     await logout();
     onLogout(null);
     navigate("/login", { replace: true });
   }
 
+  function handleNavigateTab(href: string) {
+    navigate(href);
+  }
+
+  function handleRefreshTab(href: string) {
+    navigate(href, { replace: true });
+    if (href === location.pathname) {
+      setTabReloadKey((current) => current + 1);
+    }
+  }
+
+  function handleCloseTab(href: string) {
+    if (tabs.length <= 1) {
+      return;
+    }
+
+    const closingIndex = tabs.findIndex((tab) => tab.href === href);
+    if (closingIndex < 0) {
+      return;
+    }
+
+    const nextTabs = tabs.filter((tab) => tab.href !== href);
+    const fallbackTab = nextTabs[closingIndex] ?? nextTabs[closingIndex - 1] ?? null;
+
+    setTabs(nextTabs);
+
+    if (href === location.pathname && fallbackTab) {
+      navigate(fallbackTab.href);
+    }
+  }
+
+  const currentModule = matchedNavigation?.module ?? modules[0] ?? null;
+  const currentEntry = matchedNavigation?.entry ?? null;
+  const roleLabel = user.role === "admin" ? "管理员" : "只读用户";
+
   return (
-    <div style={shellStyle}>
-      <aside style={sidebarStyle}>
-        <div>
-          <h1 style={titleStyle}>考勤系统</h1>
-          <p style={metaStyle}>当前用户：{user.username}</p>
-          <p style={metaStyle}>角色：{user.role}</p>
+    <div className="app-layout">
+      <header className="top-nav">
+        <div className="top-nav-inner">
+          <AppMenu
+            currentEntry={currentEntry}
+            currentModule={currentModule}
+            mode="top"
+            modules={modules}
+          />
+          <div className="top-nav-actions">
+            <div className="top-nav-user">
+              <span className="top-nav-user-code">{user.username}</span>
+              <span className="top-nav-user-person">{matchedNavigation?.label ?? "欢迎使用考勤系统"}</span>
+              <span className="top-nav-user-role">{roleLabel}</span>
+            </div>
+            <button className="top-nav-logout" onClick={handleLogout} type="button">
+              退出登录
+            </button>
+          </div>
         </div>
-        {isLoading ? <div style={loadingHintStyle}>正在加载菜单...</div> : null}
-        {error ? <div style={errorHintStyle}>{error}</div> : null}
-        {!isLoading && !error ? <AppMenu modules={modules} /> : null}
-        <button onClick={handleLogout} style={buttonStyle} type="button">
-          退出登录
-        </button>
-      </aside>
-      <main style={mainStyle}>
-        {isLoading ? <LoadingState message="正在准备导航..." /> : null}
-        {error ? <ErrorState description={error} title="导航加载失败" /> : null}
-        {!isLoading && !error ? <Outlet /> : null}
-      </main>
+      </header>
+      <div className="app-workspace">
+        <aside className="app-sidebar">
+          <div className="app-sidebar-brand">
+            <h1>考勤系统</h1>
+            <p>当前模块：{currentModule?.label ?? "系统导航"}</p>
+            <p>当前用户：{user.username}</p>
+          </div>
+          {isLoading ? <div className="app-sidebar-hint">正在加载菜单...</div> : null}
+          {error ? <div className="app-sidebar-error">{error}</div> : null}
+          {!isLoading && !error ? (
+            <AppMenu
+              currentEntry={currentEntry}
+              currentModule={currentModule}
+              mode="side"
+              modules={modules}
+            />
+          ) : null}
+          <button className="app-logout-button" onClick={handleLogout} type="button">
+            退出登录
+          </button>
+        </aside>
+        <main className="app-main">
+          {!isLoading && !error ? (
+            <AppTabs
+              currentPath={location.pathname}
+              onCloseTab={handleCloseTab}
+              onNavigate={handleNavigateTab}
+              onRefreshTab={handleRefreshTab}
+              tabs={tabs}
+            />
+          ) : null}
+          <div className="app-content">
+            {isLoading ? <LoadingState message="正在准备导航..." /> : null}
+            {error ? <ErrorState description={error} title="导航加载失败" /> : null}
+            {!isLoading && !error ? <Outlet key={`${location.pathname}:${tabReloadKey}`} /> : null}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
 
-const shellStyle: CSSProperties = {
-  minHeight: "100vh",
-  display: "grid",
-  gridTemplateColumns: "240px 1fr",
-  background: "linear-gradient(180deg, #f3f6ef 0%, #fcfbf7 100%)",
-  color: "#183153",
-  fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
-};
+function normalizeModuleHomeHref(module: QueryNavigationModule): QueryNavigationModule {
+  const defaultEntryHref = module.entries[0]?.href;
 
-const sidebarStyle: CSSProperties = {
-  padding: "32px 20px",
-  background: "#183153",
-  color: "#f7f4ea",
-  display: "flex",
-  flexDirection: "column",
-  gap: "24px",
-};
+  if (!defaultEntryHref || module.home_href === defaultEntryHref) {
+    return module;
+  }
 
-const titleStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "24px",
-};
-
-const metaStyle: CSSProperties = {
-  margin: "8px 0 0",
-  fontSize: "14px",
-};
-
-const buttonStyle: CSSProperties = {
-  marginTop: "auto",
-  border: "none",
-  borderRadius: "10px",
-  padding: "12px 14px",
-  background: "#f4c95d",
-  color: "#183153",
-  cursor: "pointer",
-  fontWeight: 600,
-};
-
-const mainStyle: CSSProperties = {
-  padding: "40px",
-};
-
-const loadingHintStyle: CSSProperties = {
-  color: "rgba(247, 244, 234, 0.76)",
-  fontSize: "14px",
-};
-
-const errorHintStyle: CSSProperties = {
-  color: "#fecaca",
-  fontSize: "14px",
-  lineHeight: 1.6,
-};
+  return {
+    ...module,
+    home_href: defaultEntryHref,
+  };
+}

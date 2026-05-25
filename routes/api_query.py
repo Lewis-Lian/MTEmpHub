@@ -4,7 +4,7 @@ from flask import Blueprint, Response, g, jsonify
 from sqlalchemy.orm import joinedload
 
 from models.employee import Employee
-from routes.auth import login_required, page_permission_required
+from routes.auth_helpers import login_required, page_permission_required
 from routes.employee import (
     _accessible_emp_ids,
     account_sets_api,

@@ -1,4 +1,4 @@
-import type { CSSProperties, FormEvent } from "react";
+import type { FormEvent } from "react";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
@@ -16,7 +16,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const redirectTo = typeof location.state?.from === "string" ? location.state.from : "/employee/dashboard";
+  const redirectTo = typeof location.state?.from === "string" ? location.state.from : null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -26,7 +26,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     try {
       const user = await login({ username, password });
       onLogin(user);
-      navigate(redirectTo, { replace: true });
+      navigate(redirectTo ?? defaultLandingPath(user), { replace: true });
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : "登录失败，请稍后重试");
     } finally {
@@ -35,116 +35,77 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div style={pageStyle}>
-      <section style={cardStyle}>
-        <div>
-          <p style={eyebrowStyle}>Mt Employee Attendance</p>
-          <h1 style={headingStyle}>登录考勤系统</h1>
-          <p style={descriptionStyle}>前后端分离改造的最小前端入口，当前仅提供登录与受保护路由骨架。</p>
+    <div className="login-page">
+      <div className="login-shell">
+        <div className="login-surface">
+          <section className="login-brand-panel" aria-label="系统品牌">
+            <div className="login-brand-panel-inner">
+              <div className="login-brand">
+                <span className="login-brand-mark" aria-hidden="true">
+                  <span className="login-brand-mark-top"></span>
+                  <span className="login-brand-mark-bars">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </span>
+                </span>
+                <span className="login-brand-text">企业考勤处理中心</span>
+              </div>
+              <div className="login-brand-copy">
+                <h1 className="login-brand-title">统一处理考勤、账套与权限数据</h1>
+                <p className="login-brand-subtitle">
+                  面向内部业务场景的考勤数据工作台，支持查询、修正、下载和账号权限控制。
+                </p>
+              </div>
+              <ul className="login-brand-points" aria-label="系统能力">
+                <li>员工、部门与管理人员考勤统一查询</li>
+                <li>账套导入、考勤修正与结果下载协同处理</li>
+                <li>登录后按角色进入对应功能页面</li>
+              </ul>
+            </div>
+          </section>
+          <section className="login-panel-wrap">
+            <div className="login-card">
+              <div className="login-panel-top">
+                <p className="login-panel-kicker">账号登录</p>
+                <h2 className="login-panel-title">登录考勤系统</h2>
+                <p className="login-panel-subtitle">请输入用户名和密码进入系统</p>
+              </div>
+              <form className="login-form" onSubmit={handleSubmit}>
+                <label className="login-field">
+                  <span className="login-field-label">用户名</span>
+                  <input
+                    autoComplete="username"
+                    className="login-input"
+                    onChange={(event) => setUsername(event.target.value)}
+                    required
+                    value={username}
+                  />
+                </label>
+                <label className="login-field">
+                  <span className="login-field-label">密码</span>
+                  <input
+                    autoComplete="current-password"
+                    className="login-input"
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    type="password"
+                    value={password}
+                  />
+                </label>
+                {error ? <p className="login-error">{error}</p> : null}
+                <button className="login-submit-btn" disabled={isSubmitting} type="submit">
+                  {isSubmitting ? "登录中..." : "登录"}
+                </button>
+              </form>
+            </div>
+          </section>
         </div>
-        <form onSubmit={handleSubmit} style={formStyle}>
-          <label style={labelStyle}>
-            用户名
-            <input
-              autoComplete="username"
-              onChange={(event) => setUsername(event.target.value)}
-              required
-              style={inputStyle}
-              value={username}
-            />
-          </label>
-          <label style={labelStyle}>
-            密码
-            <input
-              autoComplete="current-password"
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              style={inputStyle}
-              type="password"
-              value={password}
-            />
-          </label>
-          {error ? <p style={errorStyle}>{error}</p> : null}
-          <button disabled={isSubmitting} style={submitStyle} type="submit">
-            {isSubmitting ? "登录中..." : "登录"}
-          </button>
-        </form>
-      </section>
+      </div>
     </div>
   );
 }
 
-const pageStyle: CSSProperties = {
-  minHeight: "100vh",
-  display: "grid",
-  placeItems: "center",
-  padding: "24px",
-  background:
-    "radial-gradient(circle at top, rgba(244, 201, 93, 0.45), transparent 35%), linear-gradient(180deg, #f4efe4 0%, #dce8de 100%)",
-  fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
-};
-
-const cardStyle: CSSProperties = {
-  width: "min(420px, 100%)",
-  padding: "32px",
-  borderRadius: "24px",
-  background: "rgba(255, 255, 255, 0.88)",
-  boxShadow: "0 24px 60px rgba(24, 49, 83, 0.12)",
-  display: "grid",
-  gap: "24px",
-};
-
-const eyebrowStyle: CSSProperties = {
-  margin: 0,
-  fontSize: "12px",
-  letterSpacing: "0.18em",
-  textTransform: "uppercase",
-  color: "#5c6f68",
-};
-
-const headingStyle: CSSProperties = {
-  margin: "12px 0 0",
-  fontSize: "32px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: "12px 0 0",
-  color: "#4b5d67",
-  lineHeight: 1.6,
-};
-
-const formStyle: CSSProperties = {
-  display: "grid",
-  gap: "16px",
-};
-
-const labelStyle: CSSProperties = {
-  display: "grid",
-  gap: "8px",
-  color: "#183153",
-  fontWeight: 600,
-};
-
-const inputStyle: CSSProperties = {
-  borderRadius: "12px",
-  border: "1px solid #c4d0c5",
-  padding: "12px 14px",
-  fontSize: "16px",
-};
-
-const errorStyle: CSSProperties = {
-  margin: 0,
-  color: "#b42318",
-};
-
-const submitStyle: CSSProperties = {
-  border: "none",
-  borderRadius: "12px",
-  padding: "14px 16px",
-  background: "#183153",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontSize: "16px",
-  fontWeight: 600,
-};
+function defaultLandingPath(user: AuthUser): string {
+  return user.role === "admin" ? "/admin/dashboard" : "/employee/home";
+}

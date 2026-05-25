@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchQueryBootstrap } from "../../api/query";
@@ -93,6 +92,10 @@ export default function SummaryDownloadPage() {
     };
   }, []);
 
+  function toggleAllHeaders(headers: string[], selectedHeaders: string[], setSelectedHeaders: (headers: string[]) => void) {
+    setSelectedHeaders(selectedHeaders.length === headers.length ? [] : headers);
+  }
+
   function toggleHeader(header: string, selectedHeaders: string[], setSelectedHeaders: (headers: string[]) => void) {
     setSelectedHeaders(
       selectedHeaders.includes(header)
@@ -130,55 +133,155 @@ export default function SummaryDownloadPage() {
     return <ErrorState description="未能读取汇总下载页基础数据。" />;
   }
 
+  const activeAccountSet = bootstrap.account_sets.find((accountSet) => accountSet.month === selectedMonth) ?? null;
+  const selectedEmployeeCount = selectedEmployeeIds.length;
+  const enabledReports = [includeFinal, includePunch].filter(Boolean).length;
+  const downloadStatus =
+    enabledReports === 0
+      ? "未选择报表"
+      : selectedMonth
+        ? `已选 ${enabledReports} 份报表，等待下载`
+        : "请先选择账套月份";
+
   return (
-    <section style={pageStyle}>
-      <header style={heroStyle}>
-        <div>
-          <p style={tagStyle}>查询中心</p>
-          <h2 style={titleStyle}>汇总下载</h2>
-          <p style={descriptionStyle}>选择账套、员工范围和字段列，下载合并后的月度汇总工作簿。</p>
+    <section className="legacy-page-section">
+      <header className="legacy-page-header">
+        <div className="legacy-page-heading">
+          <p className="legacy-page-kicker">查询中心</p>
+          <h2 className="legacy-page-title">汇总下载</h2>
+          <p className="legacy-page-description">选择账套、员工范围和字段列，下载合并后的月度汇总工作簿。</p>
         </div>
+        <dl className="legacy-page-side-info">
+          <div className="legacy-page-side-item">
+            <dt>当前账套</dt>
+            <dd>{activeAccountSet?.name ?? "未选择"}</dd>
+          </div>
+          <div className="legacy-page-side-item">
+            <dt>已选员工</dt>
+            <dd>{selectedEmployeeCount === 0 ? "全部员工" : `${selectedEmployeeCount} 人`}</dd>
+          </div>
+        </dl>
       </header>
 
-      <section style={panelStyle}>
-        <label style={fieldStyle}>
-          <span style={fieldLabelStyle}>账套月份</span>
-          <select onChange={(event) => setSelectedMonth(event.target.value)} style={selectStyle} value={selectedMonth}>
-            {bootstrap.account_sets.map((accountSet) => (
-              <option key={accountSet.id} value={accountSet.month}>
-                {accountSet.name}
-                {accountSet.is_active ? "（当前）" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <EmployeePicker
-          employees={bootstrap.employees}
-          filterMode="employee"
-          onChange={setSelectedEmployeeIds}
-          selectedIds={selectedEmployeeIds}
-        />
-
-        <div style={optionsRowStyle}>
-          <label style={optionLabelStyle}>
-            <input checked={includeFinal} onChange={(event) => setIncludeFinal(event.target.checked)} type="checkbox" />
-            <span>包含考勤汇总表</span>
+      <section className="legacy-surface legacy-form-surface summary-download-panel">
+        <div className="legacy-panel-heading">
+          <h3 className="legacy-query-panel-title">下载条件</h3>
+          <p className="legacy-query-panel-description">先选择账套、员工范围和下载内容，再生成汇总工作簿。</p>
+        </div>
+        <div className="legacy-form-grid">
+          <label className="legacy-field">
+            <span className="legacy-field-label">账套月份</span>
+            <select className="legacy-select" onChange={(event) => setSelectedMonth(event.target.value)} value={selectedMonth}>
+              {bootstrap.account_sets.map((accountSet) => (
+                <option key={accountSet.id} value={accountSet.month}>
+                  {accountSet.name}
+                  {accountSet.is_active ? "（当前）" : ""}
+                </option>
+              ))}
+            </select>
           </label>
-          <label style={optionLabelStyle}>
+
+          <EmployeePicker
+            employees={bootstrap.employees}
+            filterMode="employee"
+            onChange={setSelectedEmployeeIds}
+            selectedIds={selectedEmployeeIds}
+          />
+        </div>
+
+        <div className="legacy-options-row">
+          <span className="legacy-options-label">下载内容</span>
+          <label className="legacy-check-option">
+            <input checked={includeFinal} onChange={(event) => setIncludeFinal(event.target.checked)} type="checkbox" />
+            <span>考勤数据</span>
+          </label>
+          <label className="legacy-check-option">
             <input checked={includePunch} onChange={(event) => setIncludePunch(event.target.checked)} type="checkbox" />
-            <span>包含打卡明细表</span>
+            <span>打卡数据</span>
           </label>
         </div>
 
-        <HeaderChecklist headers={FINAL_HEADERS} selectedHeaders={finalHeaders} title="考勤汇总字段" onToggle={(header) => toggleHeader(header, finalHeaders, setFinalHeaders)} />
-        <HeaderChecklist headers={PUNCH_HEADERS} selectedHeaders={punchHeaders} title="打卡明细字段" onToggle={(header) => toggleHeader(header, punchHeaders, setPunchHeaders)} />
-
-        {error ? <p style={errorStyle}>{error}</p> : null}
-        <div style={actionsStyle}>
-          <button onClick={handleDownload} style={primaryButtonStyle} type="button">
+        {error ? <p className="legacy-inline-error">{error}</p> : null}
+        <div className="legacy-actions">
+          <button className="legacy-btn-primary" onClick={handleDownload} type="button">
             下载汇总工作簿
           </button>
+        </div>
+      </section>
+
+      <section className="summary-download-report-grid">
+        <article className="legacy-surface summary-download-report-card">
+          <span className="summary-download-report-label">报表说明</span>
+          <strong>考勤数据查询工作表</strong>
+          <p>包含考勤天数、请假次数与时长、工时、半勤天数，以及与月度汇总相关的统计字段。</p>
+        </article>
+        <article className="legacy-surface summary-download-report-card">
+          <span className="summary-download-report-label">报表说明</span>
+          <strong>打卡数据查询工作表</strong>
+          <p>包含日期、原始打卡、上下班打卡、打卡次数、实出勤小时、迟到早退与异常原因。</p>
+        </article>
+      </section>
+
+      <section className="summary-download-metric-grid">
+        <article className="legacy-surface summary-download-metric-card">
+          <span className="summary-download-metric-label">已选员工</span>
+          <strong>{selectedEmployeeCount === 0 ? "全部员工" : `${selectedEmployeeCount} 人`}</strong>
+          <p>{selectedEmployeeCount === 0 ? "当前按所选月份导出全部员工" : "仅导出已选员工范围"}</p>
+        </article>
+        <article className="legacy-surface summary-download-metric-card">
+          <span className="summary-download-metric-label">当前账套</span>
+          <strong>{activeAccountSet?.month ?? "-"}</strong>
+          <p>{activeAccountSet?.name ?? "请先选择账套月份"}</p>
+        </article>
+        <article className="legacy-surface summary-download-metric-card">
+          <span className="summary-download-metric-label">可用报表</span>
+          <strong>{enabledReports}</strong>
+          <p>{enabledReports === 2 ? "考勤数据 + 打卡数据" : enabledReports === 1 ? "已选择单张报表" : "尚未选择"}</p>
+        </article>
+        <article className="legacy-surface summary-download-metric-card">
+          <span className="summary-download-metric-label">下载状态</span>
+          <strong>{enabledReports === 0 ? "等待选择" : "等待操作"}</strong>
+          <p>{downloadStatus}</p>
+        </article>
+      </section>
+
+      <section className="legacy-surface legacy-form-surface summary-download-panel">
+        <div className="summary-download-section-head">
+          <div>
+            <h3 className="legacy-query-panel-title">自定义表头</h3>
+            <p className="legacy-query-panel-description">按工作表分别选择需要导出的字段列，生成时按当前勾选结果输出。</p>
+          </div>
+        </div>
+        <HeaderChecklist
+          headers={FINAL_HEADERS}
+          onToggle={(header) => toggleHeader(header, finalHeaders, setFinalHeaders)}
+          onToggleAll={() => toggleAllHeaders(FINAL_HEADERS, finalHeaders, setFinalHeaders)}
+          selectedHeaders={finalHeaders}
+          title="考勤数据查询工作表"
+        />
+        <HeaderChecklist
+          headers={PUNCH_HEADERS}
+          onToggle={(header) => toggleHeader(header, punchHeaders, setPunchHeaders)}
+          onToggleAll={() => toggleAllHeaders(PUNCH_HEADERS, punchHeaders, setPunchHeaders)}
+          selectedHeaders={punchHeaders}
+          title="打卡数据查询工作表"
+        />
+      </section>
+
+      <section className="legacy-surface legacy-form-surface summary-download-help-panel">
+        <div className="summary-download-section-head">
+          <div>
+            <h3 className="legacy-query-panel-title">下载说明</h3>
+            <p className="legacy-query-panel-description">汇总为一个 Excel 文件，按勾选内容生成工作表，并沿用当前自定义表头设置。</p>
+          </div>
+        </div>
+        <div className="summary-download-help-box">
+          <h4>一键下载全部</h4>
+          <p>文件格式为 Excel（`.xlsx`），包含以下工作表：</p>
+          <ul className="summary-download-help-list">
+            <li>考勤数据查询：部门名称、人员编号、人员名称、考勤天数、各类请假次数与时长、工时、半勤天数。</li>
+            <li>打卡数据查询：日期、员工编号、员工姓名、部门、原始打卡数据、上下班打卡、打卡次数、实出勤小时、迟到早退分钟、异常原因。</li>
+          </ul>
         </div>
       </section>
     </section>
@@ -187,21 +290,28 @@ export default function SummaryDownloadPage() {
 
 function HeaderChecklist({
   headers,
+  onToggleAll,
   selectedHeaders,
   title,
   onToggle,
 }: {
   headers: string[];
+  onToggleAll: () => void;
   selectedHeaders: string[];
   title: string;
   onToggle: (header: string) => void;
 }) {
   return (
-    <div style={checklistWrapStyle}>
-      <p style={checklistTitleStyle}>{title}</p>
-      <div style={badgesStyle}>
+    <div className="legacy-checklist summary-download-checklist">
+      <div className="summary-download-checklist-head">
+        <p className="legacy-checklist-title">{title}</p>
+        <button className="legacy-btn-ghost" onClick={onToggleAll} type="button">
+          {selectedHeaders.length === headers.length ? "取消全选" : "全选"}
+        </button>
+      </div>
+      <div className="legacy-badges">
         {headers.map((header) => (
-          <label key={header} style={badgeStyle}>
+          <label key={header} className="legacy-badge">
             <input checked={selectedHeaders.includes(header)} onChange={() => onToggle(header)} type="checkbox" />
             <span>{header}</span>
           </label>
@@ -210,122 +320,3 @@ function HeaderChecklist({
     </div>
   );
 }
-
-const pageStyle: CSSProperties = {
-  display: "grid",
-  gap: "24px",
-};
-
-const heroStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  gap: "24px",
-  flexWrap: "wrap",
-};
-
-const tagStyle: CSSProperties = {
-  margin: 0,
-  color: "#5c6f68",
-  fontSize: "12px",
-  letterSpacing: "0.14em",
-  textTransform: "uppercase",
-};
-
-const titleStyle: CSSProperties = {
-  margin: "10px 0 8px",
-  fontSize: "34px",
-  color: "#183153",
-};
-
-const descriptionStyle: CSSProperties = {
-  margin: 0,
-  color: "#4b5d67",
-  lineHeight: 1.7,
-  maxWidth: "760px",
-};
-
-const panelStyle: CSSProperties = {
-  padding: "24px",
-  borderRadius: "28px",
-  background: "#ffffff",
-  boxShadow: "0 18px 40px rgba(24, 49, 83, 0.08)",
-  display: "grid",
-  gap: "20px",
-};
-
-const fieldStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const fieldLabelStyle: CSSProperties = {
-  fontWeight: 600,
-  color: "#183153",
-};
-
-const selectStyle: CSSProperties = {
-  borderRadius: "12px",
-  border: "1px solid #d7dfd4",
-  padding: "12px 14px",
-  background: "#fffdfa",
-};
-
-const optionsRowStyle: CSSProperties = {
-  display: "flex",
-  gap: "16px",
-  flexWrap: "wrap",
-};
-
-const optionLabelStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "8px",
-};
-
-const checklistWrapStyle: CSSProperties = {
-  display: "grid",
-  gap: "10px",
-};
-
-const checklistTitleStyle: CSSProperties = {
-  margin: 0,
-  fontWeight: 600,
-  color: "#183153",
-};
-
-const badgesStyle: CSSProperties = {
-  display: "flex",
-  gap: "10px",
-  flexWrap: "wrap",
-};
-
-const badgeStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: "8px",
-  padding: "10px 12px",
-  borderRadius: "999px",
-  background: "#f2f6f0",
-  color: "#31444c",
-};
-
-const actionsStyle: CSSProperties = {
-  display: "flex",
-  gap: "12px",
-  flexWrap: "wrap",
-};
-
-const primaryButtonStyle: CSSProperties = {
-  border: "none",
-  borderRadius: "12px",
-  padding: "12px 18px",
-  background: "#183153",
-  color: "#ffffff",
-  cursor: "pointer",
-  fontWeight: 600,
-};
-
-const errorStyle: CSSProperties = {
-  margin: 0,
-  color: "#b42318",
-};
