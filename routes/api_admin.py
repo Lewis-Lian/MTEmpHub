@@ -1,17 +1,29 @@
 import os
+from io import BytesIO
 from datetime import datetime
 
-from flask import Blueprint, current_app, jsonify, request
+import openpyxl
+from flask import Blueprint, current_app, jsonify, request, send_file
 
 from models.department import Department
 from models.shift import Shift
+from routes import admin as admin_module
 from routes.admin import (
     AccountSet,
     AccountSetImport,
     activate_account_set,
     calculate_account_set,
+    batch_operate_departments,
+    batch_operate_employees,
+    create_department,
+    create_employee,
     create_account_set,
+    create_shift,
+    delete_department,
+    delete_employee,
     delete_account_set,
+    delete_shift,
+    delete_unbound_departments,
     departments_list,
     employees_list,
     list_account_sets,
@@ -19,7 +31,10 @@ from routes.admin import (
     lock_account_set,
     manager_annual_leave_records,
     manager_overtime_records,
+    update_department,
+    update_employee,
     update_account_set,
+    update_shift,
     unlock_account_set,
 )
 from routes.admin_accounts import users_list_api
@@ -89,6 +104,180 @@ def shifts():
     return list_shifts()
 
 
+def _call_admin_view(endpoint: str):
+    return current_app.view_functions[f"admin.{endpoint}"]()
+
+
+@api_admin_bp.get("/departments/template")
+@admin_required
+def departments_template():
+    workbook = admin_module._build_departments_workbook(
+        [
+            ("D001", "行政部", "", ""),
+            ("D002", "生产中心", "", ""),
+            ("D003", "生产一部", "D002", ""),
+        ]
+    )
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="部门导入模板.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@api_admin_bp.post("/departments/import")
+@admin_required
+def departments_import():
+    return _call_admin_view("import_departments_xlsx")
+
+
+@api_admin_bp.get("/departments/export")
+@admin_required
+def departments_export():
+    return _call_admin_view("export_departments_xlsx")
+
+
+@api_admin_bp.get("/employees/template")
+@admin_required
+def employees_template():
+    workbook = openpyxl.Workbook()
+    worksheet = workbook.active
+    worksheet.title = "员工导入模板"
+    worksheet.append(
+        [
+            "人员编号",
+            "人员姓名",
+            "部门名称",
+            "班次编号",
+            "是否管理人员",
+            "是否哺乳假",
+            "员工考勤统计来源",
+            "管理人员考勤统计来源",
+        ]
+    )
+    worksheet.append(
+        [
+            "1001001",
+            "张三",
+            "生产中心",
+            "A00001",
+            "否",
+            "否",
+            "员工考勤源文件取值",
+            "管理人员考勤源文件取值",
+        ]
+    )
+    worksheet.append(
+        [
+            "1001002",
+            "李四",
+            "行政部",
+            "A00002",
+            "是",
+            "是",
+            "员工考勤源文件取值",
+            "管理人员考勤源文件取值",
+        ]
+    )
+    output = BytesIO()
+    workbook.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name="员工导入模板.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+@api_admin_bp.post("/employees/import")
+@admin_required
+def employees_import():
+    return _call_admin_view("import_employees_xlsx")
+
+
+@api_admin_bp.get("/employees/export")
+@admin_required
+def employees_export():
+    return _call_admin_view("export_employees_xlsx")
+
+
+@api_admin_bp.post("/shifts")
+@admin_required
+def shifts_create():
+    return create_shift()
+
+
+@api_admin_bp.put("/shifts/<int:shift_id>")
+@admin_required
+def shifts_update(shift_id: int):
+    return update_shift(shift_id)
+
+
+@api_admin_bp.delete("/shifts/<int:shift_id>")
+@admin_required
+def shifts_delete(shift_id: int):
+    return delete_shift(shift_id)
+
+
+@api_admin_bp.post("/departments")
+@admin_required
+def departments_create():
+    return create_department()
+
+
+@api_admin_bp.put("/departments/<int:dept_id>")
+@admin_required
+def departments_update(dept_id: int):
+    return update_department(dept_id)
+
+
+@api_admin_bp.delete("/departments/<int:dept_id>")
+@admin_required
+def departments_delete(dept_id: int):
+    return delete_department(dept_id)
+
+
+@api_admin_bp.post("/departments/batch")
+@admin_required
+def departments_batch():
+    return batch_operate_departments()
+
+
+@api_admin_bp.post("/departments/delete-unbound")
+@admin_required
+def departments_delete_unbound():
+    return delete_unbound_departments()
+
+
+@api_admin_bp.post("/employees")
+@admin_required
+def employees_create():
+    return create_employee()
+
+
+@api_admin_bp.put("/employees/<int:employee_id>")
+@admin_required
+def employees_update(employee_id: int):
+    return update_employee(employee_id)
+
+
+@api_admin_bp.delete("/employees/<int:employee_id>")
+@admin_required
+def employees_delete(employee_id: int):
+    return delete_employee(employee_id)
+
+
+@api_admin_bp.post("/employees/batch")
+@admin_required
+def employees_batch():
+    return batch_operate_employees()
+
+
 @api_admin_bp.get("/employee-attendance-overrides")
 @admin_required
 def employee_attendance_overrides():
@@ -107,6 +296,24 @@ def employee_attendance_override_record():
     return save_employee_attendance_override_record_api()
 
 
+@api_admin_bp.get("/employee-attendance-overrides/template")
+@admin_required
+def employee_attendance_override_template():
+    return _call_admin_view("download_employee_attendance_override_template")
+
+
+@api_admin_bp.get("/employee-attendance-overrides/export")
+@admin_required
+def employee_attendance_override_export():
+    return _call_admin_view("export_employee_attendance_overrides")
+
+
+@api_admin_bp.post("/employee-attendance-overrides/import")
+@admin_required
+def employee_attendance_override_import():
+    return _call_admin_view("import_employee_attendance_overrides")
+
+
 @api_admin_bp.get("/manager-attendance-overrides")
 @admin_required
 def manager_attendance_overrides():
@@ -123,6 +330,24 @@ def manager_attendance_override_history():
 @admin_required
 def manager_attendance_override_record():
     return save_manager_attendance_override_record_api()
+
+
+@api_admin_bp.get("/manager-attendance-overrides/template")
+@admin_required
+def manager_attendance_override_template():
+    return _call_admin_view("download_manager_attendance_override_template")
+
+
+@api_admin_bp.get("/manager-attendance-overrides/export")
+@admin_required
+def manager_attendance_override_export():
+    return _call_admin_view("export_manager_attendance_overrides")
+
+
+@api_admin_bp.post("/manager-attendance-overrides/import")
+@admin_required
+def manager_attendance_override_import():
+    return _call_admin_view("import_manager_attendance_overrides")
 
 
 @api_admin_bp.get("/manager-overtime")

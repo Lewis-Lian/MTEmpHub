@@ -82,9 +82,15 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/employee-attendance-overrides",
                 "/api/admin/employee-attendance-overrides/history",
                 "/api/admin/employee-attendance-overrides/record",
+                "/api/admin/employee-attendance-overrides/template",
+                "/api/admin/employee-attendance-overrides/export",
+                "/api/admin/employee-attendance-overrides/import",
                 "/api/admin/manager-attendance-overrides",
                 "/api/admin/manager-attendance-overrides/history",
                 "/api/admin/manager-attendance-overrides/record",
+                "/api/admin/manager-attendance-overrides/template",
+                "/api/admin/manager-attendance-overrides/export",
+                "/api/admin/manager-attendance-overrides/import",
                 "/api/admin/manager-overtime",
                 "/api/admin/manager-annual-leave",
             }.issubset(rules)
@@ -184,6 +190,31 @@ class ApiAdminTests(unittest.TestCase):
         self.assertIsInstance(manager_annual_leave_payload, list)
         self.assertIn("name", manager_annual_leave_payload[0])
         self.assertIn("remark", manager_annual_leave_payload[0])
+
+    def test_admin_template_download_endpoints_return_excel_attachments(self) -> None:
+        self._login()
+
+        departments_response = self.client.get("/api/admin/departments/template")
+        employees_response = self.client.get("/api/admin/employees/template")
+
+        self.assertEqual(departments_response.status_code, 200)
+        self.assertEqual(employees_response.status_code, 200)
+        self.assertIn(
+            "attachment; filename=",
+            departments_response.headers.get("Content-Disposition", ""),
+        )
+        self.assertIn(
+            "attachment; filename=",
+            employees_response.headers.get("Content-Disposition", ""),
+        )
+        self.assertEqual(
+            departments_response.headers.get("Content-Type"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        self.assertEqual(
+            employees_response.headers.get("Content-Type"),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
 
     def test_admin_record_wrappers_reuse_existing_write_behavior(self) -> None:
         self._login()
