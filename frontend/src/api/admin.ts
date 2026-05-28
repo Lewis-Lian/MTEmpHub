@@ -1,6 +1,14 @@
 import { apiRequest } from "./client";
 import { ApiError } from "./client";
-import type { AdminAccountSet, AdminAccountSetFactoryRestEntry, AdminAccountSetImport, AdminBootstrap } from "../types/admin";
+import type {
+  AdminAccountSet,
+  AdminAccountSetFactoryRestEntry,
+  AdminAccountSetImport,
+  AdminBootstrap,
+  AdminDepartment,
+  AdminEmployee,
+  AdminShift,
+} from "../types/admin";
 
 let adminBootstrapPromise: Promise<AdminBootstrap> | null = null;
 
@@ -20,6 +28,119 @@ export function fetchAdminBootstrap(): Promise<AdminBootstrap> {
 
 export function fetchAdminRows<T>(path: string): Promise<T> {
   return apiRequest<T>(path);
+}
+
+export async function fetchAdminEmployees(): Promise<AdminEmployee[]> {
+  return expectArrayResponse<AdminEmployee>(await apiRequest<unknown>("/api/admin/employees"), "员工列表");
+}
+
+export async function fetchAdminDepartments(): Promise<AdminDepartment[]> {
+  return expectArrayResponse<AdminDepartment>(await apiRequest<unknown>("/api/admin/departments"), "部门列表");
+}
+
+export async function fetchAdminShifts(): Promise<AdminShift[]> {
+  return expectArrayResponse<AdminShift>(await apiRequest<unknown>("/api/admin/shifts"), "班次列表");
+}
+
+export function createAdminEmployee(payload: Record<string, unknown>): Promise<{ status: string; employee: AdminEmployee }> {
+  return apiRequest<{ status: string; employee: AdminEmployee }>("/api/admin/employees", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function updateAdminEmployee(
+  employeeId: number,
+  payload: Record<string, unknown>,
+): Promise<{ status: string; employee: AdminEmployee }> {
+  return apiRequest<{ status: string; employee: AdminEmployee }>(`/api/admin/employees/${employeeId}`, {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function deleteAdminEmployee(employeeId: number): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>(`/api/admin/employees/${employeeId}`, {
+    method: "DELETE",
+  });
+}
+
+export function batchAdminEmployees(payload: Record<string, unknown>): Promise<{ status: string; affected: number }> {
+  return apiRequest<{ status: string; affected: number }>("/api/admin/employees/batch", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function importAdminEmployees(file: File): Promise<{ status: string; imported: number }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest<{ status: string; imported: number }>("/api/admin/employees/import", {
+    body: formData,
+    method: "POST",
+  });
+}
+
+export function createAdminDepartment(payload: Record<string, unknown>): Promise<{ status: string; id: number }> {
+  return apiRequest<{ status: string; id: number }>("/api/admin/departments", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function updateAdminDepartment(departmentId: number, payload: Record<string, unknown>): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>(`/api/admin/departments/${departmentId}`, {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function deleteAdminDepartment(departmentId: number): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>(`/api/admin/departments/${departmentId}`, {
+    method: "DELETE",
+  });
+}
+
+export function batchAdminDepartments(payload: Record<string, unknown>): Promise<{ status: string; affected: number }> {
+  return apiRequest<{ status: string; affected: number }>("/api/admin/departments/batch", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function importAdminDepartments(file: File): Promise<{ status: string; imported: number }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest<{ status: string; imported: number }>("/api/admin/departments/import", {
+    body: formData,
+    method: "POST",
+  });
+}
+
+export function deleteUnboundAdminDepartments(): Promise<Record<string, unknown>> {
+  return apiRequest<Record<string, unknown>>("/api/admin/departments/delete-unbound", {
+    method: "POST",
+  });
+}
+
+export function createAdminShift(payload: Record<string, unknown>): Promise<{ status: string; id: number }> {
+  return apiRequest<{ status: string; id: number }>("/api/admin/shifts", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function updateAdminShift(shiftId: number, payload: Record<string, unknown>): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>(`/api/admin/shifts/${shiftId}`, {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function deleteAdminShift(shiftId: number): Promise<{ status: string }> {
+  return apiRequest<{ status: string }>(`/api/admin/shifts/${shiftId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function fetchAccountSets(): Promise<AdminAccountSet[]> {

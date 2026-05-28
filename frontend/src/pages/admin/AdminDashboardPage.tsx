@@ -307,19 +307,19 @@ export default function AdminDashboardPage() {
                     </div>
                     <div>
                       <span className="factory-rest-summary-meta-label">切换方式</span>
-                      <span>非厂休 / 全天 / 上午 / 下午</span>
+                      <span>上班 / 全天 / 上午 / 下午</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="factory-rest-panel-note">
-                  点击日期卡片按“非厂休 → 全天 → 上午 → 下午 → 非厂休”循环切换，系统会自动汇总厂休天数。
+                  点击日期卡片按“上班 → 全天 → 上午 → 下午 → 上班”循环切换，系统会自动汇总厂休天数。
                 </div>
 
                 <div className="factory-rest-legend" aria-hidden="true">
                   <span className="factory-rest-legend-item">
                     <span className="factory-rest-legend-dot factory-rest-legend-dot--none" />
-                    非厂休
+                    上班
                   </span>
                   <span className="factory-rest-legend-item">
                     <span className="factory-rest-legend-dot factory-rest-legend-dot--am" />
@@ -684,7 +684,7 @@ function factoryRestStateLabel(period: FactoryRestPeriod) {
     case "pm":
       return "下午";
     default:
-      return "非厂休";
+      return "上班";
   }
 }
 

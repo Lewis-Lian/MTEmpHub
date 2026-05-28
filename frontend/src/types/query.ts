@@ -28,6 +28,7 @@ export interface AccountSet {
   month: string;
   name: string;
   is_active: boolean;
+  is_locked?: boolean;
   factory_rest_days?: number;
   factory_rest_requires_detail?: boolean;
   legacy_factory_rest_days?: number;
