@@ -3,14 +3,30 @@ export interface AdminDepartment {
   dept_no?: string;
   dept_name: string;
   parent_id: number | null;
+  parent_name?: string;
+  is_locked?: boolean;
 }
 
 export interface AdminShift {
   id: number;
   shift_no: string;
   shift_name: string;
-  time_slots: Array<Record<string, unknown>>;
+  time_slots: Array<Record<string, unknown>> | string[][];
   is_cross_day: boolean;
+}
+
+export interface AdminEmployee {
+  id: number;
+  emp_no: string;
+  name: string;
+  dept_id?: number | null;
+  dept_name?: string;
+  shift_no?: string;
+  shift_name?: string;
+  is_manager?: boolean;
+  is_nursing?: boolean;
+  employee_stats_attendance_source?: string;
+  manager_stats_attendance_source?: string;
 }
 
 export interface AdminBootstrap {

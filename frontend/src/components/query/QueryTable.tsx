@@ -1,18 +1,36 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
+
+export interface QueryTableHeader {
+  label: ReactNode;
+  sortable?: boolean;
+}
 
 interface QueryTableProps {
-  headers: string[];
-  rows: Array<Array<string | number | null>>;
+  headers: Array<string | QueryTableHeader>;
+  rows: Array<Array<ReactNode>>;
+  sortRows?: Array<Array<string | number | null>>;
   emptyText?: string;
+  panelClassName?: string;
+  wrapClassName?: string;
+  tableClassName?: string;
 }
 
 const PAGE_SIZES = [50, 100, 500, 1000, 2000];
 const DEFAULT_PAGE_SIZE = 100;
 type SortDirection = "ascending" | "descending";
 
-export default function QueryTable({ headers, rows, emptyText = "当前条件暂无数据" }: QueryTableProps) {
+export default function QueryTable({
+  headers,
+  rows,
+  sortRows,
+  emptyText = "当前条件暂无数据",
+  panelClassName,
+  wrapClassName,
+  tableClassName,
+}: QueryTableProps) {
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
-  const safeHeaders = headers.length ? headers : ["结果"];
+  const safeHeaders = headers.length ? headers.map(normalizeHeader) : [normalizeHeader("结果")];
   const hasRows = rows.length > 0;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -21,19 +39,25 @@ export default function QueryTable({ headers, rows, emptyText = "当前条件暂
   const [sortDirection, setSortDirection] = useState<SortDirection>("ascending");
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(Math.max(page, 1), pageCount);
+  const indexedRows = useMemo(
+    () => rows.map((row, index) => ({ row, sortRow: sortRows?.[index] })),
+    [rows, sortRows],
+  );
   const sortedRows = useMemo(() => {
     if (sortIndex === null) {
       return rows;
     }
 
-    return [...rows].sort((leftRow, rightRow) => {
+    const nextRows = [...indexedRows];
+    nextRows.sort((leftRow, rightRow) => {
       const result = compareCellValues(
-        parseCellValue(leftRow[sortIndex]),
-        parseCellValue(rightRow[sortIndex]),
+        parseCellValue(leftRow.sortRow ? leftRow.sortRow[sortIndex] : leftRow.row[sortIndex]),
+        parseCellValue(rightRow.sortRow ? rightRow.sortRow[sortIndex] : rightRow.row[sortIndex]),
       );
       return sortDirection === "ascending" ? result : -result;
     });
-  }, [rows, sortDirection, sortIndex]);
+    return nextRows.map((item) => item.row);
+  }, [indexedRows, rows, sortDirection, sortIndex]);
   const visibleRows = hasRows
     ? sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize)
     : [];
@@ -118,6 +142,9 @@ export default function QueryTable({ headers, rows, emptyText = "当前条件暂
   }
 
   function toggleSort(nextSortIndex: number) {
+    if (!safeHeaders[nextSortIndex]?.sortable) {
+      return;
+    }
     if (sortIndex === nextSortIndex) {
       setSortDirection((currentDirection) =>
         currentDirection === "ascending" ? "descending" : "ascending",
@@ -130,29 +157,33 @@ export default function QueryTable({ headers, rows, emptyText = "当前条件暂
   }
 
   return (
-    <div className="legacy-table-panel">
-      <div className="legacy-table-wrap" ref={tableWrapRef}>
-        <table className="legacy-table">
+    <div className={["legacy-table-panel", panelClassName].filter(Boolean).join(" ")}>
+      <div className={["legacy-table-wrap", wrapClassName].filter(Boolean).join(" ")} ref={tableWrapRef}>
+        <table className={["legacy-table", tableClassName].filter(Boolean).join(" ")}>
           <thead>
             <tr>
               {safeHeaders.map((header, index) => (
-                <th key={`${header}-${index}`} className="legacy-table-head-cell">
-                  <button
-                    aria-sort={sortIndex === index ? sortDirection : "none"}
-                    className="legacy-table-head-button"
-                    data-sort-direction={sortIndex === index ? sortDirection : "none"}
-                    onClick={() => toggleSort(index)}
-                    type="button"
-                  >
-                    <span>{header || "-"}</span>
-                    <span aria-hidden="true" className="legacy-table-sort-indicator">
-                      {sortIndex === index
-                        ? sortDirection === "ascending"
-                          ? "▲"
-                          : "▼"
-                        : "↕"}
-                    </span>
-                  </button>
+                <th key={`header-${index}`} className="legacy-table-head-cell">
+                  {header.sortable ? (
+                    <button
+                      aria-sort={sortIndex === index ? sortDirection : "none"}
+                      className="legacy-table-head-button"
+                      data-sort-direction={sortIndex === index ? sortDirection : "none"}
+                      onClick={() => toggleSort(index)}
+                      type="button"
+                    >
+                      <span>{header.label || "-"}</span>
+                      <span aria-hidden="true" className="legacy-table-sort-indicator">
+                        {sortIndex === index
+                          ? sortDirection === "ascending"
+                            ? "▲"
+                            : "▼"
+                          : "↕"}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="master-static-head">{header.label || "-"}</div>
+                  )}
                 </th>
               ))}
             </tr>
@@ -251,7 +282,17 @@ export default function QueryTable({ headers, rows, emptyText = "当前条件暂
   );
 }
 
-function parseCellValue(value: string | number | null) {
+function normalizeHeader(header: string | QueryTableHeader): QueryTableHeader {
+  if (typeof header === "string") {
+    return { label: header, sortable: true };
+  }
+  return {
+    label: header.label,
+    sortable: header.sortable ?? true,
+  };
+}
+
+function parseCellValue(value: ReactNode) {
   const text = String(value ?? "").trim();
   if (!text) {
     return { type: "empty" as const, value: "" };

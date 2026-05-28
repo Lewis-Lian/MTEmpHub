@@ -366,3 +366,8 @@ python3 -m pytest -q
 - `.claude-plugin/`
 
 这些内容不影响系统运行，主要用于辅助代码代理工具在本仓库内遵循统一开发约束。
+
+## 启动命令
+
+chmod +x /Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/macrun2.sh
+/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/macrun2.sh

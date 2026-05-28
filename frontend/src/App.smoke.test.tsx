@@ -113,9 +113,284 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "员工计算" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "管理人员计算" })).toBeInTheDocument();
     expect(screen.getByText("账套导入记录")).toBeInTheDocument();
-    expect(screen.getByText("请假单.xlsx")).toBeInTheDocument();
-    expect(screen.getByText("uploaded")).toBeInTheDocument();
+    expect(await screen.findByText(/请假单\.xlsx/)).toBeInTheDocument();
+    expect(await screen.findByText("uploaded")).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe("/admin/dashboard"));
+  });
+
+  it("主数据员工页会挂载旧版新增、导入、筛选和列表结构", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("新增员工")).toBeInTheDocument();
+    expect(screen.getByText("导入员工（xlsx）")).toBeInTheDocument();
+    expect(screen.getByText("员工列表")).toBeInTheDocument();
+    expect(screen.getByText("员工筛选器")).toBeInTheDocument();
+    expect(screen.getByText("应用到已选")).toBeInTheDocument();
+    expect(screen.getAllByText("人员编号").length).toBeGreaterThan(0);
+    await waitFor(() => expect(container.querySelector("tbody")?.textContent).toContain("E001"));
+  });
+
+  it("员工管理页会在当前页异步上传 xlsx 并在成功后刷新列表", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    let employeeFetchCount = 0;
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/employees/import") {
+        expect(init?.method).toBe("POST");
+        expect(init?.body).toBeInstanceOf(FormData);
+        return Promise.resolve(jsonResponse({ status: "ok", imported: 3 }));
+      }
+      if (path === "/api/admin/employees") {
+        employeeFetchCount += 1;
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("员工列表");
+    const file = new File(["employee"], "employees.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const input = container.querySelector('input[type="file"][accept=".xlsx"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(await screen.findByText("导入成功，处理 3 条")).toBeInTheDocument();
+    await waitFor(() => expect(employeeFetchCount).toBeGreaterThanOrEqual(2));
+    expect(window.location.pathname).toBe("/admin/employees/manage");
+  });
+
+  it("员工管理页导入失败时会原样展示后端错误", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/employees/import") {
+        expect(init?.body).toBeInstanceOf(FormData);
+        return Promise.resolve(jsonResponse({ error: "第 2 行部门名称不存在" }, { status: 400 }));
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("员工列表");
+    const file = new File(["employee"], "employees.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const input = container.querySelector('input[type="file"][accept=".xlsx"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(await screen.findByText("第 2 行部门名称不存在")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/admin/employees/manage");
+  });
+
+  it("员工管理的员工筛选器按钮会打开选择器并回填员工", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByText("员工列表");
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/i }));
+
+    expect(await screen.findByRole("heading", { name: "选择员工" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: /E001/ }));
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+
+    expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("员工甲");
+  });
+
+  it("员工管理的部门选择会复用旧版部门选择器结构", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("员工列表");
+    expect(container.querySelector("#createEmployeeDeptLookup.employee-lookup")).not.toBeNull();
+
+    fireEvent.click(screen.getAllByTitle("选择部门")[0]);
+
+    expect(await screen.findByRole("heading", { name: "选择部门" })).toBeInTheDocument();
+    expect(screen.getByText("部门树")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "信息部" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+
+    expect(screen.getAllByDisplayValue("信息部").length).toBeGreaterThan(0);
+  });
+
+  it("员工管理表格会复用查询中心的分页表格结构", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("员工列表");
+    expect(container.querySelector(".legacy-table-wrap")).not.toBeNull();
+    expect(container.querySelector(".table-pager select")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
+    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
+  });
+
+  it("主数据部门页会挂载旧版新增、导入、批量和列表结构", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    expect(await screen.findByText("新增部门")).toBeInTheDocument();
+    expect(screen.getByText("导入部门（xlsx）")).toBeInTheDocument();
+    expect(screen.getByText("部门列表")).toBeInTheDocument();
+    expect(screen.getByText("一键删除空部门")).toBeInTheDocument();
+    expect(screen.getByText("导出全部部门")).toBeInTheDocument();
+    expect(screen.getAllByText("信息部").length).toBeGreaterThan(0);
+    expect(container.querySelector(".table-pager select")).not.toBeNull();
+    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
+  });
+
+  it("部门管理页会在当前页异步上传 xlsx 并在成功后刷新列表", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    let departmentFetchCount = 0;
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/departments/import") {
+        expect(init?.method).toBe("POST");
+        expect(init?.body).toBeInstanceOf(FormData);
+        return Promise.resolve(jsonResponse({ status: "ok", imported: 2 }));
+      }
+      if (path === "/api/admin/departments") {
+        departmentFetchCount += 1;
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("部门列表");
+    const file = new File(["dept"], "departments.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const input = container.querySelector('input[type="file"][accept=".xlsx"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(await screen.findByText("导入成功，处理 2 条")).toBeInTheDocument();
+    await waitFor(() => expect(departmentFetchCount).toBeGreaterThanOrEqual(2));
+    expect(window.location.pathname).toBe("/admin/departments/manage");
+  });
+
+  it("部门管理页导入失败时会原样展示后端错误", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/departments/import") {
+        expect(init?.body).toBeInstanceOf(FormData);
+        return Promise.resolve(jsonResponse({ error: "第 3 行部门编号重复" }, { status: 400 }));
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("部门列表");
+    const file = new File(["dept"], "departments.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    const input = container.querySelector('input[type="file"][accept=".xlsx"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    fireEvent.submit(input.closest("form") as HTMLFormElement);
+
+    expect(await screen.findByText("第 3 行部门编号重复")).toBeInTheDocument();
+    expect(window.location.pathname).toBe("/admin/departments/manage");
+  });
+
+  it("部门管理的部门选择器按钮会打开部门树并回填上级部门", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByText("部门列表");
+    fireEvent.click(screen.getAllByTitle("选择上级部门")[0]);
+
+    expect(await screen.findByRole("heading", { name: "选择上级部门" })).toBeInTheDocument();
+    expect(screen.getByText("部门树")).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole("button", { name: "信息部" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+
+    expect(screen.getAllByDisplayValue("信息部").length).toBeGreaterThan(0);
+  });
+
+  it("部门管理会按旧版使用 lookup 结构和批量更改上级部门弹窗", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("部门列表");
+    expect(container.querySelector("#createDeptParentLookup.employee-lookup")).not.toBeNull();
+
+    fireEvent.click(container.querySelector('tbody input[type="checkbox"]') as Element);
+    fireEvent.change(screen.getByDisplayValue("批量操作"), { target: { value: "set_parent" } });
+    fireEvent.click(screen.getByRole("button", { name: "执行" }));
+
+    expect(await screen.findByRole("heading", { name: "批量更改上级部门" })).toBeInTheDocument();
+    expect(screen.getByText("将应用到已选 1 个部门。")).toBeInTheDocument();
+    expect(container.querySelector("#batchDeptParentLookup.employee-lookup")).not.toBeNull();
+  });
+
+  it("部门管理的上级部门输入框支持搜索下拉联想", async () => {
+    window.history.replaceState({}, "", "/admin/departments/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    const input = await screen.findByPlaceholderText("选择上级部门");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "信息" } });
+
+    expect(screen.getByRole("button", { name: "信息部" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "信息部" }));
+
+    expect(screen.getByDisplayValue("信息部")).toBeInTheDocument();
+  });
+
+  it("主数据班次页会挂载旧版新增时间段和班次列表结构", async () => {
+    window.history.replaceState({}, "", "/admin/shifts/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByText("新增班次")).toBeInTheDocument();
+    expect(screen.getByText("新增时间段")).toBeInTheDocument();
+    expect(screen.getByText("班次列表")).toBeInTheDocument();
+    expect(screen.getByText("排班规则")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建班次" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "刷新" })).toBeInTheDocument();
+    expect(screen.getAllByText("班次编号").length).toBeGreaterThan(0);
+    expect(screen.getByText("跨天")).toBeInTheDocument();
+    expect(await screen.findByText("A班")).toBeInTheDocument();
+    expect(screen.getByText("08:00-17:00")).toBeInTheDocument();
   });
 
   it("汇总下载页会挂载旧版多分区结构", async () => {
@@ -330,6 +605,39 @@ describe("App smoke regression", () => {
     expect(hasRequestedPath("/api/admin/manager-attendance-overrides")).toBe(false);
   });
 
+  it("员工考勤修正页会挂载旧版指标卡和操作区", async () => {
+    window.history.replaceState({}, "", "/admin/employee-attendance-overrides");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByText("修正月份")).toBeInTheDocument();
+    expect(screen.getByText("当前人员")).toBeInTheDocument();
+    expect(screen.getByText("修正字段")).toBeInTheDocument();
+    expect(screen.getByText("当前状态")).toBeInTheDocument();
+    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(screen.getByText("主要操作")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "示例下载" })).toBeInTheDocument();
+    expect(screen.getByText("修正列表")).toBeInTheDocument();
+  });
+
+  it("考勤修正页会挂载专用查询卡和员工选择器样式类", async () => {
+    window.history.replaceState({}, "", "/admin/employee-attendance-overrides");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    const { container } = render(<App />);
+
+    await screen.findByText("修正列表");
+    expect(container.querySelector(".attendance-override-query-card")).not.toBeNull();
+    expect(container.querySelector(".attendance-override-query-card .account-card-body")).not.toBeNull();
+    expect(container.querySelector(".attendance-override-picker-field .employee-float-list")).not.toBeNull();
+  });
+
   it("管理人员考勤修正页选择月份和人员后可以查询", async () => {
     window.history.replaceState({}, "", "/admin/manager-attendance-overrides");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
@@ -347,7 +655,114 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("经理甲")).toBeInTheDocument();
     expect(await screen.findByText("出勤天数：20")).toBeInTheDocument();
     expect(await screen.findByText("经理修正")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑管理人员考勤修正")).toBeInTheDocument();
+    expect(screen.getByText("字段")).toBeInTheDocument();
+    expect(screen.getByText("系统自动值")).toBeInTheDocument();
+    expect(screen.getByText("手工修正值")).toBeInTheDocument();
+    expect(screen.getByText("最终应用值")).toBeInTheDocument();
   });
+
+  it("管理人员加班后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
+    window.history.replaceState({}, "", "/admin/manager-overtime");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "管理人员加班" })).toBeInTheDocument();
+    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(screen.getByText("人员筛选")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
+    expect(screen.getByText("管理人员加班列表")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
+    fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+
+    expect(await screen.findByText("前年累积")).toBeInTheDocument();
+    expect(screen.getByText("剩余调休天数")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑管理人员加班")).toBeInTheDocument();
+    expect(screen.getByText("前年累积天数")).toBeInTheDocument();
+    expect(screen.getByText("1月")).toBeInTheDocument();
+  });
+
+  it("管理人员年休后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
+    window.history.replaceState({}, "", "/admin/manager-annual-leave");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "管理人员年休" })).toBeInTheDocument();
+    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(screen.getByText("人员筛选")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
+    expect(screen.getByText("管理人员年休列表")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
+    fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
+    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+
+    expect(await screen.findByText("年度已用")).toBeInTheDocument();
+    expect(screen.getByText("剩余年休天数")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑管理人员年休")).toBeInTheDocument();
+    expect(screen.getByText("1月")).toBeInTheDocument();
+    expect(screen.getByText("12月")).toBeInTheDocument();
+  });
+
+  it("账号管理页会挂载旧版创建区和批量操作区", async () => {
+    window.history.replaceState({}, "", "/admin/accounts");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "账号管理" })).toBeInTheDocument();
+    expect(screen.getByText("创建账号")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "创建账号" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "一键创建管理人员账号" })).toBeInTheDocument();
+    expect(screen.getByText("关联员工（可搜索、多选）")).toBeInTheDocument();
+    expect(screen.getByText("关联部门（可搜索、多选）")).toBeInTheDocument();
+    expect(screen.getByText("账号页面权限")).toBeInTheDocument();
+    expect(screen.getByText("账号列表")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量修改角色" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量修改关联员工" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量修改关联部门" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量修改页面权限" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量重置密码" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "批量删除账号" })).toBeInTheDocument();
+  });
+
+  it("账号管理页可以打开编辑账号弹窗", async () => {
+    window.history.replaceState({}, "", "/admin/accounts");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "账号管理" });
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+
+    expect(await screen.findByText("编辑账号")).toBeInTheDocument();
+    expect(screen.getByText("工号")).toBeInTheDocument();
+    expect(screen.getByText("姓名")).toBeInTheDocument();
+    expect(screen.getByText("部门信息")).toBeInTheDocument();
+    expect(screen.getByText("关联员工")).toBeInTheDocument();
+    expect(screen.getByText("关联部门")).toBeInTheDocument();
+    expect(screen.getByText("编辑页面权限")).toBeInTheDocument();
+  });
+
 });
 
 function normalizePath(input: RequestInfo | URL): string {
@@ -639,6 +1054,21 @@ function mockAdminAppResponse(path: string): Promise<Response> {
                   label: "账号管理",
                   href: "/admin/accounts",
                 },
+                {
+                  key: "employees",
+                  label: "员工管理",
+                  href: "/admin/employees/manage",
+                },
+                {
+                  key: "departments",
+                  label: "部门管理",
+                  href: "/admin/departments/manage",
+                },
+                {
+                  key: "shifts",
+                  label: "班次管理",
+                  href: "/admin/shifts/manage",
+                },
               ],
             },
           ],
@@ -654,6 +1084,40 @@ function mockAdminAppResponse(path: string): Promise<Response> {
             profile_emp_no: "A001",
             profile_name: "管理员",
             departments: [{ dept_name: "信息部" }],
+          },
+        ]),
+      );
+    case "/admin/users":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            id: 9,
+            username: "admin",
+            role: "admin",
+            profile_emp_no: "A001",
+            profile_name: "管理员",
+            profile_dept_id: 10,
+            profile_department: {
+              id: 10,
+              dept_no: "D001",
+              dept_name: "信息部",
+            },
+            created_at: "2026-05-02T09:00:00",
+            page_permissions: {
+              query_home: true,
+              manager_query: true,
+              manager_overtime_query: true,
+              manager_annual_leave_query: true,
+              employee_dashboard: true,
+              abnormal_query: true,
+              punch_records: true,
+              department_hours_query: true,
+              summary_download: true,
+            },
+            emp_ids: [11],
+            dept_ids: [10],
+            employees: [{ id: 11, emp_no: "M001", name: "经理甲", dept_name: "信息部" }],
+            departments: [{ id: 10, dept_name: "信息部" }],
           },
         ]),
       );
@@ -695,6 +1159,49 @@ function mockAdminAppResponse(path: string): Promise<Response> {
             imported_count: 0,
             error_message: null,
             created_at: "2026-05-02T09:00:00",
+          },
+        ]),
+      );
+    case "/api/admin/employees":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            id: 12,
+            emp_no: "E001",
+            name: "员工甲",
+            dept_id: 10,
+            dept_name: "信息部",
+            shift_no: "A",
+            shift_name: "A班",
+            is_manager: false,
+            is_nursing: false,
+            employee_stats_attendance_source: "employee",
+            manager_stats_attendance_source: "manager",
+          },
+        ]),
+      );
+    case "/api/admin/departments":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            id: 10,
+            dept_no: "D001",
+            dept_name: "信息部",
+            parent_id: null,
+            parent_name: "",
+            is_locked: false,
+          },
+        ]),
+      );
+    case "/api/admin/shifts":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            id: 1,
+            shift_no: "A",
+            shift_name: "A班",
+            time_slots: [["08:00", "17:00"]],
+            is_cross_day: false,
           },
         ]),
       );
@@ -776,6 +1283,93 @@ function mockAdminAppResponse(path: string): Promise<Response> {
                 marriage_days: null,
                 funeral_days: null,
                 late_early_minutes: 5,
+              },
+            },
+          ],
+        }),
+      );
+    case "/admin/manager-overtime/records":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            emp_id: 11,
+            dept_name: "信息部",
+            name: "经理甲",
+            prev_dec: 8,
+            m1: 2,
+            m2: 0,
+            m3: 0,
+            m4: 0,
+            m5: 0,
+            m6: 0,
+            m7: 0,
+            m8: 0,
+            m9: 0,
+            m10: 0,
+            m11: 0,
+            m12: 0,
+            remaining: 10,
+            remark: "",
+          },
+        ]),
+      );
+    case "/admin/manager-annual-leave/records":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            emp_id: 11,
+            dept_name: "信息部",
+            name: "经理甲",
+            m1: 1,
+            m2: 0,
+            m3: 0,
+            m4: 0,
+            m5: 0,
+            m6: 0,
+            m7: 0,
+            m8: 0,
+            m9: 0,
+            m10: 0,
+            m11: 0,
+            m12: 0,
+            remaining: 4,
+            remark: "",
+          },
+        ]),
+      );
+    case "/api/admin/employee-attendance-overrides":
+      return Promise.resolve(
+        jsonResponse({
+          month: "2026-05",
+          rows: [
+            {
+              employee: {
+                id: 12,
+                emp_no: "E001",
+                name: "员工甲",
+                dept_id: 10,
+                dept_name: "信息部",
+                is_manager: false,
+              },
+              automatic: {
+                attendance_days: 21,
+                work_hours: 168,
+                half_days: 0,
+                late_early_minutes: 0,
+              },
+              override: {
+                attendance_days: 20,
+                work_hours: 160,
+                half_days: 1,
+                late_early_minutes: 10,
+                remark: "员工修正",
+                updated_at: "2026-05-11T09:30:00",
+              },
+              applied: {
+                attendance_days: 20,
+                work_hours: 160,
+                half_days: 1,
+                late_early_minutes: 10,
               },
             },
           ],
