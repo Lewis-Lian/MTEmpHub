@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import type { AuthUser } from "../api/auth";
 import ProtectedRoute from "../components/auth/ProtectedRoute";
 import AppShell from "../layouts/AppShell";
+import ChangePasswordPage from "../pages/ChangePasswordPage";
 import LoginPage from "../pages/LoginPage";
 import { protectedRoutes } from "./protectedRoutes";
 
@@ -22,6 +23,7 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
           element={user ? <Navigate to={landingPath} replace /> : <LoginPage onLogin={onLogin} />}
           path="/login"
         />
+        <Route element={<ChangePasswordPage />} path="/change-password" />
         <Route element={<ProtectedRoute isLoading={isLoading} user={user} />}>
           <Route element={user ? <AppShell onLogout={onLogout} user={user} /> : null}>
             {protectedRoutes.map((route) => (
@@ -35,6 +37,6 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
   );
 }
 
-function defaultLandingPath(user: AuthUser): string {
-  return user.role === "admin" ? "/admin/dashboard" : "/employee/home";
+function defaultLandingPath(_user: AuthUser): string {
+  return "/employee/home";
 }

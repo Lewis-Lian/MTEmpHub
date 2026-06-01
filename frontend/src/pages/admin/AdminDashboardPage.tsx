@@ -192,6 +192,72 @@ export default function AdminDashboardPage() {
 
   return (
     <section className="account-center-page">
+      {/* 现代统计卡片网格 */}
+      <div className="dashboard-statistics-grid">
+        <div className="stat-card stat-card-set">
+          <div className="stat-card-title">当前账套</div>
+          <div className="stat-card-value">{selectedAccountSet ? selectedAccountSet.name : "-"}</div>
+          <div className="stat-card-meta">
+            {selectedAccountSet ? `创建时间: ${formatDateTime(selectedAccountSet.created_at)}` : "请创建或选择账套"}
+          </div>
+          {selectedAccountSet && (
+            <span className={`stat-badge ${selectedAccountSet.is_locked ? "stat-badge--locked" : "stat-badge--editable"}`}>
+              {selectedAccountSet.is_locked ? "已锁定" : "可编辑"}
+            </span>
+          )}
+        </div>
+
+        <div className="stat-card stat-card-imports">
+          <div className="stat-card-title">原始表归档</div>
+          <div className="stat-card-value">
+            {selectedAccountSet ? `${selectedAccountSet.success_count} / 6` : "0 / 6"}
+          </div>
+          {selectedAccountSet && (
+            <div className="stat-progress-container">
+              <div
+                className="stat-progress-bar"
+                style={{ width: `${Math.min(100, ((selectedAccountSet.success_count ?? 0) / 6) * 100)}%` }}
+              />
+            </div>
+          )}
+          <div className="stat-card-meta">
+            {selectedAccountSet ? `异常/失败导入: ${selectedAccountSet.error_count} 次` : "暂无账套数据"}
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-params">
+          <div className="stat-card-title">考勤核心参数</div>
+          <div className="stat-params-grid">
+            <div className="stat-param-item">
+              <span className="stat-param-label">厂休汇总</span>
+              <span className="stat-param-value">{factoryRestSummary} <small>天</small></span>
+            </div>
+            <div className="stat-param-item">
+              <span className="stat-param-label">福利天数</span>
+              <span className="stat-param-value">{monthlyBenefitDays} <small>天</small></span>
+            </div>
+          </div>
+          <div className="stat-card-meta">
+            {selectedAccountSet ? "参数实时联动更新" : "请先选择账套"}
+          </div>
+        </div>
+
+        <div className="stat-card stat-card-health">
+          <div className="stat-card-title">系统健康与动态</div>
+          <div className="stat-health-status">
+            <span className={`stat-health-dot ${selectedAccountSet && selectedAccountSet.error_count > 0 ? "stat-health-dot--warning" : "stat-health-dot--good"}`} />
+            <span className="stat-health-text">
+              {!selectedAccountSet ? "等待选择账套" : selectedAccountSet.error_count > 0 ? "存在导入异常" : "系统健康运行"}
+            </span>
+          </div>
+          <div className="stat-card-meta">
+            {selectedAccountSet && selectedAccountSet.latest_import_at
+              ? `最近导入: ${formatDateTime(selectedAccountSet.latest_import_at)}`
+              : "暂无导入动态"}
+          </div>
+        </div>
+      </div>
+
       <div className="account-workflow">
         <div className="account-workflow-side">
           <div className="account-card account-status-card">
