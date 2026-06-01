@@ -172,7 +172,20 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           退出登录
         </button>
       </aside>
-      <div className="top-nav" style={{ display: "none" }} />
+      <header className="top-nav">
+        <div className="top-nav-inner">
+          <div className="top-nav-actions">
+            <div className="top-nav-user">
+              <span className="top-nav-user-code">{user.username}</span>
+              <span className="top-nav-user-person">{matchedNavigation?.label ?? "欢迎使用考勤系统"}</span>
+              <span className="top-nav-user-role">{roleLabel}</span>
+            </div>
+            <button className="top-nav-logout" onClick={handleLogout} type="button">
+              退出登录
+            </button>
+          </div>
+        </div>
+      </header>
       <main className="app-main app-workspace app-workspace-frame">
         {!isLoading && !error ? (
           <AppTabs
@@ -181,36 +194,6 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
             onNavigate={handleNavigateTab}
             onRefreshTab={handleRefreshTab}
             tabs={tabs}
-            extra={
-              <div className="top-nav-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div className="top-nav-user" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--ent-text-secondary)" }}>
-                  <span className="top-nav-user-code" style={{ fontWeight: 600, color: "var(--ent-text)" }}>{user.username}</span>
-                  <span style={{ opacity: 0.4 }}>|</span>
-                  <span className="top-nav-user-role">{roleLabel}</span>
-                </div>
-                <button
-                  className="top-nav-logout"
-                  onClick={handleLogout}
-                  style={{
-                    minHeight: "28px",
-                    height: "28px",
-                    padding: "0 10px",
-                    fontSize: "12px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    border: "1px solid var(--ent-border-strong)",
-                    borderRadius: "var(--ent-radius-sm)",
-                    background: "#ffffff",
-                    color: "var(--ent-text-secondary)",
-                    fontWeight: 500
-                  }}
-                  type="button"
-                >
-                  退出登录
-                </button>
-              </div>
-            }
           />
         ) : null}
         <div className="app-content">
