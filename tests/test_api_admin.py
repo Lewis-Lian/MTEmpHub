@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from flask import Flask
 
@@ -93,6 +93,8 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/manager-attendance-overrides/import",
                 "/api/admin/manager-overtime",
                 "/api/admin/manager-annual-leave",
+                "/api/admin/disabled-users",
+                "/api/admin/disabled-users/<int:user_id>/unlock",
             }.issubset(rules)
         )
 
@@ -190,6 +192,46 @@ class ApiAdminTests(unittest.TestCase):
         self.assertIsInstance(manager_annual_leave_payload, list)
         self.assertIn("name", manager_annual_leave_payload[0])
         self.assertIn("remark", manager_annual_leave_payload[0])
+
+    def test_admin_can_list_and_unlock_disabled_users(self) -> None:
+        with self.app.app_context():
+            temp_locked = User(
+                username="temp-locked",
+                role="readonly",
+                login_failed_attempts=5,
+                login_locked_until=datetime.utcnow() + timedelta(minutes=10),
+            )
+            temp_locked.set_password("temp123")
+            disabled = User(
+                username="disabled-user",
+                role="readonly",
+                login_failed_attempts=10,
+                login_disabled_until_admin_unlock=True,
+                login_disabled_reason="too_many_failed_attempts",
+            )
+            disabled.set_password("disabled123")
+            db.session.add_all([temp_locked, disabled])
+            db.session.commit()
+            disabled_id = disabled.id
+
+        self._login()
+
+        list_response = self.client.get("/api/admin/disabled-users")
+        self.assertEqual(list_response.status_code, 200)
+        payload = list_response.get_json()
+        self.assertEqual([row["username"] for row in payload], ["disabled-user", "temp-locked"])
+        self.assertTrue(payload[0]["login_disabled_until_admin_unlock"])
+        self.assertIsNotNone(payload[1]["login_locked_until"])
+
+        unlock_response = self.client.post(f"/api/admin/disabled-users/{disabled_id}/unlock")
+        self.assertEqual(unlock_response.status_code, 200)
+
+        with self.app.app_context():
+            unlocked = db.session.get(User, disabled_id)
+            self.assertEqual(unlocked.login_failed_attempts, 0)
+            self.assertIsNone(unlocked.login_locked_until)
+            self.assertFalse(unlocked.login_disabled_until_admin_unlock)
+            self.assertIsNone(unlocked.login_disabled_reason)
 
     def test_admin_template_download_endpoints_return_excel_attachments(self) -> None:
         self._login()

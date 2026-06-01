@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import AccountsPage from "../pages/admin/AccountsPage";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
 import DepartmentsPage from "../pages/admin/DepartmentsPage";
+import DisabledUsersPage from "../pages/admin/DisabledUsersPage";
 import EmployeeAttendanceOverridesPage from "../pages/admin/EmployeeAttendanceOverridesPage";
 import EmployeesPage from "../pages/admin/EmployeesPage";
 import ManagerAnnualLeaveAdminPage from "../pages/admin/ManagerAnnualLeaveAdminPage";
@@ -37,6 +38,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: <SummaryDownloadPage />, path: "/employee/summary-download" },
   { element: <AdminDashboardPage />, path: "/admin/dashboard" },
   { element: <AccountsPage />, path: "/admin/accounts" },
+  { element: <DisabledUsersPage />, path: "/admin/disabled-users" },
   { element: <EmployeesPage />, path: "/admin/employees/manage" },
   { element: <DepartmentsPage />, path: "/admin/departments/manage" },
   { element: <ShiftsPage />, path: "/admin/shifts/manage" },
