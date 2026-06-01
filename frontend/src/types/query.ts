@@ -53,6 +53,11 @@ export interface HeaderRowsResponse {
   rows: Array<Array<string | number | null>>;
 }
 
+export interface FactoryRestEntry {
+  date: string;
+  period: string;
+}
+
 export interface HomeSummaryResponse {
   has_data: boolean;
   empty_state: string;
@@ -65,4 +70,5 @@ export interface HomeSummaryResponse {
     dept_name: string;
   };
   summary?: Record<string, number | string>;
+  factory_rest_entries?: FactoryRestEntry[];
 }
