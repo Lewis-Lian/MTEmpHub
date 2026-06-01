@@ -34,6 +34,18 @@ export interface AdminBootstrap {
   shifts: AdminShift[];
 }
 
+export interface AdminDisabledUser {
+  id: number;
+  username: string;
+  role: "admin" | "readonly";
+  profile_emp_no: string;
+  profile_name: string;
+  login_failed_attempts: number;
+  login_locked_until: string | null;
+  login_disabled_until_admin_unlock: boolean;
+  login_disabled_reason: string | null;
+}
+
 export interface AdminAccountSetFactoryRestEntry {
   date: string | null;
   period: string;

@@ -52,8 +52,9 @@ body {
   padding: 24px;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at top left, rgba(233, 190, 95, 0.18), transparent 34%),
-    linear-gradient(180deg, #eef2f6 0%, #dbe6df 100%);
+    radial-gradient(circle at 16% 20%, rgba(88, 103, 221, 0.22), transparent 30%),
+    radial-gradient(circle at 84% 70%, rgba(15, 170, 150, 0.16), transparent 28%),
+    linear-gradient(135deg, #f7f9ff 0%, #eef3fb 48%, #ffffff 100%);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
@@ -64,27 +65,55 @@ body {
 }
 
 .login-surface {
-  width: min(1100px, 100%);
-  min-height: 640px;
+  width: min(1080px, 100%);
+  min-height: 680px;
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 420px);
-  border-radius: 28px;
+  grid-template-columns: minmax(0, 1.08fr) minmax(380px, 440px);
+  border: 1px solid rgba(136, 151, 190, 0.2);
+  border-radius: 32px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 60px rgba(24, 49, 83, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 28px 80px rgba(28, 39, 82, 0.16);
 }
 
 .login-brand-panel {
-  background: linear-gradient(160deg, #16395d 0%, #245b8a 100%);
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(135deg, #9ca3af 0%, #6b7280 48%, #4b5563 100%);
   color: #ffffff;
 }
 
+.login-brand-panel::before,
+.login-brand-panel::after {
+  position: absolute;
+  content: "";
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.login-brand-panel::before {
+  width: 260px;
+  height: 260px;
+  left: -86px;
+  bottom: -92px;
+}
+
+.login-brand-panel::after {
+  width: 180px;
+  height: 180px;
+  right: -70px;
+  top: 72px;
+}
+
 .login-brand-panel-inner {
+  position: relative;
+  z-index: 1;
   height: 100%;
   padding: 56px 48px;
-  display: grid;
-  align-content: center;
-  gap: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .login-brand {
@@ -94,134 +123,156 @@ body {
 }
 
 .login-brand-mark {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.12);
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.16);
   display: inline-grid;
   place-items: center;
-  gap: 4px;
-  padding: 8px 9px;
   box-sizing: border-box;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
 }
 
-.login-brand-mark-top {
-  width: 100%;
-  height: 7px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+.login-brand--career {
+  align-self: flex-start;
 }
 
-.login-brand-mark-bars {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 3px;
-  align-items: end;
+.login-brand-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
 }
 
-.login-brand-mark-bars span {
-  display: block;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
+.login-brand-logo {
+  width: 32px;
+  height: 32px;
+  padding: 4px;
+  border-radius: 10px;
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(10px);
 }
 
-.login-brand-mark-bars span:nth-child(1) {
-  height: 10px;
-}
-
-.login-brand-mark-bars span:nth-child(2) {
-  height: 15px;
-}
-
-.login-brand-mark-bars span:nth-child(3) {
-  height: 20px;
+.login-brand-logo--system {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.56), rgba(71, 85, 105, 0.72));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .login-brand-text {
   font-size: 18px;
   font-weight: 600;
-  letter-spacing: 0.08em;
 }
 
-.login-brand-copy {
-  display: grid;
-  gap: 16px;
+.login-brand-stage {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 500px;
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  margin: 24px 0;
 }
 
-.login-brand-title {
-  margin: 0;
-  font-size: 40px;
-  line-height: 1.2;
+.login-brand-links {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  color: #d1d5db;
+  font-size: 14px;
 }
 
-.login-brand-subtitle {
-  margin: 0;
-  max-width: 520px;
-  font-size: 17px;
-  line-height: 1.8;
-  color: rgba(255, 255, 255, 0.82);
+.login-brand-link {
+  color: inherit;
+  text-decoration: none;
+  transition: color 0.2s ease;
 }
 
-.login-brand-points {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  gap: 14px;
-}
-
-.login-brand-points li {
-  padding: 14px 18px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.92);
-  line-height: 1.6;
+.login-brand-link:hover {
+  color: #ffffff;
+  text-decoration: underline;
 }
 
 .login-panel-wrap {
   display: grid;
   place-items: center;
   padding: 40px 32px;
-  background: rgba(248, 250, 252, 0.94);
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .login-card {
-  width: min(100%, 360px);
+  width: min(100%, 420px);
   display: grid;
-  gap: 28px;
-  color: #183153;
+  gap: 0;
+  color: #161a32;
+}
+
+.login-mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  color: #161a32;
+  font-weight: 800;
+}
+
+.login-career-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.login-career-logo--system {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  background: linear-gradient(135deg, #111827 0%, #4b5563 100%);
 }
 
 .login-panel-top {
-  display: grid;
-  gap: 10px;
-}
-
-.login-panel-kicker {
-  margin: 0;
-  color: #58708c;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  margin-bottom: 40px;
+  text-align: center;
 }
 
 .login-panel-title {
-  margin: 0;
-  font-size: 32px;
+  margin: 0 0 8px;
+  font-size: 30px;
+  font-weight: 800;
   line-height: 1.2;
+  letter-spacing: -0.035em;
+  color: #09090b;
 }
 
 .login-panel-subtitle {
   margin: 0;
-  color: #5f6f7d;
-  line-height: 1.7;
+  color: #71717a;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .login-form {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .login-field {
@@ -230,58 +281,233 @@ body {
 }
 
 .login-field-label {
-  color: #183153;
+  color: #18181b;
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .login-input {
   width: 100%;
-  padding: 13px 14px;
+  height: 48px;
+  padding: 0 14px;
   box-sizing: border-box;
-  border: 1px solid #c7d2de;
-  border-radius: 12px;
+  border: 1px solid rgba(212, 212, 216, 0.6);
+  border-radius: 8px;
   background: #ffffff;
-  color: #183153;
-  font-size: 16px;
+  color: #09090b;
+  font-size: 15px;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.login-input::placeholder {
+  color: #a1a1aa;
 }
 
 .login-input:focus {
-  border-color: #245b8a;
-  box-shadow: 0 0 0 3px rgba(36, 91, 138, 0.14);
+  border-color: #18181b;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
+}
+
+.login-password-control {
+  position: relative;
+  display: block;
+}
+
+.login-input--password {
+  padding-right: 44px;
+}
+
+.login-password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  display: inline-grid;
+  place-items: center;
+  background: transparent;
+  color: #71717a;
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: color 0.2s ease;
+}
+
+.login-password-toggle:hover {
+  color: #18181b;
+}
+
+.login-password-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.login-form-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #52525b;
+  font-size: 14px;
+}
+
+.login-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.login-remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: #18181b;
+}
+
+.login-link {
+  color: #18181b;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.login-link:hover {
+  text-decoration: underline;
 }
 
 .login-error {
   margin: 0;
+  padding: 12px;
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-success {
+  margin: 0;
   padding: 11px 14px;
   border-radius: 12px;
-  background: #fff1f1;
-  color: #b42318;
+  background: #edfff9;
+  color: #087a4c;
   font-size: 14px;
   line-height: 1.5;
 }
 
 .login-submit-btn {
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
+  min-height: 48px;
   padding: 14px 16px;
-  background: #183153;
+  background: #18181b;
   color: #ffffff;
   cursor: pointer;
   font-size: 16px;
-  font-weight: 600;
-  transition: background-color 0.2s ease, opacity 0.2s ease;
+  font-weight: 500;
+  transition: background-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease;
+}
+
+.login-submit-btn--interactive {
+  position: relative;
+  overflow: hidden;
+}
+
+.login-submit-btn--interactive::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  transform: translateX(-110%);
+  transition: transform 0.45s ease;
+}
+
+.login-submit-btn--interactive:hover::before {
+  transform: translateX(110%);
+}
+
+.login-submit-btn--interactive span {
+  position: relative;
+  z-index: 1;
 }
 
 .login-submit-btn:hover:not(:disabled) {
-  background: #204267;
+  background: #27272a;
+  transform: translateY(-1px);
 }
 
 .login-submit-btn:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.login-robot-check {
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid rgba(212, 212, 216, 0.72);
+  border-radius: 10px;
+  display: grid;
+  gap: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  color: #18181b;
+  user-select: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-robot-check:hover {
+  border-color: rgba(24, 24, 27, 0.24);
+  box-shadow: 0 10px 28px rgba(24, 24, 27, 0.06);
+}
+
+.login-robot-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.login-robot-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.login-robot-refresh {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #52525b;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.login-slider-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.login-slider-input {
+  width: 100%;
+  margin: 0;
+  accent-color: #18181b;
+  cursor: pointer;
+}
+
+.login-slider-input:disabled {
+  cursor: not-allowed;
+}
+
+.login-slider-status {
+  color: #71717a;
+  font-size: 12px;
 }
 
 @media (max-width: 900px) {
@@ -293,10 +519,6 @@ body {
   .login-brand-panel-inner,
   .login-panel-wrap {
     padding: 36px 28px;
-  }
-
-  .login-brand-title {
-    font-size: 32px;
   }
 
   .login-card {
@@ -316,6 +538,16 @@ body {
   .login-brand-panel-inner,
   .login-panel-wrap {
     padding: 28px 20px;
+  }
+
+  .login-brand-panel {
+    display: none;
+  }
+
+  .login-mobile-brand {
+    display: inline-flex;
+    justify-content: center;
+    margin-bottom: 48px;
   }
 
   .login-brand-title,
@@ -3709,3 +3941,776 @@ body {
     display: grid;
   }
 }
+
+
+/* ==========================================================================
+   Modern Enterprise Slate UI Overrides (Approved Implementation)
+   ========================================================================== */
+
+:root {
+  /* Modern Enterprise Slate Palette (Tailwind/Shadcn Inspired) */
+  --ent-blue: #2563eb;
+  --ent-blue-hover: #1d4ed8;
+  --ent-blue-light: rgba(37, 99, 235, 0.05);
+  --ent-blue-focus: rgba(37, 99, 235, 0.15);
+
+  --ent-text: #0f172a;
+  --ent-text-secondary: #64748b;
+  --ent-text-tertiary: #94a3b8;
+
+  --ent-bg: #ffffff;
+  --ent-secondary-bg: #f8fafc;
+  --ent-tertiary-bg: #f1f5f9;
+
+  --ent-border: #f1f5f9;
+  --ent-border-strong: #e2e8f0;
+  --ent-border-focus: #3b82f6;
+
+  --ent-sidebar-bg: #0f172a;
+  --ent-sidebar-text: #94a3b8;
+  --ent-sidebar-active-bg: #1e293b;
+  --ent-sidebar-active-text: #ffffff;
+
+  --ent-shadow-subtle: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --ent-shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+  --ent-shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  --ent-radius-sm: 6px;
+  --ent-radius: 8px;
+  --ent-radius-lg: 12px;
+
+  --ent-transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --ent-font: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+/* 全局重设与冷灰背景 */
+body, input, select, button, textarea {
+  font-family: var(--ent-font) !important;
+}
+
+body {
+  background-color: var(--ent-secondary-bg) !important;
+  color: var(--ent-text) !important;
+}
+
+/* ==========================================================================
+   侧边栏与头部导航 (现代化控制台风格)
+   ========================================================================== */
+
+.app-sidebar {
+  background: var(--ent-sidebar-bg) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  box-shadow: none !important;
+}
+
+.app-sidebar-brand h1 {
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.3px !important;
+  font-size: 17px !important;
+}
+
+.app-sidebar-brand p {
+  color: rgba(255, 255, 255, 0.45) !important;
+  font-size: 11.5px !important;
+}
+
+.app-sidebar-hint {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.app-sidebar-caption {
+  color: rgba(255, 255, 255, 0.3) !important;
+  font-weight: 600 !important;
+  font-size: 10.5px !important;
+  letter-spacing: 0.05em !important;
+}
+
+.app-side-link {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--ent-radius-sm) !important;
+  color: var(--ent-sidebar-text) !important;
+  transition: var(--ent-transition) !important;
+  padding: 8px 12px !important;
+}
+
+.app-side-link:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: #ffffff !important;
+}
+
+.app-side-link small {
+  color: rgba(255, 255, 255, 0.4) !important;
+}
+
+.app-side-link.is-active {
+  background: var(--ent-sidebar-active-bg) !important;
+  color: var(--ent-sidebar-active-text) !important;
+  font-weight: 600 !important;
+  border-left: 3px solid var(--ent-blue) !important;
+  border-radius: 0 var(--ent-radius-sm) var(--ent-radius-sm) 0 !important;
+}
+
+.app-side-link.is-active small {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+
+.app-module-link {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  color: var(--ent-sidebar-text) !important;
+  transition: var(--ent-transition) !important;
+}
+
+.app-module-link:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: #ffffff !important;
+}
+
+.app-module-link.is-active {
+  background: var(--ent-sidebar-active-bg) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.app-logout-button {
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  transition: var(--ent-transition) !important;
+}
+
+.app-logout-button:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* 顶部导航 */
+.top-nav {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: saturate(180%) blur(12px) !important;
+  border-bottom: 1px solid var(--ent-border) !important;
+}
+
+.top-nav-user-code {
+  color: var(--ent-text) !important;
+}
+
+.top-nav-user-role {
+  color: var(--ent-text-secondary) !important;
+}
+
+.top-nav-logout {
+  border: 1px solid var(--ent-border-strong) !important;
+  background: #ffffff !important;
+  border-radius: var(--ent-radius-sm) !important;
+  color: var(--ent-text) !important;
+  transition: var(--ent-transition) !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+.top-nav-logout:hover {
+  background: var(--ent-secondary-bg) !important;
+}
+
+/* ==========================================================================
+   多标签页系统 (IDE 简洁卡片页签风)
+   ========================================================================== */
+
+.app-tab-bar {
+  background: var(--ent-secondary-bg) !important;
+  padding: 8px 24px 0 !important;
+  border-bottom: 1px solid var(--ent-border-strong) !important;
+}
+
+.app-tab-list {
+  gap: 2px !important;
+  padding-bottom: 0 !important;
+}
+
+.app-tab-button {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-bottom: none !important;
+  border-radius: var(--ent-radius-sm) var(--ent-radius-sm) 0 0 !important;
+  color: var(--ent-text-secondary) !important;
+  padding: 6px 12px !important;
+  font-size: 12.5px !important;
+  transition: var(--ent-transition) !important;
+  margin-bottom: -1px !important;
+}
+
+.app-tab-button:hover {
+  background: rgba(0, 0, 0, 0.02) !important;
+  color: var(--ent-text) !important;
+}
+
+.app-tab-button.is-active {
+  background: var(--ent-bg) !important;
+  color: var(--ent-blue) !important;
+  border-color: var(--ent-border-strong) !important;
+  box-shadow: none !important;
+  position: relative !important;
+  font-weight: 600 !important;
+}
+
+.app-tab-button.is-active::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 2.5px !important;
+  background-color: var(--ent-blue) !important;
+}
+
+.app-content {
+  padding: 20px 24px 24px !important;
+  background: var(--ent-secondary-bg) !important;
+}
+
+/* ==========================================================================
+   精致卡片与 Tiles 重塑 (1px 极细边框，微弱漂浮投影)
+   ========================================================================== */
+
+.account-card,
+.query-result-panel,
+.attendance-override-card,
+.attendance-override-result-card,
+.query-filter-rail,
+.master-filter-panel,
+.legacy-panel,
+.dashboard-metric-card,
+.query-home-metric-card,
+.admin-dashboard-stat-item,
+.summary-download-metric-card,
+.summary-download-report-card,
+.query-home-info-item,
+.query-home-message-box,
+.summary-download-help-box,
+.legacy-feedback-block,
+.panel-note {
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius) !important;
+  background: var(--ent-bg) !important;
+  box-shadow: var(--ent-shadow-subtle) !important;
+  transition: var(--ent-transition) !important;
+}
+
+.account-card-header,
+.query-result-panel .card-header {
+  border-bottom: 1px solid var(--ent-border) !important;
+  background: transparent !important;
+  color: var(--ent-text) !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+}
+
+.account-card:hover,
+.query-result-panel:hover,
+.dashboard-metric-card:hover,
+.query-home-metric-card:hover,
+.admin-dashboard-stat-item:hover,
+.summary-download-metric-card:hover,
+.summary-download-report-card:hover,
+.query-home-info-item:hover {
+  box-shadow: var(--ent-shadow-card) !important;
+}
+
+.dashboard-metric-label,
+.query-home-metric-label,
+.admin-dashboard-stat-label,
+.summary-download-metric-label,
+.summary-download-report-label,
+.query-home-info-label {
+  color: var(--ent-text-secondary) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+}
+
+.dashboard-metric-value,
+.query-home-metric-value,
+.admin-dashboard-stat-value,
+.summary-download-metric-card strong,
+.summary-download-report-card strong,
+.query-home-info-item strong {
+  color: var(--ent-text) !important;
+  font-weight: 700 !important;
+  font-size: 24px !important;
+}
+
+/* ==========================================================================
+   表单与按钮 (现代扁平、极细描边风)
+   ========================================================================== */
+
+/* 输入框与选择框 */
+.account-input,
+.account-select,
+.account-file-input,
+.legacy-input,
+.legacy-select,
+.employee-picker-modal .form-control {
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  background: var(--ent-bg) !important;
+  color: var(--ent-text) !important;
+  font-size: 13px !important;
+  transition: var(--ent-transition) !important;
+}
+
+.account-input:focus,
+.account-select:focus,
+.legacy-input:focus,
+.legacy-select:focus {
+  border-color: var(--ent-border-focus) !important;
+  box-shadow: 0 0 0 3px var(--ent-blue-focus) !important;
+}
+
+/* 按钮重塑 */
+.account-action-button,
+.legacy-btn-primary,
+.legacy-btn-secondary,
+.legacy-btn-ghost {
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  background: var(--ent-bg) !important;
+  color: var(--ent-text) !important;
+  font-weight: 600 !important;
+  font-size: 12.5px !important;
+  transition: var(--ent-transition) !important;
+  padding: 6px 12px !important;
+}
+
+.account-action-button:hover,
+.legacy-btn-secondary:hover,
+.legacy-btn-ghost:hover {
+  background: var(--ent-secondary-bg) !important;
+}
+
+.legacy-btn-primary,
+.account-action-button--primary {
+  border-color: var(--ent-blue) !important;
+  background: var(--ent-blue) !important;
+  color: #ffffff !important;
+}
+
+.legacy-btn-primary:hover,
+.account-action-button--primary:hover {
+  background: var(--ent-blue-hover) !important;
+  border-color: var(--ent-blue-hover) !important;
+}
+
+/* 特定语义颜色的扁平化设计 */
+.account-action-button--warning {
+  border-color: rgba(245, 158, 11, 0.25) !important;
+  color: #d97706 !important;
+  background: rgba(245, 158, 11, 0.05) !important;
+}
+.account-action-button--warning:hover {
+  background: rgba(245, 158, 11, 0.1) !important;
+}
+
+.account-action-button--success {
+  border-color: rgba(16, 185, 129, 0.25) !important;
+  color: #059669 !important;
+  background: rgba(16, 185, 129, 0.05) !important;
+}
+.account-action-button--success:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+.account-action-button--danger {
+  border-color: rgba(239, 68, 68, 0.25) !important;
+  color: #dc2626 !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+.account-action-button--danger:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+}
+
+/* ==========================================================================
+   表格排版重构 (清爽高密度数据布局)
+   ========================================================================== */
+
+.legacy-table-head-cell,
+.account-table th,
+.master-static-head {
+  background: var(--ent-secondary-bg) !important;
+  color: var(--ent-text-secondary) !important;
+  border-bottom: 1px solid var(--ent-border-strong) !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+}
+
+.legacy-table-body-cell,
+.account-table td {
+  border-bottom: 1px solid var(--ent-border) !important;
+  color: var(--ent-text) !important;
+  font-size: 13px !important;
+}
+
+.legacy-table-head-button {
+  background: transparent !important;
+  color: var(--ent-text-secondary) !important;
+}
+
+.table-pager {
+  background: var(--ent-bg) !important;
+  border-top: 1px solid var(--ent-border-strong) !important;
+}
+
+/* ==========================================================================
+   登录页现代化 (极简企业门户风)
+   ========================================================================== */
+
+.login-page {
+  background: var(--ent-secondary-bg) !important;
+}
+
+.login-surface {
+  border-radius: var(--ent-radius-lg) !important;
+  box-shadow: var(--ent-shadow-modal) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+}
+
+.login-brand-panel {
+  background: var(--ent-sidebar-bg) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.login-brand-subtitle {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.login-brand-points li {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  font-size: 13px !important;
+}
+
+.login-input {
+  background: var(--ent-bg) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  transition: var(--ent-transition) !important;
+}
+
+.login-input:focus {
+  border-color: var(--ent-border-focus) !important;
+  box-shadow: 0 0 0 3px var(--ent-blue-focus) !important;
+}
+
+.login-submit-btn {
+  background: var(--ent-blue) !important;
+  border-radius: var(--ent-radius-sm) !important;
+  transition: var(--ent-transition) !important;
+}
+
+.login-submit-btn:hover:not(:disabled) {
+  background: var(--ent-blue-hover) !important;
+}
+
+/* ==========================================================================
+   遮罩层与弹窗 (现代化 Sheet 风格)
+   ========================================================================== */
+
+.master-modal-backdrop,
+.employee-picker-modal,
+.legacy-picker-modal {
+  background: rgba(15, 23, 42, 0.3) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.master-modal,
+.employee-picker-modal .modal-dialog,
+.legacy-picker-dialog {
+  border-radius: var(--ent-radius-lg) !important;
+  box-shadow: var(--ent-shadow-modal) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+}
+
+/* 厂休日期格 */
+.factory-rest-day {
+  border-radius: var(--ent-radius-sm) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+  background: var(--ent-bg) !important;
+  transition: var(--ent-transition) !important;
+}
+
+.factory-rest-day:hover:not(:disabled) {
+  border-color: var(--ent-border-focus) !important;
+  background: var(--ent-blue-light) !important;
+}
+
+.factory-rest-day--full {
+  background: rgba(239, 68, 68, 0.06) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+}
+.factory-rest-day--full .factory-rest-day-state {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.08) !important;
+}
+
+.factory-rest-day--am {
+  background: rgba(245, 158, 11, 0.06) !important;
+  border-color: rgba(245, 158, 11, 0.2) !important;
+}
+.factory-rest-day--am .factory-rest-day-state {
+  color: #d97706 !important;
+  background: rgba(245, 158, 11, 0.08) !important;
+}
+
+.factory-rest-day--pm {
+  background: rgba(59, 130, 246, 0.06) !important;
+  border-color: rgba(59, 130, 246, 0.2) !important;
+}
+.factory-rest-day--pm .factory-rest-day-state {
+  color: #2563eb !important;
+  background: rgba(59, 130, 246, 0.08) !important;
+}
+
+/* 自定义复选框颜色 */
+input[type="checkbox"] {
+  accent-color: var(--ent-blue) !important;
+}
+
+.app-tab-close,
+.app-tab-refresh {
+  transition: var(--ent-transition) !important;
+}
+
+/* ==========================================================================
+   后台控制台现代化统计指标卡片
+   ========================================================================== */
+
+.dashboard-statistics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.stat-card {
+  position: relative;
+  overflow: hidden;
+  background: #ffffff;
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 20px 25px -5px rgba(0, 0, 0, 0.02);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 142px;
+  box-sizing: border-box;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  border-color: #cbd5e1;
+}
+
+.stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+}
+
+.stat-card-set::before {
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+}
+
+.stat-card-imports::before {
+  background: linear-gradient(90deg, #ec4899, #f43f5e);
+}
+
+.stat-card-params::before {
+  background: linear-gradient(90deg, #10b981, #059669);
+}
+
+.stat-card-health::before {
+  background: linear-gradient(90deg, #f59e0b, #eab308);
+}
+
+.stat-card-title {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 12px;
+  line-height: 1.2;
+}
+
+.stat-card-meta {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 10px;
+  line-height: 1.2;
+}
+
+/* 状态标牌 stat-badge */
+.stat-badge {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 9999px;
+  line-height: 1;
+}
+
+.stat-badge--editable {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.stat-badge--locked {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* 进度条 stat-progress */
+.stat-progress-container {
+  width: 100%;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.stat-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ec4899, #f43f5e);
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 参数网格 stat-params-grid */
+.stat-params-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.stat-param-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-param-label {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stat-param-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 2px;
+  line-height: 1.2;
+}
+
+.stat-param-value small {
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  margin-left: 2px;
+}
+
+/* 健康状态 stat-health-status */
+.stat-health-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stat-health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.stat-health-dot::after {
+  content: "";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  opacity: 0.4;
+}
+
+.stat-health-dot--good {
+  background: #10b981;
+}
+
+.stat-health-dot--good::after {
+  border: 4px solid #10b981;
+  animation: stat-pulse 2s infinite ease-in-out;
+}
+
+.stat-health-dot--warning {
+  background: #ef4444;
+}
+
+.stat-health-dot--warning::after {
+  border: 4px solid #ef4444;
+  animation: stat-pulse 2s infinite ease-in-out;
+}
+
+.stat-health-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+@keyframes stat-pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* 响应式媒体查询 */
+@media (max-width: 1200px) {
+  .dashboard-statistics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-statistics-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+

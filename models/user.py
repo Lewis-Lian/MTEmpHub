@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Sequence
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
@@ -52,6 +52,10 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="readonly")
     page_permissions = db.Column(db.JSON, nullable=True)
+    login_failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    login_locked_until = db.Column(db.DateTime, nullable=True)
+    login_disabled_until_admin_unlock = db.Column(db.Boolean, nullable=False, default=False)
+    login_disabled_reason = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     employee_assignments = db.relationship(
@@ -99,6 +103,40 @@ class User(db.Model):
             return True
         permissions = self.effective_page_permissions()
         return any(permissions.get(key, False) for key in keys)
+
+    def is_temporarily_login_locked(self, now: Optional[datetime] = None) -> bool:
+        if not self.login_locked_until:
+            return False
+        current = now or datetime.utcnow()
+        return self.login_locked_until > current
+
+    def is_login_disabled(self) -> bool:
+        return bool(self.login_disabled_until_admin_unlock)
+
+    def is_login_blocked(self, now: Optional[datetime] = None) -> bool:
+        return self.is_login_disabled() or self.is_temporarily_login_locked(now)
+
+    def clear_login_lockout(self) -> None:
+        self.login_failed_attempts = 0
+        self.login_locked_until = None
+        self.login_disabled_until_admin_unlock = False
+        self.login_disabled_reason = None
+
+    def register_failed_login(self, now: Optional[datetime] = None) -> str:
+        current = now or datetime.utcnow()
+        self.login_failed_attempts = int(self.login_failed_attempts or 0) + 1
+
+        if self.login_failed_attempts >= 10:
+            self.login_disabled_until_admin_unlock = True
+            self.login_disabled_reason = "too_many_failed_attempts"
+            self.login_locked_until = None
+            return "admin_unlock_required"
+
+        if self.login_failed_attempts == 5:
+            self.login_locked_until = current + timedelta(minutes=10)
+            return "temporary_lock"
+
+        return "retry_allowed"
 
 
 class UserEmployeeAssignment(db.Model):

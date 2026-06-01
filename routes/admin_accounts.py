@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from flask import g, jsonify, request
 
 from routes.auth import admin_required, frontend_redirect
@@ -21,6 +23,38 @@ def users_list_api():
     return jsonify(
         [admin_module._serialize_user(user, profile_departments_by_id=profile_departments_by_id) for user in users]
     )
+
+
+def disabled_users_list_api():
+    from . import admin as admin_module
+
+    now = datetime.utcnow()
+    users = admin_module._user_list_query().all()
+    profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
+    profile_departments_by_id = {}
+    if profile_dept_ids:
+        profile_departments_by_id = {
+            row.id: row
+            for row in admin_module.Department.query.filter(
+                admin_module.Department.id.in_(profile_dept_ids)
+            ).all()
+        }
+
+    disabled_users = [
+        admin_module._serialize_user(user, profile_departments_by_id=profile_departments_by_id)
+        for user in users
+        if user.is_login_disabled() or user.is_temporarily_login_locked(now)
+    ]
+    return jsonify(disabled_users)
+
+
+def unlock_disabled_user_api(user_id: int):
+    from . import admin as admin_module
+
+    user = admin_module._require_model(admin_module.User, user_id)
+    user.clear_login_lockout()
+    admin_module.db.session.commit()
+    return jsonify({"status": "ok", "user": admin_module._serialize_user(user)})
 
 
 def register_admin_account_routes(admin_bp) -> None:
@@ -86,6 +120,11 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_required
     def users_list():
         return users_list_api()
+
+    @admin_bp.route("/disabled-users", methods=["GET"])
+    @admin_required
+    def disabled_users_list():
+        return disabled_users_list_api()
 
     @admin_bp.route("/users", methods=["POST"])
     @admin_required
@@ -295,6 +334,11 @@ def register_admin_account_routes(admin_bp) -> None:
         user.set_password(password)
         admin_module.db.session.commit()
         return jsonify({"status": "ok"})
+
+    @admin_bp.route("/disabled-users/<int:user_id>/unlock", methods=["POST"])
+    @admin_required
+    def unlock_disabled_user(user_id: int):
+        return unlock_disabled_user_api(user_id)
 
     @admin_bp.route("/users/<int:user_id>", methods=["DELETE"])
     @admin_required

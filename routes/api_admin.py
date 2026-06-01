@@ -37,7 +37,13 @@ from routes.admin import (
     update_shift,
     unlock_account_set,
 )
-from routes.admin_accounts import users_list_api
+from routes.admin_imports import (
+    import_departments_xlsx,
+    export_departments_xlsx,
+    import_employees_xlsx,
+    export_employees_xlsx,
+)
+from routes.admin_accounts import disabled_users_list_api, unlock_disabled_user_api, users_list_api
 from routes.admin_attendance_overrides import (
     employee_attendance_override_history_api,
     employee_attendance_override_list_api,
@@ -45,6 +51,12 @@ from routes.admin_attendance_overrides import (
     manager_attendance_override_history_api,
     manager_attendance_override_list_api,
     save_manager_attendance_override_record_api,
+    download_employee_attendance_override_template,
+    export_employee_attendance_overrides,
+    import_employee_attendance_overrides,
+    download_manager_attendance_override_template,
+    export_manager_attendance_overrides,
+    import_manager_attendance_overrides,
 )
 from routes.auth_helpers import admin_required
 
@@ -86,6 +98,18 @@ def accounts():
     return users_list_api()
 
 
+@api_admin_bp.get("/disabled-users")
+@admin_required
+def disabled_users():
+    return disabled_users_list_api()
+
+
+@api_admin_bp.post("/disabled-users/<int:user_id>/unlock")
+@admin_required
+def unlock_disabled_user(user_id: int):
+    return unlock_disabled_user_api(user_id)
+
+
 @api_admin_bp.get("/employees")
 @admin_required
 def employees():
@@ -102,10 +126,6 @@ def departments():
 @admin_required
 def shifts():
     return list_shifts()
-
-
-def _call_admin_view(endpoint: str):
-    return current_app.view_functions[f"admin.{endpoint}"]()
 
 
 @api_admin_bp.get("/departments/template")
@@ -132,13 +152,13 @@ def departments_template():
 @api_admin_bp.post("/departments/import")
 @admin_required
 def departments_import():
-    return _call_admin_view("import_departments_xlsx")
+    return import_departments_xlsx()
 
 
 @api_admin_bp.get("/departments/export")
 @admin_required
 def departments_export():
-    return _call_admin_view("export_departments_xlsx")
+    return export_departments_xlsx()
 
 
 @api_admin_bp.get("/employees/template")
@@ -197,13 +217,13 @@ def employees_template():
 @api_admin_bp.post("/employees/import")
 @admin_required
 def employees_import():
-    return _call_admin_view("import_employees_xlsx")
+    return import_employees_xlsx()
 
 
 @api_admin_bp.get("/employees/export")
 @admin_required
 def employees_export():
-    return _call_admin_view("export_employees_xlsx")
+    return export_employees_xlsx()
 
 
 @api_admin_bp.post("/shifts")
@@ -299,19 +319,19 @@ def employee_attendance_override_record():
 @api_admin_bp.get("/employee-attendance-overrides/template")
 @admin_required
 def employee_attendance_override_template():
-    return _call_admin_view("download_employee_attendance_override_template")
+    return download_employee_attendance_override_template()
 
 
 @api_admin_bp.get("/employee-attendance-overrides/export")
 @admin_required
 def employee_attendance_override_export():
-    return _call_admin_view("export_employee_attendance_overrides")
+    return export_employee_attendance_overrides()
 
 
 @api_admin_bp.post("/employee-attendance-overrides/import")
 @admin_required
 def employee_attendance_override_import():
-    return _call_admin_view("import_employee_attendance_overrides")
+    return import_employee_attendance_overrides()
 
 
 @api_admin_bp.get("/manager-attendance-overrides")
@@ -335,19 +355,19 @@ def manager_attendance_override_record():
 @api_admin_bp.get("/manager-attendance-overrides/template")
 @admin_required
 def manager_attendance_override_template():
-    return _call_admin_view("download_manager_attendance_override_template")
+    return download_manager_attendance_override_template()
 
 
 @api_admin_bp.get("/manager-attendance-overrides/export")
 @admin_required
 def manager_attendance_override_export():
-    return _call_admin_view("export_manager_attendance_overrides")
+    return export_manager_attendance_overrides()
 
 
 @api_admin_bp.post("/manager-attendance-overrides/import")
 @admin_required
 def manager_attendance_override_import():
-    return _call_admin_view("import_manager_attendance_overrides")
+    return import_manager_attendance_overrides()
 
 
 @api_admin_bp.get("/manager-overtime")

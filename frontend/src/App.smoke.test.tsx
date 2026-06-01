@@ -34,8 +34,243 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "登录考勤系统" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "欢迎回来！" })).toBeInTheDocument();
+    expect(screen.getAllByText("考勤系统").length).toBeGreaterThan(0);
+    expect(screen.queryByText("用一处入口管理每天的考勤节奏")).not.toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe("/login"));
+  });
+
+  it("登录页提供 CareerCompass 同款忘记密码入口", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("link", { name: "忘记密码？" }));
+
+    expect(await screen.findByRole("heading", { name: "修改密码" })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe("/change-password"));
+  });
+
+  it("登录页移除机器人验证后可直接提交", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/login") {
+        expect(JSON.parse(String(init?.body))).toEqual({
+          username: "admin",
+          password: "admin123",
+          remember_me: false,
+        });
+        return Promise.resolve(
+          jsonResponse({
+            user: {
+              id: 1,
+              username: "admin",
+              role: "admin",
+              page_permissions: { query_home: true },
+            },
+          }),
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("账号"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
+    const loginButton = screen.getByRole("button", { name: "登录" });
+
+    expect(screen.queryByRole("button", { name: "使用 Google 登录" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "注册" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("slider", { name: "滑动完成验证" })).not.toBeInTheDocument();
+    expect(loginButton).toBeEnabled();
+
+    fireEvent.click(loginButton);
+
+    await waitFor(() => expect(window.location.pathname).toBe("/employee/home"));
+  });
+
+  it("登录页会把记住我一起提交给登录接口", async () => {
+    window.history.replaceState({}, "", "/login");
+    let loginBody: unknown = null;
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/login") {
+        loginBody = JSON.parse(String(init?.body));
+        return Promise.resolve(
+          jsonResponse({
+            user: {
+              id: 1,
+              username: "admin",
+              role: "admin",
+              page_permissions: { query_home: true },
+            },
+          }),
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("账号"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "30 天内记住我" }));
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    await waitFor(() =>
+      expect(loginBody).toEqual({
+        username: "admin",
+        password: "admin123",
+        remember_me: true,
+      }),
+    );
+  });
+
+  it("账号输入框聚焦时会触发左侧角色互看动画", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    const purpleEyes = await screen.findByTestId("animated-purple-eyes");
+    const beforeFocusLeft = purpleEyes.getAttribute("style") ?? "";
+
+    fireEvent.focus(screen.getByLabelText("账号"));
+
+    const afterFocusLeft = purpleEyes.getAttribute("style") ?? "";
+    expect(beforeFocusLeft).toContain("left: 45px");
+    expect(afterFocusLeft).toContain("left: 55px");
+  });
+
+  it("明文显示密码时会触发紫色角色偷看姿态", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    const purpleCharacter = await screen.findByTestId("animated-purple-character");
+    const purpleEyes = screen.getByTestId("animated-purple-eyes");
+
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
+    fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
+
+    expect(purpleCharacter.getAttribute("style") ?? "").toContain("height: 400px");
+    expect(purpleCharacter.getAttribute("style") ?? "").toContain("transform: skewX(0deg)");
+    expect(purpleEyes.getAttribute("style") ?? "").toContain("left: 20px");
+    expect(purpleEyes.getAttribute("style") ?? "").toContain("top: 35px");
+  });
+
+  it("修改密码页使用原密码验证并提交到改密接口", async () => {
+    window.history.replaceState({}, "", "/change-password");
+    let changePasswordBody: unknown = null;
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/change-password") {
+        changePasswordBody = JSON.parse(String(init?.body));
+        return Promise.resolve(jsonResponse({ ok: true }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("用户名"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "admin123" } });
+    fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "newpass123" } });
+    fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "newpass123" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+
+    expect(await screen.findByText("密码修改成功，请使用新密码登录。")).toBeInTheDocument();
+    expect(changePasswordBody).toEqual({
+      username: "admin",
+      current_password: "admin123",
+      new_password: "newpass123",
+      confirm_password: "newpass123",
+    });
+  });
+
+  it("修改密码页聚焦用户名时会触发左侧角色互看动画", async () => {
+    window.history.replaceState({}, "", "/change-password");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    const purpleEyes = await screen.findByTestId("animated-purple-eyes");
+    const beforeFocusLeft = purpleEyes.getAttribute("style") ?? "";
+
+    fireEvent.focus(screen.getByLabelText("用户名"));
+
+    const afterFocusLeft = purpleEyes.getAttribute("style") ?? "";
+    expect(beforeFocusLeft).toContain("left: 45px");
+    expect(afterFocusLeft).toContain("left: 55px");
+  });
+
+  it("修改密码页明文显示密码时会触发紫色角色偷看姿态", async () => {
+    window.history.replaceState({}, "", "/change-password");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    const purpleCharacter = await screen.findByTestId("animated-purple-character");
+    const purpleEyes = screen.getByTestId("animated-purple-eyes");
+
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "admin123" } });
+    fireEvent.click(screen.getAllByRole("button", { name: "显示密码" })[0]);
+
+    expect(purpleCharacter.getAttribute("style") ?? "").toContain("height: 400px");
+    expect(purpleCharacter.getAttribute("style") ?? "").toContain("transform: skewX(0deg)");
+    expect(purpleEyes.getAttribute("style") ?? "").toContain("left: 20px");
+    expect(purpleEyes.getAttribute("style") ?? "").toContain("top: 35px");
   });
 
   it("已登录普通用户会落到默认首页并挂载查询页", async () => {
@@ -97,6 +332,19 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("系统管理员")).toBeInTheDocument();
     expect(await screen.findByText("A001")).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe("/admin/accounts"));
+  });
+
+  it("禁用用户页会显示被禁用账号并支持解锁", async () => {
+    window.history.replaceState({}, "", "/admin/disabled-users");
+    fetchMock.mockImplementation((input, init) => mockAdminAppResponse(normalizePath(input), init));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "禁用用户" })).toBeInTheDocument();
+    expect(screen.getByText("locked-user")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "解锁" }));
+    expect(await screen.findByText("已解锁账号：locked-user")).toBeInTheDocument();
   });
 
   it("账套中心会挂载旧版账套工作台", async () => {
@@ -1024,7 +1272,7 @@ function mockEmployeeAppResponse(path: string): Promise<Response> {
   }
 }
 
-function mockAdminAppResponse(path: string): Promise<Response> {
+function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Response> {
   switch (path) {
     case "/api/auth/me":
       return Promise.resolve(
@@ -1053,6 +1301,11 @@ function mockAdminAppResponse(path: string): Promise<Response> {
                   key: "accounts",
                   label: "账号管理",
                   href: "/admin/accounts",
+                },
+                {
+                  key: "disabled_users",
+                  label: "禁用用户",
+                  href: "/admin/disabled-users",
                 },
                 {
                   key: "employees",
@@ -1120,6 +1373,39 @@ function mockAdminAppResponse(path: string): Promise<Response> {
             departments: [{ id: 10, dept_name: "信息部" }],
           },
         ]),
+      );
+    case "/api/admin/disabled-users":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            id: 21,
+            username: "locked-user",
+            role: "readonly",
+            profile_emp_no: "E021",
+            profile_name: "员工乙",
+            login_failed_attempts: 10,
+            login_locked_until: null,
+            login_disabled_until_admin_unlock: true,
+            login_disabled_reason: "too_many_failed_attempts",
+          },
+        ]),
+      );
+    case "/api/admin/disabled-users/21/unlock":
+      return Promise.resolve(
+        jsonResponse({
+          status: "ok",
+          user: {
+            id: 21,
+            username: "locked-user",
+            role: "readonly",
+            profile_emp_no: "E021",
+            profile_name: "员工乙",
+            login_failed_attempts: 0,
+            login_locked_until: null,
+            login_disabled_until_admin_unlock: false,
+            login_disabled_reason: null,
+          },
+        }),
       );
     case "/api/admin/account-sets":
       return Promise.resolve(

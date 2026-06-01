@@ -78,7 +78,18 @@ class ExcelParser:
                 if not os.path.exists(converted_path):
                     return None
                 return ExcelParser._read_xlsx(converted_path)
-        except Exception:
+        except Exception as exc:
+            import logging
+            if isinstance(exc, FileNotFoundError):
+                logging.warning(
+                    "LibreOffice 进程调用失败。当前部署环境可能未安装 LibreOffice 依赖，系统已降级使用 xlrd 库直接读取文件。详细原因: %s",
+                    str(exc)
+                )
+            else:
+                logging.warning(
+                    "LibreOffice 转换 .xls 文件失败，系统已降级使用 xlrd 库直接读取文件。详细原因: %s",
+                    str(exc)
+                )
             return None
 
     @staticmethod

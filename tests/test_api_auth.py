@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from datetime import timedelta
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -43,7 +44,10 @@ class ApiAuthTests(unittest.TestCase):
     def test_api_login_sets_configured_cookie_and_cors_headers(self) -> None:
         response = self.client.post(
             "/api/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
             headers={"Origin": "http://localhost:5173"},
         )
 
@@ -53,6 +57,19 @@ class ApiAuthTests(unittest.TestCase):
         cookie_name = response.headers.get("Set-Cookie", "").split("=", 1)[0]
         self.assertEqual(cookie_name, "api_access_token")
 
+    def test_api_login_with_remember_me_sets_persistent_cookie(self) -> None:
+        response = self.client.post(
+            "/api/auth/login",
+            json={
+                "username": "admin",
+                "password": "admin123",
+                "remember_me": True,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Max-Age=2592000", response.headers.get("Set-Cookie", ""))
+
     def test_api_me_requires_cookie_auth(self) -> None:
         response = self.client.get("/api/auth/me")
 
@@ -61,7 +78,10 @@ class ApiAuthTests(unittest.TestCase):
     def test_api_me_returns_current_user_with_configured_cookie(self) -> None:
         login_response = self.client.post(
             "/api/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
             headers={"Origin": "http://localhost:5173"},
         )
 
@@ -102,7 +122,10 @@ class ApiAuthTests(unittest.TestCase):
     def test_api_logout_clears_configured_cookie(self) -> None:
         self.client.post(
             "/api/auth/login",
-            json={"username": "admin", "password": "admin123"},
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
             headers={"Origin": "http://localhost:5173"},
         )
 
@@ -110,6 +133,129 @@ class ApiAuthTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("api_access_token=;", response.headers.get("Set-Cookie", ""))
+
+    def test_change_password_rejects_wrong_current_password(self) -> None:
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "wrong-password",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.get_json()["error"], "用户名或原密码错误")
+
+        login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
+        )
+        self.assertEqual(login_response.status_code, 200)
+
+    def test_change_password_requires_matching_confirmation(self) -> None:
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "admin123",
+                "new_password": "newpass123",
+                "confirm_password": "different123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json()["error"], "两次输入的新密码不一致")
+
+    def test_change_password_updates_password_after_current_password_verification(self) -> None:
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "admin123",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ok": True})
+
+        old_login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "username": "admin",
+                "password": "admin123",
+            },
+        )
+        self.assertEqual(old_login_response.status_code, 401)
+
+        new_login_response = self.client.post(
+            "/api/auth/login",
+            json={
+                "username": "admin",
+                "password": "newpass123",
+            },
+        )
+        self.assertEqual(new_login_response.status_code, 200)
+
+    def test_api_login_locks_account_for_ten_minutes_after_five_failed_attempts(self) -> None:
+        for _ in range(5):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": "admin", "password": "wrong-password"},
+            )
+
+        self.assertEqual(response.status_code, 423)
+        self.assertEqual(response.get_json()["error"], "该账号已被临时禁用 10 分钟，请稍后再试")
+
+        blocked_response = self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin123"},
+        )
+        self.assertEqual(blocked_response.status_code, 423)
+        self.assertEqual(blocked_response.get_json()["error"], "该账号已被临时禁用 10 分钟，请稍后再试")
+
+    def test_api_login_permanently_disables_account_after_ten_failed_attempts(self) -> None:
+        for _ in range(5):
+            self.client.post("/api/auth/login", json={"username": "admin", "password": "wrong-password"})
+
+        with patch("routes.api_auth.datetime") as mock_datetime:
+            from datetime import datetime
+
+            mock_datetime.utcnow.return_value = datetime.utcnow() + timedelta(minutes=11)
+            for _ in range(5):
+                response = self.client.post(
+                    "/api/auth/login",
+                    json={"username": "admin", "password": "wrong-password"},
+                )
+
+        self.assertEqual(response.status_code, 423)
+        self.assertEqual(response.get_json()["error"], "该账号已被禁用，请联系管理员解锁")
+
+    def test_api_login_success_clears_failed_attempts(self) -> None:
+        for _ in range(4):
+            response = self.client.post(
+                "/api/auth/login",
+                json={"username": "admin", "password": "wrong-password"},
+            )
+            self.assertEqual(response.status_code, 401)
+
+        success_response = self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin123"},
+        )
+        self.assertEqual(success_response.status_code, 200)
+
+        failure_response = self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "wrong-password"},
+        )
+        self.assertEqual(failure_response.status_code, 401)
 
 
 if __name__ == "__main__":

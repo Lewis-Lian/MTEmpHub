@@ -6,6 +6,7 @@ import type {
   AdminAccountSetImport,
   AdminBootstrap,
   AdminDepartment,
+  AdminDisabledUser,
   AdminEmployee,
   AdminShift,
 } from "../types/admin";
@@ -40,6 +41,16 @@ export async function fetchAdminDepartments(): Promise<AdminDepartment[]> {
 
 export async function fetchAdminShifts(): Promise<AdminShift[]> {
   return expectArrayResponse<AdminShift>(await apiRequest<unknown>("/api/admin/shifts"), "班次列表");
+}
+
+export async function fetchDisabledUsers(): Promise<AdminDisabledUser[]> {
+  return expectArrayResponse<AdminDisabledUser>(await apiRequest<unknown>("/api/admin/disabled-users"), "禁用用户列表");
+}
+
+export function unlockDisabledUser(userId: number): Promise<{ status: string; user: AdminDisabledUser }> {
+  return apiRequest<{ status: string; user: AdminDisabledUser }>(`/api/admin/disabled-users/${userId}/unlock`, {
+    method: "POST",
+  });
 }
 
 export function createAdminEmployee(payload: Record<string, unknown>): Promise<{ status: string; employee: AdminEmployee }> {

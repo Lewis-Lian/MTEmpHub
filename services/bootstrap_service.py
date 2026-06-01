@@ -101,6 +101,20 @@ def ensure_schema_compatibility() -> None:
         if "profile_dept_id" not in user_columns:
             db.session.execute(text("ALTER TABLE users ADD COLUMN profile_dept_id INTEGER"))
             db.session.commit()
+        if "login_failed_attempts" not in user_columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN login_failed_attempts INTEGER NOT NULL DEFAULT 0"))
+            db.session.commit()
+        if "login_locked_until" not in user_columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN login_locked_until DATETIME"))
+            db.session.commit()
+        if "login_disabled_until_admin_unlock" not in user_columns:
+            db.session.execute(
+                text("ALTER TABLE users ADD COLUMN login_disabled_until_admin_unlock BOOLEAN NOT NULL DEFAULT 0")
+            )
+            db.session.commit()
+        if "login_disabled_reason" not in user_columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN login_disabled_reason VARCHAR(255)"))
+            db.session.commit()
 
     daily_record_columns = _get_column_names(inspector, "daily_records")
     if daily_record_columns is not None:

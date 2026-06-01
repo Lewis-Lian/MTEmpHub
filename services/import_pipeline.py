@@ -84,7 +84,9 @@ def convert_xls_to_xlsx(file_path: str) -> tuple[str | None, str | None]:
             return converted_path, tmpdir
         _cleanup_dir(tmpdir)
         return None, None
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.error("LibreOffice 转换 xls 到 xlsx 发生异常: %s", str(exc), exc_info=True)
         _cleanup_dir(tmpdir)
         return None, None
 
@@ -126,6 +128,10 @@ def convert_to_csv_rows(file_path: str) -> list[list[Any]]:
         candidates = glob.glob(os.path.join(tmpdir, "*.csv"))
         if candidates:
             return read_csv_rows(candidates[0])
+        return []
+    except Exception as exc:
+        import logging
+        logging.error("LibreOffice 转换 csv 发生异常: %s", str(exc), exc_info=True)
         return []
     finally:
         _cleanup_dir(tmpdir)

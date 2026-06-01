@@ -307,8 +307,25 @@ class ImportService:
         scanned = 0
         skipped_no_key = 0
         skipped_unknown_employee = 0
+
+        # Bulk Select 批量预查加班记录
+        overtime_col_idx = ImportService._find_col(header_map, "加班单号")
+        overtime_nos = []
+        if overtime_col_idx >= 0:
+            for row in rows[header_idx + 1 :]:
+                val = clean_text(ImportService._get_row_value(row, overtime_col_idx))
+                if val:
+                    overtime_nos.append(val)
+
+        existing_records = {}
+        if overtime_nos:
+            existing_records = {
+                r.overtime_no: r
+                for r in OvertimeRecord.query.filter(OvertimeRecord.overtime_no.in_(overtime_nos)).all()
+            }
+
         for row in rows[header_idx + 1 :]:
-            overtime_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "加班单号")))
+            overtime_no = clean_text(ImportService._get_row_value(row, overtime_col_idx))
             if not overtime_no:
                 skipped_no_key += 1
                 continue
@@ -326,10 +343,11 @@ class ImportService:
                 skipped_unknown_employee += 1
                 continue
 
-            record = OvertimeRecord.query.filter_by(overtime_no=overtime_no).first()
+            record = existing_records.get(overtime_no)
             if not record:
                 record = OvertimeRecord(overtime_no=overtime_no, emp_id=emp.id)
                 db.session.add(record)
+                existing_records[overtime_no] = record
 
             record.emp_id = emp.id
             record.start_time = parse_datetime(ImportService._get_row_value(row, ImportService._find_col(header_map, "开始时间")))
@@ -361,8 +379,25 @@ class ImportService:
         scanned = 0
         skipped_no_key = 0
         skipped_unknown_employee = 0
+
+        # Bulk Select 批量预查请假记录
+        leave_col_idx = ImportService._find_col(header_map, "请假单号")
+        leave_nos = []
+        if leave_col_idx >= 0:
+            for row in rows[header_idx + 1 :]:
+                val = clean_text(ImportService._get_row_value(row, leave_col_idx))
+                if val:
+                    leave_nos.append(val)
+
+        existing_records = {}
+        if leave_nos:
+            existing_records = {
+                r.leave_no: r
+                for r in LeaveRecord.query.filter(LeaveRecord.leave_no.in_(leave_nos)).all()
+            }
+
         for row in rows[header_idx + 1 :]:
-            leave_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "请假单号")))
+            leave_no = clean_text(ImportService._get_row_value(row, leave_col_idx))
             if not leave_no:
                 skipped_no_key += 1
                 continue
@@ -381,10 +416,19 @@ class ImportService:
                 skipped_unknown_employee += 1
                 continue
 
-            record = LeaveRecord.query.filter_by(leave_no=leave_no).first()
-            if not record:
+            record = existing_records.get(leave_no)
+            is_new = record is None
+            old_duration = 0.0
+            old_year = None
+            old_is_time_off = False
+            if not is_new:
+                old_duration = record.duration or 0.0
+                old_year = record.apply_date.year if record.apply_date else None
+                old_is_time_off = (record.leave_type == "补休（调休）")
+            else:
                 record = LeaveRecord(leave_no=leave_no, emp_id=emp.id)
                 db.session.add(record)
+                existing_records[leave_no] = record
 
             record.emp_id = emp.id
             record.apply_date = parse_date(ImportService._get_row_value(row, ImportService._find_col(header_map, "申请日期")))
@@ -397,14 +441,23 @@ class ImportService:
             record.approval_status = "已审批" if record.approval_comment else "未知"
             imported += 1
 
-            if record.leave_type == "补休（调休）" and record.apply_date:
-                year = record.apply_date.year
-                leave_balance = AnnualLeave.query.filter_by(emp_id=emp.id, year=year).first()
-                if not leave_balance:
-                    leave_balance = AnnualLeave(emp_id=emp.id, year=year, total_days=0, used_days=0, remaining_days=0)
-                    db.session.add(leave_balance)
-                leave_balance.used_days = (leave_balance.used_days or 0) + (record.duration or 0) / 8
-                leave_balance.remaining_days = (leave_balance.total_days or 0) - (leave_balance.used_days or 0)
+            new_year = record.apply_date.year if record.apply_date else None
+            new_is_time_off = (record.leave_type == "补休（调休）")
+
+            # 调休已用余额修正（数学差值）
+            if not is_new and old_is_time_off and old_year is not None:
+                old_balance = AnnualLeave.query.filter_by(emp_id=emp.id, year=old_year).first()
+                if old_balance:
+                    old_balance.used_days = max((old_balance.used_days or 0) - old_duration / 8, 0.0)
+                    old_balance.remaining_days = (old_balance.total_days or 0) - (old_balance.used_days or 0)
+
+            if new_is_time_off and new_year is not None:
+                new_balance = AnnualLeave.query.filter_by(emp_id=emp.id, year=new_year).first()
+                if not new_balance:
+                    new_balance = AnnualLeave(emp_id=emp.id, year=new_year, total_days=0, used_days=0, remaining_days=0)
+                    db.session.add(new_balance)
+                new_balance.used_days = (new_balance.used_days or 0) + (record.duration or 0) / 8
+                new_balance.remaining_days = (new_balance.total_days or 0) - (new_balance.used_days or 0)
 
         db.session.commit()
         return {
