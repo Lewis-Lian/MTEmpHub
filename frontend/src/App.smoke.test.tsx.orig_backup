@@ -354,29 +354,12 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("button", { name: /账套设置/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /上传原始文档/ })).toBeInTheDocument();
-
-    // 点击 ⚙️ 账套设置 打开弹窗
-    fireEvent.click(screen.getByRole("button", { name: /账套设置/ }));
     expect(await screen.findByText("月度账套")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建" })).toBeInTheDocument();
-
-    // 关闭账套设置弹窗
-    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    await waitFor(() => expect(screen.queryByText("月度账套")).not.toBeInTheDocument());
-
-    // 点击 📁 上传原始文档 打开弹窗
-    fireEvent.click(screen.getByRole("button", { name: /上传原始文档/ }));
-    expect(await screen.findByText("导入考勤原始表")).toBeInTheDocument();
+    expect(screen.getByText("导入考勤原始表")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "上传原始文件" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "员工计算" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "管理人员计算" })).toBeInTheDocument();
-
-    // 关闭上传弹窗
-    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
-    await waitFor(() => expect(screen.queryByText("导入考勤原始表")).not.toBeInTheDocument());
-
     expect(screen.getByText("账套导入记录")).toBeInTheDocument();
     expect(await screen.findByText(/请假单\.xlsx/)).toBeInTheDocument();
     expect(await screen.findByText("uploaded")).toBeInTheDocument();

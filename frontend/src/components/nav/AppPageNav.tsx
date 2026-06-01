@@ -26,7 +26,6 @@ export default function AppPageNav({ currentEntry, currentModule, modules }: App
               to={entry.href}
             >
               <span className="app-side-label">{entry.label}</span>
-              {entry.description ? <small>{entry.description}</small> : null}
             </NavLink>
           ))}
         </div>
@@ -57,7 +56,6 @@ export default function AppPageNav({ currentEntry, currentModule, modules }: App
               to={entry.href}
             >
               <span className="app-side-label">{entry.label}</span>
-              {entry.description ? <small>{entry.description}</small> : null}
             </NavLink>
           ))}
         </div>

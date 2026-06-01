@@ -1,5 +1,3 @@
-import { useEffect, useRef } from "react";
-
 export interface AppTabItem {
   href: string;
   label: string;
@@ -11,7 +9,6 @@ interface AppTabsProps {
   onCloseTab: (href: string) => void;
   onNavigate: (href: string) => void;
   onRefreshTab: (href: string) => void;
-  extra?: React.ReactNode;
 }
 
 export default function AppTabs({
@@ -20,69 +17,10 @@ export default function AppTabs({
   onCloseTab,
   onNavigate,
   onRefreshTab,
-  extra,
 }: AppTabsProps) {
-  const tabListRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = tabListRef.current;
-    if (!el) {
-      return;
-    }
-
-    let isDown = false;
-    let startX = 0;
-    let scrollLeft = 0;
-
-    const handleMouseDown = (e: MouseEvent) => {
-      isDown = true;
-      startX = e.pageX - el.offsetLeft;
-      scrollLeft = el.scrollLeft;
-    };
-
-    const handleMouseLeave = () => {
-      isDown = false;
-    };
-
-    const handleMouseUp = () => {
-      isDown = false;
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDown) {
-        return;
-      }
-      e.preventDefault();
-      const x = e.pageX - el.offsetLeft;
-      const walk = (x - startX) * 1.5;
-      el.scrollLeft = scrollLeft - walk;
-    };
-
-    const handleWheel = (e: WheelEvent) => {
-      if (e.deltaY !== 0) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-
-    el.addEventListener("mousedown", handleMouseDown);
-    el.addEventListener("mouseleave", handleMouseLeave);
-    el.addEventListener("mouseup", handleMouseUp);
-    el.addEventListener("mousemove", handleMouseMove);
-    el.addEventListener("wheel", handleWheel, { passive: false });
-
-    return () => {
-      el.removeEventListener("mousedown", handleMouseDown);
-      el.removeEventListener("mouseleave", handleMouseLeave);
-      el.removeEventListener("mouseup", handleMouseUp);
-      el.removeEventListener("mousemove", handleMouseMove);
-      el.removeEventListener("wheel", handleWheel);
-    };
-  }, []);
-
   return (
     <section className="app-tab-bar" aria-label="已打开页面">
-      <div className="app-tab-list" ref={tabListRef} role="tablist">
+      <div className="app-tab-list" role="tablist">
         {tabs.map((tab) => {
           const isActive = tab.href === currentPath;
 
@@ -125,7 +63,6 @@ export default function AppTabs({
           );
         })}
       </div>
-      {extra && <div className="app-tab-extra">{extra}</div>}
     </section>
   );
 }

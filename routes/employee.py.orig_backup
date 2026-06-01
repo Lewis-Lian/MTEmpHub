@@ -1094,18 +1094,6 @@ def home_manager_summary_api():
     else:
         benefit_remaining = 12.0
 
-    factory_rest_entries = sorted(
-        account_set.factory_rest_entries,
-        key=lambda item: item.rest_date.isoformat() if item.rest_date else "",
-    )
-    serialized_factory_rest_entries = [
-        {
-            "date": item.rest_date.isoformat() if item.rest_date else None,
-            "period": item.rest_period,
-        }
-        for item in factory_rest_entries
-    ]
-
     return jsonify(
         {
             "has_data": True,
@@ -1128,11 +1116,9 @@ def home_manager_summary_api():
                 "benefit_days": benefit_remaining,
                 "overtime_remaining_days": round(overtime_remaining, 2),
             },
-            "factory_rest_entries": serialized_factory_rest_entries,
             "support_message": "如对考勤数据有疑问，请联系信息中心协助核对处理。",
         }
     )
-
 
 
 @employee_bp.route("/api/punch-records", methods=["GET"])
