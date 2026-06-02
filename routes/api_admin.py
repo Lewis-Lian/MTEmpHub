@@ -25,6 +25,8 @@ from routes.admin_core import (
     lock_account_set,
     manager_annual_leave_records,
     manager_overtime_records,
+    update_manager_annual_leave_record,
+    update_manager_overtime_summary,
     update_department,
     update_employee,
     update_account_set,
@@ -34,10 +36,16 @@ from routes.admin_core import (
 from routes.admin_imports import (
     download_departments_template,
     download_employees_template,
+    download_manager_annual_leave_template,
+    download_manager_overtime_template,
     import_departments_xlsx,
     export_departments_xlsx,
     import_employees_xlsx,
     export_employees_xlsx,
+    import_manager_annual_leave,
+    import_manager_overtime,
+    export_manager_annual_leave,
+    export_manager_overtime,
     import_raw_files as admin_import_raw_files,
 )
 from routes.admin_accounts import disabled_users_list_api, unlock_disabled_user_api, users_list_api
@@ -339,10 +347,70 @@ def manager_overtime():
     return manager_overtime_records()
 
 
+@api_admin_bp.get("/manager-overtime/records")
+@admin_required
+def manager_overtime_records_api():
+    return manager_overtime_records()
+
+
+@api_admin_bp.put("/manager-overtime/records")
+@admin_required
+def manager_overtime_records_update():
+    return update_manager_overtime_summary()
+
+
+@api_admin_bp.get("/manager-overtime/template")
+@admin_required
+def manager_overtime_template():
+    return download_manager_overtime_template()
+
+
+@api_admin_bp.post("/manager-overtime/import")
+@admin_required
+def manager_overtime_import():
+    return import_manager_overtime()
+
+
+@api_admin_bp.get("/manager-overtime/export")
+@admin_required
+def manager_overtime_export():
+    return export_manager_overtime()
+
+
 @api_admin_bp.get("/manager-annual-leave")
 @admin_required
 def manager_annual_leave():
     return manager_annual_leave_records()
+
+
+@api_admin_bp.get("/manager-annual-leave/records")
+@admin_required
+def manager_annual_leave_records_api():
+    return manager_annual_leave_records()
+
+
+@api_admin_bp.put("/manager-annual-leave/records")
+@admin_required
+def manager_annual_leave_records_update():
+    return update_manager_annual_leave_record()
+
+
+@api_admin_bp.get("/manager-annual-leave/template")
+@admin_required
+def manager_annual_leave_template():
+    return download_manager_annual_leave_template()
+
+
+@api_admin_bp.post("/manager-annual-leave/import")
+@admin_required
+def manager_annual_leave_import():
+    return import_manager_annual_leave()
+
+
+@api_admin_bp.get("/manager-annual-leave/export")
+@admin_required
+def manager_annual_leave_export():
+    return export_manager_annual_leave()
 
 
 @api_admin_bp.get("/account-sets")

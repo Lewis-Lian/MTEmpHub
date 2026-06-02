@@ -21,7 +21,7 @@ interface SummaryColumn {
 
 interface ManagerMonthStatPageProps {
   title: string;
-  endpointBase: "/admin/manager-overtime" | "/admin/manager-annual-leave";
+  endpointBase: "/api/admin/manager-overtime" | "/api/admin/manager-annual-leave";
   listTitle: string;
   editTitle: string;
   remainingLabel: string;
@@ -273,7 +273,7 @@ export default function ManagerMonthStatPage({
                 <button className="account-action-button account-action-button--warning" onClick={submitImport} type="button">
                   导入
                 </button>
-                <a className="account-action-button" href={`${endpointBase}/template`}>
+                <a className="account-action-button" href={buildApiUrl(`${endpointBase}/template`)}>
                   下载示例
                 </a>
               </div>

@@ -622,6 +622,16 @@ def _manager_emp_ids(emp_ids: list[int]) -> list[int]:
     return [emp_id for emp_id in emp_ids if emp_id in allowed]
 
 
+def _accessible_manager_emp_ids() -> list[int]:
+    manager_ids = set(_manager_emp_ids(_accessible_emp_ids()))
+    profile_emp_no = (g.current_user.profile_emp_no or "").strip()
+    if profile_emp_no:
+        profile_manager = Employee.query.with_entities(Employee.id).filter_by(emp_no=profile_emp_no, is_manager=True).first()
+        if profile_manager:
+            manager_ids.add(profile_manager.id)
+    return list(manager_ids)
+
+
 def _manager_factory_rest_days(account_set: AccountSet | None) -> float:
     if account_set is None:
         return 0.0
@@ -1421,7 +1431,7 @@ def summary_download_export_api():
 
 
 def manager_attendance_api():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
+    emp_ids = _accessible_manager_emp_ids()
     requested_ids = _requested_emp_ids()
     if requested_ids:
         allowed = set(emp_ids)
@@ -1444,7 +1454,7 @@ def manager_overtime_query_api():
 
     year = request.args.get("year", type=int) or datetime.now().year
     values = _manager_overtime_values(year)
-    allowed_ids = set(_manager_emp_ids(_accessible_emp_ids()))
+    allowed_ids = set(_accessible_manager_emp_ids())
     values = {name: row for name, row in values.items() if row.get("emp_id") in allowed_ids}
     requested_ids = set(_requested_emp_ids())
     if requested_ids:
@@ -1463,7 +1473,7 @@ def manager_annual_leave_query_api():
 
     year = request.args.get("year", type=int) or datetime.now().year
     values = _manager_annual_leave_values(year)
-    allowed_ids = set(_manager_emp_ids(_accessible_emp_ids()))
+    allowed_ids = set(_accessible_manager_emp_ids())
     values = {name: row for name, row in values.items() if row.get("emp_id") in allowed_ids}
     requested_ids = set(_requested_emp_ids())
     if requested_ids:
@@ -1478,7 +1488,7 @@ def manager_annual_leave_query_api():
 
 
 def manager_department_hours_api():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
+    emp_ids = _accessible_manager_emp_ids()
     if not emp_ids:
         return jsonify([])
 
@@ -1487,7 +1497,7 @@ def manager_department_hours_api():
 
 
 def manager_department_hours_export_api():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
+    emp_ids = _accessible_manager_emp_ids()
     if not emp_ids:
         return jsonify({"error": "No manager assigned"}), 400
 

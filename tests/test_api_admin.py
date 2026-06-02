@@ -107,7 +107,15 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/manager-attendance-overrides/export",
                 "/api/admin/manager-attendance-overrides/import",
                 "/api/admin/manager-overtime",
+                "/api/admin/manager-overtime/records",
+                "/api/admin/manager-overtime/template",
+                "/api/admin/manager-overtime/export",
+                "/api/admin/manager-overtime/import",
                 "/api/admin/manager-annual-leave",
+                "/api/admin/manager-annual-leave/records",
+                "/api/admin/manager-annual-leave/template",
+                "/api/admin/manager-annual-leave/export",
+                "/api/admin/manager-annual-leave/import",
                 "/api/admin/disabled-users",
                 "/api/admin/disabled-users/<int:user_id>/unlock",
             }.issubset(rules)
@@ -207,6 +215,25 @@ class ApiAdminTests(unittest.TestCase):
         self.assertIsInstance(manager_annual_leave_payload, list)
         self.assertIn("name", manager_annual_leave_payload[0])
         self.assertIn("remark", manager_annual_leave_payload[0])
+
+    def test_manager_month_stat_record_endpoints_match_collection_payloads(self) -> None:
+        self._login()
+
+        overtime_collection = self.client.get(f"/api/admin/manager-overtime?year=2026&emp_ids={self.manager_id}")
+        overtime_records = self.client.get(f"/api/admin/manager-overtime/records?year=2026&emp_ids={self.manager_id}")
+        annual_leave_collection = self.client.get(
+            f"/api/admin/manager-annual-leave?year=2026&emp_ids={self.manager_id}"
+        )
+        annual_leave_records = self.client.get(
+            f"/api/admin/manager-annual-leave/records?year=2026&emp_ids={self.manager_id}"
+        )
+
+        self.assertEqual(overtime_collection.status_code, 200)
+        self.assertEqual(overtime_records.status_code, 200)
+        self.assertEqual(overtime_records.get_json(), overtime_collection.get_json())
+        self.assertEqual(annual_leave_collection.status_code, 200)
+        self.assertEqual(annual_leave_records.status_code, 200)
+        self.assertEqual(annual_leave_records.get_json(), annual_leave_collection.get_json())
 
     def test_admin_can_list_and_unlock_disabled_users(self) -> None:
         with self.app.app_context():
