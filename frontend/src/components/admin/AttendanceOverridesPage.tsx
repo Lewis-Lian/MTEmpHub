@@ -5,7 +5,7 @@ import { fetchQueryBootstrap } from "../../api/query";
 import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
 import EmployeePicker from "../query/EmployeePicker";
-import QueryMetricCard from "../query/QueryMetricCard";
+import QueryResultPanel from "../query/QueryResultPanel";
 import type { AccountSet, QueryBootstrap } from "../../types/query";
 
 interface OverrideEmployee {
@@ -93,6 +93,7 @@ export default function AttendanceOverridesPage({
   const [editingRow, setEditingRow] = useState<AttendanceOverrideRow | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraftState>({ remark: "", values: {} });
   const [activeEditId, setActiveEditId] = useState<number | null>(null);
+  const [showActionsModal, setShowActionsModal] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -134,8 +135,8 @@ export default function AttendanceOverridesPage({
       ? `已选 ${selectedIds.length} 人`
       : "未选择";
   const lockNotice = isLocked
-    ? `${selectedMonth || "-"} 账套已锁定，当前仅可查看列表和修正详情`
-    : "请选择月份并查询修正列表";
+    ? `${selectedMonth || "-" } 账套已锁定，当前仅可查看列表和修正详情`
+    : "";
 
   async function handleQuery() {
     if (!selectedMonth) {
@@ -306,117 +307,105 @@ export default function AttendanceOverridesPage({
   }
 
   return (
-    <section className="attendance-override-page">
-      <header className="attendance-override-page-header">
-        <h2 className="attendance-override-page-title">{title}</h2>
-      </header>
-      <div className="attendance-override-metrics">
-        <QueryMetricCard label="修正月份" sub={`按月份维护${title.replace("修正", "")}`} value={selectedMonth || "-"} valueClassName="dashboard-metric-text" />
-        <QueryMetricCard label="当前人员" sub={metricEmployeeSub} value={metricEmployeeValue} valueClassName="dashboard-metric-text" />
-        <QueryMetricCard label="修正字段" sub={metricFieldSub} value={metricFieldCount} />
-        <QueryMetricCard label="当前状态" sub="空值表示使用系统自动值" value={statusText} valueClassName="dashboard-metric-text" />
-      </div>
-
-      <section className="account-card attendance-override-card attendance-override-query-card">
-        <div className="account-card-header">
-          <span>查询条件</span>
-          <span className="account-card-header-note">选择人员和月份后维护手工修正值</span>
+    <div className="query-page-shell attendance-override-page">
+      <aside className="query-filter-rail">
+        <div className="query-filter-heading">
+          <span className="query-filter-kicker">Query Filters</span>
+          <h2>查询条件</h2>
+          <p>选择人员和月份后维护手工修正值</p>
         </div>
-        <div className="account-card-body attendance-override-filter-body">
-          <div className="attendance-override-filter-grid">
-            <label className="account-field">
-              <span className="account-field-label">月份</span>
-              <input className="account-input" onChange={handleMonthChange} type="month" value={selectedMonth} />
-            </label>
-
-            <div className="account-field attendance-override-picker-field">
-              <span className="account-field-label">{pickerLabel}</span>
-              <EmployeePicker
-                departments={bootstrap.departments}
-                employees={bootstrap.employees}
-                filterMode={filterMode}
-                label={pickerButtonLabel}
-                onChange={handleSelectionChange}
-                selectedIds={selectedIds}
-                showFieldChrome={false}
-              />
-            </div>
-
-            <div className="account-field attendance-override-actions-field">
-              <span className="account-field-label">主要操作</span>
-              <div className="toolbar attendance-override-actions">
-                <button className="account-action-button account-action-button--primary" disabled={isQuerying} onClick={handleQuery} type="button">
-                  {isQuerying ? "查询中..." : "查询"}
-                </button>
-                <button className="account-action-button" onClick={() => handleDownload("export")} type="button">
-                  导出
-                </button>
-                <button className="account-action-button" disabled={isLocked} onClick={() => fileInputRef.current?.click()} type="button">
-                  导入
-                </button>
-                <button className="account-action-button" onClick={() => handleDownload("template")} type="button">
-                  示例下载
-                </button>
-                <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" onChange={handleImportFile} type="file" />
-              </div>
-              <div className={`account-lock-notice${isLocked ? " is-locked" : ""}`}>{lockNotice}</div>
-            </div>
+        <div className="query-filter-body">
+          <div className="query-filter-field">
+            <label className="form-label">{pickerLabel}</label>
+            <EmployeePicker
+              departments={bootstrap.departments}
+              employees={bootstrap.employees}
+              filterMode={filterMode}
+              label={pickerButtonLabel}
+              onChange={handleSelectionChange}
+              selectedIds={selectedIds}
+              showFieldChrome={false}
+            />
           </div>
-          {error ? <div className="legacy-inline-error">{error}</div> : null}
-        </div>
-      </section>
 
-      <section className="account-card attendance-override-card attendance-override-result-card">
-        <div className="account-card-header">
-          <span>修正列表</span>
-          <span className="account-card-header-note">查询后按员工逐行展示当前月份修正情况，支持逐行编辑</span>
+          <div className="query-filter-field">
+            <label className="form-label">月份</label>
+            <input className="form-control" onChange={handleMonthChange} type="month" value={selectedMonth} />
+          </div>
+
+          <div className="query-filter-field">
+            <label className="form-label">主要操作</label>
+            <div className="query-filter-actions">
+              <button className="btn btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
+                {isQuerying ? "查询中..." : "查询"}
+              </button>
+              
+              <button 
+                className="btn btn-outline-secondary" 
+                onClick={() => setShowActionsModal(true)}
+                type="button"
+              >
+                数据操作
+              </button>
+              <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" style={{ display: "none" }} onChange={handleImportFile} type="file" />
+            </div>
+            {lockNotice ? (
+              <div className={`account-lock-notice${isLocked ? " is-locked" : ""}`} style={{ marginTop: "4px" }}>{lockNotice}</div>
+            ) : null}
+          </div>
         </div>
-        <div className="legacy-table-panel attendance-override-table-panel">
-          <div className="legacy-table-wrap">
-            <table className="legacy-table attendance-override-table">
-              <thead>
-                <tr>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">工号</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">系统值</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">手工修正</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">最终应用</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">备注</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">更新时间</div></th>
-                  <th className="legacy-table-head-cell"><div className="master-static-head">操作</div></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  rows.map((row) => (
-                    <tr className={activeEditId === row.employee.id ? "attendance-override-row-active" : ""} key={row.employee.id}>
-                      <td className="legacy-table-body-cell">{row.employee.emp_no || "-"}</td>
-                      <td className="legacy-table-body-cell">{row.employee.name || "-"}</td>
-                      <td className="legacy-table-body-cell">{row.employee.dept_name || "-"}</td>
-                      <td className="legacy-table-body-cell">{summarizeValues(row.automatic, fields)}</td>
-                      <td className="legacy-table-body-cell">{summarizeValues(row.override, fields)}</td>
-                      <td className="legacy-table-body-cell">{summarizeValues(row.applied, fields)}</td>
-                      <td className="legacy-table-body-cell">{String(row.override?.remark ?? "-")}</td>
-                      <td className="legacy-table-body-cell">{formatDateTime(row.override?.updated_at)}</td>
-                      <td className="legacy-table-body-cell">
-                        <button className="account-action-button" onClick={() => openEdit(row)} type="button">
-                          编辑
-                        </button>
+        {error ? <div className="legacy-inline-error">{error}</div> : null}
+      </aside>
+
+      <section className="query-workspace">
+        <QueryResultPanel>
+          <div className="legacy-table-panel attendance-override-table-panel">
+            <div className="legacy-table-wrap">
+              <table className="legacy-table attendance-override-table">
+                <thead>
+                  <tr>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">工号</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">系统值</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">手工修正</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">最终应用</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">备注</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">更新时间</div></th>
+                    <th className="legacy-table-head-cell"><div className="master-static-head">操作</div></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    rows.map((row) => (
+                      <tr className={activeEditId === row.employee.id ? "attendance-override-row-active" : ""} key={row.employee.id}>
+                        <td className="legacy-table-body-cell">{row.employee.emp_no || "-"}</td>
+                        <td className="legacy-table-body-cell">{row.employee.name || "-"}</td>
+                        <td className="legacy-table-body-cell">{row.employee.dept_name || "-"}</td>
+                        <td className="legacy-table-body-cell">{summarizeValues(row.automatic, fields)}</td>
+                        <td className="legacy-table-body-cell">{summarizeValues(row.override, fields)}</td>
+                        <td className="legacy-table-body-cell">{summarizeValues(row.applied, fields)}</td>
+                        <td className="legacy-table-body-cell">{String(row.override?.remark ?? "-")}</td>
+                        <td className="legacy-table-body-cell">{formatDateTime(row.override?.updated_at)}</td>
+                        <td className="legacy-table-body-cell">
+                          <button className="account-action-button" onClick={() => openEdit(row)} type="button">
+                            编辑
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="legacy-table-empty-cell" colSpan={9}>
+                        {hasQueried ? listEmptyHint : `请先查询${pickerLabel}和月份`}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="legacy-table-empty-cell" colSpan={9}>
-                      {hasQueried ? listEmptyHint : `请先查询${pickerLabel}和月份`}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </QueryResultPanel>
       </section>
 
       {editingRow ? (
@@ -489,7 +478,66 @@ export default function AttendanceOverridesPage({
           </div>
         </div>
       ) : null}
-    </section>
+
+      <div 
+        aria-label="数据操作" 
+        aria-modal="true" 
+        className="master-modal-backdrop" 
+        role="dialog"
+        style={{
+          left: showActionsModal ? 0 : "-9999px",
+          right: showActionsModal ? 0 : "auto",
+          opacity: showActionsModal ? 1 : 0,
+          pointerEvents: showActionsModal ? "auto" : "none",
+          transition: "opacity 0.15s ease-in-out",
+          zIndex: 100
+        }}
+      >
+        <div className="master-modal" style={{ maxWidth: "400px", width: "100%" }}>
+          <div className="master-modal-header">
+            <div>
+              <h2>数据操作</h2>
+              <div className="attendance-override-edit-meta">选择需要执行的数据导出或导入操作</div>
+            </div>
+            <button aria-label="关闭" className="master-modal-close" onClick={() => setShowActionsModal(false)} type="button">
+              ×
+            </button>
+          </div>
+          <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "20px 24px" }}>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => { handleDownload("export"); setShowActionsModal(false); }}
+              type="button"
+              style={{ width: "100%", justifyContent: "center" }}
+            >
+              导出
+            </button>
+            <button 
+              className="btn btn-outline-success" 
+              disabled={isLocked}
+              onClick={() => { fileInputRef.current?.click(); setShowActionsModal(false); }}
+              type="button"
+              style={{ width: "100%", justifyContent: "center" }}
+            >
+              导入
+            </button>
+            <button 
+              className="btn btn-outline-secondary" 
+              onClick={() => { handleDownload("template"); setShowActionsModal(false); }}
+              type="button"
+              style={{ width: "100%", justifyContent: "center" }}
+            >
+              示例下载
+            </button>
+          </div>
+          <div className="master-modal-footer">
+            <button className="account-action-button" onClick={() => setShowActionsModal(false)} type="button">
+              取消
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

@@ -6,6 +6,7 @@ import { fetchQueryBootstrap } from "../../api/query";
 import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
 import EmployeePicker from "../query/EmployeePicker";
+import QueryResultPanel from "../query/QueryResultPanel";
 import type { QueryBootstrap } from "../../types/query";
 
 interface MonthField {
@@ -207,136 +208,122 @@ export default function ManagerMonthStatPage({
   }
 
   return (
-    <section className="manager-month-stat-page">
-      <header className="legacy-page-header">
-        <div className="legacy-page-heading">
-          <p className="legacy-page-kicker">后台管理</p>
-          <h2 className="legacy-page-title">{title}</h2>
-          <p className="legacy-page-description">按年度和人员筛选后查看列表，通过弹窗维护单人整年数据</p>
+    <div className="query-page-shell manager-month-stat-page">
+      <aside className="query-filter-rail">
+        <div className="query-filter-heading">
+          <span className="query-filter-kicker">Query Filters</span>
+          <h2>查询条件</h2>
+          <p>按年度和人员筛选后查看列表，通过弹窗维护单人整年数据</p>
         </div>
-      </header>
-
-      <section className="account-card manager-month-stat-query-card">
-        <div className="account-card-header">
-          <span>查询条件</span>
-          <span className="account-card-header-note">按年度和人员筛选后查看列表，通过弹窗维护单人整年数据</span>
-        </div>
-        <div className="account-card-body manager-month-stat-query-body">
-          <div className="manager-month-stat-grid">
-            <label className="account-field">
-              <span className="account-field-label">年份</span>
+        <div className="query-filter-body">
+          <div className="query-filter-field">
+            <label className="form-label">年份</label>
+            <input
+              className="form-control"
+              max="2100"
+              min="2000"
+              onChange={(event) => setYear(event.target.value)}
+              type="number"
+              value={year}
+            />
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">人员筛选</label>
+            <EmployeePicker
+              departments={bootstrap.departments}
+              employees={managerEmployees}
+              filterMode="manager"
+              label="管理人员范围"
+              onChange={setSelectedEmployeeIds}
+              selectedIds={selectedEmployeeIds}
+              showFieldChrome={false}
+            />
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">导入文件</label>
+            <div className="manager-month-stat-import-controls" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
               <input
-                className="account-input"
-                max="2100"
-                min="2000"
-                onChange={(event) => setYear(event.target.value)}
-                type="number"
-                value={year}
+                accept=".xlsx"
+                className="form-control"
+                style={{ width: "160px" }}
+                onChange={(event: ChangeEvent<HTMLInputElement>) => setImportFile(event.target.files?.[0] ?? null)}
+                type="file"
               />
-            </label>
-            <label className="account-field manager-month-stat-picker-field">
-              <span className="account-field-label">人员筛选</span>
-              <EmployeePicker
-                departments={bootstrap.departments}
-                employees={managerEmployees}
-                filterMode="manager"
-                label="管理人员范围"
-                onChange={setSelectedEmployeeIds}
-                selectedIds={selectedEmployeeIds}
-                showFieldChrome={false}
-              />
-            </label>
-            <div className="account-field">
-              <span className="account-field-label">主要操作</span>
-              <div className="toolbar manager-month-stat-actions">
-                <button className="account-action-button account-action-button--primary" onClick={loadRows} type="button">
-                  查询
-                </button>
-                <button className="account-action-button account-action-button--success" onClick={handleExport} type="button">
-                  导出XLSX
-                </button>
-              </div>
-              <div className="account-lock-notice">{buildLockNotice(year, columnStates)}</div>
+              <button className="btn btn-outline-warning" onClick={submitImport} type="button">
+                导入
+              </button>
+              <a className="btn btn-outline-secondary" href={buildApiUrl(`${endpointBase}/template`)}>
+                下载示例
+              </a>
             </div>
           </div>
-
-          <div className="manager-month-stat-import-row">
-            <label className="account-field manager-month-stat-import-field">
-              <span className="account-field-label">导入文件</span>
-              <div className="manager-month-stat-import-controls">
-                <input
-                  accept=".xlsx"
-                  className="account-input"
-                  onChange={(event: ChangeEvent<HTMLInputElement>) => setImportFile(event.target.files?.[0] ?? null)}
-                  type="file"
-                />
-                <button className="account-action-button account-action-button--warning" onClick={submitImport} type="button">
-                  导入
-                </button>
-                <a className="account-action-button" href={buildApiUrl(`${endpointBase}/template`)}>
-                  下载示例
-                </a>
-              </div>
-            </label>
+          <div className="query-filter-field">
+            <label className="form-label">主要操作</label>
+            <div className="query-filter-actions" style={{ display: "flex", gap: "8px" }}>
+              <button className="btn btn-primary" onClick={loadRows} type="button">
+                查询
+              </button>
+              <button className="btn btn-outline-success" onClick={handleExport} type="button">
+                导出XLSX
+              </button>
+            </div>
+            <div className="account-lock-notice" style={{ marginTop: "4px" }}>{buildLockNotice(year, columnStates)}</div>
           </div>
-
-          {queryError ? <div className="legacy-inline-error">{queryError}</div> : null}
-          {importError ? <div className="legacy-inline-error">{importError}</div> : null}
-          <div className="manager-month-stat-result">{resultMessage}</div>
         </div>
-      </section>
+        {queryError ? <div className="legacy-inline-error">{queryError}</div> : null}
+        {importError ? <div className="legacy-inline-error">{importError}</div> : null}
+        <div className="manager-month-stat-result" style={{ marginTop: "8px" }}>{resultMessage}</div>
+      </aside>
 
-      <section className="account-card manager-month-stat-list-card">
-        <div className="account-card-header">
-          <span>{listTitle}</span>
-          <span className="account-card-header-note">一行一人展示当前年度汇总，点击编辑维护整年月份数据</span>
-        </div>
-        <div className="legacy-table-panel manager-month-stat-table-panel">
-          <div className="legacy-table-wrap">
-            <table className="legacy-table manager-month-stat-table">
-              <thead>
-                <tr>
-                  <th className="legacy-table-head-cell">部门</th>
-                  <th className="legacy-table-head-cell">姓名</th>
-                  {summaryColumns.map((column) => (
-                    <th className="legacy-table-head-cell" key={column.key}>
-                      {column.label}
-                    </th>
-                  ))}
-                  <th className="legacy-table-head-cell">备注</th>
-                  <th className="legacy-table-head-cell">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length ? (
-                  rows.map((row) => (
-                    <tr key={row.emp_id}>
-                      <td className="legacy-table-body-cell">{String(row.dept_name ?? "")}</td>
-                      <td className="legacy-table-body-cell">{String(row.name ?? "")}</td>
-                      {summaryColumns.map((column) => (
-                        <td className="legacy-table-body-cell" key={column.key}>
-                          {column.render(row)}
+      <section className="query-workspace">
+        <QueryResultPanel>
+          <div className="legacy-table-panel manager-month-stat-table-panel">
+            <div className="legacy-table-wrap">
+              <table className="legacy-table manager-month-stat-table">
+                <thead>
+                  <tr>
+                    <th className="legacy-table-head-cell">部门</th>
+                    <th className="legacy-table-head-cell">姓名</th>
+                    {summaryColumns.map((column) => (
+                      <th className="legacy-table-head-cell" key={column.key}>
+                        {column.label}
+                      </th>
+                    ))}
+                    <th className="legacy-table-head-cell">备注</th>
+                    <th className="legacy-table-head-cell">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.length ? (
+                    rows.map((row) => (
+                      <tr key={row.emp_id}>
+                        <td className="legacy-table-body-cell">{String(row.dept_name ?? "")}</td>
+                        <td className="legacy-table-body-cell">{String(row.name ?? "")}</td>
+                        {summaryColumns.map((column) => (
+                          <td className="legacy-table-body-cell" key={column.key}>
+                            {column.render(row)}
+                          </td>
+                        ))}
+                        <td className="legacy-table-body-cell">{String(row.remark ?? "")}</td>
+                        <td className="legacy-table-body-cell">
+                          <button className="account-action-button" onClick={() => openEdit(row)} type="button">
+                            编辑
+                          </button>
                         </td>
-                      ))}
-                      <td className="legacy-table-body-cell">{String(row.remark ?? "")}</td>
-                      <td className="legacy-table-body-cell">
-                        <button className="account-action-button" onClick={() => openEdit(row)} type="button">
-                          编辑
-                        </button>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="legacy-table-empty-cell" colSpan={summaryColumns.length + 4}>
+                        {isQuerying ? "正在加载..." : "当前条件无数据"}
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="legacy-table-empty-cell" colSpan={summaryColumns.length + 4}>
-                      {isQuerying ? "正在加载..." : "当前条件无数据"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        </QueryResultPanel>
       </section>
 
       {editingRow ? (
@@ -406,7 +393,7 @@ export default function ManagerMonthStatPage({
           </div>
         </div>
       ) : null}
-    </section>
+    </div>
   );
 }
 

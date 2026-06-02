@@ -662,27 +662,54 @@ export default function EmployeesPage() {
           <button className="account-action-button" onClick={clearFilters} type="button">清空筛选</button>
         </div>
       </div>
+      <QueryResultPanel>
+        {loading ? (
+          <div className="legacy-table-panel master-table-panel master-table-panel--with-filter">
+            <div className="legacy-table-wrap">
+              <table className="legacy-table master-table master-table--employees">
+                <tbody>
+                  <tr><td className="legacy-table-empty-cell">正在加载员工列表...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <QueryTable
+            emptyText="暂无员工数据"
+            headers={employeeTableHeaders}
+            panelClassName="master-table-panel master-table-panel--with-filter"
+            rows={employeeTableRows}
+            sortRows={employeeTableSortRows}
+            tableClassName="master-table master-table--employees"
+          />
+        )}
+      </QueryResultPanel>
 
-      <div className="inline-batch-bar" style={{
+      <div className="master-side-note" style={{ marginTop: "16px", fontSize: "12.5px" }}>
+        班次维护已迁移到独立页面：<a href="/admin/shifts/manage">前往班次管理</a>
+      </div>
+
+      <div className="floating-batch-bar" style={{
+        position: "fixed",
+        top: "72px",
+        left: selectedIds.length > 0 ? "50%" : "-9999px",
+        transform: selectedIds.length > 0 ? "translate(-50%, 0)" : "translate(-50%, -20px)",
         background: "rgba(255, 255, 255, 0.95)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
-        border: selectedIds.length > 0 ? "1px solid #cbd5e1" : "0px solid transparent",
-        borderRadius: "8px",
-        padding: selectedIds.length > 0 ? "10px 20px" : "0px",
-        marginBottom: selectedIds.length > 0 ? "16px" : "0px",
-        height: selectedIds.length > 0 ? "54px" : "0px",
-        opacity: selectedIds.length > 0 ? 1 : 0,
-        overflow: "hidden",
-        boxShadow: selectedIds.length > 0 ? "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.02)" : "none",
-        zIndex: 10,
+        border: "1px solid #cbd5e1",
+        borderRadius: "9999px",
+        padding: "10px 24px",
+        boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.08)",
+        zIndex: 100,
         display: "flex",
         alignItems: "center",
         gap: "16px",
         boxSizing: "border-box",
         flexWrap: "wrap",
+        opacity: selectedIds.length > 0 ? 1 : 0,
         pointerEvents: selectedIds.length > 0 ? "auto" : "none",
-        transition: "all 0.2s ease"
+        transition: "opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
       }}>
         {/* 左侧：已选计数 */}
         <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", userSelect: "none" }}>
@@ -789,33 +816,6 @@ export default function EmployeesPage() {
             清空选择
           </button>
         </div>
-      </div>
-
-      <QueryResultPanel>
-        {loading ? (
-          <div className="legacy-table-panel master-table-panel master-table-panel--with-filter">
-            <div className="legacy-table-wrap">
-              <table className="legacy-table master-table master-table--employees">
-                <tbody>
-                  <tr><td className="legacy-table-empty-cell">正在加载员工列表...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <QueryTable
-            emptyText="暂无员工数据"
-            headers={employeeTableHeaders}
-            panelClassName="master-table-panel master-table-panel--with-filter"
-            rows={employeeTableRows}
-            sortRows={employeeTableSortRows}
-            tableClassName="master-table master-table--employees"
-          />
-        )}
-      </QueryResultPanel>
-
-      <div className="master-side-note" style={{ marginTop: "16px", fontSize: "12.5px" }}>
-        班次维护已迁移到独立页面：<a href="/admin/shifts/manage">前往班次管理</a>
       </div>
 
 

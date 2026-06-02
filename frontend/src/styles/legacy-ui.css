@@ -4863,18 +4863,7 @@ input[type="checkbox"] {
 
 /* 悬浮批量操作条样式 */
 .floating-batch-bar {
-  animation: slideUpFade 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes slideUpFade {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 12px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
+  /* 移除了 CSS 关键帧动画，改由 React inline style 的 transition 驱动以保证优雅的上下滑入退场 */
 }
 
 .floating-batch-bar .account-select,
@@ -4932,9 +4921,6 @@ input[type="checkbox"] {
   color: #334155 !important;
 }
 
-/* 在悬浮条中让部门快捷弹窗列表向上展开，防止被屏幕遮挡 */
-.floating-batch-bar .employee-float-list {
-  top: auto !important;
-  bottom: calc(100% + 8px) !important;
-}
+
+
 
