@@ -2033,6 +2033,16 @@ body {
   overflow: visible;
 }
 
+.account-center-page .master-filter-panel {
+  position: relative;
+  z-index: 40;
+}
+
+.account-center-page .query-result-panel {
+  position: relative;
+  z-index: 1;
+}
+
 .account-center-page .employee-lookup {
   z-index: 2;
 }
@@ -2072,7 +2082,7 @@ body {
 
 .account-center-page .account-table-panel {
   min-height: 280px;
-  max-height: 420px;
+  max-height: calc(100vh - 320px);
 }
 
 .account-center-page .legacy-table-body-cell {

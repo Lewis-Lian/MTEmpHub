@@ -252,7 +252,7 @@ export default function AccountsPage() {
     }
 
     try {
-      await apiRequest("/admin/users", {
+      await apiRequest("/api/admin/users", {
         body: {
           username: createUsername.trim(),
           password: createPassword,
@@ -281,7 +281,7 @@ export default function AccountsPage() {
     setResultMessage("");
     setResultError("");
     try {
-      const result = await apiRequest<{ created_count: number; skipped_count: number }>("/admin/users/manager-batch", {
+      const result = await apiRequest<{ created_count: number; skipped_count: number }>("/api/admin/users/manager-batch", {
         method: "POST",
       });
       setResultMessage(`成功创建 ${result.created_count} 个账号，跳过 ${result.skipped_count} 个员工`);
@@ -317,7 +317,7 @@ export default function AccountsPage() {
       return;
     }
     try {
-      await apiRequest(`/admin/users/${editingUser.id}`, {
+      await apiRequest(`/api/admin/users/${editingUser.id}`, {
         body: {
           role: editRole,
           profile_emp_no: editProfileEmpNo.trim(),
@@ -341,7 +341,7 @@ export default function AccountsPage() {
     setResultMessage("");
     setResultError("");
     try {
-      await apiRequest(`/admin/users/${userId}/password`, {
+      await apiRequest(`/api/admin/users/${userId}/password`, {
         body: { password: "mt@123" },
         method: "PUT",
       });
@@ -355,7 +355,7 @@ export default function AccountsPage() {
     setResultMessage("");
     setResultError("");
     try {
-      await apiRequest(`/admin/users/${userId}`, { method: "DELETE" });
+      await apiRequest(`/api/admin/users/${userId}`, { method: "DELETE" });
       setResultMessage("账号已删除");
       await refreshUsers();
     } catch (error) {
@@ -371,7 +371,7 @@ export default function AccountsPage() {
       return false;
     }
     try {
-      await apiRequest("/admin/users/batch", {
+      await apiRequest("/api/admin/users/batch", {
         body: { action, user_ids: selectedUserIds, ...payload },
         method: "POST",
       });

@@ -4,6 +4,8 @@ import { fetchDisabledUsers, unlockDisabledUser } from "../../api/admin";
 import type { AdminDisabledUser } from "../../types/admin";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
+import QueryResultPanel from "../../components/query/QueryResultPanel";
+import QueryTable from "../../components/query/QueryTable";
 
 export default function DisabledUsersPage() {
   const [users, setUsers] = useState<AdminDisabledUser[]>([]);
@@ -52,72 +54,64 @@ export default function DisabledUsersPage() {
     return <ErrorState title="禁用用户页面加载失败" description={loadError} />;
   }
 
+  const disabledUserTableHeaders = [
+    "用户名",
+    "姓名",
+    "工号",
+    "累计错误次数",
+    "禁用状态",
+    { label: "操作", sortable: false as const },
+  ];
+
+  const disabledUserTableRows = users.map((user) => [
+    user.username,
+    user.profile_name || "-",
+    user.profile_emp_no || "-",
+    user.login_failed_attempts,
+    formatLoginStatus(user),
+    <button
+      className="account-action-button account-action-button--primary"
+      disabled={workingUserId === user.id}
+      onClick={() => void handleUnlock(user)}
+      type="button"
+      key={user.id}
+    >
+      {workingUserId === user.id ? "解锁中..." : "解锁"}
+    </button>,
+  ]);
+
+  const disabledUserTableSortRows = users.map((user) => [
+    user.username,
+    user.profile_name || "-",
+    user.profile_emp_no || "-",
+    user.login_failed_attempts,
+    formatLoginStatus(user),
+    "",
+  ]);
+
   return (
     <main className="account-center-page">
-      <section className="legacy-page-section">
-        <header className="legacy-page-header">
-          <div className="legacy-page-heading">
-            <p className="legacy-page-kicker">系统设置</p>
-            <h2 className="legacy-page-title">禁用用户</h2>
-            <p className="legacy-page-description">查看当前被限制登录的账号，并由管理员手动解锁。</p>
-          </div>
-        </header>
-
-        <section className="account-card table-wrap-tight">
-          <div className="account-card-header">
-            <span>禁用登录账号列表</span>
+      <section className="account-page-stack">
+        <div className="account-card-header master-list-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 4px", borderBottom: "none", background: "transparent", flexWrap: "wrap", gap: "12px" }}>
+          <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)", margin: 0 }}>禁用用户</h2>
+          <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             <button className="account-action-button" onClick={() => void loadUsers()} type="button">
               刷新
             </button>
           </div>
-          <div className="account-card-body">
-            {resultMessage ? <div className="account-result-message">{resultMessage}</div> : null}
-            {resultError ? <div className="legacy-inline-error">{resultError}</div> : null}
-            <div className="legacy-table-shell">
-              <table className="legacy-table">
-                <thead>
-                  <tr>
-                    <th className="legacy-table-head-cell">用户名</th>
-                    <th className="legacy-table-head-cell">姓名</th>
-                    <th className="legacy-table-head-cell">工号</th>
-                    <th className="legacy-table-head-cell">累计错误次数</th>
-                    <th className="legacy-table-head-cell">禁用状态</th>
-                    <th className="legacy-table-head-cell">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.length ? (
-                    users.map((user) => (
-                      <tr key={user.id}>
-                        <td className="legacy-table-body-cell">{user.username}</td>
-                        <td className="legacy-table-body-cell">{user.profile_name || "-"}</td>
-                        <td className="legacy-table-body-cell">{user.profile_emp_no || "-"}</td>
-                        <td className="legacy-table-body-cell">{user.login_failed_attempts}</td>
-                        <td className="legacy-table-body-cell">{formatLoginStatus(user)}</td>
-                        <td className="legacy-table-body-cell">
-                          <button
-                            className="account-action-button account-action-button--primary"
-                            disabled={workingUserId === user.id}
-                            onClick={() => void handleUnlock(user)}
-                            type="button"
-                          >
-                            {workingUserId === user.id ? "解锁中..." : "解锁"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="legacy-table-empty" colSpan={6}>
-                        当前没有被禁用登录的用户
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </section>
+        </div>
+
+        {resultMessage ? <div className="account-result-message" style={{ marginBottom: "12px" }}>{resultMessage}</div> : null}
+        {resultError ? <div className="legacy-inline-error" style={{ marginBottom: "12px" }}>{resultError}</div> : null}
+
+        <QueryResultPanel>
+          <QueryTable
+            emptyText="当前没有被禁用登录的用户"
+            headers={disabledUserTableHeaders}
+            rows={disabledUserTableRows}
+            sortRows={disabledUserTableSortRows}
+          />
+        </QueryResultPanel>
       </section>
     </main>
   );
