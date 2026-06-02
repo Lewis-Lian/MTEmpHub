@@ -108,6 +108,60 @@ def register_admin_import_routes(admin_bp) -> None:
 
 
 @admin_required
+def download_manager_overtime_template():
+    from routes import admin_core as admin_module
+
+    return admin_module._download_manager_stat_template("overtime")
+
+
+@admin_required
+def import_manager_overtime():
+    from routes import admin_core as admin_module
+
+    year = request.form.get("year", type=int) or datetime.now().year
+    locked_error = admin_module._ensure_year_months_unlocked(
+        year, "导入管理人员加班统计", include_prev_dec=True
+    )
+    if locked_error:
+        return locked_error
+    return admin_module._import_manager_stat_file("overtime", year)
+
+
+@admin_required
+def export_manager_overtime():
+    from routes import admin_core as admin_module
+
+    year = request.args.get("year", type=int) or datetime.now().year
+    return admin_module._export_manager_overtime_workbook(year)
+
+
+@admin_required
+def download_manager_annual_leave_template():
+    from routes import admin_core as admin_module
+
+    return admin_module._download_manager_stat_template("annual_leave")
+
+
+@admin_required
+def import_manager_annual_leave():
+    from routes import admin_core as admin_module
+
+    year = request.form.get("year", type=int) or datetime.now().year
+    locked_error = admin_module._ensure_year_months_unlocked(year, "导入管理人员年休统计")
+    if locked_error:
+        return locked_error
+    return admin_module._import_manager_stat_file("annual_leave", year)
+
+
+@admin_required
+def export_manager_annual_leave():
+    from routes import admin_core as admin_module
+
+    year = request.args.get("year", type=int) or datetime.now().year
+    return admin_module._export_manager_annual_leave_workbook(year)
+
+
+@admin_required
 def import_raw_files():
     from routes import admin_core as admin_module
 

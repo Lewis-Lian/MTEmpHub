@@ -942,6 +942,7 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-overtime/template");
     expect(screen.getByText("管理人员加班列表")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
@@ -971,6 +972,7 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-annual-leave/template");
     expect(screen.getByText("管理人员年休列表")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
@@ -1591,7 +1593,7 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
           ],
         }),
       );
-    case "/admin/manager-overtime/records":
+    case "/api/admin/manager-overtime/records":
       return Promise.resolve(
         jsonResponse([
           {
@@ -1616,7 +1618,7 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
           },
         ]),
       );
-    case "/admin/manager-annual-leave/records":
+    case "/api/admin/manager-annual-leave/records":
       return Promise.resolve(
         jsonResponse([
           {

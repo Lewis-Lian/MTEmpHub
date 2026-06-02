@@ -4,7 +4,7 @@ export default function ManagerAnnualLeaveAdminPage() {
   return (
     <ManagerMonthStatPage
       editTitle="编辑管理人员年休"
-      endpointBase="/admin/manager-annual-leave"
+      endpointBase="/api/admin/manager-annual-leave"
       listTitle="管理人员年休列表"
       monthFields={[
         { key: "m1", label: "1月" },
