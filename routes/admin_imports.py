@@ -55,84 +55,7 @@ def register_admin_import_routes(admin_bp) -> None:
         result = admin_module.ImportService.import_file(save_path)
         return jsonify(result)
 
-    @admin_bp.route("/import/raw-files", methods=["POST"])
-    @admin_required
-    def import_raw_files():
-        account_set_id = request.form.get("account_set_id", type=int)
-        account_set = (
-            admin_module.db.session.get(admin_module.AccountSet, account_set_id)
-            if account_set_id
-            else admin_module.AccountSet.query.filter_by(is_active=True).first()
-        )
-        if not account_set:
-            return jsonify({"status": "error", "message": "请先创建并选择账套"}), 400
-        locked_error = admin_module._ensure_account_set_unlocked(account_set, "上传原始文件")
-        if locked_error:
-            return locked_error
-
-        uploaded_files = [file for file in request.files.getlist("files") if (file.filename or "").strip()]
-        if not uploaded_files:
-            return jsonify({"status": "error", "message": "请至少选择一个要上传的源文件"}), 400
-
-        results = []
-        success = 0
-        failed = 0
-        for file in uploaded_files:
-            filename = file.filename.strip()
-            file_type = admin_module._account_set_file_type(filename)
-            previous_record = admin_module.AccountSetImport.query.filter_by(
-                account_set_id=account_set.id, file_type=file_type
-            ).first()
-            replaced = previous_record is not None
-
-            if previous_record:
-                old_path = (previous_record.stored_path or "").strip()
-                if old_path and os.path.exists(old_path):
-                    try:
-                        os.remove(old_path)
-                    except Exception:
-                        pass
-                admin_module.db.session.delete(previous_record)
-                admin_module.db.session.flush()
-
-            account_set_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "account_sets", account_set.month)
-            os.makedirs(account_set_dir, exist_ok=True)
-            save_name = f"{int(datetime.now().timestamp())}_{filename}"
-            save_path = os.path.join(account_set_dir, save_name)
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-            file.save(save_path)
-
-            import_record = admin_module.AccountSetImport(
-                account_set_id=account_set.id,
-                source_filename=filename,
-                stored_path=save_path,
-                file_type=file_type,
-                status="uploaded",
-                imported_count=0,
-            )
-            admin_module.db.session.add(import_record)
-
-            try:
-                success += 1
-                import_record.error_message = None
-                results.append({"file": filename, "status": "ok", "message": "replaced" if replaced else "uploaded"})
-            except Exception as exc:
-                failed += 1
-                import_record.status = "error"
-                import_record.error_message = str(exc)
-                results.append({"file": filename, "status": "error", "error": str(exc)})
-            admin_module.db.session.commit()
-
-        return jsonify(
-            {
-                "status": "ok" if failed == 0 else "partial",
-                "account_set": admin_module._serialize_account_set(account_set),
-                "total": len(uploaded_files),
-                "success": success,
-                "failed": failed,
-                "results": results,
-            }
-        )
+    admin_bp.add_url_rule("/import/raw-files", endpoint="import_raw_files", view_func=import_raw_files, methods=["POST"])
 
     @admin_bp.route("/manager-overtime/template", methods=["GET"])
     @admin_required
@@ -182,6 +105,87 @@ def register_admin_import_routes(admin_bp) -> None:
     admin_bp.add_url_rule("/employees/import", endpoint="import_employees_xlsx", view_func=import_employees_xlsx, methods=["POST"])
     admin_bp.add_url_rule("/employees/template", endpoint="download_employees_template", view_func=download_employees_template, methods=["GET"])
     admin_bp.add_url_rule("/employees/export", endpoint="export_employees_xlsx", view_func=export_employees_xlsx, methods=["GET"])
+
+
+@admin_required
+def import_raw_files():
+    from routes import admin as admin_module
+
+    account_set_id = request.form.get("account_set_id", type=int)
+    account_set = (
+        admin_module.db.session.get(admin_module.AccountSet, account_set_id)
+        if account_set_id
+        else admin_module.AccountSet.query.filter_by(is_active=True).first()
+    )
+    if not account_set:
+        return jsonify({"status": "error", "message": "请先创建并选择账套"}), 400
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "上传原始文件")
+    if locked_error:
+        return locked_error
+
+    uploaded_files = [file for file in request.files.getlist("files") if (file.filename or "").strip()]
+    if not uploaded_files:
+        return jsonify({"status": "error", "message": "请至少选择一个要上传的源文件"}), 400
+
+    results = []
+    success = 0
+    failed = 0
+    for file in uploaded_files:
+        filename = file.filename.strip()
+        file_type = admin_module._account_set_file_type(filename)
+        previous_record = admin_module.AccountSetImport.query.filter_by(
+            account_set_id=account_set.id, file_type=file_type
+        ).first()
+        replaced = previous_record is not None
+
+        if previous_record:
+            old_path = (previous_record.stored_path or "").strip()
+            if old_path and os.path.exists(old_path):
+                try:
+                    os.remove(old_path)
+                except Exception:
+                    pass
+            admin_module.db.session.delete(previous_record)
+            admin_module.db.session.flush()
+
+        account_set_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "account_sets", account_set.month)
+        os.makedirs(account_set_dir, exist_ok=True)
+        save_name = f"{int(datetime.now().timestamp())}_{filename}"
+        save_path = os.path.join(account_set_dir, save_name)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        file.save(save_path)
+
+        import_record = admin_module.AccountSetImport(
+            account_set_id=account_set.id,
+            source_filename=filename,
+            stored_path=save_path,
+            file_type=file_type,
+            status="uploaded",
+            imported_count=0,
+        )
+        admin_module.db.session.add(import_record)
+
+        try:
+            success += 1
+            import_record.error_message = None
+            results.append({"file": filename, "status": "ok", "message": "replaced" if replaced else "uploaded"})
+        except Exception as exc:
+            failed += 1
+            import_record.status = "error"
+            import_record.error_message = str(exc)
+            results.append({"file": filename, "status": "error", "error": str(exc)})
+        admin_module.db.session.commit()
+
+    return jsonify(
+        {
+            "status": "ok" if failed == 0 else "partial",
+            "account_set": admin_module._serialize_account_set(account_set),
+            "total": len(uploaded_files),
+            "success": success,
+            "failed": failed,
+            "results": results,
+        }
+    )
 
 
 @admin_required
@@ -590,4 +594,3 @@ def export_employees_xlsx():
         download_name="员工主数据导出.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-
