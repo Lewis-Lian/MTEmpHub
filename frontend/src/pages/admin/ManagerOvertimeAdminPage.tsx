@@ -4,7 +4,7 @@ export default function ManagerOvertimeAdminPage() {
   return (
     <ManagerMonthStatPage
       editTitle="编辑管理人员加班"
-      endpointBase="/admin/manager-overtime"
+      endpointBase="/api/admin/manager-overtime"
       listTitle="管理人员加班列表"
       monthFields={[
         { key: "prev_dec", label: "前年累积天数" },
