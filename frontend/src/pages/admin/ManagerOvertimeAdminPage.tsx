@@ -5,7 +5,6 @@ export default function ManagerOvertimeAdminPage() {
     <ManagerMonthStatPage
       editTitle="编辑管理人员加班"
       endpointBase="/api/admin/manager-overtime"
-      listTitle="管理人员加班列表"
       monthFields={[
         { key: "prev_dec", label: "前年累积天数" },
         { key: "m1", label: "1月" },
@@ -22,7 +21,6 @@ export default function ManagerOvertimeAdminPage() {
         { key: "m12", label: "12月" },
       ]}
       remainingLabel="剩余调休天数"
-      saveSuccessText="加班修正已保存"
       summaryColumns={[
         { key: "prev_dec", label: "前年累积", render: (row) => String(row.prev_dec ?? 0) },
         {

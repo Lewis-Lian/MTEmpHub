@@ -5,7 +5,6 @@ export default function ManagerAnnualLeaveAdminPage() {
     <ManagerMonthStatPage
       editTitle="编辑管理人员年休"
       endpointBase="/api/admin/manager-annual-leave"
-      listTitle="管理人员年休列表"
       monthFields={[
         { key: "m1", label: "1月" },
         { key: "m2", label: "2月" },
@@ -21,7 +20,6 @@ export default function ManagerAnnualLeaveAdminPage() {
         { key: "m12", label: "12月" },
       ]}
       remainingLabel="剩余年休天数"
-      saveSuccessText="年休修正已保存"
       summaryColumns={[
         {
           key: "used_total",

@@ -18,13 +18,8 @@ export default function ManagerAttendanceOverridesPage() {
       fields={MANAGER_FIELDS}
       filterMode="manager"
       listEmptyHint="当前条件下暂无管理人员修正数据"
-      metricEmployeeSub="只支持管理人员"
-      metricFieldCount="6"
-      metricFieldSub="出勤、工伤、出差、婚丧假、迟到早退"
       pickerButtonLabel="管理人员范围"
       pickerLabel="管理人员"
-      queryDoneText={(count) => `已查询 ${count} 人`}
-      queryLoadingText="正在加载管理人员修正列表"
       saveSuccessText="修正已保存"
       title="管理人员考勤修正"
     />

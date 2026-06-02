@@ -326,7 +326,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "账号管理" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "创建账号" })).toBeInTheDocument();
     expect(await screen.findAllByText("后台管理")).not.toHaveLength(0);
     expect(await screen.findAllByRole("button", { name: "退出登录" })).toHaveLength(2);
     expect(await screen.findByText("系统管理员")).toBeInTheDocument();
@@ -880,9 +880,9 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("主要操作")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导出" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "示例下载" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
+    expect(screen.queryByText("选择人员和月份后维护手工修正值")).not.toBeInTheDocument();
     expect(screen.getByText("请先查询员工和月份")).toBeInTheDocument();
   });
 
@@ -916,11 +916,13 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("经理甲")).toBeInTheDocument();
     expect(await screen.findByText("出勤天数：20")).toBeInTheDocument();
     expect(await screen.findByText("经理修正")).toBeInTheDocument();
+    expect(document.querySelector(".table-pager select")).not.toBeNull();
+    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员考勤修正")).toBeInTheDocument();
     expect(screen.getByText("字段")).toBeInTheDocument();
     expect(screen.getByText("系统自动值")).toBeInTheDocument();
-    expect(screen.getByText("手工修正值")).toBeInTheDocument();
+    expect(screen.queryByText("手工修正值")).not.toBeInTheDocument();
     expect(screen.getByText("最终应用值")).toBeInTheDocument();
   });
 
@@ -929,16 +931,16 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
-    expect(screen.getByText("人员筛选")).toBeInTheDocument();
+    expect(screen.getByText("管理人员")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-overtime/template");
-    expect(screen.getByText("当前条件无数据")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
+    expect(screen.queryByText("按年度和人员筛选后查看列表，通过弹窗维护单人整年数据")).not.toBeInTheDocument();
+    expect(screen.getByText("请先查询管理人员和年份")).toBeInTheDocument();
+    expect(container.querySelector(".table-pager")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
@@ -947,6 +949,8 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByText("前年累积")).toBeInTheDocument();
     expect(screen.getByText("剩余调休天数")).toBeInTheDocument();
+    expect(container.querySelector(".table-pager select")).not.toBeNull();
+    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员加班")).toBeInTheDocument();
     expect(screen.getByText("前年累积天数")).toBeInTheDocument();
@@ -958,16 +962,16 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
-    expect(screen.getByText("人员筛选")).toBeInTheDocument();
+    expect(screen.getByText("管理人员")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-annual-leave/template");
-    expect(screen.getByText("当前条件无数据")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
+    expect(screen.queryByText("按年度和人员筛选后查看列表，通过弹窗维护单人整年数据")).not.toBeInTheDocument();
+    expect(screen.getByText("请先查询管理人员和年份")).toBeInTheDocument();
+    expect(container.querySelector(".table-pager")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
@@ -976,6 +980,8 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByText("年度已用")).toBeInTheDocument();
     expect(screen.getByText("剩余年休天数")).toBeInTheDocument();
+    expect(container.querySelector(".table-pager select")).not.toBeNull();
+    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员年休")).toBeInTheDocument();
     expect(screen.getByText("1月")).toBeInTheDocument();
@@ -989,20 +995,27 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "账号管理" })).toBeInTheDocument();
-    expect(screen.getByText("创建账号")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "创建账号" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "创建账号" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "一键创建管理人员账号" })).toBeInTheDocument();
-    expect(screen.getByText("关联员工（可搜索、多选）")).toBeInTheDocument();
-    expect(screen.getByText("关联部门（可搜索、多选）")).toBeInTheDocument();
-    expect(screen.getByText("账号页面权限")).toBeInTheDocument();
     expect(screen.getByText("账号列表")).toBeInTheDocument();
+    expect(screen.queryByText(/当前显示 .* 个账号/)).toBeNull();
+    expect(screen.getByRole("button", { name: "清空筛选" })).toBeInTheDocument();
+    expect((await screen.findAllByText("admin")).length).toBeGreaterThan(1);
+    expect(screen.queryByText("暂无账号数据")).toBeNull();
+    expect(screen.queryByRole("button", { name: "重置密码" })).toBeNull();
+
+    fireEvent.click(screen.getAllByRole("checkbox")[1]);
     expect(screen.getByRole("button", { name: "批量修改角色" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批量修改关联员工" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批量修改关联部门" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批量修改页面权限" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批量重置密码" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "批量删除账号" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "创建账号" }));
+    expect(await screen.findByText("关联员工（可搜索、多选）")).toBeInTheDocument();
+    expect(screen.getByText("关联部门（可搜索、多选）")).toBeInTheDocument();
+    expect(screen.getByText("账号页面权限")).toBeInTheDocument();
   });
 
   it("账号管理页可以打开编辑账号弹窗", async () => {
@@ -1012,7 +1025,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    await screen.findByRole("heading", { name: "账号管理" });
+    await screen.findByRole("button", { name: "创建账号" });
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
 
     expect(await screen.findByText("编辑账号")).toBeInTheDocument();
@@ -1022,6 +1035,7 @@ describe("App smoke regression", () => {
     expect(screen.getByText("关联员工")).toBeInTheDocument();
     expect(screen.getByText("关联部门")).toBeInTheDocument();
     expect(screen.getByText("编辑页面权限")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重置密码" })).toBeInTheDocument();
   });
 
 });
@@ -1341,19 +1355,6 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
         }),
       );
     case "/api/admin/accounts":
-      return Promise.resolve(
-        jsonResponse([
-          {
-            id: 9,
-            username: "admin",
-            role: "系统管理员",
-            profile_emp_no: "A001",
-            profile_name: "管理员",
-            departments: [{ dept_name: "信息部" }],
-          },
-        ]),
-      );
-    case "/admin/users":
       return Promise.resolve(
         jsonResponse([
           {

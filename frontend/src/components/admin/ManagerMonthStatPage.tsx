@@ -1,4 +1,4 @@
-import { ChangeEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchAccountSets } from "../../api/admin";
 import { apiRequest, buildApiUrl } from "../../api/client";
@@ -7,6 +7,7 @@ import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
 import EmployeePicker from "../query/EmployeePicker";
 import QueryResultPanel from "../query/QueryResultPanel";
+import QueryTable from "../query/QueryTable";
 import type { QueryBootstrap } from "../../types/query";
 
 interface MonthField {
@@ -23,10 +24,8 @@ interface SummaryColumn {
 interface ManagerMonthStatPageProps {
   title: string;
   endpointBase: "/api/admin/manager-overtime" | "/api/admin/manager-annual-leave";
-  listTitle: string;
   editTitle: string;
   remainingLabel: string;
-  saveSuccessText: string;
   monthFields: MonthField[];
   summaryColumns: SummaryColumn[];
 }
@@ -44,13 +43,12 @@ type ColumnState = "editable" | "locked" | "missing_account_set";
 export default function ManagerMonthStatPage({
   title,
   endpointBase,
-  listTitle,
   editTitle,
   remainingLabel,
-  saveSuccessText,
   monthFields,
   summaryColumns,
 }: ManagerMonthStatPageProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -58,14 +56,14 @@ export default function ManagerMonthStatPage({
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [rows, setRows] = useState<ManagerStatRow[]>([]);
   const [queryError, setQueryError] = useState("");
-  const [resultMessage, setResultMessage] = useState("请选择年份和管理人员后查询");
   const [isQuerying, setIsQuerying] = useState(false);
   const [editingRow, setEditingRow] = useState<ManagerStatRow | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editRemark, setEditRemark] = useState("");
   const [columnStates, setColumnStates] = useState<Record<string, ColumnState>>({});
-  const [importFile, setImportFile] = useState<File | null>(null);
   const [importError, setImportError] = useState("");
+  const [hasQueried, setHasQueried] = useState(false);
+  const [showActionsModal, setShowActionsModal] = useState(false);
 
   useEffect(() => {
     void (async () => {
@@ -84,6 +82,20 @@ export default function ManagerMonthStatPage({
     () => bootstrap?.employees.filter((employee) => employee.is_manager) ?? [],
     [bootstrap],
   );
+  const tableHeaders = [
+    "部门",
+    "姓名",
+    ...summaryColumns.map((column) => column.label),
+    "备注",
+    { label: "操作", sortable: false as const },
+  ];
+  const tableRows = rows.map((row) => [
+    String(row.dept_name ?? ""),
+    String(row.name ?? ""),
+    ...summaryColumns.map((column) => column.render(row)),
+    String(row.remark ?? ""),
+    <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>,
+  ]);
 
   async function loadRows() {
     if (!year) {
@@ -106,11 +118,11 @@ export default function ManagerMonthStatPage({
       ]);
       setRows(Array.isArray(nextRows) ? nextRows : []);
       setColumnStates(states);
+      setHasQueried(true);
       setEditingRow(null);
-      setResultMessage(Array.isArray(nextRows) && nextRows.length ? `已查询 ${nextRows.length} 人` : "当前条件无数据");
     } catch (error) {
       setRows([]);
-      setResultMessage("查询失败");
+      setHasQueried(true);
       setQueryError(error instanceof Error ? error.message : "后台数据加载失败");
     } finally {
       setIsQuerying(false);
@@ -145,20 +157,20 @@ export default function ManagerMonthStatPage({
         method: "PUT",
       });
       await loadRows();
-      setResultMessage(saveSuccessText);
     } catch (error) {
       setQueryError(error instanceof Error ? error.message : "保存失败");
     }
   }
 
-  async function submitImport() {
+  async function submitImport(event: ChangeEvent<HTMLInputElement>) {
     setImportError("");
+    const importFile = event.target.files?.[0];
     if (!importFile?.name) {
-      setImportError("请选择要导入的 xlsx 文件");
       return;
     }
     if (!importFile.name.toLowerCase().endsWith(".xlsx")) {
       setImportError("仅支持 .xlsx 文件");
+      event.target.value = "";
       return;
     }
 
@@ -181,13 +193,16 @@ export default function ManagerMonthStatPage({
         result.error_count && result.errors?.length
           ? `\n失败 ${result.error_count} 条：\n${result.errors.join("\n")}`
           : "";
-      setResultMessage(`已导入 ${String(result.imported ?? 0)} 人${warnings}${errors}`);
-      setImportFile(null);
       if (selectedEmployeeIds.length) {
         await loadRows();
       }
+      if (warnings || errors) {
+        window.alert(`已导入 ${String(result.imported ?? 0)} 人${warnings}${errors}`);
+      }
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "导入失败");
+    } finally {
+      event.target.value = "";
     }
   }
 
@@ -211,11 +226,21 @@ export default function ManagerMonthStatPage({
     <div className="query-page-shell manager-month-stat-page">
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
-          <span className="query-filter-kicker">Query Filters</span>
           <h2>查询条件</h2>
-          <p>按年度和人员筛选后查看列表，通过弹窗维护单人整年数据</p>
         </div>
         <div className="query-filter-body">
+          <div className="query-filter-field">
+            <label className="form-label">管理人员</label>
+            <EmployeePicker
+              departments={bootstrap.departments}
+              employees={managerEmployees}
+              filterMode="manager"
+              label="管理人员范围"
+              onChange={setSelectedEmployeeIds}
+              selectedIds={selectedEmployeeIds}
+              showFieldChrome={false}
+            />
+          </div>
           <div className="query-filter-field">
             <label className="form-label">年份</label>
             <input
@@ -228,101 +253,32 @@ export default function ManagerMonthStatPage({
             />
           </div>
           <div className="query-filter-field">
-            <label className="form-label">人员筛选</label>
-            <EmployeePicker
-              departments={bootstrap.departments}
-              employees={managerEmployees}
-              filterMode="manager"
-              label="管理人员范围"
-              onChange={setSelectedEmployeeIds}
-              selectedIds={selectedEmployeeIds}
-              showFieldChrome={false}
-            />
-          </div>
-          <div className="query-filter-field">
-            <label className="form-label">导入文件</label>
-            <div className="manager-month-stat-import-controls" style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              <input
-                accept=".xlsx"
-                className="form-control"
-                style={{ width: "160px" }}
-                onChange={(event: ChangeEvent<HTMLInputElement>) => setImportFile(event.target.files?.[0] ?? null)}
-                type="file"
-              />
-              <button className="btn btn-outline-warning" onClick={submitImport} type="button">
-                导入
-              </button>
-              <a className="btn btn-outline-secondary" href={buildApiUrl(`${endpointBase}/template`)}>
-                下载示例
-              </a>
-            </div>
-          </div>
-          <div className="query-filter-field">
             <label className="form-label">主要操作</label>
-            <div className="query-filter-actions" style={{ display: "flex", gap: "8px" }}>
+            <div className="query-filter-actions">
               <button className="btn btn-primary" onClick={loadRows} type="button">
                 查询
               </button>
-              <button className="btn btn-outline-success" onClick={handleExport} type="button">
-                导出XLSX
+              <button className="btn btn-outline-secondary" onClick={() => setShowActionsModal(true)} type="button">
+                导入导出
               </button>
+              <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" onChange={submitImport} type="file" />
             </div>
             <div className="account-lock-notice" style={{ marginTop: "4px" }}>{buildLockNotice(year, columnStates)}</div>
           </div>
         </div>
         {queryError ? <div className="legacy-inline-error">{queryError}</div> : null}
         {importError ? <div className="legacy-inline-error">{importError}</div> : null}
-        <div className="manager-month-stat-result" style={{ marginTop: "8px" }}>{resultMessage}</div>
       </aside>
 
       <section className="query-workspace">
         <QueryResultPanel>
-          <div className="legacy-table-panel manager-month-stat-table-panel">
-            <div className="legacy-table-wrap">
-              <table className="legacy-table manager-month-stat-table">
-                <thead>
-                  <tr>
-                    <th className="legacy-table-head-cell">部门</th>
-                    <th className="legacy-table-head-cell">姓名</th>
-                    {summaryColumns.map((column) => (
-                      <th className="legacy-table-head-cell" key={column.key}>
-                        {column.label}
-                      </th>
-                    ))}
-                    <th className="legacy-table-head-cell">备注</th>
-                    <th className="legacy-table-head-cell">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.length ? (
-                    rows.map((row) => (
-                      <tr key={row.emp_id}>
-                        <td className="legacy-table-body-cell">{String(row.dept_name ?? "")}</td>
-                        <td className="legacy-table-body-cell">{String(row.name ?? "")}</td>
-                        {summaryColumns.map((column) => (
-                          <td className="legacy-table-body-cell" key={column.key}>
-                            {column.render(row)}
-                          </td>
-                        ))}
-                        <td className="legacy-table-body-cell">{String(row.remark ?? "")}</td>
-                        <td className="legacy-table-body-cell">
-                          <button className="account-action-button" onClick={() => openEdit(row)} type="button">
-                            编辑
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td className="legacy-table-empty-cell" colSpan={summaryColumns.length + 4}>
-                        {isQuerying ? "正在加载..." : "当前条件无数据"}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <QueryTable
+            emptyText={isQuerying ? "正在加载..." : hasQueried ? "当前条件无数据" : "请先查询管理人员和年份"}
+            headers={tableHeaders}
+            panelClassName="manager-month-stat-table-panel"
+            rows={tableRows}
+            tableClassName="manager-month-stat-table"
+          />
         </QueryResultPanel>
       </section>
 
@@ -393,6 +349,46 @@ export default function ManagerMonthStatPage({
           </div>
         </div>
       ) : null}
+
+      {showActionsModal ? (
+        <div aria-label="导入导出" aria-modal="true" className="master-modal-backdrop attendance-override-actions-backdrop" role="dialog">
+          <div className="master-modal attendance-override-actions-modal">
+            <div className="master-modal-header">
+              <div>
+                <h2>导入导出</h2>
+                <div className="attendance-override-edit-meta">选择需要执行的数据导出或导入操作</div>
+              </div>
+              <button aria-label="关闭" className="master-modal-close" onClick={() => setShowActionsModal(false)} type="button">
+                ×
+              </button>
+            </div>
+            <div className="master-modal-body attendance-override-actions-body">
+              <button
+                className="account-action-button account-action-button--primary attendance-override-actions-button"
+                onClick={() => { handleExport(); setShowActionsModal(false); }}
+                type="button"
+              >
+                导出
+              </button>
+              <button
+                className="account-action-button account-action-button--success attendance-override-actions-button"
+                onClick={() => { fileInputRef.current?.click(); setShowActionsModal(false); }}
+                type="button"
+              >
+                导入
+              </button>
+              <a className="account-action-button attendance-override-actions-button" href={buildApiUrl(`${endpointBase}/template`)}>
+                示例下载
+              </a>
+            </div>
+            <div className="master-modal-footer">
+              <button className="account-action-button" onClick={() => setShowActionsModal(false)} type="button">
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -418,22 +414,15 @@ async function buildColumnStates(year: string, keys: string[]): Promise<Record<s
 
 function buildLockNotice(year: string, states: Record<string, ColumnState>): string {
   const locked: string[] = [];
-  const missing: string[] = [];
   Object.entries(states).forEach(([key, state]) => {
     const month = key === "prev_dec" ? `${Number(year) - 1}-12` : `${year}-${String(Number(key.slice(1))).padStart(2, "0")}`;
     if (state === "locked") {
       locked.push(month);
-    }
-    if (state === "missing_account_set") {
-      missing.push(month);
     }
   });
   const parts: string[] = [];
   if (locked.length) {
     parts.push(`已锁定：${locked.join("、")}`);
   }
-  if (missing.length) {
-    parts.push(`暂无账套：${missing.join("、")}（仍可编辑）`);
-  }
-  return parts.join("；") || "当前年度相关账套未锁定，可导入并通过弹窗保存";
+  return parts.join("；");
 }
