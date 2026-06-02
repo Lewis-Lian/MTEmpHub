@@ -309,6 +309,12 @@ def _serialize_employee(employee: Employee) -> dict:
 
 def _parse_attendance_source(value: Any, default: str) -> str:
     source = str(value or "").strip() or default
+    label_map = {
+        "员工考勤源文件取值": ATTENDANCE_SOURCE_EMPLOYEE,
+        "管理人员考勤源文件取值": ATTENDANCE_SOURCE_MANAGER,
+        "自动回退": ATTENDANCE_SOURCE_AUTO_FALLBACK,
+    }
+    source = label_map.get(source, source)
     if source not in ATTENDANCE_SOURCE_VALUES:
         return default
     return source
