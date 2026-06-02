@@ -864,30 +864,26 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "管理人员考勤修正" })).toBeInTheDocument();
-    expect(await screen.findAllByText("等待查询")).not.toHaveLength(0);
+    expect(await screen.findByText("查询条件")).toBeInTheDocument();
+    expect(await screen.findAllByText("请先查询管理人员和月份")).not.toHaveLength(0);
     expect(screen.queryByText("管理人员考勤修正加载失败")).not.toBeInTheDocument();
     expect(hasRequestedPath("/api/admin/manager-attendance-overrides")).toBe(false);
   });
 
-  it("员工考勤修正页会挂载旧版指标卡和操作区", async () => {
+  it("员工考勤修正页会挂载查询操作区和列表区", async () => {
     window.history.replaceState({}, "", "/admin/employee-attendance-overrides");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByText("修正月份")).toBeInTheDocument();
-    expect(screen.getByText("当前人员")).toBeInTheDocument();
-    expect(screen.getByText("修正字段")).toBeInTheDocument();
-    expect(screen.getByText("当前状态")).toBeInTheDocument();
-    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("主要操作")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导出" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "示例下载" })).toBeInTheDocument();
-    expect(screen.getByText("修正列表")).toBeInTheDocument();
+    expect(screen.getByText("请先查询员工和月份")).toBeInTheDocument();
   });
 
   it("考勤修正页会挂载专用查询卡和员工选择器样式类", async () => {
@@ -897,10 +893,10 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    await screen.findByText("修正列表");
-    expect(container.querySelector(".attendance-override-query-card")).not.toBeNull();
-    expect(container.querySelector(".attendance-override-query-card .account-card-body")).not.toBeNull();
-    expect(container.querySelector(".attendance-override-picker-field .employee-float-list")).not.toBeNull();
+    await screen.findByText("查询条件");
+    expect(container.querySelector(".query-filter-rail")).not.toBeNull();
+    expect(container.querySelector(".query-filter-rail .query-filter-body")).not.toBeNull();
+    expect(container.querySelector(".query-filter-field .employee-float-list")).not.toBeNull();
   });
 
   it("管理人员考勤修正页选择月份和人员后可以查询", async () => {
@@ -910,7 +906,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    await screen.findByRole("heading", { name: "管理人员考勤修正" });
+    await screen.findByText("查询条件");
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
     fireEvent.click(screen.getByRole("button", { name: "确定" }));
@@ -935,15 +931,14 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "管理人员加班" })).toBeInTheDocument();
-    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("人员筛选")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-overtime/template");
-    expect(screen.getByText("管理人员加班列表")).toBeInTheDocument();
+    expect(screen.getByText("当前条件无数据")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
@@ -965,15 +960,14 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    expect(await screen.findByRole("heading", { name: "管理人员年休" })).toBeInTheDocument();
-    expect(screen.getByText("查询条件")).toBeInTheDocument();
+    expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("人员筛选")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导出XLSX" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "下载示例" })).toHaveAttribute("href", "/api/admin/manager-annual-leave/template");
-    expect(screen.getByText("管理人员年休列表")).toBeInTheDocument();
+    expect(screen.getByText("当前条件无数据")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
