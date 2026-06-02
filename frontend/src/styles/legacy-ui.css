@@ -1201,8 +1201,27 @@ body {
   z-index: 130;
 }
 
+.attendance-override-actions-backdrop {
+  z-index: 120;
+}
+
 .attendance-override-edit-modal {
   width: min(920px, 100%);
+}
+
+.attendance-override-actions-modal {
+  width: min(420px, 100%);
+}
+
+.attendance-override-actions-body {
+  display: grid;
+  gap: 10px;
+}
+
+.attendance-override-actions-button {
+  display: inline-flex;
+  justify-content: center;
+  width: 100%;
 }
 
 .manager-month-stat-page {
@@ -1264,16 +1283,6 @@ body {
   flex: 1;
 }
 
-.manager-month-stat-result {
-  white-space: pre-line;
-  padding: 10px 12px;
-  border: 1px solid #cfe0be;
-  background: #f7fbf1;
-  color: #3f6212;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
 .manager-month-stat-table-panel {
   min-height: 320px;
   max-height: calc(100vh - 290px);
@@ -1284,11 +1293,27 @@ body {
 }
 
 .manager-month-stat-edit-modal {
-  width: min(1180px, 100%);
+  width: min(1380px, 100%);
 }
 
 .manager-month-stat-edit-table {
   min-width: 1040px;
+}
+
+.manager-month-stat-edit-table .legacy-table-head-cell,
+.manager-month-stat-edit-table .legacy-table-body-cell {
+  min-width: 88px;
+  white-space: nowrap;
+}
+
+.manager-month-stat-edit-table .legacy-table-head-cell:last-child,
+.manager-month-stat-edit-table .legacy-table-body-cell:last-child {
+  min-width: 128px;
+}
+
+.manager-month-stat-edit-table .attendance-override-edit-input {
+  width: 100%;
+  min-width: 72px;
 }
 
 .attendance-override-edit-meta {
@@ -1962,6 +1987,7 @@ body {
 .employee-master-page .employee-lookup-card .account-card-body,
 .employee-master-page .master-data-main,
 .employee-master-page .master-filter-panel,
+.employee-master-page .master-list-header,
 .employee-dept-modal,
 .employee-dept-modal .master-modal-body,
 .employee-dept-modal .account-field {
@@ -1977,14 +2003,115 @@ body {
   z-index: 1;
 }
 
+.employee-master-page .master-filter-panel {
+  position: relative;
+  z-index: 40;
+}
+
+.employee-master-page .query-result-panel {
+  position: relative;
+  z-index: 1;
+}
+
+.employee-master-page .legacy-table-head-cell {
+  z-index: 1;
+}
+
 .employee-master-page .employee-lookup,
 .employee-dept-modal .employee-lookup {
-  z-index: 2;
+  position: relative;
+  z-index: 41;
 }
 
 .employee-master-page .employee-float-list,
 .employee-dept-modal .employee-float-list {
+  z-index: 4200;
+}
+
+.account-center-page .master-filter-panel,
+.account-center-page .account-field {
+  overflow: visible;
+}
+
+.account-center-page .employee-lookup {
+  z-index: 2;
+}
+
+.account-center-page .employee-float-list {
   z-index: 1250;
+}
+
+.account-center-page .account-top-control-row {
+  width: auto;
+}
+
+.account-center-page .account-filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  grid-template-columns: none;
+}
+
+.account-center-page .account-filter-inline-action {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.account-center-page .account-action-button--compact {
+  min-height: 38px;
+  padding: 0 16px;
+  font-size: 12px;
+}
+
+.account-center-page .query-result-panel,
+.account-center-page .query-result-table,
+.account-center-page .legacy-table-panel,
+.account-center-page .legacy-table-wrap {
+  min-width: 0;
+}
+
+.account-center-page .account-table-panel {
+  min-height: 280px;
+  max-height: 420px;
+}
+
+.account-center-page .legacy-table-body-cell {
+  white-space: nowrap;
+}
+
+.account-center-page .toolbar {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.account-edit-modal,
+.account-edit-modal .master-modal-body,
+.account-edit-modal .account-grid-two,
+.account-edit-modal .account-field {
+  overflow: visible;
+}
+
+.account-edit-modal .employee-lookup {
+  position: relative;
+  z-index: 3;
+}
+
+.account-edit-modal .account-field:has(.employee-float-list.show),
+.account-edit-modal .employee-lookup:has(.employee-float-list.show) {
+  position: relative;
+  z-index: 60;
+}
+
+.account-edit-modal .employee-float-list {
+  z-index: 2200;
+}
+
+.account-table-text-ellipsis {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .employee-picker-list {
@@ -3076,6 +3203,13 @@ body {
 
 .account-center-page {
   min-height: 100%;
+}
+
+.account-page-stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
 }
 
 .account-workflow {
@@ -4921,6 +5055,26 @@ input[type="checkbox"] {
   color: #334155 !important;
 }
 
+.master-modal.account-edit-modal,
+.master-modal.account-edit-modal .master-modal-body,
+.master-modal.account-edit-modal .account-grid-two,
+.master-modal.account-edit-modal .account-field {
+  overflow: visible !important;
+}
 
+.master-modal.account-edit-modal .employee-lookup {
+  position: relative;
+  z-index: 3;
+}
 
+.master-modal.account-edit-modal .account-field:has(.employee-float-list.show),
+.master-modal.account-edit-modal .employee-lookup:has(.employee-float-list.show) {
+  position: relative;
+  z-index: 90;
+}
 
+.master-modal.account-edit-modal .employee-float-list.show {
+  top: calc(100% + 4px);
+  bottom: auto;
+  z-index: 5000;
+}

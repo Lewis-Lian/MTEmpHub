@@ -6,6 +6,8 @@ import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import DepartmentPicker from "../../components/query/DepartmentPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
+import QueryResultPanel from "../../components/query/QueryResultPanel";
+import QueryTable from "../../components/query/QueryTable";
 import type { AdminDepartment, AdminEmployee } from "../../types/admin";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
 
@@ -42,6 +44,7 @@ const permissionCatalog = [
 ] as const;
 
 const allPermissionKeys = permissionCatalog.map((item) => item.key);
+const ACCOUNT_LIST_PATH = "/api/admin/accounts";
 
 export default function AccountsPage() {
   const [users, setUsers] = useState<AccountUser[]>([]);
@@ -58,6 +61,7 @@ export default function AccountsPage() {
   const [createEmpIds, setCreateEmpIds] = useState<number[]>([]);
   const [createDeptIds, setCreateDeptIds] = useState<number[]>([]);
   const [createPermissionKeys, setCreatePermissionKeys] = useState<string[]>(allPermissionKeys);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
   const [filterEmpIds, setFilterEmpIds] = useState<number[]>([]);
   const [filterRole, setFilterRole] = useState("");
@@ -97,7 +101,7 @@ export default function AccountsPage() {
     setLoadError("");
     try {
       const [userRows, employeeRows, departmentRows] = await Promise.all([
-        apiRequest<AccountUser[]>("/admin/users"),
+        apiRequest<AccountUser[]>(ACCOUNT_LIST_PATH),
         fetchAdminEmployees(),
         fetchAdminDepartments(),
       ]);
@@ -112,7 +116,7 @@ export default function AccountsPage() {
   }
 
   async function refreshUsers() {
-    const rows = await apiRequest<AccountUser[]>("/admin/users");
+    const rows = await apiRequest<AccountUser[]>(ACCOUNT_LIST_PATH);
     setUsers(Array.isArray(rows) ? rows : []);
     setSelectedUserIds((current) => current.filter((id) => rows.some((user) => user.id === id)));
   }
@@ -166,6 +170,70 @@ export default function AccountsPage() {
     }
     return `${row.dept_no ?? ""} ${row.dept_name}`.toLowerCase().includes(departmentKeyword.trim().toLowerCase());
   });
+  const accountTableHeaders = [
+    {
+      label: (
+        <input
+          checked={filteredUsers.length > 0 && filteredUsers.every((user) => selectedUserIds.includes(user.id))}
+          onChange={(event) =>
+            setSelectedUserIds(event.target.checked ? filteredUsers.map((user) => user.id) : [])
+          }
+          type="checkbox"
+        />
+      ),
+      sortable: false,
+    },
+    "ID",
+    "用户名",
+    "角色",
+    "绑定工号",
+    "绑定姓名",
+    "档案部门",
+    "员工范围",
+    "部门范围",
+    "可访问页面",
+    "创建时间",
+    { label: "操作", sortable: false as const },
+  ];
+  const accountTableRows = filteredUsers.map((user) => [
+    <input
+      checked={selectedUserIds.includes(user.id)}
+      onChange={() =>
+        setSelectedUserIds((current) =>
+          current.includes(user.id) ? current.filter((id) => id !== user.id) : [...current, user.id],
+        )
+      }
+      type="checkbox"
+    />,
+    user.id,
+    <CompactTableText value={user.username} />,
+    roleLabel(user.role),
+    <CompactTableText value={user.profile_emp_no} />,
+    <CompactTableText value={user.profile_name} />,
+    <CompactTableText value={user.profile_department?.dept_name ?? "-"} />,
+    <CompactTableText value={summarizeUserEmployees(user)} />,
+    <CompactTableText value={summarizeUserDepartments(user)} />,
+    <CompactTableText value={summarizePermissions(enabledPermissionKeys(user.page_permissions))} />,
+    <CompactTableText value={formatDateTime(user.created_at)} />,
+    <div className="toolbar">
+      <button className="account-action-button" onClick={() => openEdit(user)} type="button">编辑</button>
+      <button className="account-action-button account-action-button--danger" onClick={() => void deleteUser(user.id)} type="button">删除</button>
+    </div>,
+  ]);
+  const accountTableSortRows = filteredUsers.map((user) => [
+    "",
+    user.id,
+    user.username,
+    roleLabel(user.role),
+    user.profile_emp_no,
+    user.profile_name,
+    user.profile_department?.dept_name ?? "-",
+    summarizeUserEmployees(user),
+    summarizeUserDepartments(user),
+    summarizePermissions(enabledPermissionKeys(user.page_permissions)),
+    formatDateTime(user.created_at),
+    "",
+  ]);
 
   if (loading) {
     return <LoadingState message="正在准备账号管理页面..." />;
@@ -201,6 +269,7 @@ export default function AccountsPage() {
       setCreateEmpIds([]);
       setCreateDeptIds([]);
       setCreatePermissionKeys(allPermissionKeys);
+      setCreateModalOpen(false);
       setResultMessage("创建成功");
       await refreshUsers();
     } catch (error) {
@@ -351,201 +420,184 @@ export default function AccountsPage() {
 
   return (
     <main className="account-center-page">
-      <section className="legacy-page-section">
-        <header className="legacy-page-header">
-          <div className="legacy-page-heading">
-            <p className="legacy-page-kicker">后台管理</p>
-            <h2 className="legacy-page-title">账号管理</h2>
-            <p className="legacy-page-description">维护登录账号、角色权限及员工、部门的数据访问范围。</p>
+      <section className="account-page-stack">
+        <div className="account-top-control-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px", marginBottom: "16px" }}>
+          <div className="account-panel-selector" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            <button className="btn btn-outline-secondary" onClick={() => setCreateModalOpen(true)} type="button">
+              创建账号
+            </button>
+            <button className="btn btn-outline-secondary" onClick={createManagerAccounts} type="button">
+              一键创建管理人员账号
+            </button>
           </div>
-        </header>
 
-        <div className="account-workflow">
-          <aside className="account-workflow-side sticky-side">
-            <section className="account-card">
-              <div className="account-card-header">
-                <span>创建账号表单</span>
-                <span className="page-tag">Account Setup</span>
-              </div>
-              <div className="account-card-body">
-                <div className="account-create-form">
-                  <label className="account-field">
-                    <span className="account-field-label">用户名</span>
-                    <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} />
-                  </label>
-                  <label className="account-field">
-                    <span className="account-field-label">密码</span>
-                    <input className="account-input" onChange={(event) => setCreatePassword(event.target.value)} type="password" value={createPassword} />
-                  </label>
-                  <label className="account-field">
-                    <span className="account-field-label">角色</span>
-                    <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
-                      <option value="readonly">只读</option>
-                      <option value="admin">管理员</option>
-                    </select>
-                  </label>
-                  <label className="account-field">
-                    <span className="account-field-label">关联员工（可搜索、多选）</span>
-                    <EmployeePicker
-                      departments={pickerDepartments}
-                      employees={pickerEmployees}
-                      onChange={setCreateEmpIds}
-                      selectedIds={createEmpIds}
-                      showFieldChrome={false}
-                    />
-                  </label>
-                  <label className="account-field">
-                    <span className="account-field-label">关联部门（可搜索、多选）</span>
-                    <PickerSummaryField
-                      buttonLabel="选择"
-                      onClick={() => {
-                        setDraftDepartmentIds(createDeptIds);
-                        setDepartmentContext("create");
-                      }}
-                      value={summarizeDepartments(createDeptIds, departments)}
-                    />
-                  </label>
-                  <label className="account-field">
-                    <span className="account-field-label">账号页面权限</span>
-                    <PickerSummaryField
-                      buttonLabel="选择"
-                      onClick={() => setPermissionContext("create")}
-                      value={summarizePermissions(createPermissionKeys)}
-                    />
-                  </label>
-                  <div className="toolbar">
-                    <button className="account-action-button account-action-button--primary" onClick={submitCreate} type="button">
-                      创建账号
-                    </button>
-                    <button className="account-action-button" onClick={createManagerAccounts} type="button">
-                      一键创建管理人员账号
-                    </button>
-                  </div>
-                </div>
-                {resultMessage ? <div className="account-result-message">{resultMessage}</div> : null}
-                {resultError ? <div className="legacy-inline-error">{resultError}</div> : null}
-              </div>
-            </section>
-          </aside>
-
-          <section className="account-card account-workflow-main table-wrap-tight">
-            <div className="account-card-header">
-              <span>账号列表</span>
-              <button className="account-action-button" onClick={refreshUsers} type="button">刷新</button>
+          <div className="active-account-set-summary-bar" style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "14px", minHeight: "36px", boxSizing: "border-box", padding: "0 14px", marginLeft: "auto", maxWidth: "100%", width: "auto", flex: "0 1 auto", background: "var(--ent-secondary-bg, #f8fafc)", border: "1px solid var(--ent-border-strong)", borderRadius: "var(--ent-radius-lg, 8px)", fontSize: "13px", color: "var(--ent-text)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>账号总数：</span>
+              <strong style={{ color: "var(--ent-primary)" }}>{users.length} 个</strong>
             </div>
-            <div className="account-card-body">
-              <div className="account-grid-two">
+            <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "var(--ent-text-secondary)" }}>管理员：</span>
+              <strong style={{ color: "var(--ent-primary)" }}>{users.filter((user) => user.role === "admin").length} 个</strong>
+            </div>
+            <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ color: "var(--ent-text-secondary)" }}>只读账号：</span>
+              <strong style={{ color: "var(--ent-primary)" }}>{users.filter((user) => user.role === "readonly").length} 个</strong>
+            </div>
+          </div>
+        </div>
+
+        {resultMessage ? <div className="account-result-message" style={{ marginBottom: "12px" }}>{resultMessage}</div> : null}
+        {resultError ? <div className="legacy-inline-error" style={{ marginBottom: "12px" }}>{resultError}</div> : null}
+
+        <div className="account-card-header master-list-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 4px", borderBottom: "none", background: "transparent", flexWrap: "wrap", gap: "12px" }}>
+          <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>账号列表</span>
+          <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <button className="account-action-button" onClick={refreshUsers} type="button">刷新</button>
+          </div>
+        </div>
+
+        <div className="master-filter-panel" style={{ marginBottom: "16px" }}>
+          <div className="master-filter-grid">
+            <label className="account-field">
+              <span className="account-field-label">账号筛选</span>
+              <EmployeePicker
+                departments={pickerDepartments}
+                employees={pickerEmployees}
+                onChange={setFilterEmpIds}
+                selectedIds={filterEmpIds}
+                showFieldChrome={false}
+              />
+            </label>
+            <label className="account-field">
+              <span className="account-field-label">是否管理员账号</span>
+              <select className="account-select" onChange={(event) => setFilterRole(event.target.value)} value={filterRole}>
+                <option value="">全部</option>
+                <option value="admin">是</option>
+                <option value="readonly">否</option>
+              </select>
+            </label>
+            <div className="account-filter-inline-action">
+              <button className="account-action-button account-action-button--compact" onClick={() => { setFilterEmpIds([]); setFilterRole(""); }} type="button">
+                清空筛选
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <QueryResultPanel>
+          <QueryTable
+            emptyText="暂无账号数据"
+            headers={accountTableHeaders}
+            panelClassName="account-table-panel"
+            rows={accountTableRows}
+            sortRows={accountTableSortRows}
+          />
+        </QueryResultPanel>
+      </section>
+
+      {createModalOpen ? (
+        <div className="master-modal-backdrop">
+          <div className="master-modal account-edit-modal">
+            <div className="master-modal-header">
+              <h2>创建账号</h2>
+              <button className="master-modal-close" onClick={() => setCreateModalOpen(false)} type="button">×</button>
+            </div>
+            <div className="master-modal-body">
+              <div className="account-create-form">
                 <label className="account-field">
-                  <span className="account-field-label">账号筛选</span>
+                  <span className="account-field-label">用户名</span>
+                  <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} />
+                </label>
+                <label className="account-field">
+                  <span className="account-field-label">密码</span>
+                  <input className="account-input" onChange={(event) => setCreatePassword(event.target.value)} type="password" value={createPassword} />
+                </label>
+                <label className="account-field">
+                  <span className="account-field-label">角色</span>
+                  <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
+                    <option value="readonly">只读</option>
+                    <option value="admin">管理员</option>
+                  </select>
+                </label>
+                <label className="account-field">
+                  <span className="account-field-label">关联员工（可搜索、多选）</span>
                   <EmployeePicker
                     departments={pickerDepartments}
                     employees={pickerEmployees}
-                    onChange={setFilterEmpIds}
-                    selectedIds={filterEmpIds}
+                    onChange={setCreateEmpIds}
+                    selectedIds={createEmpIds}
                     showFieldChrome={false}
                   />
                 </label>
                 <label className="account-field">
-                  <span className="account-field-label">是否管理员账号</span>
-                  <select className="account-select" onChange={(event) => setFilterRole(event.target.value)} value={filterRole}>
-                    <option value="">全部</option>
-                    <option value="admin">是</option>
-                    <option value="readonly">否</option>
-                  </select>
+                  <span className="account-field-label">关联部门（可搜索、多选）</span>
+                  <PickerSummaryField
+                    buttonLabel="选择"
+                    onClick={() => {
+                      setDraftDepartmentIds(createDeptIds);
+                      setDepartmentContext("create");
+                    }}
+                    value={summarizeDepartments(createDeptIds, departments)}
+                  />
+                </label>
+                <label className="account-field">
+                  <span className="account-field-label">账号页面权限</span>
+                  <PickerSummaryField
+                    buttonLabel="选择"
+                    onClick={() => setPermissionContext("create")}
+                    value={summarizePermissions(createPermissionKeys)}
+                  />
                 </label>
               </div>
-              <div className="toolbar account-list-toolbar">
-                <button className="account-action-button account-action-button--primary" type="button">查询</button>
-                <button
-                  className="account-action-button"
-                  onClick={() => {
-                    setFilterEmpIds([]);
-                    setFilterRole("");
-                  }}
-                  type="button"
-                >
-                  重置
-                </button>
-              </div>
-
-              <div className="toolbar account-list-toolbar">
-                <span className="master-selected-count">已选 {selectedUserIds.length} 个账号</span>
-                <button className="account-action-button" onClick={() => setBatchRoleOpen(true)} type="button">批量修改角色</button>
-                <button className="account-action-button" onClick={() => setBatchEmployeeOpen(true)} type="button">批量修改关联员工</button>
-                <button className="account-action-button" onClick={() => { setDraftDepartmentIds(batchDepartmentIds); setBatchDepartmentOpen(true); }} type="button">批量修改关联部门</button>
-                <button className="account-action-button" onClick={() => setPermissionContext("batch")} type="button">批量修改页面权限</button>
-                <button className="account-action-button account-action-button--warning" onClick={() => void runBatch("reset_password")} type="button">批量重置密码</button>
-                <button className="account-action-button account-action-button--danger" onClick={() => void runBatch("delete")} type="button">批量删除账号</button>
-              </div>
-
-              <div className="legacy-table-panel">
-                <div className="legacy-table-wrap">
-                  <table className="legacy-table">
-                    <thead>
-                      <tr>
-                        <th className="legacy-table-head-cell">
-                          <input
-                            checked={filteredUsers.length > 0 && filteredUsers.every((user) => selectedUserIds.includes(user.id))}
-                            onChange={(event) =>
-                              setSelectedUserIds(event.target.checked ? filteredUsers.map((user) => user.id) : [])
-                            }
-                            type="checkbox"
-                          />
-                        </th>
-                        <th className="legacy-table-head-cell">ID</th>
-                        <th className="legacy-table-head-cell">用户名</th>
-                        <th className="legacy-table-head-cell">角色</th>
-                        <th className="legacy-table-head-cell">绑定工号</th>
-                        <th className="legacy-table-head-cell">绑定姓名</th>
-                        <th className="legacy-table-head-cell">档案部门</th>
-                        <th className="legacy-table-head-cell">员工范围</th>
-                        <th className="legacy-table-head-cell">部门范围</th>
-                        <th className="legacy-table-head-cell">可访问页面</th>
-                        <th className="legacy-table-head-cell">创建时间</th>
-                        <th className="legacy-table-head-cell">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredUsers.map((user) => (
-                        <tr key={user.id}>
-                          <td className="legacy-table-body-cell">
-                            <input
-                              checked={selectedUserIds.includes(user.id)}
-                              onChange={() =>
-                                setSelectedUserIds((current) =>
-                                  current.includes(user.id) ? current.filter((id) => id !== user.id) : [...current, user.id],
-                                )
-                              }
-                              type="checkbox"
-                            />
-                          </td>
-                          <td className="legacy-table-body-cell">{user.id}</td>
-                          <td className="legacy-table-body-cell">{user.username}</td>
-                          <td className="legacy-table-body-cell">{roleLabel(user.role)}</td>
-                          <td className="legacy-table-body-cell">{user.profile_emp_no}</td>
-                          <td className="legacy-table-body-cell">{user.profile_name}</td>
-                          <td className="legacy-table-body-cell">{user.profile_department?.dept_name ?? "-"}</td>
-                          <td className="legacy-table-body-cell">{summarizeUserEmployees(user)}</td>
-                          <td className="legacy-table-body-cell">{summarizeUserDepartments(user)}</td>
-                          <td className="legacy-table-body-cell">{summarizePermissions(enabledPermissionKeys(user.page_permissions))}</td>
-                          <td className="legacy-table-body-cell">{formatDateTime(user.created_at)}</td>
-                          <td className="legacy-table-body-cell">
-                            <div className="toolbar">
-                              <button className="account-action-button" onClick={() => openEdit(user)} type="button">编辑</button>
-                              <button className="account-action-button account-action-button--warning" onClick={() => void resetPassword(user.id)} type="button">重置密码</button>
-                              <button className="account-action-button account-action-button--danger" onClick={() => void deleteUser(user.id)} type="button">删除</button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
-          </section>
+            <div className="master-modal-footer">
+              <button className="account-action-button" onClick={() => setCreateModalOpen(false)} type="button">取消</button>
+              <button className="account-action-button account-action-button--primary" onClick={submitCreate} type="button">创建账号</button>
+            </div>
+          </div>
         </div>
-      </section>
+      ) : null}
+
+      <div className="floating-batch-bar" style={{
+        position: "fixed",
+        top: "72px",
+        left: selectedUserIds.length > 0 ? "50%" : "-9999px",
+        transform: selectedUserIds.length > 0 ? "translate(-50%, 0)" : "translate(-50%, -20px)",
+        background: "rgba(255, 255, 255, 0.95)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid #cbd5e1",
+        borderRadius: "9999px",
+        padding: "10px 24px",
+        boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.08)",
+        zIndex: 100,
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        boxSizing: "border-box",
+        flexWrap: "wrap",
+        opacity: selectedUserIds.length > 0 ? 1 : 0,
+        pointerEvents: selectedUserIds.length > 0 ? "auto" : "none",
+        transition: "opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", userSelect: "none" }}>
+          <span style={{ color: "#64748b" }}>已选择</span>
+          <strong style={{ color: "var(--ent-primary, #2563eb)", fontSize: "15px", fontWeight: "600" }}>{selectedUserIds.length}</strong>
+          <span style={{ color: "#64748b" }}>个账号</span>
+        </div>
+        <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          <button className="account-action-button" onClick={() => setBatchRoleOpen(true)} type="button">批量修改角色</button>
+          <button className="account-action-button" onClick={() => setBatchEmployeeOpen(true)} type="button">批量修改关联员工</button>
+          <button className="account-action-button" onClick={() => { setDraftDepartmentIds(batchDepartmentIds); setBatchDepartmentOpen(true); }} type="button">批量修改关联部门</button>
+          <button className="account-action-button" onClick={() => setPermissionContext("batch")} type="button">批量修改页面权限</button>
+          <button className="account-action-button account-action-button--warning" onClick={() => void runBatch("reset_password")} type="button">批量重置密码</button>
+          <button className="account-action-button account-action-button--danger" onClick={() => void runBatch("delete")} type="button">批量删除账号</button>
+        </div>
+      </div>
 
       {editingUser ? (
         <div className="master-modal-backdrop">
@@ -592,7 +644,7 @@ export default function AccountsPage() {
                 </label>
               </div>
 
-              <label className="account-field">
+              <label className="account-field account-employee-picker-field">
                 <span className="account-field-label">关联员工</span>
                 <EmployeePicker
                   departments={pickerDepartments}
@@ -625,6 +677,13 @@ export default function AccountsPage() {
               </label>
             </div>
             <div className="master-modal-footer">
+              <button
+                className="account-action-button account-action-button--warning"
+                onClick={() => void resetPassword(editingUser.id)}
+                type="button"
+              >
+                重置密码
+              </button>
               <button className="account-action-button" onClick={() => setEditingUser(null)} type="button">取消</button>
               <button className="account-action-button account-action-button--primary" onClick={saveEdit} type="button">保存</button>
             </div>
@@ -851,6 +910,14 @@ function PickerSummaryField({
         {buttonLabel}
       </button>
     </div>
+  );
+}
+
+function CompactTableText({ value }: { value: string }) {
+  return (
+    <span className="account-table-text-ellipsis" title={value}>
+      {value}
+    </span>
   );
 }
 

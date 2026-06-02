@@ -72,7 +72,9 @@ class ApiQueryTests(unittest.TestCase):
                 profile_name="经理甲账号",
             )
             manager_viewer.set_password("manager123")
-            db.session.add_all([viewer, blocked, home_only, manager_viewer])
+            admin = User(username="admin", role="admin", profile_emp_no="A001", profile_name="系统管理员")
+            admin.set_password("admin123")
+            db.session.add_all([viewer, blocked, home_only, manager_viewer, admin])
             db.session.flush()
 
             db.session.add(UserEmployeeAssignment(user_id=viewer.id, emp_id=employee_a.id))
@@ -141,6 +143,18 @@ class ApiQueryTests(unittest.TestCase):
         self.assertIn("employee_dashboard", entry_keys)
         self.assertIn("summary_download", entry_keys)
         self.assertTrue(all("href" in entry for entry in query_module["entries"]))
+
+    def test_query_navigation_api_exposes_disabled_users_in_settings(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.get("/api/query/navigation")
+
+        self.assertEqual(response.status_code, 200)
+        modules = response.get_json()["modules"]
+        settings_module = next(module for module in modules if module["slug"] == "settings")
+        entry_hrefs = {entry["href"] for entry in settings_module["entries"]}
+        self.assertIn("/admin/accounts", entry_hrefs)
+        self.assertIn("/admin/disabled-users", entry_hrefs)
 
     def test_legacy_employee_dashboard_route_is_not_available(self) -> None:
         self._login("viewer", "viewer123")

@@ -199,6 +199,13 @@ MODULES: list[dict[str, Any]] = [
                 "admin_only": True,
                 "description": "维护管理员和只读账号权限。",
             },
+            {
+                "key": "disabled_users",
+                "label": "禁用用户",
+                "href": "/admin/disabled-users",
+                "admin_only": True,
+                "description": "查看被限制登录的账号并手动解锁。",
+            },
         ],
     },
 ]

@@ -16,13 +16,8 @@ export default function EmployeeAttendanceOverridesPage() {
       fields={EMPLOYEE_FIELDS}
       filterMode="employee"
       listEmptyHint="当前条件下暂无员工修正数据"
-      metricEmployeeSub="只支持普通员工"
-      metricFieldCount="4"
-      metricFieldSub="考勤天数、工时、半勤天数、迟到早退"
       pickerButtonLabel="员工范围"
       pickerLabel="员工"
-      queryDoneText={(count) => `已查询 ${count} 人`}
-      queryLoadingText="正在加载员工修正列表"
       saveSuccessText="修正已保存"
       title="员工考勤修正"
     />
