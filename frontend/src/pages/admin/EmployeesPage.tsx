@@ -656,9 +656,7 @@ export default function EmployeesPage() {
             </select>
           </label>
         </div>
-        <div className="master-filter-actions">
-          <span>当前显示 {filteredRows.length} / {rows.length} 人</span>
-          <button className="account-action-button" onClick={() => { setKeyword(""); setFilterEmployeeIds([]); }} type="button">清除筛选内容</button>
+        <div className="master-filter-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
           <button className="account-action-button" onClick={clearFilters} type="button">清空筛选</button>
         </div>
       </div>

@@ -19,6 +19,11 @@ export function fetchQueryBootstrap(): Promise<QueryBootstrap> {
   return queryBootstrapPromise;
 }
 
+export function clearQueryBootstrapCache() {
+  queryBootstrapPromise = null;
+}
+
+
 export function fetchHomeSummary(month?: string): Promise<HomeSummaryResponse> {
   const query = new URLSearchParams();
   if (month) {
