@@ -118,6 +118,7 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/manager-annual-leave/import",
                 "/api/admin/disabled-users",
                 "/api/admin/disabled-users/<int:user_id>/unlock",
+                "/api/admin/users/<int:user_id>",
             }.issubset(rules)
         )
 
@@ -274,6 +275,36 @@ class ApiAdminTests(unittest.TestCase):
             self.assertIsNone(unlocked.login_locked_until)
             self.assertFalse(unlocked.login_disabled_until_admin_unlock)
             self.assertIsNone(unlocked.login_disabled_reason)
+
+    def test_admin_can_update_user(self) -> None:
+        with self.app.app_context():
+            user = User(username="user-to-edit", role="readonly")
+            user.set_password("pwd123")
+            db.session.add(user)
+            db.session.commit()
+            user_id = user.id
+
+        self._login()
+
+        dept_id = self.client.get("/api/admin/departments").get_json()[0]["id"]
+
+        response = self.client.put(
+            f"/api/admin/users/{user_id}",
+            json={
+                "role": "admin",
+                "profile_emp_no": "E999",
+                "profile_name": "修改后的名字",
+                "profile_dept_id": dept_id,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["status"], "ok")
+
+        with self.app.app_context():
+            updated = db.session.get(User, user_id)
+            self.assertEqual(updated.role, "admin")
+            self.assertEqual(updated.profile_emp_no, "E999")
+            self.assertEqual(updated.profile_name, "修改后的名字")
 
     def test_admin_template_download_endpoints_return_excel_attachments(self) -> None:
         self._login()

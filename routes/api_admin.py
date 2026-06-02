@@ -48,7 +48,12 @@ from routes.admin_imports import (
     export_manager_overtime,
     import_raw_files as admin_import_raw_files,
 )
-from routes.admin_accounts import disabled_users_list_api, unlock_disabled_user_api, users_list_api
+from routes.admin_accounts import (
+    disabled_users_list_api,
+    unlock_disabled_user_api,
+    users_list_api,
+    register_admin_account_routes,
+)
 from routes.admin_attendance_overrides import (
     employee_attendance_override_history_api,
     employee_attendance_override_list_api,
@@ -71,6 +76,7 @@ from routes.auth_helpers import admin_required
 
 
 api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
+register_admin_account_routes(api_admin_bp)
 
 
 @api_admin_bp.get("/bootstrap")
@@ -107,16 +113,7 @@ def accounts():
     return users_list_api()
 
 
-@api_admin_bp.get("/disabled-users")
-@admin_required
-def disabled_users():
-    return disabled_users_list_api()
 
-
-@api_admin_bp.post("/disabled-users/<int:user_id>/unlock")
-@admin_required
-def unlock_disabled_user(user_id: int):
-    return unlock_disabled_user_api(user_id)
 
 
 @api_admin_bp.get("/employees")
