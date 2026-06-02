@@ -7,11 +7,11 @@ from io import BytesIO
 import openpyxl
 from flask import current_app, jsonify, request, send_file
 
-from routes.auth import admin_required
+from routes.auth_helpers import admin_required
 
 
 def register_admin_import_routes(admin_bp) -> None:
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     @admin_bp.route("/account-sets/<int:account_set_id>/imports", methods=["GET"])
     @admin_required
@@ -109,7 +109,7 @@ def register_admin_import_routes(admin_bp) -> None:
 
 @admin_required
 def import_raw_files():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
 
     account_set_id = request.form.get("account_set_id", type=int)
     account_set = (
@@ -190,7 +190,7 @@ def import_raw_files():
 
 @admin_required
 def import_departments_xlsx():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     file = request.files.get("file")
     if not file or not file.filename:
         return jsonify({"error": "file is required"}), 400
@@ -318,7 +318,7 @@ def import_departments_xlsx():
 
 @admin_required
 def download_departments_template():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     wb = admin_module._build_departments_workbook(
         [
             ("D001", "行政部", "", ""),
@@ -339,7 +339,7 @@ def download_departments_template():
 
 @admin_required
 def export_departments_xlsx():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     departments = admin_module.Department.query.order_by(
         admin_module.Department.dept_no.asc(), admin_module.Department.dept_name.asc()
     ).all()
@@ -366,7 +366,7 @@ def export_departments_xlsx():
 
 @admin_required
 def import_employees_xlsx():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     file = request.files.get("file")
     if not file or not file.filename:
         return jsonify({"error": "file is required"}), 400
@@ -523,7 +523,7 @@ def download_employees_template():
 
 @admin_required
 def export_employees_xlsx():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "员工主数据导出"
