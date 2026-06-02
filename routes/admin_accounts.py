@@ -4,11 +4,11 @@ from datetime import datetime
 
 from flask import g, jsonify, request
 
-from routes.auth import admin_required, frontend_redirect
+from routes.auth_helpers import admin_required
 
 
 def users_list_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     users = admin_module._user_list_query().all()
     profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
@@ -26,7 +26,7 @@ def users_list_api():
 
 
 def disabled_users_list_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     now = datetime.utcnow()
     users = admin_module._user_list_query().all()
@@ -49,7 +49,7 @@ def disabled_users_list_api():
 
 
 def unlock_disabled_user_api(user_id: int):
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     user = admin_module._require_model(admin_module.User, user_id)
     user.clear_login_lockout()
@@ -58,7 +58,7 @@ def unlock_disabled_user_api(user_id: int):
 
 
 def register_admin_account_routes(admin_bp) -> None:
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     def _manager_self_query_permissions() -> dict[str, bool]:
         permissions = {key: False for key in admin_module.ALL_PAGE_PERMISSION_KEYS}
@@ -73,11 +73,6 @@ def register_admin_account_routes(admin_bp) -> None:
             return []
         users = admin_module.User.query.filter(admin_module.User.id.in_(user_ids)).order_by(admin_module.User.id.asc()).all()
         return users
-
-    @admin_bp.route("/accounts")
-    @admin_required
-    def accounts_page():
-        return frontend_redirect("/admin/accounts")
 
     @admin_bp.route("/users/readonly", methods=["POST"])
     @admin_required

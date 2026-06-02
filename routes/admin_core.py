@@ -6,7 +6,7 @@ from io import BytesIO
 from datetime import datetime
 from typing import Any
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, send_file, g
+from flask import abort, jsonify, request, send_file, g
 import openpyxl
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -41,11 +41,9 @@ from models.user import (
 )
 from services.import_service import ImportService
 from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows
-from routes.auth import admin_required, frontend_redirect
 from utils.helpers import parse_bool_zh
 
 
-admin_bp = Blueprint("admin", __name__, url_prefix="/admin")
 
 
 _EMPLOYEE_OVERRIDE_FIELDS = (
@@ -820,21 +818,11 @@ def _assign_employee_shift(employee: Employee, shift: Shift | None) -> None:
         assignment.shift_id = shift.id
 
 
-@admin_bp.route("/dashboard")
-@admin_required
-def dashboard():
-    return frontend_redirect("/admin/dashboard")
-
-
-@admin_bp.route("/account-sets", methods=["GET"])
-@admin_required
 def list_account_sets():
     rows = AccountSet.query.order_by(AccountSet.month.desc()).all()
     return jsonify([_serialize_account_set(row) for row in rows])
 
 
-@admin_bp.route("/account-sets", methods=["POST"])
-@admin_required
 def create_account_set():
     data = request.json or {}
     month = (data.get("month") or "").strip()
@@ -864,8 +852,6 @@ def create_account_set():
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>", methods=["PUT"])
-@admin_required
 def update_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     locked_error = _ensure_account_set_unlocked(row, "修改账套参数")
@@ -886,8 +872,6 @@ def update_account_set(account_set_id: int):
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>/activate", methods=["POST"])
-@admin_required
 def activate_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     AccountSet.query.update({AccountSet.is_active: False})
@@ -896,8 +880,6 @@ def activate_account_set(account_set_id: int):
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>/lock", methods=["POST"])
-@admin_required
 def lock_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     if not row.is_locked:
@@ -908,8 +890,6 @@ def lock_account_set(account_set_id: int):
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>/unlock", methods=["POST"])
-@admin_required
 def unlock_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     if row.is_locked:
@@ -920,8 +900,6 @@ def unlock_account_set(account_set_id: int):
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>", methods=["DELETE"])
-@admin_required
 def delete_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     locked_error = _ensure_account_set_unlocked(row, "删除账套")
@@ -951,8 +929,6 @@ def delete_account_set(account_set_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/account-sets/<int:account_set_id>/calculate", methods=["POST"])
-@admin_required
 def calculate_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     locked_error = _ensure_account_set_unlocked(row, "重新计算")
@@ -1046,38 +1022,6 @@ def calculate_account_set(account_set_id: int):
     )
 
 
-@admin_bp.route("/employees/manage")
-@admin_required
-def employees_page():
-    return frontend_redirect("/admin/employees/manage")
-
-
-@admin_bp.route("/shifts/manage")
-@admin_required
-def shifts_page():
-    return frontend_redirect("/admin/shifts/manage")
-
-
-@admin_bp.route("/departments/manage")
-@admin_required
-def departments_page():
-    return frontend_redirect("/admin/departments/manage")
-
-
-@admin_bp.route("/manager-overtime")
-@admin_required
-def manager_overtime_page():
-    return frontend_redirect("/admin/manager-overtime")
-
-
-@admin_bp.route("/manager-annual-leave")
-@admin_required
-def manager_annual_leave_page():
-    return frontend_redirect("/admin/manager-annual-leave")
-
-
-@admin_bp.route("/shifts", methods=["POST"])
-@admin_required
 def create_shift():
     data = request.json or {}
     shift_no = (data.get("shift_no") or "").strip()
@@ -1104,8 +1048,6 @@ def create_shift():
     return jsonify({"status": "ok", "id": shift.id})
 
 
-@admin_bp.route("/shifts", methods=["GET"])
-@admin_required
 def list_shifts():
     rows = Shift.query.order_by(Shift.shift_no.asc()).all()
     return jsonify(
@@ -1122,8 +1064,6 @@ def list_shifts():
     )
 
 
-@admin_bp.route("/shifts/<int:shift_id>", methods=["PUT"])
-@admin_required
 def update_shift(shift_id: int):
     data = request.json or {}
     shift_no = (data.get("shift_no") or "").strip()
@@ -1147,8 +1087,6 @@ def update_shift(shift_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/shifts/<int:shift_id>", methods=["DELETE"])
-@admin_required
 def delete_shift(shift_id: int):
     shift = _require_model(Shift, shift_id)
     if shift.employee_assignments:
@@ -1161,15 +1099,11 @@ def delete_shift(shift_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/employees", methods=["GET"])
-@admin_required
 def employees_list():
     rows = _unique_employees(Employee.query.order_by(Employee.emp_no.asc()).all())
     return jsonify([_serialize_employee(e) for e in rows])
 
 
-@admin_bp.route("/departments", methods=["GET"])
-@admin_required
 def departments_list():
     rows = Department.query.order_by(Department.dept_name.asc()).all()
     return jsonify(
@@ -1187,22 +1121,16 @@ def departments_list():
     )
 
 
-@admin_bp.route("/manager-overtime/records", methods=["GET"])
-@admin_required
 def manager_overtime_records():
     year = request.args.get("year", type=int) or datetime.now().year
     return jsonify(_manager_month_rows(_manager_overtime_values(year, _requested_emp_ids() or None), "剩余调休天数"))
 
 
-@admin_bp.route("/manager-overtime/records", methods=["PUT"])
-@admin_required
 def update_manager_overtime_summary():
     payload, status = _save_manager_month_stat("overtime")
     return jsonify(payload), status
 
 
-@admin_bp.route("/manager-overtime/records/<int:record_id>", methods=["PUT"])
-@admin_required
 def update_manager_overtime_record(record_id: int):
     row = _require_model(OvertimeRecord, record_id)
     if not row.employee or not row.employee.is_manager:
@@ -1920,8 +1848,6 @@ def _export_manager_annual_leave_workbook(year: int):
     )
 
 
-@admin_bp.route("/manager-annual-leave/records", methods=["GET"])
-@admin_required
 def manager_annual_leave_records():
     year = request.args.get("year", type=int) or datetime.now().year
     return jsonify(
@@ -1933,8 +1859,6 @@ def manager_annual_leave_records():
     )
 
 
-@admin_bp.route("/manager-annual-leave/records", methods=["PUT"])
-@admin_required
 def update_manager_annual_leave_record():
     data = request.json or {}
     if any(key in data for key in _annual_leave_value_keys()) or "remaining" in data:
@@ -1960,8 +1884,6 @@ def update_manager_annual_leave_record():
     return jsonify({"status": "ok", "id": row.id})
 
 
-@admin_bp.route("/departments", methods=["POST"])
-@admin_required
 def create_department():
     data = request.json or {}
     dept_no = (data.get("dept_no") or "").strip()
@@ -1989,8 +1911,6 @@ def create_department():
     return jsonify({"status": "ok", "id": department.id})
 
 
-@admin_bp.route("/departments/<int:dept_id>", methods=["PUT"])
-@admin_required
 def update_department(dept_id: int):
     data = request.json or {}
     dept_no = (data.get("dept_no") or "").strip()
@@ -2018,8 +1938,6 @@ def update_department(dept_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/departments/<int:dept_id>", methods=["DELETE"])
-@admin_required
 def delete_department(dept_id: int):
     department = _require_model(Department, dept_id)
     if department.children:
@@ -2034,8 +1952,6 @@ def delete_department(dept_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/departments/batch", methods=["POST"])
-@admin_required
 def batch_operate_departments():
     data = request.json or {}
     ids = data.get("ids") or []
@@ -2096,8 +2012,6 @@ def batch_operate_departments():
     return jsonify({"status": "ok", "action": action, "affected": len(departments)})
 
 
-@admin_bp.route("/departments/delete-unbound", methods=["POST"])
-@admin_required
 def delete_unbound_departments():
     all_departments = Department.query.all()
     deleted = 0
@@ -2160,8 +2074,6 @@ def _build_departments_workbook(
     return wb
 
 
-@admin_bp.route("/employees", methods=["POST"])
-@admin_required
 def create_employee():
     data = request.json or {}
     emp_no = (data.get("emp_no") or "").strip()
@@ -2199,8 +2111,6 @@ def create_employee():
     return jsonify({"status": "ok", "employee": _serialize_employee(employee)})
 
 
-@admin_bp.route("/employees/<int:employee_id>", methods=["PUT"])
-@admin_required
 def update_employee(employee_id: int):
     data = request.json or {}
     emp_no = (data.get("emp_no") or "").strip()
@@ -2245,8 +2155,6 @@ def update_employee(employee_id: int):
     return jsonify({"status": "ok", "employee": _serialize_employee(employee)})
 
 
-@admin_bp.route("/employees/<int:employee_id>", methods=["DELETE"])
-@admin_required
 def delete_employee(employee_id: int):
     employee = _require_model(Employee, employee_id)
     db.session.delete(employee)
@@ -2254,8 +2162,6 @@ def delete_employee(employee_id: int):
     return jsonify({"status": "ok"})
 
 
-@admin_bp.route("/employees/batch", methods=["POST"])
-@admin_required
 def batch_operate_employees():
     data = request.json or {}
     ids = data.get("ids") or []
@@ -2344,8 +2250,6 @@ def batch_operate_employees():
     return jsonify({"error": "unsupported action"}), 400
 
 
-@admin_bp.route("/daily-records/<int:record_id>/annotate", methods=["POST"])
-@admin_required
 def annotate_record(record_id: int):
     data = request.json or {}
     reason = (data.get("exception_reason") or "").strip()
@@ -2360,7 +2264,7 @@ def _employee_override_values(override: EmployeeAttendanceOverride | None) -> di
 
 
 def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None:
-    from routes.employee import _build_final_rows
+    from routes.query_core import _build_final_rows
 
     rows = _build_final_rows(month, [emp_id])
     if not rows:
@@ -2375,7 +2279,7 @@ def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None
 
 
 def _employee_late_early_minutes(emp_id: int, month: str) -> int:
-    from routes.employee import _month_date_range
+    from routes.query_core import _month_date_range
 
     date_range = _month_date_range(month)
     if not date_range:
@@ -2458,17 +2362,3 @@ def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[di
     return {"rows": rows, "month": month}, 200
 
 
-@admin_bp.route("/")
-@admin_required
-def admin_root():
-    return redirect("/admin/dashboard")
-
-
-from .admin_accounts import register_admin_account_routes
-from .admin_attendance_overrides import register_admin_attendance_override_routes
-from .admin_imports import register_admin_import_routes
-
-
-register_admin_account_routes(admin_bp)
-register_admin_attendance_override_routes(admin_bp)
-register_admin_import_routes(admin_bp)

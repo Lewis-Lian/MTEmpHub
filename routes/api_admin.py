@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify
 
 from models.department import Department
 from models.shift import Shift
-from routes.admin import (
+from routes.admin_core import (
     AccountSet,
     AccountSetImport,
     activate_account_set,
@@ -396,7 +396,7 @@ def account_sets_calculate(account_set_id: int):
 @api_admin_bp.get("/account-sets/<int:account_set_id>/imports")
 @admin_required
 def account_set_imports(account_set_id: int):
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
 
     row = admin_module._require_model(AccountSet, account_set_id)
     records = (

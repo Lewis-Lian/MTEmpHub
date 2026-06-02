@@ -9,7 +9,7 @@ from io import BytesIO
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
-from flask import Blueprint, jsonify, redirect, render_template, request, g, send_file, url_for
+from flask import jsonify, request, g, send_file
 from sqlalchemy.orm import joinedload
 import openpyxl
 
@@ -39,11 +39,9 @@ from services.manager_attendance_service import (
     normalize_days,
     rows_as_table,
 )
-from routes.auth import frontend_redirect, login_required, page_permission_required
 from utils.helpers import overlap_duration_days
 
 
-employee_bp = Blueprint("employee", __name__, url_prefix="/employee")
 MANAGER_ATTENDANCE_TEMPLATE_PATH = Path(__file__).resolve().parents[1] / "templates" / "export_templates" / "manager_attendance.xlsx"
 MANAGER_TEMPLATE_TITLE_ROW = 1
 MANAGER_TEMPLATE_HEADER_ROW = 2
@@ -895,70 +893,6 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
     return [{"dept_name": k, "total_hours": round(v, 2)} for k, v in sorted(totals.items(), key=lambda x: x[0])]
 
 
-@employee_bp.route("/dashboard")
-@page_permission_required("employee_dashboard")
-def dashboard():
-    return frontend_redirect("/employee/dashboard")
-
-
-@employee_bp.route("/home")
-@login_required
-def query_home_page():
-    if not g.current_user.can_access_page("query_home"):
-        return redirect(url_for("auth.root"))
-    return frontend_redirect("/employee/home")
-
-
-@employee_bp.route("/manager-query")
-@page_permission_required("manager_query")
-def manager_query_page():
-    return frontend_redirect("/employee/manager-query")
-
-
-@employee_bp.route("/manager-overtime-query")
-@page_permission_required("manager_overtime_query")
-def manager_overtime_query_page():
-    return frontend_redirect("/employee/manager-overtime-query")
-
-
-@employee_bp.route("/manager-annual-leave-query")
-@page_permission_required("manager_annual_leave_query")
-def manager_annual_leave_query_page():
-    return frontend_redirect("/employee/manager-annual-leave-query")
-
-
-@employee_bp.route("/manager-department-hours-query")
-@page_permission_required("manager_department_hours_query")
-def manager_department_hours_query_page():
-    return frontend_redirect("/employee/manager-department-hours-query")
-
-
-@employee_bp.route("/abnormal-query")
-@page_permission_required("abnormal_query")
-def abnormal_query_page():
-    return frontend_redirect("/employee/abnormal-query")
-
-
-@employee_bp.route("/department-hours-query")
-@page_permission_required("department_hours_query")
-def department_hours_query_page():
-    return frontend_redirect("/employee/department-hours-query")
-
-
-@employee_bp.route("/punch-records")
-@page_permission_required("punch_records")
-def punch_records_page():
-    return frontend_redirect("/employee/punch-records")
-
-
-@employee_bp.route("/summary-download")
-@page_permission_required("summary_download")
-def summary_download_page():
-    return frontend_redirect("/employee/summary-download")
-
-
-@employee_bp.route("/api/account-sets", methods=["GET"])
-@login_required
 def account_sets_api():
     if not g.current_user.can_access_page("query_home"):
         return jsonify({"error": "Forbidden"}), 403
@@ -980,8 +914,6 @@ def account_sets_api():
     )
 
 
-@employee_bp.route("/api/departments", methods=["GET"])
-@login_required
 def departments_api():
     if not _can_access_query_center():
         return jsonify({"error": "Forbidden"}), 403
@@ -1017,8 +949,6 @@ def departments_api():
     )
 
 
-@employee_bp.route("/api/home-manager-summary", methods=["GET"])
-@login_required
 def home_manager_summary_api():
     if not g.current_user.can_access_page("query_home"):
         return jsonify({"error": "Forbidden"}), 403
@@ -1094,6 +1024,18 @@ def home_manager_summary_api():
     else:
         benefit_remaining = 12.0
 
+    factory_rest_entries = sorted(
+        account_set.factory_rest_entries,
+        key=lambda item: item.rest_date.isoformat() if item.rest_date else "",
+    )
+    serialized_factory_rest_entries = [
+        {
+            "date": item.rest_date.isoformat() if item.rest_date else None,
+            "period": item.rest_period,
+        }
+        for item in factory_rest_entries
+    ]
+
     return jsonify(
         {
             "has_data": True,
@@ -1116,13 +1058,13 @@ def home_manager_summary_api():
                 "benefit_days": benefit_remaining,
                 "overtime_remaining_days": round(overtime_remaining, 2),
             },
+            "factory_rest_entries": serialized_factory_rest_entries,
             "support_message": "如对考勤数据有疑问，请联系信息中心协助核对处理。",
         }
     )
 
 
-@employee_bp.route("/api/punch-records", methods=["GET"])
-@page_permission_required("punch_records")
+
 def punch_records_api():
     emp_ids = _pick_emp_ids()
     dept_id = request.args.get("dept_id", type=int)
@@ -1163,8 +1105,6 @@ def punch_records_api():
     )
 
 
-@employee_bp.route("/api/punch-records/export", methods=["GET"])
-@page_permission_required("punch_records")
 def punch_records_export_api():
     emp_ids = _pick_emp_ids()
     dept_id = request.args.get("dept_id", type=int)
@@ -1238,8 +1178,6 @@ def punch_records_export_api():
     )
 
 
-@employee_bp.route("/api/summary", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def summary_api():
     emp_id = _pick_emp_id()
     if not emp_id:
@@ -1266,8 +1204,6 @@ def summary_api():
     )
 
 
-@employee_bp.route("/api/daily-records", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def daily_records_api():
     emp_id = _pick_emp_id()
     if not emp_id:
@@ -1297,8 +1233,6 @@ def daily_records_api():
     )
 
 
-@employee_bp.route("/api/overtime", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def overtime_api():
     emp_id = _pick_emp_id()
     if not emp_id:
@@ -1323,8 +1257,6 @@ def overtime_api():
     )
 
 
-@employee_bp.route("/api/leave", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def leave_api():
     emp_id = _pick_emp_id()
     if not emp_id:
@@ -1348,8 +1280,6 @@ def leave_api():
     )
 
 
-@employee_bp.route("/api/annual-leave", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def annual_leave_api():
     emp_id = _pick_emp_id()
     year = request.args.get("year", type=int) or datetime.now().year
@@ -1369,8 +1299,6 @@ def annual_leave_api():
     )
 
 
-@employee_bp.route("/api/final-data", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def final_data_api():
     emp_ids = _pick_emp_ids()
     if not emp_ids:
@@ -1392,8 +1320,6 @@ def final_data_api():
     )
 
 
-@employee_bp.route("/api/final-data/export", methods=["GET"])
-@page_permission_required("employee_dashboard")
 def final_data_export_api():
     emp_ids = _pick_emp_ids()
     if not emp_ids:
@@ -1421,8 +1347,6 @@ def final_data_export_api():
     )
 
 
-@employee_bp.route("/api/summary-download/export", methods=["GET"])
-@page_permission_required("summary_download")
 def summary_download_export_api():
     emp_ids = _pick_emp_ids()
     if not emp_ids:
@@ -1496,8 +1420,6 @@ def summary_download_export_api():
     )
 
 
-@employee_bp.route("/api/manager-attendance", methods=["GET"])
-@page_permission_required("manager_query")
 def manager_attendance_api():
     emp_ids = _manager_emp_ids(_accessible_emp_ids())
     requested_ids = _requested_emp_ids()
@@ -1517,10 +1439,8 @@ def manager_attendance_api():
     )
 
 
-@employee_bp.route("/api/manager-overtime-query", methods=["GET"])
-@page_permission_required("manager_overtime_query")
 def manager_overtime_query_api():
-    from routes.admin import _manager_month_rows, _manager_overtime_values
+    from routes.admin_core import _manager_month_rows, _manager_overtime_values
 
     year = request.args.get("year", type=int) or datetime.now().year
     values = _manager_overtime_values(year)
@@ -1538,10 +1458,8 @@ def manager_overtime_query_api():
     )
 
 
-@employee_bp.route("/api/manager-annual-leave-query", methods=["GET"])
-@page_permission_required("manager_annual_leave_query")
 def manager_annual_leave_query_api():
-    from routes.admin import _annual_leave_value_keys, _manager_annual_leave_values, _manager_month_rows
+    from routes.admin_core import _annual_leave_value_keys, _manager_annual_leave_values, _manager_month_rows
 
     year = request.args.get("year", type=int) or datetime.now().year
     values = _manager_annual_leave_values(year)
@@ -1559,8 +1477,6 @@ def manager_annual_leave_query_api():
     )
 
 
-@employee_bp.route("/api/manager-department-hours", methods=["GET"])
-@page_permission_required("manager_department_hours_query")
 def manager_department_hours_api():
     emp_ids = _manager_emp_ids(_accessible_emp_ids())
     if not emp_ids:
@@ -1570,8 +1486,6 @@ def manager_department_hours_api():
     return jsonify(_build_manager_department_hours_rows(month, emp_ids))
 
 
-@employee_bp.route("/api/manager-department-hours/export", methods=["GET"])
-@page_permission_required("manager_department_hours_query")
 def manager_department_hours_export_api():
     emp_ids = _manager_emp_ids(_accessible_emp_ids())
     if not emp_ids:
@@ -1821,8 +1735,6 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
     ws.print_area = f"A1:M{ws.max_row}"
 
 
-@employee_bp.route("/api/manager-attendance/export", methods=["GET"])
-@page_permission_required("manager_query")
 def manager_attendance_export_api():
     emp_ids = _manager_emp_ids(_accessible_emp_ids())
     requested_ids = _requested_emp_ids()
@@ -1851,8 +1763,6 @@ def manager_attendance_export_api():
     )
 
 
-@employee_bp.route("/api/manager-attendance/export-template", methods=["GET"])
-@page_permission_required("manager_query")
 def manager_attendance_template_export_api():
     emp_ids = _manager_emp_ids(_accessible_emp_ids())
     requested_ids = _requested_emp_ids()
@@ -1888,8 +1798,6 @@ def manager_attendance_template_export_api():
     )
 
 
-@employee_bp.route("/api/abnormal-attendance", methods=["GET"])
-@page_permission_required("abnormal_query")
 def abnormal_attendance_api():
     emp_ids = _pick_emp_ids()
     if not emp_ids:
@@ -1899,8 +1807,6 @@ def abnormal_attendance_api():
     return jsonify(_build_abnormal_rows(month, emp_ids))
 
 
-@employee_bp.route("/api/abnormal-attendance/export", methods=["GET"])
-@page_permission_required("abnormal_query")
 def abnormal_attendance_export_api():
     emp_ids = _pick_emp_ids()
     if not emp_ids:
@@ -1928,8 +1834,6 @@ def abnormal_attendance_export_api():
     )
 
 
-@employee_bp.route("/api/department-hours", methods=["GET"])
-@page_permission_required("department_hours_query")
 def department_hours_api():
     emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
     if not emp_ids:
@@ -1939,8 +1843,6 @@ def department_hours_api():
     return jsonify(_build_department_hours_rows(month, emp_ids))
 
 
-@employee_bp.route("/api/department-hours/export", methods=["GET"])
-@page_permission_required("department_hours_query")
 def department_hours_export_api():
     emp_ids = _non_manager_emp_ids(_accessible_emp_ids())
     if not emp_ids:

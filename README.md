@@ -141,14 +141,20 @@ python3 -m pytest -q
   CLI 初始化与旧库升级命令
 - `models/`
   数据模型定义
-- `routes/`
-  路由与接口入口
+- `routes/api_auth.py`
+  认证 API
+- `routes/api_query.py`
+  查询中心 API
+- `routes/api_admin.py`
+  管理后台 API
+- `routes/query_core.py`
+  查询 API 复用业务逻辑
+- `routes/admin_core.py`
+  管理 API 复用业务逻辑
 - `services/`
   业务逻辑、导入处理、统计汇总
 - `frontend/`
   React/Vite 独立前端工程
-- `templates/`
-  历史模板资源与导出模板
 - `tests/`
   回归测试与功能测试
 - `docs/`
