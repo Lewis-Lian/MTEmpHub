@@ -1,12 +1,9 @@
 import io
 import os
 from datetime import date, timedelta
-from pathlib import Path
 from types import SimpleNamespace
-from zipfile import ZipFile
 import tempfile
 import unittest
-import warnings
 
 import openpyxl
 from flask import Flask, g
@@ -19,8 +16,8 @@ from models.employee import Employee
 from models.manager_month_stat import ManagerMonthStat
 from models.user import User
 from routes import register_routes
-from routes.admin import _factory_rest_unit, _manager_attendance_options
-from routes.employee import _fill_manager_template, _manager_options
+from routes.admin_core import _factory_rest_unit, _manager_attendance_options
+from routes.query_core import _manager_options
 from services.bootstrap_service import ensure_schema_compatibility
 from utils.app_navigation import nav_context, visible_modules
 
@@ -78,10 +75,6 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             db.session.remove()
             db.drop_all()
         self.tmpdir.cleanup()
-
-    def _manager_template_path(self) -> Path:
-        project_root = Path(__file__).resolve().parents[1]
-        return project_root / "templates" / "export_templates" / "manager_attendance.xlsx"
 
     def test_employee_manual_save_creates_history_once(self) -> None:
         payload = {
@@ -314,57 +307,6 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         may_payload = viewer_client.get("/api/query/home-summary?month=2026-05").get_json()
         self.assertEqual(may_payload["summary"]["benefit_days"], 9)
         self.assertEqual(may_payload["summary"]["overtime_remaining_days"], 2.5)
-
-    def test_manager_attendance_template_is_stored_in_repo(self) -> None:
-        template_path = self._manager_template_path()
-        self.assertTrue(template_path.exists())
-
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
-            wb = openpyxl.load_workbook(template_path)
-        self.assertEqual([str(item.message) for item in caught], [])
-        ws = wb.active
-        self.assertEqual(ws.print_title_rows, "$1:$2")
-        self.assertTrue(ws.print_options.horizontalCentered)
-
-        with ZipFile(template_path) as zf:
-            sheet_xml = zf.read("xl/worksheets/sheet1.xml").decode("utf-8")
-        self.assertIn("<oddFooter>", sheet_xml)
-        self.assertIn("第 &amp;P 页，共 &amp;N 页", sheet_xml)
-
-    def test_fill_manager_template_clears_unused_sample_rows(self) -> None:
-        wb = openpyxl.load_workbook(self._manager_template_path())
-        ws = wb.active
-        current_month_text = __import__("datetime").datetime.now().strftime("%Y年%-m月")
-
-        _fill_manager_template(
-            ws,
-            [
-                {
-                    "dept_name": "行政部",
-                    "name": "经理甲",
-                    "attendance_days": 20,
-                    "personal_sick_days": 0,
-                    "injury_days": 0,
-                    "business_trip_days": 0,
-                    "marriage_days": 0,
-                    "funeral_days": 0,
-                    "late_early_minutes": 0,
-                    "summary": "",
-                    "benefit_days": 0,
-                    "overtime_change": 0,
-                    "remark": "",
-                }
-            ],
-            "2026-04",
-            include_actual_attendance_days=False,
-        )
-
-        self.assertEqual(ws["A1"].value, "2026年4月份考勤记录")
-        self.assertEqual(ws["J109"].value, current_month_text)
-        self.assertEqual(ws["A3"].value, "行政部")
-        self.assertEqual(ws["B3"].value, "经理甲")
-        self.assertIsNone(ws["B4"].value)
 
     def test_manager_attendance_options_use_zero_for_legacy_factory_rest_days_without_detail(self) -> None:
         with self.app.app_context():

@@ -1,8 +1,8 @@
 import unittest
 
 from models.user import ALL_PAGE_PERMISSION_KEYS
-from routes.admin import _default_page_permissions_for_role
-from routes.employee import _normalized_leave_days
+from routes.admin_core import _default_page_permissions_for_role
+from routes.query_core import _normalized_leave_days
 from services.manager_attendance_service import normalize_days
 
 

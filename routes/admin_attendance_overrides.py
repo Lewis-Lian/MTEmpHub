@@ -5,7 +5,7 @@ from datetime import datetime
 import openpyxl
 from flask import jsonify, request
 
-from routes.auth import admin_required, frontend_redirect
+from routes.auth_helpers import admin_required
 
 
 def _requested_emp_ids() -> list[int]:
@@ -29,7 +29,7 @@ def _requested_emp_ids() -> list[int]:
 
 
 def manager_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     emp_id = request.args.get("emp_id", type=int) or 0
     month = admin_module._validate_month(request.args.get("month"))
@@ -40,7 +40,7 @@ def manager_attendance_override_record_api():
 
 
 def manager_attendance_override_list_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
@@ -50,7 +50,7 @@ def manager_attendance_override_list_api():
 
 
 def save_manager_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     data = request.json or {}
     emp_id = int(data.get("emp_id") or 0)
@@ -106,7 +106,7 @@ def save_manager_attendance_override_record_api():
 
 
 def delete_manager_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     emp_id = request.args.get("emp_id", type=int) or 0
     month = admin_module._validate_month(request.args.get("month"))
@@ -132,7 +132,7 @@ def delete_manager_attendance_override_record_api():
 
 
 def manager_attendance_override_history_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
@@ -141,7 +141,7 @@ def manager_attendance_override_history_api():
 
 
 def employee_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     emp_id = request.args.get("emp_id", type=int) or 0
     month = admin_module._validate_month(request.args.get("month"))
@@ -152,7 +152,7 @@ def employee_attendance_override_record_api():
 
 
 def employee_attendance_override_list_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
@@ -162,7 +162,7 @@ def employee_attendance_override_list_api():
 
 
 def save_employee_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     data = request.json or {}
     emp_id = int(data.get("emp_id") or 0)
@@ -200,7 +200,7 @@ def save_employee_attendance_override_record_api():
 
 
 def delete_employee_attendance_override_record_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     emp_id = request.args.get("emp_id", type=int) or 0
     month = admin_module._validate_month(request.args.get("month"))
@@ -222,7 +222,7 @@ def delete_employee_attendance_override_record_api():
 
 
 def employee_attendance_override_history_api():
-    from . import admin as admin_module
+    from routes import admin_core as admin_module
 
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
@@ -231,11 +231,6 @@ def employee_attendance_override_history_api():
 
 
 def register_admin_attendance_override_routes(admin_bp) -> None:
-    @admin_bp.route("/manager-attendance-overrides")
-    @admin_required
-    def manager_attendance_overrides_page():
-        return frontend_redirect("/admin/manager-attendance-overrides")
-
     @admin_bp.route("/manager-attendance-overrides/record", methods=["GET"])
     @admin_required
     def manager_attendance_override_record():
@@ -264,11 +259,6 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
     admin_bp.add_url_rule("/manager-attendance-overrides/template", endpoint="download_manager_attendance_override_template", view_func=download_manager_attendance_override_template, methods=["GET"])
     admin_bp.add_url_rule("/manager-attendance-overrides/export", endpoint="export_manager_attendance_overrides", view_func=export_manager_attendance_overrides, methods=["GET"])
     admin_bp.add_url_rule("/manager-attendance-overrides/import", endpoint="import_manager_attendance_overrides", view_func=import_manager_attendance_overrides, methods=["POST"])
-
-    @admin_bp.route("/employee-attendance-overrides")
-    @admin_required
-    def employee_attendance_overrides_page():
-        return frontend_redirect("/admin/employee-attendance-overrides")
 
     @admin_bp.route("/employee-attendance-overrides/record", methods=["GET"])
     @admin_required
@@ -302,7 +292,7 @@ def register_admin_attendance_override_routes(admin_bp) -> None:
 
 @admin_required
 def download_manager_attendance_override_template():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.args.get("month")) or datetime.now().strftime("%Y-%m")
     return admin_module._override_workbook_response(
         admin_module._build_manager_override_export_workbook(month, include_real_rows=False),
@@ -312,7 +302,7 @@ def download_manager_attendance_override_template():
 
 @admin_required
 def export_manager_attendance_overrides():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
         return jsonify({"error": "请选择有效月份"}), 400
@@ -324,7 +314,7 @@ def export_manager_attendance_overrides():
 
 @admin_required
 def import_manager_attendance_overrides():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.form.get("month"))
     if not month:
         return jsonify({"error": "请选择有效月份"}), 400
@@ -424,7 +414,7 @@ def import_manager_attendance_overrides():
 
 @admin_required
 def download_employee_attendance_override_template():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.args.get("month")) or datetime.now().strftime("%Y-%m")
     return admin_module._override_workbook_response(
         admin_module._build_employee_override_export_workbook(month, include_real_rows=False),
@@ -434,7 +424,7 @@ def download_employee_attendance_override_template():
 
 @admin_required
 def export_employee_attendance_overrides():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.args.get("month"))
     if not month:
         return jsonify({"error": "请选择有效月份"}), 400
@@ -446,7 +436,7 @@ def export_employee_attendance_overrides():
 
 @admin_required
 def import_employee_attendance_overrides():
-    from routes import admin as admin_module
+    from routes import admin_core as admin_module
     month = admin_module._validate_month(request.form.get("month"))
     if not month:
         return jsonify({"error": "请选择有效月份"}), 400

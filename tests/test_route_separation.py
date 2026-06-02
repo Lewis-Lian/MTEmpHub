@@ -48,6 +48,29 @@ class RouteSeparationTests(unittest.TestCase):
         self.assertEqual(api_query_module.page_permission_required.__module__, "routes.auth_helpers")
         self.assertEqual(api_admin_module.admin_required.__module__, "routes.auth_helpers")
 
+    def test_api_modules_do_not_depend_on_legacy_page_modules(self) -> None:
+        api_auth_module = importlib.import_module("routes.api_auth")
+        api_query_module = importlib.import_module("routes.api_query")
+        api_admin_module = importlib.import_module("routes.api_admin")
+
+        legacy_modules = {
+            "routes.admin",
+            "routes.employee",
+            "routes.module",
+            "routes.auth",
+        }
+
+        for module in (api_auth_module, api_query_module, api_admin_module):
+            referenced_modules = {
+                value.__module__
+                for value in module.__dict__.values()
+                if callable(value) and hasattr(value, "__module__")
+            }
+            self.assertTrue(
+                referenced_modules.isdisjoint(legacy_modules),
+                f"{module.__name__} still references {referenced_modules & legacy_modules}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
