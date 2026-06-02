@@ -101,6 +101,25 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     });
   }, [error, isLoading, location.pathname, matchedNavigation]);
 
+  useEffect(() => {
+    const handleAccountSetActiveChanged = () => {
+      setTabReloadKeys((current) => {
+        const next = { ...current };
+        tabs.forEach((tab) => {
+          if (tab.href !== location.pathname) {
+            next[tab.href] = (next[tab.href] ?? 0) + 1;
+          }
+        });
+        return next;
+      });
+    };
+
+    window.addEventListener("account-set-active-changed", handleAccountSetActiveChanged);
+    return () => {
+      window.removeEventListener("account-set-active-changed", handleAccountSetActiveChanged);
+    };
+  }, [tabs, location.pathname]);
+
   async function handleLogout() {
     await logout();
     onLogout(null);

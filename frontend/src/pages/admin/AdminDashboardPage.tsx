@@ -12,6 +12,7 @@ import {
   updateAccountSet,
   uploadAccountSetRawFiles,
 } from "../../api/admin";
+import { clearQueryBootstrapCache } from "../../api/query";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
@@ -602,6 +603,8 @@ export default function AdminDashboardPage() {
                           }
                           await activateAccountSet(selectedAccountSet.id);
                           setResultMessage(`已切换当前账套：${selectedAccountSet.name}`);
+                          clearQueryBootstrapCache();
+                          window.dispatchEvent(new CustomEvent("account-set-active-changed"));
                           await reloadAccountSets(selectedAccountSet.id);
                         })
                       }
