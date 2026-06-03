@@ -45,23 +45,34 @@ class ApiAdminTests(unittest.TestCase):
             admin = User(username="admin", role="admin")
             admin.set_password("admin123")
             dept = Department(dept_no="D001", dept_name="行政部")
+            alt_dept = Department(dept_no="D002", dept_name="生产部")
             shift = Shift(
                 shift_no="S001",
                 shift_name="白班",
                 time_slots=[{"start": "08:00", "end": "17:00"}],
                 is_cross_day=False,
             )
-            db.session.add_all([admin, dept, shift])
+            db.session.add_all([admin, dept, alt_dept, shift])
             db.session.flush()
 
             employee = Employee(emp_no="E001", name="员工甲", dept_id=dept.id, is_manager=False)
             manager = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
-            db.session.add_all([employee, manager])
+            nursing_employee = Employee(
+                emp_no="E002",
+                name="筛选目标",
+                dept_id=alt_dept.id,
+                is_manager=False,
+                is_nursing=True,
+                employee_stats_attendance_source="auto_fallback",
+                manager_stats_attendance_source="employee",
+            )
+            db.session.add_all([employee, manager, nursing_employee])
             db.session.add(AccountSet(month="2026-05", name="2026-05", is_active=True, is_locked=False))
             db.session.commit()
 
             self.employee_id = employee.id
             self.manager_id = manager.id
+            self.filtered_employee_id = nursing_employee.id
 
         self.client = self.app.test_client()
 
@@ -117,6 +128,7 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/manager-annual-leave/export",
                 "/api/admin/manager-annual-leave/import",
                 "/api/admin/disabled-users",
+                "/api/admin/database-settings",
                 "/api/admin/disabled-users/<int:user_id>/unlock",
                 "/api/admin/users/<int:user_id>",
             }.issubset(rules)
@@ -135,8 +147,21 @@ class ApiAdminTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertEqual([row["dept_no"] for row in payload["departments"]], ["D001"])
+        self.assertEqual(sorted(row["dept_no"] for row in payload["departments"]), ["D001", "D002"])
         self.assertEqual([row["shift_no"] for row in payload["shifts"]], ["S001"])
+
+    def test_database_settings_returns_masked_database_summary(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/admin/database-settings")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIsInstance(payload, list)
+        labels = {row["item"]: row["value"] for row in payload}
+        self.assertEqual(labels["数据库类型"], "sqlite")
+        self.assertEqual(labels["用户名"], "-")
+        self.assertIn("api-admin.db", labels["数据库名称"])
 
     def test_admin_collection_endpoints_return_expected_payloads(self) -> None:
         self._login()
@@ -184,7 +209,7 @@ class ApiAdminTests(unittest.TestCase):
         self.assertIsInstance(departments_payload, list)
         self.assertIn("dept_no", departments_payload[0])
         self.assertIn("dept_name", departments_payload[0])
-        self.assertEqual(departments_payload[0]["dept_no"], "D001")
+        self.assertIn("D001", [row["dept_no"] for row in departments_payload])
         self.assertEqual(shifts_response.status_code, 200)
         self.assertIsInstance(shifts_payload, list)
         self.assertIn("shift_no", shifts_payload[0])
@@ -216,6 +241,39 @@ class ApiAdminTests(unittest.TestCase):
         self.assertIsInstance(manager_annual_leave_payload, list)
         self.assertIn("name", manager_annual_leave_payload[0])
         self.assertIn("remark", manager_annual_leave_payload[0])
+
+    def test_employees_export_supports_current_filters(self) -> None:
+        self._login()
+
+        response = self.client.get(
+            "/api/admin/employees/export"
+            "?keyword=%E7%AD%9B%E9%80%89"
+            "&type=employee"
+            "&is_nursing=1"
+            "&employee_source=auto_fallback"
+            "&manager_source=employee"
+            f"&ids={self.filtered_employee_id},{self.employee_id}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        workbook = openpyxl.load_workbook(BytesIO(response.data))
+        sheet = workbook.active
+        rows = list(sheet.iter_rows(values_only=True))
+
+        self.assertEqual(rows[0], (
+            "人员编号",
+            "人员姓名",
+            "部门名称",
+            "班次编号",
+            "是否管理人员",
+            "是否哺乳假",
+            "员工考勤统计来源",
+            "管理人员考勤统计来源",
+        ))
+        self.assertEqual(
+            rows[1:],
+            [("E002", "筛选目标", "生产部", None, "否", "是", "自动回退", "员工考勤源文件取值")],
+        )
 
     def test_manager_month_stat_record_endpoints_match_collection_payloads(self) -> None:
         self._login()

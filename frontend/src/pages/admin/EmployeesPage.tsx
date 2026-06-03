@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 
+import { buildApiUrl } from "../../api/client";
 import {
   batchAdminEmployees,
   createAdminEmployee,
@@ -296,6 +297,27 @@ export default function EmployeesPage() {
     } finally {
       setIsImporting(false);
     }
+  }
+
+  function buildFilteredExportUrl() {
+    const query = new URLSearchParams();
+    filterEmployeeIds.forEach((id) => query.append("ids", String(id)));
+    if (typeFilter) {
+      query.set("type", typeFilter);
+    }
+    if (nursingFilter) {
+      query.set("is_nursing", nursingFilter);
+    }
+    if (employeeSourceFilter) {
+      query.set("employee_source", employeeSourceFilter);
+    }
+    if (managerSourceFilter) {
+      query.set("manager_source", managerSourceFilter);
+    }
+
+    const queryString = query.toString();
+    const exportPath = queryString ? `/api/admin/employees/export?${queryString}` : "/api/admin/employees/export";
+    return buildApiUrl(exportPath);
   }
 
   function renderDepartmentSelect(
@@ -904,7 +926,7 @@ export default function EmployeesPage() {
               </button>
               <a className="account-action-button" href="/api/admin/employees/template" style={{ flex: "1 1 120px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>下载示例模板</a>
               <a className="account-action-button" href="/api/admin/employees/export" style={{ flex: "1 1 120px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>导出主数据</a>
-              <button className="account-action-button" type="button" style={{ flex: "1 1 120px" }}>导出筛选结果</button>
+              <a className="account-action-button" href={buildFilteredExportUrl()} style={{ flex: "1 1 120px", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>导出筛选结果</a>
             </div>
           </form>
           <div className="panel-note" style={{ marginTop: "12px" }}>模板列：人员编号、人员姓名、部门名称、班次编号、是否管理人员、是否哺乳假、员工考勤统计来源、管理人员考勤统计来源。</div>

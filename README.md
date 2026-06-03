@@ -221,6 +221,18 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_windows.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_windows.ps1 -ProjectRoot "D:\attendance_system" -InitEnv -PipIndexUrl "https://pypi.tuna.tsinghua.edu.cn/simple" -PipTrustedHost "pypi.tuna.tsinghua.edu.cn"
 ```
 
+如果你希望把“初始化环境 + 建库 + 初始化管理员 + 安装服务”合并成一条命令，推荐直接使用新的生产部署脚本：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -InstallService
+```
+
+如果目标机器使用的是历史版本数据库，再额外加上：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\windows\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -UpgradeLegacySchema -InstallService
+```
+
 ### 3. 手动初始化与生产启动
 
 需要手动冒烟验证时，可以执行：
