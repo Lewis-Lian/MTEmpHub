@@ -4515,8 +4515,15 @@ body {
   color: #ffffff !important;
 }
 
-.legacy-btn-primary:hover,
-.account-action-button--primary:hover {
+.legacy-btn-primary:disabled,
+.account-action-button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  filter: grayscale(0.3) !important;
+}
+
+.legacy-btn-primary:hover:not(:disabled),
+.account-action-button--primary:hover:not(:disabled) {
   background: var(--ent-blue-hover) !important;
   border-color: var(--ent-blue-hover) !important;
 }
