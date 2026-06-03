@@ -34,6 +34,22 @@ backups/
 Thumbs.db
 .idea/
 .vscode/
+.cursor/
+
+# AI tool configs (personal, not project-level)
+.claude/
+.claude-plugin/
+.codex
+.claude-md-cat/
+skills/
+AGENTS.md
+DESIGN.md
+
+# AI-generated plans/specs (dev process artifacts)
+docs/superpowers/
+
+# Runtime config (auto-generated on deploy)
+instance/windows_service_manager.json
 
 # Build outputs
 build/
