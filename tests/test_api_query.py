@@ -171,6 +171,34 @@ class ApiQueryTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_summary_download_export_includes_manager_hours_and_count(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.get(
+            "/api/query/summary-download/export?month=2026-05&sheets=emp_dept_hours,mgr_dept_hours"
+        )
+        self.assertEqual(response.status_code, 200)
+
+        import io
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        self.assertIn("员工部门工时查询", wb.sheetnames)
+        self.assertIn("管理人员部门工时查询", wb.sheetnames)
+
+        ws_emp = wb["员工部门工时查询"]
+        self.assertEqual(ws_emp.cell(row=1, column=3).value, "部门人数")
+
+        ws_mgr = wb["管理人员部门工时查询"]
+        self.assertEqual(ws_mgr.cell(row=1, column=3).value, "部门人数")
+
+        rows_mgr = list(ws_mgr.values)
+        dept_names = [r[0] for r in rows_mgr]
+        self.assertIn("制造一部", dept_names)
+        
+        # 检查是否成功统计到人数。经理甲属于制造一部，所以在经理部门工时里制造一部人数应当是1
+        d001_row = next(r for r in rows_mgr if r[0] == "制造一部")
+        self.assertEqual(d001_row[2], 1)
+
     def test_manager_profile_binding_can_query_overtime_and_annual_leave(self) -> None:
         self._login("manager-viewer", "manager123")
 
