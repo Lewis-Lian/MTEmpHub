@@ -155,6 +155,7 @@ class ApiQueryTests(unittest.TestCase):
         entry_hrefs = {entry["href"] for entry in settings_module["entries"]}
         self.assertIn("/admin/accounts", entry_hrefs)
         self.assertIn("/admin/disabled-users", entry_hrefs)
+        self.assertIn("/admin/database-settings", entry_hrefs)
 
     def test_legacy_employee_dashboard_route_is_not_available(self) -> None:
         self._login("viewer", "viewer123")

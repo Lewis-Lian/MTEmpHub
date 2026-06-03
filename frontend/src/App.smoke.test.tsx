@@ -526,6 +526,32 @@ describe("App smoke regression", () => {
     expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
   });
 
+  it("员工管理页会按当前筛选条件触发筛选导出", async () => {
+    window.history.replaceState({}, "", "/admin/employees/manage");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByText("员工列表");
+
+    const typeField = screen
+      .getAllByText("人员类型")
+      .map((node) => node.closest("label"))
+      .find((node) => node?.querySelector("select"));
+    const typeSelect = typeField?.querySelector("select");
+    expect(typeSelect).not.toBeNull();
+    fireEvent.change(typeSelect as HTMLSelectElement, { target: { value: "employee" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "导入员工" }));
+    expect(await screen.findByText("导入员工（xlsx）")).toBeInTheDocument();
+
+    expect(screen.getByRole("link", { name: "导出筛选结果" })).toHaveAttribute(
+      "href",
+      "/api/admin/employees/export?type=employee",
+    );
+  });
+
   it("部门管理页会在当前页异步上传 xlsx 并在成功后刷新列表", async () => {
     window.history.replaceState({}, "", "/admin/departments/manage");
     let departmentFetchCount = 0;
@@ -1038,6 +1064,19 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "重置密码" })).toBeInTheDocument();
   });
 
+  it("数据库设置页会展示当前数据库连接摘要", async () => {
+    window.history.replaceState({}, "", "/admin/database-settings");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "数据库设置" })).toBeInTheDocument();
+    expect(screen.getByText("数据库类型")).toBeInTheDocument();
+    expect(screen.getByText("sqlite")).toBeInTheDocument();
+    expect(screen.getByText("attendance.db")).toBeInTheDocument();
+  });
+
 });
 
 function normalizePath(input: RequestInfo | URL): string {
@@ -1335,6 +1374,11 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
                   href: "/admin/disabled-users",
                 },
                 {
+                  key: "database_settings",
+                  label: "数据库设置",
+                  href: "/admin/database-settings",
+                },
+                {
                   key: "employees",
                   label: "员工管理",
                   href: "/admin/employees/manage",
@@ -1420,6 +1464,31 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
             login_disabled_reason: null,
           },
         }),
+      );
+    case "/api/admin/database-settings":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            item: "数据库类型",
+            value: "sqlite",
+            description: "当前 SQLAlchemy 连接使用的数据库方言。",
+          },
+          {
+            item: "数据库名称",
+            value: "attendance.db",
+            description: "当前应用实际连接的数据库名称或本地文件名。",
+          },
+          {
+            item: "主机地址",
+            value: "-",
+            description: "远程数据库显示主机地址，本地 sqlite 显示为 - 。",
+          },
+          {
+            item: "用户名",
+            value: "-",
+            description: "数据库连接用户名；未配置时显示为 - 。",
+          },
+        ]),
       );
     case "/api/admin/account-sets":
       return Promise.resolve(

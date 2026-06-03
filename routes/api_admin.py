@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify
+from urllib.parse import urlparse
+
+from flask import Blueprint, current_app, jsonify
 
 from models.department import Department
 from models.shift import Shift
@@ -104,6 +106,48 @@ def bootstrap():
                 for row in Shift.query.order_by(Shift.shift_no.asc()).all()
             ],
         }
+    )
+
+
+@api_admin_bp.get("/database-settings")
+@admin_required
+def database_settings():
+    uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "") or ""
+    parsed = urlparse(uri)
+    dialect = parsed.scheme.split("+", 1)[0] if parsed.scheme else "unknown"
+
+    if dialect == "sqlite":
+        database_name = parsed.path.lstrip("/") or ":memory:"
+        host = "-"
+    else:
+        database_name = parsed.path.lstrip("/") or "-"
+        host = parsed.hostname or "-"
+
+    username = parsed.username or "-"
+
+    return jsonify(
+        [
+            {
+                "item": "数据库类型",
+                "value": dialect,
+                "description": "当前 SQLAlchemy 连接使用的数据库方言。",
+            },
+            {
+                "item": "数据库名称",
+                "value": database_name,
+                "description": "当前应用实际连接的数据库名称或本地文件名。",
+            },
+            {
+                "item": "主机地址",
+                "value": host,
+                "description": "远程数据库显示主机地址，本地 sqlite 显示为 - 。",
+            },
+            {
+                "item": "用户名",
+                "value": username,
+                "description": "数据库连接用户名；未配置时显示为 - 。",
+            },
+        ]
     )
 
 

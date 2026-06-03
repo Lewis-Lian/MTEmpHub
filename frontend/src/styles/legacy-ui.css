@@ -558,7 +558,7 @@ body {
 
 .app-layout {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   min-height: 100vh;
   background: #edf1f5;
@@ -620,6 +620,7 @@ body {
 .app-sidebar {
   grid-column: 1;
   grid-row: 1;
+  width: 212px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -633,6 +634,36 @@ body {
   border-right: 1px solid #c9d4df;
   background: linear-gradient(180deg, #f6f9fc 0%, #e9eef3 100%);
   color: #183153;
+  transition: width 0.2s ease, padding 0.2s ease;
+}
+
+.app-sidebar.is-collapsed {
+  width: 56px;
+  padding: 16px 8px 18px;
+  gap: 12px;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-brand p {
+  display: none;
+}
+
+.app-sidebar.is-collapsed .app-sidebar-brand h1 {
+  font-size: 18px;
+  text-align: center;
+}
+
+.app-sidebar.is-collapsed .app-module-link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.app-sidebar.is-collapsed .app-side-link {
+  justify-content: center;
+  padding: 10px;
+}
+
+.app-sidebar.is-collapsed .app-page-nav-shell {
+  overflow: visible;
 }
 
 .app-sidebar-brand h1 {
@@ -669,8 +700,9 @@ body {
 }
 
 .app-module-link {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 12px;
   border: 1px solid #cad4df;
   border-radius: 4px;
@@ -720,8 +752,9 @@ body {
 }
 
 .app-side-link {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 12px;
   border-radius: 4px;
   color: #2e4358;
@@ -745,6 +778,16 @@ body {
   font-weight: 600;
 }
 
+.nav-icon {
+  flex-shrink: 0;
+  opacity: 0.65;
+}
+
+.app-module-link.is-active .nav-icon,
+.app-side-link.is-active .nav-icon {
+  opacity: 1;
+}
+
 .app-logout-button {
   border: 1px solid #c9d4df;
   border-radius: 4px;
@@ -753,6 +796,25 @@ body {
   color: #183153;
   font-weight: 600;
   cursor: pointer;
+}
+
+.app-sidebar-toggle {
+  margin-top: auto;
+  border: 1px solid #c9d4df;
+  border-radius: 4px;
+  padding: 8px;
+  background: #ffffff;
+  color: #536578;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.app-sidebar-toggle:hover {
+  color: #183153;
+  background: #f0f4f7;
 }
 
 .app-main {

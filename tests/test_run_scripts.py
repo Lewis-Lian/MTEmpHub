@@ -35,6 +35,17 @@ class RunScriptTests(unittest.TestCase):
                 self.assertNotIn("templates/partials/app_nav.html", content)
                 self.assertIn("/health", content)
 
+    def test_windows_deploy_script_covers_bootstrap_init_and_service_install(self) -> None:
+        content = self._read_script("scripts/windows/deploy_production.ps1")
+
+        self.assertIn("bootstrap_windows.ps1", content)
+        self.assertIn("init-db", content)
+        self.assertIn("upgrade-legacy-schema", content)
+        self.assertIn("init-admin", content)
+        self.assertIn("install_service.ps1", content)
+        self.assertIn('"APP_ENV"', content)
+        self.assertIn('"production"', content)
+
 
 if __name__ == "__main__":
     unittest.main()

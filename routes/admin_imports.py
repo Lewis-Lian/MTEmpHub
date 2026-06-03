@@ -6,6 +6,7 @@ from io import BytesIO
 
 import openpyxl
 from flask import current_app, jsonify, request, send_file
+from sqlalchemy import func, or_
 
 from routes.auth_helpers import admin_required
 
@@ -578,6 +579,51 @@ def download_employees_template():
 @admin_required
 def export_employees_xlsx():
     from routes import admin_core as admin_module
+
+    def requested_ids() -> list[int]:
+        values: list[int] = []
+        for raw in request.args.getlist("ids"):
+            for part in str(raw).split(","):
+                text = part.strip()
+                if text.isdigit():
+                    values.append(int(text))
+        return values
+
+    query = admin_module.Employee.query
+
+    employee_ids = requested_ids()
+    if employee_ids:
+        query = query.filter(admin_module.Employee.id.in_(employee_ids))
+
+    employee_type = (request.args.get("type") or "").strip()
+    if employee_type == "employee":
+        query = query.filter(admin_module.Employee.is_manager.is_(False))
+    elif employee_type == "manager":
+        query = query.filter(admin_module.Employee.is_manager.is_(True))
+
+    nursing_flag = (request.args.get("is_nursing") or "").strip()
+    if nursing_flag == "1":
+        query = query.filter(admin_module.Employee.is_nursing.is_(True))
+    elif nursing_flag == "0":
+        query = query.filter(admin_module.Employee.is_nursing.is_(False))
+
+    employee_source = (request.args.get("employee_source") or "").strip()
+    if employee_source in admin_module.ATTENDANCE_SOURCE_VALUES:
+        query = query.filter(admin_module.Employee.employee_stats_attendance_source == employee_source)
+
+    manager_source = (request.args.get("manager_source") or "").strip()
+    if manager_source in admin_module.ATTENDANCE_SOURCE_VALUES:
+        query = query.filter(admin_module.Employee.manager_stats_attendance_source == manager_source)
+
+    keyword = (request.args.get("keyword") or "").strip().lower()
+    if keyword:
+        query = query.filter(
+            or_(
+                func.lower(admin_module.Employee.emp_no).contains(keyword),
+                func.lower(admin_module.Employee.name).contains(keyword),
+            )
+        )
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "员工主数据导出"
@@ -593,17 +639,6 @@ def export_employees_xlsx():
             "管理人员考勤统计来源",
         ]
     )
-
-    requested_ids: list[int] = []
-    for raw in request.args.getlist("ids"):
-        for part in str(raw).split(","):
-            text = part.strip()
-            if text.isdigit():
-                requested_ids.append(int(text))
-
-    query = admin_module.Employee.query
-    if requested_ids:
-        query = query.filter(admin_module.Employee.id.in_(requested_ids))
 
     employees = query.order_by(admin_module.Employee.emp_no.asc(), admin_module.Employee.name.asc()).all()
     for employee in employees:
