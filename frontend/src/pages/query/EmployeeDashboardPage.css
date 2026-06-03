@@ -1,0 +1,413 @@
+/* ==========================================================================
+   员工考勤数据查询页：极光白底玻璃拟物化样式
+   ========================================================================== */
+
+/* 极光背景流光球 */
+.query-page-shell {
+  padding: 24px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  box-sizing: border-box;
+  background-color: #f8fafc;
+  background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1.5px, transparent 0);
+  background-size: 28px 28px;
+  height: calc(100vh - 86px) !important;
+  max-height: calc(100vh - 86px) !important;
+  overflow: hidden !important;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 20px !important;
+  align-items: start;
+}
+
+/* 保证内容在上层，并使筛选栏的层级高于结果表格以解决下拉框遮挡问题 */
+.query-filter-rail {
+  position: relative;
+  z-index: 15 !important;
+}
+.query-workspace {
+  position: relative;
+  z-index: 5 !important;
+}
+
+/* 确保人员选择弹窗悬浮于系统最上层 */
+.employee-picker-modal {
+  z-index: 9999 !important;
+}
+
+/* 极光动态流光背景球 */
+.qh-glow-sphere {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+  animation: auroraFlow 22s infinite alternate ease-in-out;
+}
+.qh-glow-sphere.sphere-1 {
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, #38bdf8 0%, #818cf8 100%);
+  top: -10%;
+  left: 5%;
+  animation-duration: 18s;
+}
+.qh-glow-sphere.sphere-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #f472b6 0%, #c084fc 100%);
+  bottom: 10%;
+  right: 5%;
+  animation-duration: 25s;
+}
+.qh-glow-sphere.sphere-3 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, #34d399 0%, #38bdf8 100%);
+  top: 40%;
+  left: 45%;
+  animation-duration: 20s;
+}
+
+@keyframes auroraFlow {
+  0% {
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+  100% {
+    transform: translate(50px, 30px) scale(1.1) rotate(120deg);
+  }
+}
+
+/* ==========================================================================
+   筛选栏面板重构（高透磨砂玻璃）
+   ========================================================================== */
+.query-filter-rail {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  border-radius: 16px !important;
+  padding: 24px 28px !important;
+  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  position: relative;
+  top: 0;
+  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  gap: 16px !important;
+}
+
+.query-filter-rail:hover {
+  top: -2px !important;
+  box-shadow: 0 16px 35px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  border-color: rgba(203, 213, 225, 0.8) !important;
+}
+
+.query-filter-heading {
+  gap: 8px 20px !important;
+}
+
+.query-filter-kicker {
+  color: #0284c7 !important;
+  font-weight: 700 !important;
+  letter-spacing: 1.8px !important;
+}
+
+.query-filter-heading h2 {
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  color: #0f172a !important;
+  margin: 0 !important;
+}
+
+.query-filter-heading p {
+  font-size: 12px !important;
+  color: #64748b !important;
+}
+
+.query-filter-body {
+  gap: 16px !important;
+}
+
+.query-filter-field .form-label {
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  color: #475569 !important;
+  margin-bottom: 8px !important;
+}
+
+/* ==========================================================================
+   输入组件高度、尺寸、边框完全对齐 (38px)
+   ========================================================================== */
+.query-page-shell .employee-lookup .input-group {
+  height: 38px !important;
+}
+
+.query-page-shell .employee-lookup .form-control {
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 13.5px !important;
+  padding: 8px 12px !important;
+  border-radius: 8px 0 0 8px !important;
+  box-sizing: border-box !important;
+}
+
+.query-page-shell .employee-lookup .btn {
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-left: none !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  box-sizing: border-box !important;
+}
+
+.query-page-shell .employee-lookup-clear {
+  height: 38px !important;
+  min-height: 38px !important;
+  line-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
+}
+
+.query-page-shell .employee-picker-trigger {
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.query-page-shell .form-select {
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid #cbd5e1 !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 8px !important;
+  font-size: 13.5px !important;
+  padding: 8px 36px 8px 12px !important;
+  box-sizing: border-box !important;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230284c7' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 11px;
+}
+
+.query-page-shell .form-select:hover {
+  border-color: #94a3b8;
+  background-color: #f8fafc;
+}
+
+/* ==========================================================================
+   多选显示选项重构为微型高光卡片药丸
+   ========================================================================== */
+.query-page-shell .dashboard-check-stack {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.query-page-shell .dashboard-check-option {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  transition: var(--qh-transition);
+  user-select: none;
+  gap: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.query-page-shell .dashboard-check-option:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+  transform: translateY(-1px);
+}
+
+.query-page-shell .dashboard-check-option:has(input:checked) {
+  border-color: #0284c7;
+  background: rgba(56, 189, 248, 0.08);
+  color: #0284c7;
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.12);
+}
+
+.query-page-shell .dashboard-check-option input[type="checkbox"] {
+  accent-color: #0284c7;
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  margin: 0;
+}
+
+/* ==========================================================================
+   按钮组件与发光、渐变效果
+   ========================================================================== */
+.query-page-shell .query-filter-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.query-page-shell .query-filter-actions .btn {
+  height: 38px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  transition: var(--qh-transition) !important;
+  cursor: pointer;
+}
+
+.query-page-shell .query-filter-actions .btn-primary {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+}
+
+.query-page-shell .query-filter-actions .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%) !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.3) !important;
+}
+
+.query-page-shell .query-filter-actions .btn-outline-success {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
+  transition: all 0.3s ease !important;
+}
+
+.query-page-shell .query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background-position: right center !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
+}
+
+.query-page-shell .query-filter-actions .btn-outline-success:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+}
+
+/* ==========================================================================
+   右侧结果面板磨砂玻璃化
+   ========================================================================== */
+.query-page-shell .query-workspace {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  padding: 12px 16px 12px !important;
+  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.06);
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.query-page-shell .query-workspace:hover {
+  box-shadow: 0 16px 35px rgba(148, 163, 184, 0.1);
+  border-color: rgba(226, 232, 240, 1);
+}
+
+.query-page-shell .query-workspace .query-result-panel,
+.query-page-shell .query-workspace .legacy-table-panel {
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 让表格内容区在超出时在内部产生滚动条，刚好占满 */
+.query-page-shell .query-workspace .legacy-table-wrap {
+  flex: 1 !important;
+  min-height: 0 !important;
+  overflow: auto !important;
+}
+
+.query-page-shell .query-workspace .query-result-table {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.query-page-shell .query-workspace .table-pager {
+  flex-shrink: 0 !important;
+  margin-top: 12px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 992px) {
+  .query-filter-body {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .query-page-shell {
+    padding: 16px;
+  }
+  
+  .query-filter-body {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ==========================================================================
+   查询进度条 (极光流光玻璃拟物化效果)
+   ========================================================================== */
+.query-progress-bar-wrap {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  height: 4px !important;
+  background: rgba(226, 232, 240, 0.4) !important;
+  z-index: 100 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s ease !important;
+  border-radius: 16px 16px 0 0 !important; /* 与结果面板的圆角贴合 */
+}
+
+.query-progress-bar-wrap.is-active {
+  opacity: 1 !important;
+}
+
+.query-progress-bar-inner {
+  height: 100% !important;
+  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #818cf8 100%) !important;
+  background-size: 200% 100% !important;
+  animation: barShimmer 1.5s infinite linear !important;
+  transition: width 0.3s cubic-bezier(0.1, 0.8, 0.25, 1) !important;
+}
+
+@keyframes barShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}

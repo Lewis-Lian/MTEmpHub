@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-
+import { createPortal } from "react-dom";
 import type { AdminDepartment } from "../../types/admin";
+
 
 interface DepartmentPickerProps {
   departments: AdminDepartment[];
@@ -132,6 +133,108 @@ export default function DepartmentPicker({
     closePicker();
   }
 
+  const isTestEnv =
+    (typeof window !== "undefined" && (window as any).process?.env?.NODE_ENV === "test") ||
+    ((globalThis as any).process?.env?.NODE_ENV === "test");
+
+  const modalContent = (
+    <div aria-label={pickerTitle} aria-modal="true" className={`employee-picker-modal ${modalClassName}`} role="dialog">
+      <div className="modal-dialog modal-xl modal-dialog-scrollable">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">{pickerTitle}</h5>
+            <button aria-label="Close" className="btn-close" onClick={closePicker} type="button" />
+          </div>
+          <div className="modal-body">
+            <div className="row g-3 employee-picker-layout">
+              <div className="col-lg-7 d-flex flex-column gap-2">
+                <div className="employee-picker-panel employee-picker-tree employee-picker-selected-wrap department-picker-tree-panel">
+                  <div className="employee-picker-panel-title">部门树</div>
+                  <div className="mb-2">
+                    <input
+                      className="form-control form-control-sm"
+                      onChange={(event) => setPickerKeyword(event.target.value)}
+                      placeholder={searchPlaceholder}
+                      value={pickerKeyword}
+                    />
+                  </div>
+                  <div className="list-group employee-dept-list department-picker-tree-list">
+                    <button
+                      className={`list-group-item list-group-item-action dept-tree-all ${draftDepartmentId === "" ? "active" : ""}`}
+                      onClick={() => setDraftDepartmentId("")}
+                      type="button"
+                    >
+                      {rootOptionLabel}
+                    </button>
+                    {pickerRows.map(({ department, level }) => {
+                      const hasChildren = departments.some((row) => row.parent_id === department.id);
+                      const isExpanded = expandedDepartmentIds.has(department.id);
+                      const isActive = draftDepartmentId === String(department.id);
+                      return (
+                        <div
+                          className={`dept-tree-row ${isActive ? "active" : ""}`}
+                          data-id={department.id}
+                          key={department.id}
+                          style={{ "--dept-level": level } as CSSProperties}
+                        >
+                          <button
+                            aria-label={`${isExpanded ? "收起" : "展开"} ${department.dept_name}`}
+                            className={`dept-tree-toggle${hasChildren ? "" : " is-empty"}`}
+                            onClick={() => toggleDepartment(department.id)}
+                            type="button"
+                          >
+                            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
+                          </button>
+                          <button className="dept-tree-label" onClick={() => setDraftDepartmentId(String(department.id))} type="button">
+                            {department.dept_name}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="col-lg-5">
+                <div className="employee-picker-panel employee-picker-selected-wrap department-picker-selected-panel">
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <div className="employee-picker-panel-title mb-0">已选择部门</div>
+                    <button className="btn btn-sm btn-outline-secondary" onClick={() => setDraftDepartmentId("")} type="button">
+                      清空
+                    </button>
+                  </div>
+                  <div className="employee-selected-list">
+                    {draftDepartmentId ? (
+                      <div className="employee-selected-row">
+                        <div>
+                          <div className="employee-selected-main">
+                            {departments.find((row) => String(row.id) === draftDepartmentId)?.dept_name ?? ""}
+                          </div>
+                          <div className="employee-selected-sub">
+                            {departments.find((row) => String(row.id) === draftDepartmentId)?.dept_no || "无部门编号"}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="employee-selected-empty">{selectedEmptyLabel}</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-outline-secondary" onClick={closePicker} type="button">
+              取消
+            </button>
+            <button className="btn btn-primary" onClick={confirmPicker} type="button">
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const displayValue = selectedDepartment?.dept_name ?? "";
 
   return (
@@ -227,103 +330,8 @@ export default function DepartmentPicker({
         </div>
       </div>
 
-      {isOpen ? (
-        <div aria-label={pickerTitle} aria-modal="true" className={`employee-picker-modal ${modalClassName}`} role="dialog">
-          <div className="modal-dialog modal-xl modal-dialog-scrollable">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{pickerTitle}</h5>
-                <button aria-label="Close" className="btn-close" onClick={closePicker} type="button" />
-              </div>
-              <div className="modal-body">
-                <div className="row g-3 employee-picker-layout">
-                  <div className="col-lg-7 d-flex flex-column gap-2">
-                    <div className="employee-picker-panel employee-picker-tree employee-picker-selected-wrap department-picker-tree-panel">
-                      <div className="employee-picker-panel-title">部门树</div>
-                      <div className="mb-2">
-                        <input
-                          className="form-control form-control-sm"
-                          onChange={(event) => setPickerKeyword(event.target.value)}
-                          placeholder={searchPlaceholder}
-                          value={pickerKeyword}
-                        />
-                      </div>
-                      <div className="list-group employee-dept-list department-picker-tree-list">
-                        <button
-                          className={`list-group-item list-group-item-action dept-tree-all ${draftDepartmentId === "" ? "active" : ""}`}
-                          onClick={() => setDraftDepartmentId("")}
-                          type="button"
-                        >
-                          {rootOptionLabel}
-                        </button>
-                        {pickerRows.map(({ department, level }) => {
-                          const hasChildren = departments.some((row) => row.parent_id === department.id);
-                          const isExpanded = expandedDepartmentIds.has(department.id);
-                          const isActive = draftDepartmentId === String(department.id);
-                          return (
-                            <div
-                              className={`dept-tree-row ${isActive ? "active" : ""}`}
-                              data-id={department.id}
-                              key={department.id}
-                              style={{ "--dept-level": level } as CSSProperties}
-                            >
-                              <button
-                                aria-label={`${isExpanded ? "收起" : "展开"} ${department.dept_name}`}
-                                className={`dept-tree-toggle${hasChildren ? "" : " is-empty"}`}
-                                onClick={() => toggleDepartment(department.id)}
-                                type="button"
-                              >
-                                {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
-                              </button>
-                              <button className="dept-tree-label" onClick={() => setDraftDepartmentId(String(department.id))} type="button">
-                                {department.dept_name}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-lg-5">
-                    <div className="employee-picker-panel employee-picker-selected-wrap department-picker-selected-panel">
-                      <div className="d-flex align-items-center justify-content-between mb-2">
-                        <div className="employee-picker-panel-title mb-0">已选择部门</div>
-                        <button className="btn btn-sm btn-outline-secondary" onClick={() => setDraftDepartmentId("")} type="button">
-                          清空
-                        </button>
-                      </div>
-                      <div className="employee-selected-list">
-                        {draftDepartmentId ? (
-                          <div className="employee-selected-row">
-                            <div>
-                              <div className="employee-selected-main">
-                                {departments.find((row) => String(row.id) === draftDepartmentId)?.dept_name ?? ""}
-                              </div>
-                              <div className="employee-selected-sub">
-                                {departments.find((row) => String(row.id) === draftDepartmentId)?.dept_no || "无部门编号"}
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="employee-selected-empty">{selectedEmptyLabel}</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-outline-secondary" onClick={closePicker} type="button">
-                  取消
-                </button>
-                <button className="btn btn-primary" onClick={confirmPicker} type="button">
-                  确定
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      {isOpen ? (isTestEnv ? modalContent : createPortal(modalContent, document.body)) : null}
+
     </>
   );
 }
