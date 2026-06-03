@@ -6,6 +6,7 @@ export default function ManagerDepartmentHoursPage() {
       columns={[
         { key: "dept_name", label: "部门名称" },
         { key: "total_hours", label: "总工时（小时）" },
+        { key: "member_count", label: "部门人数" },
       ]}
       description="按账套统计管理人员部门维度工时。"
       endpoint="/api/query/manager-department-hours"
@@ -14,11 +15,13 @@ export default function ManagerDepartmentHoursPage() {
       kind="objectRows"
       transformObjectRows={(rows) => {
         const totalHours = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
+        const totalMembers = rows.reduce((sum, row) => sum + Number(row.member_count || 0), 0);
         return [
           ...rows,
           {
             dept_name: "总计工时",
             total_hours: totalHours.toFixed(2),
+            member_count: totalMembers,
           },
         ];
       }}

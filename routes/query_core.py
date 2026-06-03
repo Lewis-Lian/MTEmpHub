@@ -140,6 +140,22 @@ def _filter_punch_columns(headers: list[str], rows: list[list[object]]) -> tuple
     return filtered_headers, filtered_rows
 
 
+def _filter_columns(headers: list[str], rows: list[list[object]], param_name: str) -> tuple[list[str], list[list[object]]]:
+    requested = (request.args.get(param_name) or "").strip()
+    if not requested:
+        return headers, rows
+    wanted = [h.strip() for h in requested.split(",") if h.strip()]
+    wanted_set = set(wanted)
+    keep_indexes: list[int] = []
+    filtered_headers: list[str] = []
+    for idx, header in enumerate(headers):
+        if header in wanted_set:
+            keep_indexes.append(idx)
+            filtered_headers.append(header)
+    filtered_rows = [[row[idx] if idx < len(row) else "" for idx in keep_indexes] for row in rows]
+    return filtered_headers, filtered_rows
+
+
 def _normalize_leave_type(value: str | None) -> str:
     text = (value or "").strip()
     if text in {"补休(调休)", "补休（调休）"}:
@@ -847,6 +863,7 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
         .all()
     )
     totals: dict[str, float] = {}
+    dept_member_counts: dict[str, int] = {}
     overrides = {
         row.emp_id: row
         for row in EmployeeAttendanceOverride.query.filter(
@@ -858,6 +875,7 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
     for employee in employees:
         dept_name = employee.department.dept_name if employee.department else "未分配部门"
         totals.setdefault(dept_name, 0.0)
+        dept_member_counts[dept_name] = dept_member_counts.get(dept_name, 0) + 1
 
     if not employees:
         return []
@@ -871,7 +889,14 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
         totals.setdefault(dept_name, 0.0)
         totals[dept_name] += work_hours
 
-    return [{"dept_name": k, "total_hours": round(v, 2)} for k, v in sorted(totals.items(), key=lambda x: x[0])]
+    return [
+        {
+            "dept_name": k,
+            "total_hours": round(v, 2),
+            "member_count": dept_member_counts.get(k, 0)
+        }
+        for k, v in sorted(totals.items(), key=lambda x: x[0])
+    ]
 
 
 def _top_level_department_name(department: Department | None) -> str:
@@ -893,10 +918,12 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
         .all()
     )
     totals: dict[str, float] = {}
+    dept_member_counts: dict[str, int] = {}
 
     for employee in employees:
         dept_name = _top_level_department_name(employee.department)
         totals.setdefault(dept_name, 0.0)
+        dept_member_counts[dept_name] = dept_member_counts.get(dept_name, 0) + 1
 
     if not employees:
         return []
@@ -910,7 +937,14 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
             else:
                 totals[dept_name] += float(row.actual_hours or 0)
 
-    return [{"dept_name": k, "total_hours": round(v, 2)} for k, v in sorted(totals.items(), key=lambda x: x[0])]
+    return [
+        {
+            "dept_name": k,
+            "total_hours": round(v, 2),
+            "member_count": dept_member_counts.get(k, 0)
+        }
+        for k, v in sorted(totals.items(), key=lambda x: x[0])
+    ]
 
 
 def account_sets_api():
@@ -1368,29 +1402,39 @@ def final_data_export_api():
 
 
 def summary_download_export_api():
-    emp_ids = _pick_emp_ids()
-    if not emp_ids:
+    requested = _requested_emp_ids()
+    accessible = _accessible_emp_ids()
+    if requested:
+        accessible_set = set(accessible)
+        full_emp_ids = [emp_id for emp_id in requested if emp_id in accessible_set]
+        full_emp_ids = _keyword_filtered_emp_ids(list(dict.fromkeys(full_emp_ids)))
+    else:
+        full_emp_ids = _keyword_filtered_emp_ids(accessible)
+
+    if not full_emp_ids:
         return jsonify({"error": "No employee selected"}), 400
 
     month = _resolve_query_month()
+    year = int(month.split("-", 1)[0]) if month else datetime.now().year
     sheets_raw = (request.args.get("sheets") or "final,punch").strip()
-    include_final = "final" in sheets_raw
-    include_punch = "punch" in sheets_raw
+    sheets_list = [s.strip() for s in sheets_raw.split(",") if s.strip()]
+
+    emp_ids = _non_manager_emp_ids(full_emp_ids)
 
     wb = openpyxl.Workbook()
+    wb.remove(wb.active)
 
-    if include_final:
+    # 1. final：员工考勤数据查询
+    if "final" in sheets_list:
         final_rows = _build_final_rows(month, emp_ids)
         headers, rows = _filter_final_columns(FINAL_HEADERS, final_rows)
-        ws = wb.active
-        ws.title = "考勤数据查询"
+        ws = wb.create_sheet("考勤数据查询")
         ws.append(headers)
         for row in rows:
             ws.append(row)
-    else:
-        wb.remove(wb.active)
 
-    if include_punch:
+    # 2. punch：员工打卡数据查询
+    if "punch" in sheets_list:
         employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
         punch_rows = []
         rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
@@ -1427,6 +1471,104 @@ def summary_download_export_api():
         ws2.append(punch_headers)
         for row in punch_row_data:
             ws2.append(row)
+
+    # 3. abnormal：员工异常查询
+    if "abnormal" in sheets_list:
+        abnormal_rows = _build_abnormal_rows(month, emp_ids)
+        headers = ["部门名称", "人员编号", "人员姓名", "异常考勤次数"]
+        row_data = []
+        for r in abnormal_rows:
+            row_data.append([
+                r.get("dept_name", ""),
+                r.get("emp_no", ""),
+                r.get("name", ""),
+                r.get("abnormal_count", 0)
+            ])
+        headers, row_data = _filter_columns(headers, row_data, "abnormal_headers")
+        ws3 = wb.create_sheet("员工异常查询")
+        ws3.append(headers)
+        for row in row_data:
+            ws3.append(row)
+
+    # 4. emp_dept_hours：员工部门工时查询
+    if "emp_dept_hours" in sheets_list:
+        non_mgr_ids = _non_manager_emp_ids(emp_ids)
+        dept_hours_rows = _build_department_hours_rows(month, non_mgr_ids)
+        headers = ["部门名称", "总工时（小时）", "部门人数"]
+        row_data = []
+        for r in dept_hours_rows:
+            row_data.append([
+                r.get("dept_name", ""),
+                r.get("total_hours", 0),
+                r.get("member_count", 0)
+            ])
+        headers, row_data = _filter_columns(headers, row_data, "emp_dept_hours_headers")
+        ws4 = wb.create_sheet("员工部门工时查询")
+        ws4.append(headers)
+        for row in row_data:
+            ws4.append(row)
+
+    # 5. mgr_attendance：管理人员考勤查询
+    if "mgr_attendance" in sheets_list:
+        mgr_ids = _manager_emp_ids(full_emp_ids)
+        options = ManagerAttendanceOptions(month=month)
+        rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, mgr_ids))
+        headers = manager_headers(True)
+        row_data = rows_as_table(rows, True)
+        headers, row_data = _filter_columns(headers, row_data, "mgr_attendance_headers")
+        ws5 = wb.create_sheet("管理人员考勤查询")
+        ws5.append(headers)
+        for row in row_data:
+            ws5.append(row)
+
+    # 6. mgr_overtime：管理人员加班查询
+    if "mgr_overtime" in sheets_list:
+        from routes.admin_core import _manager_month_rows, _manager_overtime_values
+        values = _manager_overtime_values(year)
+        mgr_ids = set(_manager_emp_ids(full_emp_ids))
+        values = {name: r for name, r in values.items() if r.get("emp_id") in mgr_ids}
+        headers = ["部门", "姓名", "前年累积天数", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余调休天数", "备注"]
+        row_data = _manager_month_rows(values, "剩余调休天数")
+        headers, row_data = _filter_columns(headers, row_data, "mgr_overtime_headers")
+        ws6 = wb.create_sheet("管理人员加班查询")
+        ws6.append(headers)
+        for row in row_data:
+            ws6.append(row)
+
+    # 7. mgr_annual_leave：管理人员年假查询
+    if "mgr_annual_leave" in sheets_list:
+        from routes.admin_core import _annual_leave_value_keys, _manager_annual_leave_values, _manager_month_rows
+        values = _manager_annual_leave_values(year)
+        mgr_ids = set(_manager_emp_ids(full_emp_ids))
+        values = {name: r for name, r in values.items() if r.get("emp_id") in mgr_ids}
+        headers = ["部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"]
+        row_data = _manager_month_rows(values, "剩余年休天数", _annual_leave_value_keys())
+        headers, row_data = _filter_columns(headers, row_data, "mgr_annual_leave_headers")
+        ws7 = wb.create_sheet("管理人员年假查询")
+        ws7.append(headers)
+        for row in row_data:
+            ws7.append(row)
+
+    # 8. mgr_dept_hours：管理人员部门工时查询
+    if "mgr_dept_hours" in sheets_list:
+        mgr_ids = _manager_emp_ids(full_emp_ids)
+        mgr_dept_hours_rows = _build_manager_department_hours_rows(month, mgr_ids)
+        headers = ["部门名称", "总工时（小时）", "部门人数"]
+        row_data = []
+        for r in mgr_dept_hours_rows:
+            row_data.append([
+                r.get("dept_name", ""),
+                r.get("total_hours", 0),
+                r.get("member_count", 0)
+            ])
+        headers, row_data = _filter_columns(headers, row_data, "mgr_dept_hours_headers")
+        ws8 = wb.create_sheet("管理人员部门工时查询")
+        ws8.append(headers)
+        for row in row_data:
+            ws8.append(row)
+
+    if not wb.sheetnames:
+        wb.create_sheet("无选择数据")
 
     output = BytesIO()
     wb.save(output)
@@ -1517,9 +1659,9 @@ def manager_department_hours_export_api():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "管理人员部门工时查询"
-    ws.append(["部门名称", "总工时（小时）"])
+    ws.append(["部门名称", "总工时（小时）", "部门人数"])
     for row in rows:
-        ws.append([row.get("dept_name", ""), row.get("total_hours", 0)])
+        ws.append([row.get("dept_name", ""), row.get("total_hours", 0), row.get("member_count", 0)])
 
     output = BytesIO()
     wb.save(output)
@@ -1874,9 +2016,9 @@ def department_hours_export_api():
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "员工部门工时查询"
-    ws.append(["部门名称", "总工时（小时）"])
+    ws.append(["部门名称", "总工时（小时）", "部门人数"])
     for row in rows:
-        ws.append([row.get("dept_name", ""), row.get("total_hours", 0)])
+        ws.append([row.get("dept_name", ""), row.get("total_hours", 0), row.get("member_count", 0)])
 
     output = BytesIO()
     wb.save(output)
