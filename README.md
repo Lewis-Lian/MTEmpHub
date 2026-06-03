@@ -224,13 +224,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\windows\bootstrap_windows.ps1
 如果你希望把“初始化环境 + 建库 + 初始化管理员 + 安装服务”合并成一条命令，推荐直接使用新的生产部署脚本：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -InstallService
+powershell -ExecutionPolicy Bypass -File .\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -InstallService
+```
+
+如果你是在 Git Bash 或者习惯用和 `./winrun.sh` 一样的入口，也可以直接在项目根目录执行：
+
+```bash
+INSTALL_SERVICE=1 ./winrun_deploy.sh
+```
+
+旧数据库机器可以这样执行：
+
+```bash
+UPGRADE_LEGACY_SCHEMA=1 INSTALL_SERVICE=1 ./winrun_deploy.sh
 ```
 
 如果目标机器使用的是历史版本数据库，再额外加上：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\windows\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -UpgradeLegacySchema -InstallService
+powershell -ExecutionPolicy Bypass -File .\deploy_production.ps1 -ProjectRoot "D:\attendance_system" -UpgradeLegacySchema -InstallService
 ```
 
 ### 3. 手动初始化与生产启动
