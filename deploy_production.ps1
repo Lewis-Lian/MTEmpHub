@@ -17,7 +17,7 @@ $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($ProjectRoot)) {
     $scriptBase = if ($PSScriptRoot) { $PSScriptRoot } elseif ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { (Get-Location).Path }
-    $ProjectRoot = (Resolve-Path (Join-Path $scriptBase "..\..")).Path
+    $ProjectRoot = (Resolve-Path $scriptBase).Path
 }
 
 $bootstrapScript = Join-Path $ProjectRoot "scripts\windows\bootstrap_windows.ps1"
