@@ -285,6 +285,8 @@
 }
 
 .query-page-shell .query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
   transform: translateY(-2px) !important;
