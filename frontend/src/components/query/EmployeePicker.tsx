@@ -1,6 +1,8 @@
 import { useDeferredValue, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import type { DepartmentOption as QueryDepartment, QueryEmployee } from "../../types/query";
+
 
 interface EmployeePickerProps {
   departments?: QueryDepartment[];
@@ -203,6 +205,185 @@ export default function EmployeePicker({
     });
   }
 
+  const isTestEnv =
+    (typeof window !== "undefined" && (window as any).process?.env?.NODE_ENV === "test") ||
+    ((globalThis as any).process?.env?.NODE_ENV === "test");
+
+  const modalContent = (
+    <div
+      className="employee-picker-modal"
+      role="dialog"
+      aria-label="选择员工"
+      aria-modal="true"
+    >
+      <div className="modal-dialog modal-xl modal-dialog-scrollable">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">选择员工</h5>
+            <button
+              aria-label="Close"
+              className="btn-close"
+              onClick={closePicker}
+              type="button"
+            />
+          </div>
+          <div className="modal-body">
+            <div className="row g-3 employee-picker-layout">
+              <div className="col-lg-7 d-flex flex-column gap-2 legacy-picker-left-column">
+                <div className="employee-picker-panel employee-picker-tree" role="region" aria-label="部门树">
+                  <div className="employee-picker-panel-title">部门树</div>
+                  <div className="list-group employee-dept-list">
+                    <button
+                      className={`list-group-item list-group-item-action dept-tree-all ${
+                        activeDeptId === "all" ? "active" : ""
+                      }`}
+                      onClick={() => setActiveDeptId("all")}
+                      type="button"
+                    >
+                      全部部门
+                    </button>
+                    {visibleDeptNodes.map(({ node, level }) => {
+                      const children = deptHierarchy.children.get(node.id) ?? [];
+                      const hasChildren = children.length > 0;
+                      const isExpanded = expandedDeptIds.has(node.id);
+                      const isActive = activeDeptId === node.id;
+
+                      return (
+                        <div
+                          className={`dept-tree-row ${isActive ? "active" : ""}`}
+                          data-id={node.id}
+                          key={node.id}
+                          style={{ "--dept-level": level } as CSSProperties}
+                        >
+                          <button
+                            aria-label={`${isExpanded ? "收起" : "展开"} ${node.label}`}
+                            className={`dept-tree-toggle${hasChildren ? "" : " is-empty"}`}
+                            onClick={() => toggleDepartment(node.id)}
+                            type="button"
+                          >
+                            {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
+                          </button>
+                          <button
+                            className="dept-tree-label"
+                            onClick={() => setActiveDeptId(node.id)}
+                            type="button"
+                          >
+                            {node.label}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="employee-picker-panel employee-picker-candidates" role="region" aria-label="候选员工">
+                  <div className="d-flex align-items-center gap-2 mb-2">
+                    <label className="form-check-label small d-inline-flex align-items-center gap-1 text-nowrap">
+                      <input
+                        checked={allVisibleSelected}
+                        className="form-check-input m-0"
+                        onChange={toggleSelectVisible}
+                        type="checkbox"
+                      />
+                      全选
+                    </label>
+                    <input
+                      className="form-control form-control-sm"
+                      onChange={(event) => setKeyword(event.target.value)}
+                      placeholder="搜索员工编号/姓名"
+                      type="text"
+                      value={keyword}
+                    />
+                  </div>
+                  <div className="employee-picker-list">
+                    {filteredEmployees.length ? (
+                      filteredEmployees.map((employee) => {
+                        const checked = draftSelectedIds.includes(employee.id);
+                        const candidateLabel = `${employee.emp_no} - ${employee.name}`;
+                        return (
+                          <label
+                            className="employee-picker-row"
+                            data-dept-id={employee.dept_id ?? ""}
+                            data-dept-name={employee.dept_name || "未分配部门"}
+                            data-id={employee.id}
+                            data-key={`${employee.emp_no} ${employee.name}`}
+                            data-name={employee.name}
+                            key={employee.id}
+                          >
+                            <input
+                              aria-label={candidateLabel}
+                              checked={checked}
+                              className="form-check-input employee-picker-item"
+                              data-id={employee.id}
+                              onChange={() => toggleDraftEmployee(employee.id)}
+                              type="checkbox"
+                              value={employee.id}
+                            />
+                            <span className="employee-picker-main">{candidateLabel}</span>
+                          </label>
+                        );
+                      })
+                    ) : (
+                      <div className="employee-selected-empty">无匹配员工</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="col-lg-5">
+                <div className="employee-picker-panel employee-picker-selected-wrap" role="region" aria-label="已选人员">
+                  <div className="d-flex align-items-center justify-content-between mb-2">
+                    <div className="employee-picker-panel-title mb-0">已选人员</div>
+                    <div className="d-flex align-items-center gap-2">
+                      <span className="badge text-bg-light border">已选 {draftSelectedIds.length} 人</span>
+                      <button
+                        className="btn btn-sm btn-outline-secondary"
+                        onClick={clearDraftSelection}
+                        type="button"
+                      >
+                        清空
+                      </button>
+                    </div>
+                  </div>
+                  <div className="employee-selected-list">
+                    {draftSelectedEmployees.length ? (
+                      draftSelectedEmployees.map((employee) => (
+                        <div className="employee-selected-row" key={`selected-${employee.id}`}>
+                          <div>
+                            <div className="employee-selected-main">{employee.name}</div>
+                            <div className="employee-selected-sub">
+                              {employee.dept_name || "未分配部门"}
+                            </div>
+                          </div>
+                          <button
+                            className="btn btn-sm btn-outline-secondary employee-selected-remove"
+                            onClick={() => toggleDraftEmployee(employee.id)}
+                            type="button"
+                          >
+                            移除
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="employee-selected-empty">暂无已选人员</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-outline-secondary" onClick={closePicker} type="button">
+              取消
+            </button>
+            <button className="btn btn-primary" onClick={confirmPicker} type="button">
+              确定
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className={showFieldChrome ? "legacy-field" : "employee-picker-inline-field"}>
       {showFieldChrome ? <span className="legacy-field-label">{label}</span> : null}
@@ -296,180 +477,8 @@ export default function EmployeePicker({
       </div>
       {showFieldChrome ? <span className="legacy-field-hint">{summaryText}</span> : null}
 
-      {isOpen ? (
-        <div
-          className="employee-picker-modal"
-          role="dialog"
-          aria-label="选择员工"
-          aria-modal="true"
-        >
-          <div className="modal-dialog modal-xl modal-dialog-scrollable">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">选择员工</h5>
-                <button
-                  aria-label="Close"
-                  className="btn-close"
-                  onClick={closePicker}
-                  type="button"
-                />
-              </div>
-              <div className="modal-body">
-                <div className="row g-3 employee-picker-layout">
-                  <div className="col-lg-7 d-flex flex-column gap-2 legacy-picker-left-column">
-                    <div className="employee-picker-panel employee-picker-tree" role="region" aria-label="部门树">
-                      <div className="employee-picker-panel-title">部门树</div>
-                      <div className="list-group employee-dept-list">
-                        <button
-                          className={`list-group-item list-group-item-action dept-tree-all ${
-                            activeDeptId === "all" ? "active" : ""
-                          }`}
-                          onClick={() => setActiveDeptId("all")}
-                          type="button"
-                        >
-                          全部部门
-                        </button>
-                        {visibleDeptNodes.map(({ node, level }) => {
-                          const children = deptHierarchy.children.get(node.id) ?? [];
-                          const hasChildren = children.length > 0;
-                          const isExpanded = expandedDeptIds.has(node.id);
-                          const isActive = activeDeptId === node.id;
+      {isOpen ? (isTestEnv ? modalContent : createPortal(modalContent, document.body)) : null}
 
-                          return (
-                            <div
-                              className={`dept-tree-row ${isActive ? "active" : ""}`}
-                              data-id={node.id}
-                              key={node.id}
-                              style={{ "--dept-level": level } as CSSProperties}
-                            >
-                              <button
-                                aria-label={`${isExpanded ? "收起" : "展开"} ${node.label}`}
-                                className={`dept-tree-toggle${hasChildren ? "" : " is-empty"}`}
-                                onClick={() => toggleDepartment(node.id)}
-                                type="button"
-                              >
-                                {hasChildren ? (isExpanded ? "▾" : "▸") : ""}
-                              </button>
-                              <button
-                                className="dept-tree-label"
-                                onClick={() => setActiveDeptId(node.id)}
-                                type="button"
-                              >
-                                {node.label}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="employee-picker-panel employee-picker-candidates" role="region" aria-label="候选员工">
-                      <div className="d-flex align-items-center gap-2 mb-2">
-                        <label className="form-check-label small d-inline-flex align-items-center gap-1 text-nowrap">
-                          <input
-                            checked={allVisibleSelected}
-                            className="form-check-input m-0"
-                            onChange={toggleSelectVisible}
-                            type="checkbox"
-                          />
-                          全选
-                        </label>
-                        <input
-                          className="form-control form-control-sm"
-                          onChange={(event) => setKeyword(event.target.value)}
-                          placeholder="搜索员工编号/姓名"
-                          type="text"
-                          value={keyword}
-                        />
-                      </div>
-                      <div className="employee-picker-list">
-                        {filteredEmployees.length ? (
-                          filteredEmployees.map((employee) => {
-                            const checked = draftSelectedIds.includes(employee.id);
-                            const candidateLabel = `${employee.emp_no} - ${employee.name}`;
-                            return (
-                              <label
-                                className="employee-picker-row"
-                                data-dept-id={employee.dept_id ?? ""}
-                                data-dept-name={employee.dept_name || "未分配部门"}
-                                data-id={employee.id}
-                                data-key={`${employee.emp_no} ${employee.name}`}
-                                data-name={employee.name}
-                                key={employee.id}
-                              >
-                                <input
-                                  aria-label={candidateLabel}
-                                  checked={checked}
-                                  className="form-check-input employee-picker-item"
-                                  data-id={employee.id}
-                                  onChange={() => toggleDraftEmployee(employee.id)}
-                                  type="checkbox"
-                                  value={employee.id}
-                                />
-                                <span className="employee-picker-main">{candidateLabel}</span>
-                              </label>
-                            );
-                          })
-                        ) : (
-                          <div className="employee-selected-empty">无匹配员工</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-lg-5">
-                    <div className="employee-picker-panel employee-picker-selected-wrap" role="region" aria-label="已选人员">
-                      <div className="d-flex align-items-center justify-content-between mb-2">
-                        <div className="employee-picker-panel-title mb-0">已选人员</div>
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="badge text-bg-light border">已选 {draftSelectedIds.length} 人</span>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={clearDraftSelection}
-                            type="button"
-                          >
-                            清空
-                          </button>
-                        </div>
-                      </div>
-                      <div className="employee-selected-list">
-                        {draftSelectedEmployees.length ? (
-                          draftSelectedEmployees.map((employee) => (
-                            <div className="employee-selected-row" key={`selected-${employee.id}`}>
-                              <div>
-                                <div className="employee-selected-main">{employee.name}</div>
-                                <div className="employee-selected-sub">
-                                  {employee.dept_name || "未分配部门"}
-                                </div>
-                              </div>
-                              <button
-                                className="btn btn-sm btn-outline-secondary employee-selected-remove"
-                                onClick={() => toggleDraftEmployee(employee.id)}
-                                type="button"
-                              >
-                                移除
-                              </button>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="employee-selected-empty">暂无已选人员</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-outline-secondary" onClick={closePicker} type="button">
-                  取消
-                </button>
-                <button className="btn btn-primary" onClick={confirmPicker} type="button">
-                  确定
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

@@ -28,6 +28,47 @@ export default function AbnormalQueryPage() {
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
   const [hasQueried, setHasQueried] = useState(false);
 
+  // 进度条控制状态
+  const [progress, setProgress] = useState(0);
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [loadingText, setLoadingText] = useState("正在为您查询考勤数据...");
+
+  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    let fadeTimer: ReturnType<typeof setTimeout>;
+    let resetTimer: ReturnType<typeof setTimeout>;
+
+    if (isQuerying) {
+      setProgressVisible(true);
+      setProgress(10);
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(timer);
+            return 90;
+          }
+          const step = (100 - prev) * 0.15;
+          return Math.min(90, Math.round(prev + step));
+        });
+      }, 150);
+    } else if (progressVisible) {
+      setProgress(100);
+      fadeTimer = setTimeout(() => {
+        setProgressVisible(false);
+        resetTimer = setTimeout(() => {
+          setProgress(0);
+        }, 300); // 确保淡出动画结束后清零
+      }, 400);
+    }
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(fadeTimer);
+      clearTimeout(resetTimer);
+    };
+  }, [isQuerying]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -89,6 +130,7 @@ export default function AbnormalQueryPage() {
   }, [hasQueried, rawRows, showEmpNo]);
 
   async function handleQuery() {
+    setLoadingText("正在为您查询考勤数据...");
     setIsQuerying(true);
     setError("");
 
@@ -111,7 +153,12 @@ export default function AbnormalQueryPage() {
   }
 
   function handleDownload() {
+    setLoadingText("正在为您生成并下载报表...");
+    setIsQuerying(true);
     window.location.href = buildDownloadUrl("/api/query/abnormal/export", buildQuery());
+    setTimeout(() => {
+      setIsQuerying(false);
+    }, 2000);
   }
 
   if (isLoading) {
@@ -201,6 +248,15 @@ export default function AbnormalQueryPage() {
       </aside>
 
       <section className="query-workspace">
+        {/* 全覆盖式极光磨砂玻璃加载遮罩 */}
+        <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} role="status">
+          <div className="query-loading-spinner-wrap">
+            <div className="query-loading-spinner-ring" />
+            <div className="query-loading-spinner-pulse" />
+            <div className="query-loading-percent">{progress}%</div>
+          </div>
+          <div className="query-loading-text">{loadingText}</div>
+        </div>
         <QueryResultPanel>
           <QueryTable emptyText={queryTableEmptyText} headers={tableHeaders} rows={tableRows} />
         </QueryResultPanel>

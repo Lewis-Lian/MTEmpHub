@@ -108,10 +108,15 @@ export default function QueryHomePage() {
 
   return (
     <div className="query-home-container">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       {/* 仪表盘头部信息区 */}
       <header className="qh-dashboard-header">
         <div className="qh-header-title-area">
-          <p className="qh-header-kicker">首页</p>
+          <p className="qh-header-kicker">Dashboard</p>
           <h2 className="qh-header-title">管理人员首页概览</h2>
         </div>
         <div className="qh-header-flat-controls">
@@ -161,28 +166,67 @@ export default function QueryHomePage() {
           {/* 四列大卡片核心 KPI 网格 */}
           <section className="qh-main-kpis-four">
             <div className="qh-kpi-card-hero attendance">
-              <span className="qh-kpi-hero-label">考勤天数</span>
+              <div className="qh-kpi-hero-label">
+                <span>考勤天数</span>
+                <span className="qh-kpi-icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                </span>
+              </div>
               <div className="qh-kpi-hero-body">
                 <strong className="qh-kpi-hero-value">{summary?.attendance_days ?? 0}</strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
+            
             <div className="qh-kpi-card-hero benefit">
-              <span className="qh-kpi-hero-label">剩余福利天数</span>
+              <div className="qh-kpi-hero-label">
+                <span>剩余福利天数</span>
+                <span className="qh-kpi-icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                    <path d="M2 17l10 5 10-5"></path>
+                    <path d="M2 12l10 5 10-5"></path>
+                  </svg>
+                </span>
+              </div>
               <div className="qh-kpi-hero-body">
                 <strong className="qh-kpi-hero-value">{summary?.benefit_days ?? 0}</strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
+
             <div className="qh-kpi-card-hero overtime">
-              <span className="qh-kpi-hero-label">剩余调休天数</span>
+              <div className="qh-kpi-hero-label">
+                <span>剩余调休天数</span>
+                <span className="qh-kpi-icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
+                  </svg>
+                </span>
+              </div>
               <div className="qh-kpi-hero-body">
                 <strong className="qh-kpi-hero-value">{summary?.overtime_remaining_days ?? 0}</strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
+
             <div className="qh-kpi-card-hero late-minutes">
-              <span className="qh-kpi-hero-label">迟到早退分钟数</span>
+              <div className="qh-kpi-hero-label">
+                <span>迟到早退分钟数</span>
+                <span className="qh-kpi-icon-wrapper">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </span>
+              </div>
               <div className="qh-kpi-hero-body">
                 <strong className="qh-kpi-hero-value">{summary?.late_early_minutes ?? 0}</strong>
                 <span className="qh-kpi-hero-unit">分钟</span>
@@ -192,71 +236,95 @@ export default function QueryHomePage() {
 
           {/* 自适应双栏 */}
           <div className="qh-layout-columns">
-            {/* 左栏：详细指标面板按性质分类底色卡片 */}
+            {/* 左栏：详细指标面板按性质分类磨砂玻璃卡片 */}
             <section className="qh-dashboard-panel">
-              <h3 className="qh-panel-title">详细考勤指标分析</h3>
-              <div style={{ display: "grid", gap: "20px", marginTop: "16px" }}>
+              <h3 className="qh-panel-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--qh-primary)" }}>
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <span>详细考勤指标分析</span>
+              </h3>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "28px", marginTop: "24px" }}>
                 {/* 类别1: 出勤指标 */}
                 <div>
-                  <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#475569", marginBottom: "8px", borderLeft: "3px solid #10b981", paddingLeft: "8px" }}>工作与出勤</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#f8fafc" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>考勤天数</div>
-                      <strong style={{ fontSize: "20px", color: "#0f172a" }}>{summary?.attendance_days ?? 0} 天</strong>
+                  <h4 className="qh-indicator-section-title">
+                    <span className="qh-neon-dot green" />
+                    <span>工作与出勤</span>
+                  </h4>
+                  <div className="qh-indicator-grid">
+                    <div className="qh-indicator-item-card green-rail">
+                      <div className="qh-indicator-label">考勤天数</div>
+                      <div className="qh-indicator-value">{summary?.attendance_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#f8fafc" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>外勤出差天数</div>
-                      <strong style={{ fontSize: "20px", color: "#0f172a" }}>{summary?.business_trip_days ?? 0} 天</strong>
+                    <div className="qh-indicator-item-card green-rail">
+                      <div className="qh-indicator-label">外勤出差天数</div>
+                      <div className="qh-indicator-value">{summary?.business_trip_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
                   </div>
                 </div>
 
                 {/* 类别2: 请假缺勤 */}
                 <div>
-                  <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#475569", marginBottom: "8px", borderLeft: "3px solid #f59e0b", paddingLeft: "8px" }}>缺勤与假勤</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fffbeb" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>事病假天数</div>
-                      <strong style={{ fontSize: "20px", color: "#d97706" }}>{summary?.personal_sick_days ?? 0} 天</strong>
+                  <h4 className="qh-indicator-section-title">
+                    <span className="qh-neon-dot orange" />
+                    <span>缺勤与假勤</span>
+                  </h4>
+                  <div className="qh-indicator-grid">
+                    <div className="qh-indicator-item-card orange-rail">
+                      <div className="qh-indicator-label">事病假天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-warning)" }}>{summary?.personal_sick_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fffbeb" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>工伤天数</div>
-                      <strong style={{ fontSize: "20px", color: "#d97706" }}>{summary?.injury_days ?? 0} 天</strong>
+                    <div className="qh-indicator-item-card orange-rail">
+                      <div className="qh-indicator-label">工伤天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-warning)" }}>{summary?.injury_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fffbeb" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>婚假天数</div>
-                      <strong style={{ fontSize: "20px", color: "#d97706" }}>{summary?.marriage_days ?? 0} 天</strong>
+                    <div className="qh-indicator-item-card orange-rail">
+                      <div className="qh-indicator-label">婚假天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-warning)" }}>{summary?.marriage_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#fffbeb" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>丧假天数</div>
-                      <strong style={{ fontSize: "20px", color: "#d97706" }}>{summary?.funeral_days ?? 0} 天</strong>
+                    <div className="qh-indicator-item-card orange-rail">
+                      <div className="qh-indicator-label">丧假天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-warning)" }}>{summary?.funeral_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
                   </div>
                 </div>
 
                 {/* 类别3: 额度余额 */}
                 <div>
-                  <h4 style={{ fontSize: "14px", fontWeight: "600", color: "#475569", marginBottom: "8px", borderLeft: "3px solid #8b5cf6", paddingLeft: "8px" }}>额度与假勤余额</h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "12px" }}>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#f5f3ff" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>剩余福利天数</div>
-                      <strong style={{ fontSize: "20px", color: "#7c3aed" }}>{summary?.benefit_days ?? 0} 天</strong>
+                  <h4 className="qh-indicator-section-title">
+                    <span className="qh-neon-dot purple" />
+                    <span>额度与假勤余额</span>
+                  </h4>
+                  <div className="qh-indicator-grid">
+                    <div className="qh-indicator-item-card purple-rail">
+                      <div className="qh-indicator-label">剩余福利天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-purple)" }}>{summary?.benefit_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
-                    <div style={{ padding: "12px", border: "1px solid #e2e8f0", borderRadius: "8px", background: "#f5f3ff" }}>
-                      <div style={{ fontSize: "12px", color: "#64748b" }}>剩余调休天数</div>
-                      <strong style={{ fontSize: "20px", color: "#7c3aed" }}>{summary?.overtime_remaining_days ?? 0} 天</strong>
+                    <div className="qh-indicator-item-card purple-rail">
+                      <div className="qh-indicator-label">剩余调休天数</div>
+                      <div className="qh-indicator-value" style={{ color: "var(--qh-purple)" }}>{summary?.overtime_remaining_days ?? 0} <span className="qh-kpi-hero-unit">天</span></div>
                     </div>
                   </div>
                 </div>
               </div>
             </section>
 
-            {/* 右栏：占比堆叠条和通知 Banner 说明 */}
+            {/* 右栏：占比堆叠条和系统广播 Notice Banner */}
             <div className="qh-right-box">
               {/* 请假假勤占比分析 */}
               <section className="qh-dashboard-panel">
-                <h3 className="qh-panel-title">请假与外勤类型占比</h3>
-                <div className="qh-stack-bar-box" style={{ marginTop: "16px" }}>
+                <h3 className="qh-panel-title">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--qh-purple)" }}>
+                    <path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path>
+                    <path d="M22 12A10 10 0 0 0 12 2v10z"></path>
+                  </svg>
+                  <span>请假与外勤类型占比</span>
+                </h3>
+                
+                <div className="qh-stack-bar-box" style={{ marginTop: "24px" }}>
                   {leaveTotal > 0 ? (
                     <>
                       <div className="qh-stack-bar-wrapper">
@@ -266,7 +334,8 @@ export default function QueryHomePage() {
                         {marriage > 0 && <div className="qh-stack-segment marriage" style={{ width: `${marriagePercent}%` }} title={`婚假: ${marriage}天`} />}
                         {funeral > 0 && <div className="qh-stack-segment funeral" style={{ width: `${funeralPercent}%` }} title={`丧假: ${funeral}天`} />}
                       </div>
-                      <div className="qh-stack-legend" style={{ marginTop: "12px" }}>
+                      
+                      <div className="qh-stack-legend" style={{ marginTop: "8px" }}>
                         {personalSick > 0 && (
                           <div className="qh-legend-item">
                             <span className="qh-legend-dot sick" />
@@ -300,14 +369,13 @@ export default function QueryHomePage() {
                       </div>
                     </>
                   ) : (
-                    <div className="qh-stack-empty">本月暂无请假或出差记录</div>
+                    <div className="qh-stack-empty" style={{ padding: "24px 0" }}>本月暂无请假或出差记录</div>
                   )}
                 </div>
               </section>
 
               {/* 首页说明 Notice Banner */}
               <div className="qh-notice-banner">
-                <span className="qh-notice-icon">💡</span>
                 <div className="qh-notice-content">
                   <h4 className="qh-notice-title">首页说明</h4>
                   <p className="qh-notice-body">{message}</p>
