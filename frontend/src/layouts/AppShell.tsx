@@ -24,6 +24,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
   const [error, setError] = useState("");
   const [tabs, setTabs] = useState<AppTabItem[]>([]);
   const [tabReloadKeys, setTabReloadKeys] = useState<Record<string, number>>({});
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const matchedNavigation = useMemo(() => {
     for (const module of modules) {
@@ -169,26 +170,36 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
 
   return (
     <div className="app-layout app-shell-grid">
-      <aside className="app-sidebar">
+      <aside className={`app-sidebar${sidebarCollapsed ? " is-collapsed" : ""}`}>
         <div className="app-sidebar-brand">
-          <h1>考勤系统</h1>
-          <p>当前模块：{currentModule?.label ?? "系统导航"}</p>
-          <p>当前用户：{user.username}</p>
+          <h1>{sidebarCollapsed ? "考" : "考勤系统"}</h1>
+          {!sidebarCollapsed && <p>当前模块：{currentModule?.label ?? "系统导航"}</p>}
+          {!sidebarCollapsed && <p>当前用户：{user.username}</p>}
         </div>
         {isLoading ? <div className="app-sidebar-hint">正在加载菜单...</div> : null}
         {error ? <div className="app-sidebar-error">{error}</div> : null}
         {!isLoading && !error ? (
           <>
-            <AppModuleNav currentModule={currentModule} modules={modules} />
+            <AppModuleNav collapsed={sidebarCollapsed} currentModule={currentModule} modules={modules} />
             <AppPageNav
+              collapsed={sidebarCollapsed}
               currentEntry={currentEntry}
               currentModule={currentModule}
               modules={modules}
             />
           </>
         ) : null}
-        <button className="app-logout-button" onClick={handleLogout} type="button">
-          退出登录
+        <button
+          className="app-sidebar-toggle"
+          onClick={() => setSidebarCollapsed((v) => !v)}
+          title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+          type="button"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            {sidebarCollapsed
+              ? <path d="M6 3l5 5-5 5" />
+              : <path d="M10 3L5 8l5 5" />}
+          </svg>
         </button>
       </aside>
       <div className="top-nav" style={{ display: "none" }} />

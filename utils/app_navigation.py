@@ -206,6 +206,13 @@ MODULES: list[dict[str, Any]] = [
                 "admin_only": True,
                 "description": "查看被限制登录的账号并手动解锁。",
             },
+            {
+                "key": "database_settings",
+                "label": "数据库设置",
+                "href": "/admin/database-settings",
+                "admin_only": True,
+                "description": "查看当前数据库连接与存储位置摘要。",
+            },
         ],
     },
 ]
