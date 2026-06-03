@@ -190,8 +190,25 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           </>
         ) : null}
         <button
+          className="app-logout-button"
+          onClick={handleLogout}
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            boxSizing: "border-box"
+          }}
+          title={sidebarCollapsed ? "退出登录" : undefined}
+          type="button"
+        >
+          {sidebarCollapsed ? "退" : "退出登录"}
+        </button>
+        <button
           className="app-sidebar-toggle"
           onClick={() => setSidebarCollapsed((v) => !v)}
+          style={{ marginTop: 0 }}
           title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
           type="button"
         >
