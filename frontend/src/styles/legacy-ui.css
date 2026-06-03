@@ -905,6 +905,18 @@ body {
 
 .app-tab-pane.is-active {
   display: grid;
+  animation: tab-pane-in 0.18s ease-out;
+}
+
+@keyframes tab-pane-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .app-tab-pane[hidden] {
@@ -5448,6 +5460,8 @@ input[type="checkbox"] {
 }
 
 .query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
   transform: translateY(-2px) !important;
@@ -5469,6 +5483,8 @@ input[type="checkbox"] {
 }
 
 .query-filter-actions .btn-outline-secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #64748b 0%, #475569 50%, #334155 100%) !important;
+  background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
   transform: translateY(-2px) !important;
