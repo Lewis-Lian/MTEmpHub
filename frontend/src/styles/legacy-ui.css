@@ -5150,3 +5150,334 @@ input[type="checkbox"] {
   bottom: auto;
   z-index: 5000;
 }
+
+/* ==========================================================================
+   全局交互与页签美化升级（流光磨砂、点阵与模糊化）
+   ========================================================================== */
+
+/* 全屏弹窗背景全部模糊并强制铺满居中，防止因为 transform 父容器定位退化导致错位 */
+.employee-picker-modal {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: grid !important;
+  place-items: center !important;
+  z-index: 99999 !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+}
+
+/* 弹窗完美剪裁圆角（消除多余的直角边框叠影） */
+.employee-picker-modal .modal-content,
+.employee-picker-modal .modal-dialog {
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+}
+
+/* 页签向下方移动，恢复父容器的底横条，且允许下溢盖线 */
+.app-tab-bar {
+  padding-top: 14px !important;
+  border-bottom: 1px solid #cbd5e1 !important; /* 父容器底横线 */
+  background-color: #f8fafc !important;
+  background-image: none !important;
+  overflow: visible !important; /* 关键：允许子元素溢出以盖住底线 */
+  align-items: flex-end !important; /* 贴靠底部对齐，使页签底部直接接触底线 */
+}
+
+/* 页签列表容器也允许溢出 */
+.app-tab-list {
+  overflow: visible !important;
+}
+
+/* 右侧额外元素区保持垂直居中 */
+.app-tab-extra {
+  align-self: center !important;
+}
+
+/* 去除上一版添加的占位伪元素以防线条多余 */
+.app-tab-list::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* 未激活的页签按钮：显式保留底边框，使其自身灰色底边与父容器底线完美重合 */
+.app-tab-button {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important; /* 四周边框均有，包含底边框 */
+  border-radius: 6px 6px 0 0 !important;
+  color: #64748b !important;
+  margin-bottom: -1px !important;
+  position: relative !important;
+  z-index: 1 !important;
+  box-shadow: none !important;
+}
+
+/* 修复未激活页签悬停（Hover）时因半透明背景导致底线穿透透出的视觉缺陷 */
+.app-tab-button:hover:not(.is-active) {
+  background: #e2e8f0 !important; /* 不透明的亮灰色，确保能够完美遮挡其覆盖的那 1px 父级底线 */
+  color: #0f172a !important;
+  border-bottom: 1px solid #cbd5e1 !important; /* 确保悬停时灰色底边框依然存在并重合 */
+}
+
+/* 激活的页签：底边框设为白色且向下移 1px 覆盖父容器底横线，无缝与内容区相连 */
+.app-tab-button.is-active {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #0284c7 !important;
+  border-color: #cbd5e1 !important;
+  border-bottom: 1px solid #ffffff !important; /* 关键：底边设为白色以盖住灰色底线 */
+  margin-bottom: -1px !important;
+  position: relative !important;
+  top: 1px !important; /* 向下压 1px */
+  z-index: 2 !important;
+  font-weight: 700 !important;
+}
+
+/* 激活页签悬停（Hover）时保持白色底色，防止变灰或穿透 */
+.app-tab-button.is-active:hover {
+  background-color: #ffffff !important;
+  background-image: none !important;
+  color: #0284c7 !important;
+}
+
+/* 确保 Tab 页面主体没有额外的顶边框 */
+.app-content {
+  border-top: none !important;
+}
+
+
+
+/* ==========================================================================
+   分页器字体、框样式统一
+   ========================================================================== */
+
+/* 强制分页器内所有文本字号与“共 X 条记录”统一为 12.5px */
+.table-pager,
+.table-pager * {
+  font-size: 12.5px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* 统一分页器内所有交互控件（选择框、输入框、按钮）的尺寸与边框，缩小并锁死到精致的 26px */
+.table-pager select.form-select,
+.table-pager input.form-control,
+.table-pager button.btn,
+.query-page-shell .table-pager select.form-select,
+.query-page-shell .table-pager input.form-control,
+.query-page-shell .table-pager button.btn {
+  height: 26px !important;
+  min-height: 26px !important;
+  max-height: 26px !important;
+  line-height: 24px !important; /* 对齐行高以保证文字完美垂直居中 */
+  box-sizing: border-box !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 4px !important;
+  padding: 0 6px !important;
+  background: #ffffff !important;
+  color: #1e293b !important;
+  transition: all 0.2s ease !important;
+  vertical-align: middle !important;
+}
+
+/* 下拉选择框小尺寸与重绘箭头，防止过宽过大 */
+.table-pager select.form-select,
+.query-page-shell .table-pager select.form-select {
+  width: 74px !important;
+  min-width: 74px !important;
+  max-width: 74px !important;
+  padding: 0 16px 0 6px !important;
+  appearance: none !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 6px center !important;
+  background-size: 10px !important;
+}
+
+/* 跳转输入页码框小尺寸规范，只容纳数字并居中 */
+.table-pager-jump .form-control,
+.query-page-shell .table-pager-jump .form-control {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  text-align: center !important;
+  padding: 0 !important;
+}
+
+/* 上一页、下一页按钮内边距对齐 */
+.table-pager button.btn,
+.query-page-shell .table-pager button.btn {
+  padding: 0 8px !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.table-pager button:hover:not(:disabled),
+.table-pager select:hover,
+.table-pager input:focus {
+  border-color: #0284c7 !important;
+  background-color: #f8fafc !important;
+}
+
+.table-pager button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+}
+
+/* ==========================================================================
+   全覆盖极光磨砂玻璃加载遮罩 (SaaS 拟物化风格)
+   ========================================================================== */
+.query-workspace {
+  position: relative !important;
+}
+
+.query-workspace-loading {
+  position: absolute !important;
+  inset: 0 !important;
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  z-index: 150 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  border-radius: 16px !important;
+  gap: 16px !important;
+}
+
+.query-workspace-loading.is-active {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+.query-loading-spinner-wrap {
+  position: relative !important;
+  width: 80px !important;
+  height: 80px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.query-loading-spinner-ring {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  border: 3px solid rgba(226, 232, 240, 0.8) !important;
+  border-top: 3px solid #0284c7 !important;
+  border-right: 3px solid #38bdf8 !important;
+  border-radius: 50% !important;
+  animation: spinnerRotate 1s infinite linear !important;
+  box-shadow: 0 0 15px rgba(56, 189, 248, 0.3) !important;
+}
+
+@keyframes spinnerRotate {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.query-loading-spinner-pulse {
+  position: absolute !important;
+  width: 90% !important;
+  height: 90% !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.08) 0%, transparent 70%) !important;
+  animation: spinnerPulse 2s infinite ease-in-out !important;
+}
+
+@keyframes spinnerPulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.3;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+.query-loading-percent {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: #0284c7 !important;
+  text-shadow: 0 0 8px rgba(56, 189, 248, 0.2) !important;
+  z-index: 2 !important;
+}
+
+.query-loading-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  letter-spacing: 0.5px !important;
+  animation: textFade 1.5s infinite alternate ease-in-out !important;
+}
+
+@keyframes textFade {
+  0% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   下载/导出按钮渐变流光与点击物理微动效
+   ========================================================================== */
+.query-filter-actions .btn-outline-success {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
+  transition: all 0.3s ease !important;
+}
+
+.query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background-position: right center !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
+}
+
+.query-filter-actions .btn-outline-success:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+}
+
+.query-filter-actions .btn-outline-secondary {
+  background: linear-gradient(135deg, #64748b 0%, #475569 50%, #334155 100%) !important;
+  background-size: 200% 100% !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(71, 85, 105, 0.18) !important;
+  transition: all 0.3s ease !important;
+}
+
+.query-filter-actions .btn-outline-secondary:hover:not(:disabled) {
+  background-position: right center !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(71, 85, 105, 0.35) !important;
+}
+
+.query-filter-actions .btn-outline-secondary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(71, 85, 105, 0.2) !important;
+}
+
+
