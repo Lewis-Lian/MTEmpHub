@@ -202,6 +202,53 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(len(payload["rows"]), 1)
         self.assertEqual(payload["rows"][0][3], 3.0)
 
+    def test_department_hours_api_uses_override_work_hours(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                DailyRecord(
+                    emp_id=self.employee_id,
+                    record_date=date(2026, 5, 7),
+                    expected_hours=8,
+                    actual_hours=8,
+                    absent_hours=0,
+                    check_in_times=["08:00"],
+                    check_out_times=["17:00"],
+                    leave_hours=0,
+                    overtime_hours=0,
+                    late_minutes=0,
+                    early_leave_minutes=0,
+                    employee_payload={
+                        "expected_hours": 8,
+                        "actual_hours": 8,
+                        "absent_hours": 0,
+                        "check_in_times": ["08:00"],
+                        "check_out_times": ["17:00"],
+                        "leave_hours": 0,
+                        "overtime_hours": 0,
+                        "late_minutes": 0,
+                        "early_leave_minutes": 0,
+                    },
+                )
+            )
+            db.session.commit()
+
+        self.client.put(
+            "/api/admin/employee-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "work_hours": "5.5",
+                "remark": "部门工时修正",
+            },
+        )
+
+        res = self.client.get("/api/query/department-hours?month=2026-05")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(len(payload), 1)
+        self.assertEqual(payload[0]["dept_name"], "行政部")
+        self.assertEqual(payload[0]["total_hours"], 5.5)
+
     def test_punch_records_export_filters_to_requested_headers(self) -> None:
         with self.app.app_context():
             db.session.add(
