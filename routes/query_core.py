@@ -847,6 +847,13 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
         .all()
     )
     totals: dict[str, float] = {}
+    overrides = {
+        row.emp_id: row
+        for row in EmployeeAttendanceOverride.query.filter(
+            EmployeeAttendanceOverride.month == month,
+            EmployeeAttendanceOverride.emp_id.in_(emp_ids),
+        ).all()
+    }
 
     for employee in employees:
         dept_name = employee.department.dept_name if employee.department else "未分配部门"
@@ -857,9 +864,12 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
     for employee in employees:
         dept_name = employee.department.dept_name if employee.department else "未分配部门"
-        for row in rows_by_emp.get(employee.id, []):
-            totals.setdefault(dept_name, 0.0)
-            totals[dept_name] += _calc_record_work_hours(row)[0]
+        work_hours = round(sum(_calc_record_work_hours(row)[0] for row in rows_by_emp.get(employee.id, [])), 2)
+        override = overrides.get(employee.id)
+        if override and override.work_hours is not None:
+            work_hours = round(float(override.work_hours or 0), 2)
+        totals.setdefault(dept_name, 0.0)
+        totals[dept_name] += work_hours
 
     return [{"dept_name": k, "total_hours": round(v, 2)} for k, v in sorted(totals.items(), key=lambda x: x[0])]
 
