@@ -5,20 +5,18 @@ set -euo pipefail
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
-BACKEND_HOST="${BACKEND_HOST:-${HOST:-127.0.0.1}}"
-BACKEND_PORT="${BACKEND_PORT:-${PORT:-5000}}"
-FRONTEND_HOST="${FRONTEND_HOST:-127.0.0.1}"
-FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-VENV_DIR="${VENV_DIR:-.venv-win}"
-INSTALL_FRONTEND_DEPS="${INSTALL_FRONTEND_DEPS:-1}"
+BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
+BACKEND_PORT="${BACKEND_PORT:-5000}"
+FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
+FRONTEND_PORT="${FRONTEND_PORT:-4173}"
+VENV_DIR="${VENV_DIR:-.venv-win-prod}"
 
-export FLASK_ENV="${FLASK_ENV:-development}"
-export FLASK_DEBUG="${FLASK_DEBUG:-1}"
+export APP_ENV="${APP_ENV:-production}"
+export FLASK_ENV="${FLASK_ENV:-production}"
 export PIP_DISABLE_PIP_VERSION_CHECK=1
 export PIP_NO_CACHE_DIR=1
+export VITE_BACKEND_TARGET="${VITE_BACKEND_TARGET:-http://127.0.0.1:${BACKEND_PORT}}"
 export FRONTEND_ORIGIN="${FRONTEND_ORIGIN:-http://${FRONTEND_HOST}:${FRONTEND_PORT}}"
-export FRONTEND_APP_URL="${FRONTEND_APP_URL:-$FRONTEND_ORIGIN}"
-export VITE_BACKEND_TARGET="${VITE_BACKEND_TARGET:-http://${BACKEND_HOST}:${BACKEND_PORT}}"
 
 BACKEND_PID=""
 FRONTEND_PID=""
@@ -40,57 +38,83 @@ cleanup() {
 
 trap cleanup INT TERM EXIT
 
-if [ ! -d "$VENV_DIR" ]; then
-    echo "Creating virtual environment..."
-    python -m venv "$VENV_DIR"
-fi
-
-if [ -f "$VENV_DIR/Scripts/activate" ]; then
-    # shellcheck disable=SC1090
-    source "$VENV_DIR/Scripts/activate"
-elif [ -f "$VENV_DIR/bin/activate" ]; then
-    # shellcheck disable=SC1090
-    source "$VENV_DIR/bin/activate"
-else
-    echo "Cannot find virtualenv activation script." >&2
+# 检查 Python
+if ! command -v python &>/dev/null; then
+    echo "错误：未找到 python，请确认 Python 已安装并加入 PATH。" >&2
     exit 1
 fi
 
-echo "Installing dependencies..."
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
+# 创建虚拟环境
+if [ ! -d "$VENV_DIR" ]; then
+    echo "正在创建虚拟环境..."
+    python -m venv "$VENV_DIR"
+fi
 
-if [ -f ".env.example" ] && [ ! -f ".env" ]; then
-    echo "Creating .env from .env.example..."
+# 激活虚拟环境
+if [ -f "$VENV_DIR/Scripts/activate" ]; then
+    source "$VENV_DIR/Scripts/activate"
+elif [ -f "$VENV_DIR/bin/activate" ]; then
+    source "$VENV_DIR/bin/activate"
+else
+    echo "错误：找不到虚拟环境激活脚本。" >&2
+    exit 1
+fi
+
+# 安装 Python 依赖
+echo "正在安装 Python 依赖..."
+python -m pip install --upgrade pip -q
+python -m pip install -r requirements.txt waitress -q
+
+# 初始化 .env
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+    echo "正在从 .env.example 创建 .env..."
     cp .env.example .env
 fi
 
+# 创建运行时目录
 mkdir -p instance static/uploads logs
 
-if [ "$INSTALL_FRONTEND_DEPS" = "1" ] && [ ! -d "frontend/node_modules" ]; then
+# 初始化数据库
+echo "正在初始化数据库..."
+python -m flask --app manage.py init-db
+
+# 初始化默认管理员
+echo "正在初始化默认管理员..."
+python -m flask --app manage.py init-admin
+
+# 安装前端依赖
+if [ ! -d "frontend/node_modules" ]; then
+    echo "正在安装前端依赖..."
     (
         cd frontend
         npm install
     )
 fi
 
-python -c "from app import create_app; create_app(); print('Flask API bootstrap OK')"
+# 构建前端生产版本
+echo "正在构建前端..."
+(
+    cd frontend
+    npm run build
+)
 
-echo "后端 API 将启动在: http://${BACKEND_HOST}:${BACKEND_PORT}"
-echo "前端开发服务将启动在: http://${FRONTEND_HOST}:${FRONTEND_PORT}"
-echo "前端代理后端目标: ${VITE_BACKEND_TARGET}"
-echo "后端健康检查地址: http://${BACKEND_HOST}:${BACKEND_PORT}/health"
+echo ""
+echo "============================================"
+echo "  后端 API:  http://${BACKEND_HOST}:${BACKEND_PORT}"
+echo "  前端页面:  http://${FRONTEND_HOST}:${FRONTEND_PORT}"
+echo "  健康检查:  http://127.0.0.1:${BACKEND_PORT}/health"
+echo "  按 Ctrl+C 同时停止前后端"
+echo "============================================"
+echo ""
 
-python -m flask --app app:app run --debug --host="$BACKEND_HOST" --port="$BACKEND_PORT" &
+python -m waitress --host="$BACKEND_HOST" --port="$BACKEND_PORT" --threads=8 --channel-timeout=120 wsgi:app &
 BACKEND_PID=$!
 
 (
     cd frontend
-    npm run dev -- --host "$FRONTEND_HOST" --port "$FRONTEND_PORT"
+    npx vite preview --host "$FRONTEND_HOST" --port "$FRONTEND_PORT"
 ) &
 FRONTEND_PID=$!
-
-echo "按 Ctrl+C 同时停止前后端服务。"
 
 while true; do
     if ! kill -0 "$BACKEND_PID" >/dev/null 2>&1; then
