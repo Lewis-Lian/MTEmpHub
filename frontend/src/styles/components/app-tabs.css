@@ -1,0 +1,114 @@
+.app-tab-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 48px;
+  min-height: 48px;
+  padding: 14px 16px 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  border-bottom: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
+
+.app-tab-list {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 6px 0 0;
+  white-space: nowrap;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-tab-list::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.app-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  max-width: min(240px, calc(100vw - 160px));
+  margin-bottom: -1px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px 6px 0 0;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 12.5px;
+  position: relative;
+  z-index: 1;
+  box-shadow: none;
+  white-space: nowrap;
+  transition: var(--ent-transition);
+}
+
+.app-tab-trigger,
+.app-tab-refresh,
+.app-tab-close {
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.app-tab-trigger {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+.app-tab-button.is-active {
+  background: #ffffff;
+  color: #0284c7;
+  border-color: #cbd5e1;
+  border-bottom-color: #ffffff;
+  font-weight: 700;
+  position: relative;
+  top: 1px;
+  z-index: 2;
+}
+
+.app-tab-button:hover:not(.is-active) {
+  background: #e2e8f0;
+  color: #0f172a;
+  border-bottom-color: #cbd5e1;
+}
+
+.app-tab-button.is-active:hover {
+  background: #ffffff;
+  color: #0284c7;
+}
+
+.app-tab-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #6a7c8f;
+}
+
+.app-tab-extra {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  align-self: center;
+}
+
+.app-tab-close,
+.app-tab-refresh {
+  font-size: 12px;
+  transition: var(--ent-transition);
+}
