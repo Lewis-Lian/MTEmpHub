@@ -18,6 +18,7 @@ import LoadingState from "../../components/feedback/LoadingState";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminAccountSet, AdminAccountSetFactoryRestEntry, AdminAccountSetImport } from "../../types/admin";
+import MonthPicker from "../../components/common/MonthPicker";
 
 const FILE_INPUT_LABELS = [
   "1. 请假单",
@@ -518,89 +519,298 @@ export default function AdminDashboardPage() {
             </button>
 
             {showModal === "settings" && (
-              <div className="account-status-card" style={{ border: "none", boxShadow: "none", margin: 0, padding: 0 }}>
-                <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
-                  <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>月度账套</span>
-                </div>
-                <div className="account-card-body" style={{ padding: 0 }}>
-                  <form
-                    className="account-create-form"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (!createMonth) {
-                        setError("请选择账套月份");
-                        return;
-                      }
-                      void runAction(async () => {
-                        const payload = await createAccountSet(createMonth);
-                        setCreateMonth("");
-                        setResultMessage(`创建成功：${payload.account_set.name}`);
-                        await reloadAccountSets(payload.account_set.id);
-                      });
-                    }}
-                  >
-                    <label className="account-field">
-                      <span className="account-field-label">账套月份</span>
-                      <input
-                        className="account-input"
-                        onChange={(event) => setCreateMonth(event.target.value)}
-                        type="month"
-                        value={createMonth}
-                      />
-                    </label>
-                    <button className="legacy-btn-primary account-primary-button" disabled={isWorking} type="submit">
-                      创建
-                    </button>
-                  </form>
-
-                  <label className="account-field">
-                    <span className="account-field-label">当前账套</span>
-                    <select
-                      className="account-select"
-                      onChange={(event) => setSelectedAccountSetId(Number(event.target.value || 0) || null)}
-                      value={selectedAccountSetId ?? ""}
+              <div className="settings-double-panel">
+                {/* 左面板 */}
+                <div className="settings-panel-left">
+                  {/* 创建账套卡片 */}
+                  <div className="settings-card-module">
+                    <div className="settings-card-title">月度账套</div>
+                    <form
+                      className="settings-form-row"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        if (!createMonth) {
+                          setError("请选择账套月份");
+                          return;
+                        }
+                        void runAction(async () => {
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在创建新账套...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 5;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 80);
+                          try {
+                            const payload = await createAccountSet(createMonth);
+                            setCreateMonth("");
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("新账套创建成功！");
+                            setResultMessage(`创建成功：${payload.account_set.name}`);
+                            await reloadAccountSets(payload.account_set.id);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "创建账套失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        });
+                      }}
                     >
-                      {accountSets.length ? (
-                        accountSets.map((accountSet) => (
-                          <option key={accountSet.id} value={accountSet.id}>
-                            {accountSet.name}
-                            {accountSet.is_active ? "（当前）" : ""}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="">暂无账套，请先创建</option>
-                      )}
-                    </select>
-                  </label>
-
-                  <div className="account-lock-notice">
-                    {!selectedAccountSet
-                      ? "请选择账套"
-                      : selectedAccountSet.is_locked
-                        ? "该账套已锁定，仅允许查看、设为当前和解锁。"
-                        : "该账套未锁定，可继续上传、计算和修改。"}
+                      <label className="settings-field" style={{ flex: 1, marginBottom: 0 }}>
+                        <span className="settings-field-label">账套月份</span>
+                        <MonthPicker
+                          onChange={(val) => setCreateMonth(val)}
+                          value={createMonth}
+                        />
+                      </label>
+                      <button className="legacy-btn-primary account-primary-button" disabled={isWorking} type="submit">
+                        创建
+                      </button>
+                    </form>
                   </div>
 
-                  <div className="account-params-grid">
-                    <label className="account-field">
-                      <span className="account-field-label">本月厂休天数</span>
-                      <input className="account-input" readOnly type="number" value={factoryRestSummary} />
+                  {/* 当前账套激活与状态卡片 */}
+                  <div className="settings-card-module">
+                    <div className="settings-card-title">当前账套</div>
+                    <label className="settings-field" style={{ marginBottom: "8px" }}>
+                      <select
+                        className="settings-select"
+                        onChange={(event) => setSelectedAccountSetId(Number(event.target.value || 0) || null)}
+                        value={selectedAccountSetId ?? ""}
+                      >
+                        {accountSets.length ? (
+                          accountSets.map((accountSet) => (
+                            <option key={accountSet.id} value={accountSet.id}>
+                              {accountSet.name}
+                              {accountSet.is_active ? "（当前）" : ""}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">暂无账套，请先创建</option>
+                        )}
+                      </select>
                     </label>
-                    <label className="account-field">
-                      <span className="account-field-label">本月可用福利天数</span>
-                      <input
-                        className="account-input"
-                        disabled={!selectedAccountSet || selectedAccountSet.is_locked}
-                        min={0}
-                        onChange={(event) => setMonthlyBenefitDays(event.target.value)}
-                        step={0.5}
-                        type="number"
-                        value={monthlyBenefitDays}
-                      />
-                    </label>
+                    <div className="account-lock-notice" style={{ margin: "8px 0 0 0", fontSize: "12px", lineHeight: "1.4" }}>
+                      {!selectedAccountSet
+                        ? "请选择账套"
+                        : selectedAccountSet.is_locked
+                          ? "该账套已锁定，仅允许查看、设为当前和解锁。"
+                          : "该账套未锁定，可继续上传、计算和修改。"}
+                    </div>
                   </div>
 
-                  <div className="factory-rest-panel" style={{ border: "none", boxShadow: "none", padding: "12px 0", background: "transparent" }}>
+                  {/* 账套控制动作栏 */}
+                  <div className="settings-toolbar">
+                    <button
+                      className="btn-set-current"
+                      disabled={!selectedAccountSet || isWorking}
+                      onClick={() =>
+                        void runAction(async () => {
+                          if (!selectedAccountSet) {
+                            return;
+                          }
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在设置当前激活账套...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 10;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 60);
+                          try {
+                            await activateAccountSet(selectedAccountSet.id);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("当前账套设置成功！");
+                            setResultMessage(`已切换当前账套：${selectedAccountSet.name}`);
+                            clearQueryBootstrapCache();
+                            window.dispatchEvent(new CustomEvent("account-set-active-changed"));
+                            await reloadAccountSets(selectedAccountSet.id);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "设置当前账套失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        })
+                      }
+                      type="button"
+                    >
+                      设为当前
+                    </button>
+                    <button
+                      className="btn-lock-set"
+                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                      onClick={() =>
+                        void runAction(async () => {
+                          if (!selectedAccountSet || !window.confirm("确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。")) {
+                            return;
+                          }
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在锁定当前账套...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 10;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 60);
+                          try {
+                            await lockAccountSet(selectedAccountSet.id);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("账套已锁定！");
+                            setResultMessage(`账套已锁定：${selectedAccountSet.name}`);
+                            await reloadAccountSets(selectedAccountSet.id);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "锁定账套失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        })
+                      }
+                      type="button"
+                    >
+                      锁定账套
+                    </button>
+                    <button
+                      className="btn-unlock-set"
+                      disabled={!selectedAccountSet || !selectedAccountSet.is_locked || isWorking}
+                      onClick={() =>
+                        void runAction(async () => {
+                          if (!selectedAccountSet || !window.confirm("确认解锁该账套吗？解锁后将恢复修改能力。")) {
+                            return;
+                          }
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在解锁当前账套...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 10;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 60);
+                          try {
+                            await unlockAccountSet(selectedAccountSet.id);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("账套已解锁！");
+                            setResultMessage(`账套已解锁：${selectedAccountSet.name}`);
+                            await reloadAccountSets(selectedAccountSet.id);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "解锁账套失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        })
+                      }
+                      type="button"
+                    >
+                      解锁账套
+                    </button>
+                    <button
+                      className="btn-delete-set"
+                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                      onClick={() =>
+                        void runAction(async () => {
+                          if (!selectedAccountSet || !window.confirm("确认删除该账套吗？将同时删除账套下的归档文件记录。")) {
+                            return;
+                          }
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在删除该账套...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 10;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 60);
+                          try {
+                            await deleteAccountSet(selectedAccountSet.id);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("账套已成功删除！");
+                            setResultMessage("账套已删除");
+                            await reloadAccountSets(null);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "删除账套失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        })
+                      }
+                      type="button"
+                    >
+                      删除
+                    </button>
+                    <button
+                      className="settings-select"
+                      style={{
+                        height: "38px",
+                        fontSize: "13px",
+                        fontWeight: "600",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        border: "1px solid #cbd5e1"
+                      }}
+                      disabled={isWorking}
+                      onClick={() => void runAction(async () => reloadAccountSets(selectedAccountSetId))}
+                      type="button"
+                    >
+                      刷新
+                    </button>
+                  </div>
+                  {resultMessage ? <div className="account-result-message" style={{ marginTop: "12px" }}>{resultMessage}</div> : null}
+                  {error ? <p className="legacy-inline-error" style={{ marginTop: "12px" }}>{error}</p> : null}
+                </div>
+
+                {/* 右面板 */}
+                <div className="settings-panel-right">
+                  {/* 参数配置卡片 */}
+                  <div className="settings-card-module">
+                    <div className="settings-card-title">参数设置</div>
+                    <div className="account-params-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                      <label className="settings-field" style={{ marginBottom: 0 }}>
+                        <span className="settings-field-label">本月厂休天数</span>
+                        <input className="settings-input" readOnly type="number" value={factoryRestSummary} />
+                      </label>
+                      <label className="settings-field" style={{ marginBottom: 0 }}>
+                        <span className="settings-field-label">本月可用福利天数</span>
+                        <input
+                          className="settings-input"
+                          disabled={!selectedAccountSet || selectedAccountSet.is_locked}
+                          min={0}
+                          onChange={(event) => setMonthlyBenefitDays(event.target.value)}
+                          step={0.5}
+                          type="number"
+                          value={monthlyBenefitDays}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* 厂休日期配置日历 */}
+                  <div className="settings-card-module factory-rest-panel" style={{ border: "none", boxShadow: "none", padding: 0, background: "transparent" }}>
                     <div className="factory-rest-panel-head">
                       <div>
                         <div className="factory-rest-panel-kicker">厂休配置</div>
@@ -639,7 +849,7 @@ export default function AdminDashboardPage() {
                       点击日期卡片按“上班 → 全天 → 上午 → 下午 → 上班”循环切换，系统会自动汇总厂休天数。
                     </div>
 
-                    <div className="factory-rest-legend" aria-hidden="true">
+                    <div className="factory-rest-legend" aria-hidden="true" style={{ marginTop: "12px", marginBottom: "12px" }}>
                       <span className="factory-rest-legend-item">
                         <span className="factory-rest-legend-dot factory-rest-legend-dot--none" />
                         上班
@@ -689,112 +899,53 @@ export default function AdminDashboardPage() {
                     )}
                   </div>
 
-                  <div className="toolbar">
+                  {/* 保存动作栏 */}
+                  <div className="settings-toolbar" style={{ marginTop: "8px" }}>
                     <button
-                      className="account-action-button account-action-button--primary"
+                      className="btn-save-params"
                       disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
                       onClick={() =>
                         void runAction(async () => {
                           if (!selectedAccountSet) {
                             return;
                           }
-                          const payload: { monthly_benefit_days: string; factory_rest_entries?: AdminAccountSetFactoryRestEntry[] } = {
-                            monthly_benefit_days: monthlyBenefitDays,
-                          };
-                          if (isFactoryRestDirty) {
-                            payload.factory_rest_entries = factoryRestEntries;
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在保存账套参数与厂休明细...");
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 10;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 80);
+                          try {
+                            const payload: { monthly_benefit_days: string; factory_rest_entries?: AdminAccountSetFactoryRestEntry[] } = {
+                              monthly_benefit_days: monthlyBenefitDays,
+                            };
+                            if (isFactoryRestDirty) {
+                              payload.factory_rest_entries = factoryRestEntries;
+                            }
+                            await updateAccountSet(selectedAccountSet.id, payload);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("账套参数已保存！");
+                            setResultMessage("账套参数已保存");
+                            await reloadAccountSets(selectedAccountSet.id);
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "保存参数失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
                           }
-                          await updateAccountSet(selectedAccountSet.id, payload);
-                          setResultMessage("账套参数已保存");
-                          await reloadAccountSets(selectedAccountSet.id);
                         })
                       }
                       type="button"
                     >
                       保存参数
                     </button>
-                    <button
-                      className="account-action-button"
-                      disabled={!selectedAccountSet || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          await activateAccountSet(selectedAccountSet.id);
-                          setResultMessage(`已切换当前账套：${selectedAccountSet.name}`);
-                          clearQueryBootstrapCache();
-                          window.dispatchEvent(new CustomEvent("account-set-active-changed"));
-                          await reloadAccountSets(selectedAccountSet.id);
-                        })
-                      }
-                      type="button"
-                    >
-                      设为当前
-                    </button>
-                    <button
-                      className="account-action-button account-action-button--warning"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。")) {
-                            return;
-                          }
-                          await lockAccountSet(selectedAccountSet.id);
-                          setResultMessage(`账套已锁定：${selectedAccountSet.name}`);
-                          await reloadAccountSets(selectedAccountSet.id);
-                        })
-                      }
-                      type="button"
-                    >
-                      锁定账套
-                    </button>
-                    <button
-                      className="account-action-button account-action-button--success"
-                      disabled={!selectedAccountSet || !selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认解锁该账套吗？解锁后将恢复修改能力。")) {
-                            return;
-                          }
-                          await unlockAccountSet(selectedAccountSet.id);
-                          setResultMessage(`账套已解锁：${selectedAccountSet.name}`);
-                          await reloadAccountSets(selectedAccountSet.id);
-                        })
-                      }
-                      type="button"
-                    >
-                      解锁账套
-                    </button>
-                    <button
-                      className="account-action-button account-action-button--danger"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认删除该账套吗？将同时删除账套下的归档文件记录。")) {
-                            return;
-                          }
-                          await deleteAccountSet(selectedAccountSet.id);
-                          setResultMessage("账套已删除");
-                          await reloadAccountSets(null);
-                        })
-                      }
-                      type="button"
-                    >
-                      删除
-                    </button>
-                    <button
-                      className="account-action-button"
-                      disabled={isWorking}
-                      onClick={() => void runAction(async () => reloadAccountSets(selectedAccountSetId))}
-                      type="button"
-                    >
-                      刷新
-                    </button>
                   </div>
-
-                  {resultMessage ? <div className="account-result-message">{resultMessage}</div> : null}
-                  {error ? <p className="legacy-inline-error">{error}</p> : null}
                 </div>
               </div>
             )}

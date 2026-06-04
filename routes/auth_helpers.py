@@ -143,3 +143,17 @@ def page_permission_required(page_key: str):
         return wrapper
 
     return decorator
+
+
+def any_page_permission_required(page_keys: tuple[str, ...]):
+    def decorator(fn):
+        @wraps(fn)
+        @login_required
+        def wrapper(*args, **kwargs):
+            if g.current_user.role == "admin" or g.current_user.has_any_page_access(page_keys):
+                return fn(*args, **kwargs)
+            return jsonify({"error": "Forbidden"}), 403
+
+        return wrapper
+
+    return decorator
