@@ -4,6 +4,13 @@ body,
   height: 100%;
 }
 
+:root {
+  --z-sticky: 20;
+  --z-dropdown: 1200;
+  --z-modal: 5000;
+  --z-overlay: 9000;
+}
+
 body {
   margin: 0;
   overflow: auto;
@@ -560,7 +567,9 @@ body {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
   min-height: 100vh;
+  overflow-x: clip;
   background: #edf1f5;
   color: #183153;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -612,6 +621,7 @@ body {
 }
 
 .app-workspace {
+  min-width: 0;
   min-height: 0;
   grid-column: 2;
   grid-row: 1;
@@ -822,77 +832,18 @@ body {
   min-height: 0;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-}
-
-.app-tab-bar {
-  padding: 8px 12px 0;
-  background: #edf1f5;
-}
-
-.app-tab-list {
-  display: flex;
-  gap: 4px;
-  overflow-x: auto;
-  padding-bottom: 0;
-}
-
-.app-tab-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border: 1px solid #cdd7e1;
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  background: linear-gradient(180deg, #e7edf3 0%, #d9e2ea 100%);
-  color: #4c6175;
-  white-space: nowrap;
-}
-
-.app-tab-trigger,
-.app-tab-refresh,
-.app-tab-close {
-  border: none;
-  padding: 0;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-
-.app-tab-trigger {
-  display: inline-flex;
-  align-items: center;
-  font-size: 13px;
-}
-
-.app-tab-button.is-active {
-  background: #ffffff;
-  color: #183153;
-  border-color: #cdd7e1;
-  position: relative;
-  top: 1px;
-}
-
-.app-tab-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: #6a7c8f;
-}
-
-.app-tab-close,
-.app-tab-refresh {
-  font-size: 12px;
+  overflow-x: clip;
 }
 
 .app-content {
   min-width: 0;
   min-height: 0;
   display: grid;
-  padding: 14px 16px 18px;
-  border-top: 1px solid #cdd7e1;
-  background: #edf1f5;
+  padding: 20px 24px 24px;
+  border-top: none;
+  background: var(--ent-secondary-bg);
   overflow: visible;
+  overflow-x: clip;
 }
 
 .app-content > * {
@@ -1027,7 +978,7 @@ body {
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   align-items: start;
-  min-height: 0;
+  min-width: 0;
   min-height: calc(100vh - 116px);
 }
 
@@ -1164,6 +1115,7 @@ body {
 .query-workspace {
   display: grid;
   grid-template-rows: minmax(0, 1fr);
+  position: relative;
   min-width: 0;
   min-height: 0;
 }
@@ -1255,7 +1207,7 @@ body {
 }
 
 .attendance-override-picker-field .employee-float-list {
-  z-index: 1250;
+  z-index: var(--z-dropdown);
 }
 
 .attendance-override-table-panel {
@@ -1330,7 +1282,7 @@ body {
 }
 
 .manager-month-stat-picker-field .employee-float-list {
-  z-index: 1250;
+  z-index: var(--z-dropdown);
 }
 
 .manager-month-stat-actions,
@@ -1719,7 +1671,7 @@ body {
   left: 0;
   right: 0;
   top: calc(100% + 4px);
-  z-index: 1200;
+  z-index: var(--z-dropdown);
   display: none;
   max-height: 320px;
   overflow: auto;
@@ -1790,197 +1742,6 @@ body {
 
 .employee-float-list .p-2 {
   padding: 8px;
-}
-
-.employee-picker-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 120;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(24, 49, 83, 0.2);
-}
-
-.employee-picker-modal .modal-dialog {
-  width: min(1080px, 100%);
-  max-height: min(760px, calc(100vh - 48px));
-  display: grid;
-}
-
-.employee-picker-modal .modal-content {
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  border: 1px solid #ccd6df;
-  background: #ffffff;
-  box-shadow: 0 24px 60px rgba(24, 49, 83, 0.18);
-}
-
-.employee-picker-modal .modal-header,
-.employee-picker-modal .modal-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid #d9e4ef;
-}
-
-.employee-picker-modal .modal-footer {
-  justify-content: flex-end;
-  border-top: 1px solid #d9e4ef;
-  border-bottom: 0;
-}
-
-.employee-picker-modal .modal-title {
-  margin: 0;
-  color: #183153;
-  font-size: 18px;
-}
-
-.employee-picker-modal .modal-body {
-  min-height: 0;
-  overflow: auto;
-  padding: 16px;
-  background: #fbfdff;
-}
-
-.employee-picker-modal .btn,
-.employee-picker-modal .btn-close {
-  border: 1px solid #bfcbd7;
-  background: #ffffff;
-  color: #183153;
-  cursor: pointer;
-}
-
-.employee-picker-modal .btn {
-  min-height: 32px;
-  padding: 6px 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.employee-picker-modal .btn-sm {
-  min-height: 28px;
-  padding: 4px 8px;
-  font-size: 12px;
-}
-
-.employee-picker-modal .btn-primary {
-  border-color: #1f4f7c;
-  background: #245b8a;
-  color: #ffffff;
-}
-
-.employee-picker-modal .btn-close {
-  width: 30px;
-  height: 30px;
-  border-radius: 0;
-}
-
-.employee-picker-modal .btn-close::before {
-  content: "×";
-  font-size: 18px;
-  line-height: 1;
-}
-
-.employee-picker-modal .form-control {
-  width: 100%;
-  min-height: 32px;
-  padding: 6px 8px;
-  box-sizing: border-box;
-  border: 1px solid #c7d2de;
-  background: #ffffff;
-  color: #183153;
-  font-size: 13px;
-}
-
-.employee-picker-modal .form-check-input {
-  margin: 0;
-}
-
-.employee-picker-modal .row {
-  display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(300px, 5fr);
-  gap: 16px;
-}
-
-.employee-picker-modal .d-flex {
-  display: flex;
-}
-
-.employee-picker-modal .flex-column {
-  flex-direction: column;
-}
-
-.employee-picker-modal .align-items-center {
-  align-items: center;
-}
-
-.employee-picker-modal .justify-content-between {
-  justify-content: space-between;
-}
-
-.employee-picker-modal .gap-1 {
-  gap: 4px;
-}
-
-.employee-picker-modal .gap-2 {
-  gap: 8px;
-}
-
-.employee-picker-modal .mb-0 {
-  margin-bottom: 0;
-}
-
-.employee-picker-modal .mb-2 {
-  margin-bottom: 8px;
-}
-
-.employee-picker-modal .text-nowrap {
-  white-space: nowrap;
-}
-
-.employee-picker-modal .small {
-  font-size: 12px;
-}
-
-.employee-picker-modal .badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 3px 8px;
-  border: 1px solid #d9e4ef;
-  background: #f8fafc;
-  color: #31475f;
-  font-size: 12px;
-}
-
-.employee-picker-panel {
-  border: 1px solid #d9e4ef;
-  border-radius: 10px;
-  background: #fff;
-  padding: 10px;
-}
-
-.employee-picker-panel-title {
-  margin-bottom: 8px;
-  color: #2a3d55;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.employee-picker-tree {
-  min-height: 190px;
-}
-
-.employee-picker-candidates {
-  min-height: 290px;
-}
-
-.employee-picker-selected-wrap {
-  min-height: 492px;
 }
 
 .employee-dept-list {
@@ -2054,7 +1815,7 @@ body {
 }
 
 .department-parent-modal .employee-float-list {
-  z-index: 1250;
+  z-index: var(--z-dropdown);
 }
 
 .employee-master-page .employee-lookup-card,
@@ -2088,7 +1849,7 @@ body {
 }
 
 .employee-master-page .legacy-table-head-cell {
-  z-index: 1;
+  z-index: var(--z-sticky);
 }
 
 .employee-master-page .employee-lookup,
@@ -2099,7 +1860,7 @@ body {
 
 .employee-master-page .employee-float-list,
 .employee-dept-modal .employee-float-list {
-  z-index: 4200;
+  z-index: var(--z-dropdown);
 }
 
 .account-center-page .master-filter-panel,
@@ -2122,7 +1883,7 @@ body {
 }
 
 .account-center-page .employee-float-list {
-  z-index: 1250;
+  z-index: var(--z-dropdown);
 }
 
 .account-center-page .account-top-control-row {
@@ -2187,7 +1948,7 @@ body {
 }
 
 .account-edit-modal .employee-float-list {
-  z-index: 2200;
+  z-index: var(--z-dropdown);
 }
 
 .account-table-text-ellipsis {
@@ -2672,6 +2433,7 @@ body {
 }
 
 .legacy-table-panel {
+  min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -2681,6 +2443,7 @@ body {
 }
 
 .legacy-table-wrap {
+  min-width: 0;
   min-height: 0;
   overflow: auto;
   cursor: grab;
@@ -2705,7 +2468,7 @@ body {
 .legacy-table-head-cell {
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: var(--z-sticky);
   padding: 0;
   border-bottom: 1px solid #cfd8e1;
   background: #eef3f7;
@@ -2760,78 +2523,6 @@ body {
   padding: 24px 12px;
   color: #607284;
   text-align: center;
-}
-
-.table-pager {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  border-top: 1px solid #e5ecf4;
-  padding: 8px 12px;
-  background: #fbfdff;
-}
-
-.table-pager-total {
-  color: #5f738b;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-
-.table-pager-right {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.table-pager .form-select {
-  min-height: 30px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  border: 1px solid #c7d2de;
-  background: #ffffff;
-  color: #183153;
-  font-size: 12.5px;
-}
-
-.table-pager .btn {
-  min-height: 30px;
-  padding: 3px 8px;
-  border: 1px solid #bfcbd7;
-  background: #ffffff;
-  color: #183153;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.table-pager .btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-}
-
-.table-pager-page {
-  min-width: 82px;
-  color: #42556d;
-  font-size: 12.5px;
-  text-align: center;
-}
-
-.table-pager-jump {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.table-pager-jump .form-control {
-  width: 74px;
-  min-height: 30px;
-  padding-top: 3px;
-  padding-bottom: 3px;
-  border: 1px solid #c7d2de;
-  background: #ffffff;
-  color: #183153;
-  font-size: 12.5px;
 }
 
 .query-home-header-tools {
@@ -4054,7 +3745,7 @@ body {
 .master-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 80;
+  z-index: var(--z-overlay);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -4341,56 +4032,6 @@ body {
 }
 
 /* ==========================================================================
-   多标签页系统 (IDE 简洁卡片页签风)
-   ========================================================================== */
-
-.app-tab-bar {
-  background: var(--ent-secondary-bg) !important;
-  padding: 8px 24px 0 !important;
-  border-bottom: 1px solid var(--ent-border-strong) !important;
-}
-
-.app-tab-list {
-  gap: 2px !important;
-  padding-bottom: 0 !important;
-}
-
-.app-tab-button {
-  background: #f1f5f9 !important;
-  border: 1px solid var(--ent-border-strong) !important;
-  border-bottom: none !important;
-  border-radius: var(--ent-radius-sm) var(--ent-radius-sm) 0 0 !important;
-  color: var(--ent-text-secondary) !important;
-  padding: 6px 12px !important;
-  font-size: 12.5px !important;
-  transition: var(--ent-transition) !important;
-  margin-bottom: -1px !important;
-}
-
-.app-tab-button:hover {
-  background: rgba(0, 0, 0, 0.02) !important;
-  color: var(--ent-text) !important;
-}
-
-.app-tab-button.is-active {
-  background: var(--ent-bg) !important;
-  color: var(--ent-blue) !important;
-  border-color: var(--ent-border-strong) !important;
-  box-shadow: none !important;
-  position: relative !important;
-  font-weight: 600 !important;
-}
-
-.app-tab-button.is-active::before {
-  content: none !important;
-}
-
-.app-content {
-  padding: 20px 24px 24px !important;
-  background: var(--ent-secondary-bg) !important;
-}
-
-/* ==========================================================================
    精致卡片与 Tiles 重塑 (1px 极细边框，微弱漂浮投影)
    ========================================================================== */
 
@@ -4469,8 +4110,7 @@ body {
 .account-select,
 .account-file-input,
 .legacy-input,
-.legacy-select,
-.employee-picker-modal .form-control {
+.legacy-select {
   border: 1px solid var(--ent-border-strong) !important;
   border-radius: var(--ent-radius-sm) !important;
   background: var(--ent-bg) !important;
@@ -4582,11 +4222,6 @@ body {
   color: var(--ent-text-secondary) !important;
 }
 
-.table-pager {
-  background: var(--ent-bg) !important;
-  border-top: 1px solid var(--ent-border-strong) !important;
-}
-
 /* ==========================================================================
    登录页现代化 (极简企业门户风)
    ========================================================================== */
@@ -4643,14 +4278,12 @@ body {
    ========================================================================== */
 
 .master-modal-backdrop,
-.employee-picker-modal,
 .legacy-picker-modal {
   background: rgba(15, 23, 42, 0.3) !important;
   backdrop-filter: blur(8px) !important;
 }
 
 .master-modal,
-.employee-picker-modal .modal-dialog,
 .legacy-picker-dialog {
   border-radius: var(--ent-radius-lg) !important;
   box-shadow: var(--ent-shadow-modal) !important;
@@ -4700,11 +4333,6 @@ body {
 /* 自定义复选框颜色 */
 input[type="checkbox"] {
   accent-color: var(--ent-blue) !important;
-}
-
-.app-tab-close,
-.app-tab-refresh {
-  transition: var(--ent-transition) !important;
 }
 
 /* ==========================================================================
@@ -5024,60 +4652,6 @@ input[type="checkbox"] {
   transform: translateY(-1px) !important;
 }
 
-/* 页签行现代简约布局 (不折行,防顶出) */
-.app-tab-bar {
-  display: flex !important;
-  justify-content: space-between !important;
-  align-items: center !important;
-  padding: 0 16px !important;
-  background: #ffffff !important;
-  border-bottom: 1px solid #e2e8f0 !important;
-  height: 48px !important;
-  min-height: 48px !important;
-  box-sizing: border-box !important;
-  gap: 16px !important;
-  width: 100% !important;
-  max-width: 100% !important;
-  overflow: hidden !important;
-}
-
-.app-tab-list {
-  display: flex !important;
-  gap: 4px !important;
-  overflow-x: auto !important;
-  padding: 6px 0 0 !important;
-  flex: 1 !important;
-  min-width: 0 !important;
-  scrollbar-width: none !important; /* Firefox */
-  -ms-overflow-style: none !important; /* IE 10+ */
-}
-
-.app-tab-list::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important; /* Chrome, Safari, Opera */
-}
-
-.app-tab-extra {
-  flex-shrink: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-.app-tab-button {
-  border-radius: 6px 6px 0 0 !important;
-  border-bottom: none !important;
-}
-
-.app-tab-button.is-active {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #cbd5e1 !important;
-  position: relative !important;
-  top: 1px !important;
-  z-index: 2 !important;
-}
-
 /* 悬浮批量操作条样式 */
 .floating-batch-bar {
   /* 移除了 CSS 关键帧动画，改由 React inline style 的 transition 驱动以保证优雅的上下滑入退场 */
@@ -5159,201 +4733,16 @@ input[type="checkbox"] {
 .master-modal.account-edit-modal .employee-float-list.show {
   top: calc(100% + 4px);
   bottom: auto;
-  z-index: 5000;
+  z-index: var(--z-dropdown);
 }
 
 /* ==========================================================================
    全局交互与页签美化升级（流光磨砂、点阵与模糊化）
    ========================================================================== */
 
-/* 全屏弹窗背景全部模糊并强制铺满居中，防止因为 transform 父容器定位退化导致错位 */
-.employee-picker-modal {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  display: grid !important;
-  place-items: center !important;
-  z-index: 99999 !important;
-  background: rgba(15, 23, 42, 0.45) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
-}
-
-/* 弹窗完美剪裁圆角（消除多余的直角边框叠影） */
-.employee-picker-modal .modal-content,
-.employee-picker-modal .modal-dialog {
-  border-radius: 16px !important;
-  overflow: hidden !important;
-  border: 1px solid rgba(226, 232, 240, 0.8) !important;
-}
-
-/* 页签向下方移动，恢复父容器的底横条，且允许下溢盖线 */
-.app-tab-bar {
-  padding-top: 14px !important;
-  border-bottom: 1px solid #cbd5e1 !important; /* 父容器底横线 */
-  background-color: #f8fafc !important;
-  background-image: none !important;
-  overflow: hidden !important;
-  align-items: flex-end !important; /* 贴靠底部对齐，使页签底部直接接触底线 */
-  min-width: 0 !important;
-}
-
-.app-tab-list {
-  overflow-x: auto !important;
-  overflow-y: hidden !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-  max-width: 100% !important;
-  white-space: nowrap !important;
-}
-
-/* 右侧额外元素区保持垂直居中 */
-.app-tab-extra {
-  align-self: center !important;
-  flex: 0 0 auto !important;
-}
-
-/* 去除上一版添加的占位伪元素以防线条多余 */
-.app-tab-list::after {
-  display: none !important;
-  content: none !important;
-}
-
-/* 未激活的页签按钮：显式保留底边框，使其自身灰色底边与父容器底线完美重合 */
-.app-tab-button {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important; /* 四周边框均有，包含底边框 */
-  border-radius: 6px 6px 0 0 !important;
-  color: #64748b !important;
-  margin-bottom: -1px !important;
-  position: relative !important;
-  z-index: 1 !important;
-  box-shadow: none !important;
-  flex: 0 0 auto !important;
-  max-width: min(240px, calc(100vw - 160px)) !important;
-}
-
-/* 修复未激活页签悬停（Hover）时因半透明背景导致底线穿透透出的视觉缺陷 */
-.app-tab-button:hover:not(.is-active) {
-  background: #e2e8f0 !important; /* 不透明的亮灰色，确保能够完美遮挡其覆盖的那 1px 父级底线 */
-  color: #0f172a !important;
-  border-bottom: 1px solid #cbd5e1 !important; /* 确保悬停时灰色底边框依然存在并重合 */
-}
-
-/* 激活的页签：底边框设为白色且向下移 1px 覆盖父容器底横线，无缝与内容区相连 */
-.app-tab-button.is-active {
-  background-color: #ffffff !important;
-  background-image: none !important;
-  color: #0284c7 !important;
-  border-color: #cbd5e1 !important;
-  border-bottom: 1px solid #ffffff !important; /* 关键：底边设为白色以盖住灰色底线 */
-  margin-bottom: -1px !important;
-  position: relative !important;
-  top: 1px !important; /* 向下压 1px */
-  z-index: 2 !important;
-  font-weight: 700 !important;
-}
-
-/* 激活页签悬停（Hover）时保持白色底色，防止变灰或穿透 */
-.app-tab-button.is-active:hover {
-  background-color: #ffffff !important;
-  background-image: none !important;
-  color: #0284c7 !important;
-}
-
-/* 确保 Tab 页面主体没有额外的顶边框 */
-.app-content {
-  border-top: none !important;
-}
-
-
-
-/* ==========================================================================
-   分页器字体、框样式统一
-   ========================================================================== */
-
-/* 强制分页器内所有文本字号与“共 X 条记录”统一为 12.5px */
-.table-pager,
-.table-pager * {
-  font-size: 12.5px !important;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-}
-
-/* 统一分页器内所有交互控件（选择框、输入框、按钮）的尺寸与边框，缩小并锁死到精致的 26px */
-.table-pager select.form-select,
-.table-pager input.form-control,
-.table-pager button.btn,
-.query-page-shell .table-pager select.form-select,
-.query-page-shell .table-pager input.form-control,
-.query-page-shell .table-pager button.btn {
-  height: 26px !important;
-  min-height: 26px !important;
-  max-height: 26px !important;
-  line-height: 24px !important; /* 对齐行高以保证文字完美垂直居中 */
-  box-sizing: border-box !important;
-  border: 1px solid #cbd5e1 !important;
-  border-radius: 4px !important;
-  padding: 0 6px !important;
-  background: #ffffff !important;
-  color: #1e293b !important;
-  transition: all 0.2s ease !important;
-  vertical-align: middle !important;
-}
-
-/* 下拉选择框小尺寸与重绘箭头，防止过宽过大 */
-.table-pager select.form-select,
-.query-page-shell .table-pager select.form-select {
-  width: 74px !important;
-  min-width: 74px !important;
-  max-width: 74px !important;
-  padding: 0 16px 0 6px !important;
-  appearance: none !important;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E") !important;
-  background-repeat: no-repeat !important;
-  background-position: right 6px center !important;
-  background-size: 10px !important;
-}
-
-/* 跳转输入页码框小尺寸规范，只容纳数字并居中 */
-.table-pager-jump .form-control,
-.query-page-shell .table-pager-jump .form-control {
-  width: 48px !important;
-  min-width: 48px !important;
-  max-width: 48px !important;
-  text-align: center !important;
-  padding: 0 !important;
-}
-
-/* 上一页、下一页按钮内边距对齐 */
-.table-pager button.btn,
-.query-page-shell .table-pager button.btn {
-  padding: 0 8px !important;
-  cursor: pointer !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-}
-
-.table-pager button:hover:not(:disabled),
-.table-pager select:hover,
-.table-pager input:focus {
-  border-color: #0284c7 !important;
-  background-color: #f8fafc !important;
-}
-
-.table-pager button:disabled {
-  opacity: 0.5 !important;
-  cursor: not-allowed !important;
-}
-
 /* ==========================================================================
    全覆盖极光磨砂玻璃加载遮罩 (SaaS 拟物化风格)
    ========================================================================== */
-.query-workspace {
-  position: relative !important;
-}
-
 .query-workspace-loading {
   position: absolute !important;
   inset: 0 !important;
@@ -5587,7 +4976,7 @@ input[type="checkbox"] {
   background: rgba(15, 23, 42, 0.45) !important;
   backdrop-filter: blur(16px) !important;
   -webkit-backdrop-filter: blur(16px) !important;
-  z-index: 99990 !important;
+  z-index: var(--z-overlay) !important;
   display: grid !important;
   place-items: center !important;
   padding: 24px !important;
@@ -5601,7 +4990,7 @@ input[type="checkbox"] {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
-  z-index: 99991 !important;
+  z-index: var(--z-modal) !important;
 }
 
 /* 3. 弹窗极光 Loading 样式 */
@@ -6201,7 +5590,7 @@ input[type="checkbox"] {
   position: absolute !important;
   top: calc(100% + 4px) !important;
   left: 0 !important;
-  z-index: 1000 !important;
+  z-index: var(--z-dropdown) !important;
   width: 280px !important;
   background: #ffffff !important;
   border: 1px solid #f0f0f0 !important;
@@ -6334,5 +5723,3 @@ input[type="checkbox"] {
 .month-picker-btn-confirm:active {
   background: #000000 !important;
 }
-
-
