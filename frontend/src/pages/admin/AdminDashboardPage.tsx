@@ -39,6 +39,10 @@ export default function AdminDashboardPage() {
   const [factoryRestEntries, setFactoryRestEntries] = useState<AdminAccountSetFactoryRestEntry[]>([]);
   const [isFactoryRestDirty, setIsFactoryRestDirty] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<Array<File | null>>(() => Array.from({ length: 6 }, () => null));
+  const [dragOverIndex, setDragOverIndex] = useState<Array<boolean>>(() => Array.from({ length: 6 }, () => false));
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState("");
   const [resultMessage, setResultMessage] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +53,11 @@ export default function AdminDashboardPage() {
     setShowModal(null);
     setResultMessage("");
     setError("");
+    setUploadFiles(Array.from({ length: 6 }, () => null));
+    setDragOverIndex(Array.from({ length: 6 }, () => false));
+    setProgressVisible(false);
+    setProgress(0);
+    setLoadingText("");
   };
 
   const selectedAccountSet = useMemo(
@@ -219,6 +228,15 @@ export default function AdminDashboardPage() {
 
   return (
     <section className="account-center-page">
+      {/* 主页面的全屏极光磨砂进度条遮罩 */}
+      <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} style={{ position: "fixed", borderRadius: 0 }} role="status">
+        <div className="query-loading-spinner-wrap">
+          <div className="query-loading-spinner-ring" />
+          <div className="query-loading-spinner-pulse" />
+          <div className="query-loading-percent">{progress}%</div>
+        </div>
+        <div className="query-loading-text">{loadingText}</div>
+      </div>
 
 
       {/* 顶部控制与账套信息行 */}
@@ -232,29 +250,121 @@ export default function AdminDashboardPage() {
         marginTop: "16px"
       }}>
         {/* 左侧：控制按钮组 */}
-        <div className="account-panel-selector" style={{ display: "flex", gap: "10px" }}>
+        <div className="account-panel-selector" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
           <button
-            className="btn btn-outline-secondary"
+            className="btn-settings"
             onClick={() => setShowModal("settings")}
             type="button"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
             账套设置
           </button>
           <button
-            className="btn btn-primary"
+            className="btn-upload"
             onClick={() => setShowModal("upload")}
             type="button"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
             上传原始文档
+          </button>
+          <button
+            className="btn-calc-employee"
+            disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+            onClick={() =>
+              void runAction(async () => {
+                if (!selectedAccountSet) {
+                  return;
+                }
+
+                setProgressVisible(true);
+                setProgress(0);
+                setLoadingText("正在对员工考勤进行汇总与数据结算...");
+
+                let current = 0;
+                const interval = setInterval(() => {
+                  current += Math.floor(Math.random() * 10) + 4;
+                  if (current >= 98) current = 98;
+                  setProgress(current);
+                }, 120);
+
+                try {
+                  await calculateAccountSet(selectedAccountSet.id, "employee");
+                  clearInterval(interval);
+                  setProgress(100);
+                  setLoadingText("员工考勤结算成功！");
+                  await reloadAccountSets(selectedAccountSet.id);
+                  setResultMessage("员工计算成功");
+                } catch (caughtError) {
+                  clearInterval(interval);
+                  setError(caughtError instanceof ApiError ? caughtError.message : "员工考勤结算失败");
+                } finally {
+                  setTimeout(() => {
+                    setProgressVisible(false);
+                  }, 500);
+                }
+              })
+            }
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="9" y1="9" x2="15" y2="15"></line>
+              <line x1="15" y1="9" x2="9" y2="15"></line>
+            </svg>
+            员工计算
+          </button>
+          <button
+            className="btn-calc-manager"
+            disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+            onClick={() =>
+              void runAction(async () => {
+                if (!selectedAccountSet) {
+                  return;
+                }
+
+                setProgressVisible(true);
+                setProgress(0);
+                setLoadingText("正在计算管理人员考勤及年假加班额度...");
+
+                let current = 0;
+                const interval = setInterval(() => {
+                  current += Math.floor(Math.random() * 12) + 5;
+                  if (current >= 98) current = 98;
+                  setProgress(current);
+                }, 100);
+
+                try {
+                  await calculateAccountSet(selectedAccountSet.id, "manager");
+                  clearInterval(interval);
+                  setProgress(100);
+                  setLoadingText("管理人员考勤计算成功！");
+                  await reloadAccountSets(selectedAccountSet.id);
+                  setResultMessage("管理人员计算成功");
+                } catch (caughtError) {
+                  clearInterval(interval);
+                  setError(caughtError instanceof ApiError ? caughtError.message : "管理人员考勤计算失败");
+                } finally {
+                  setTimeout(() => {
+                    setProgressVisible(false);
+                  }, 500);
+                }
+              })
+            }
+            type="button"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <polyline points="17 11 19 13 23 9"></polyline>
+            </svg>
+            管理人员计算
           </button>
         </div>
 
@@ -371,6 +481,16 @@ export default function AdminDashboardPage() {
               boxSizing: "border-box",
             }}
           >
+            {/* 弹窗内的极光磨砂进度条遮罩 */}
+            <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} style={{ borderRadius: "12px" }} role="status">
+              <div className="query-loading-spinner-wrap">
+                <div className="query-loading-spinner-ring" />
+                <div className="query-loading-spinner-pulse" />
+                <div className="query-loading-percent">{progress}%</div>
+              </div>
+              <div className="query-loading-text">{loadingText}</div>
+            </div>
+
             {/* 关闭按钮 */}
             <button
               onClick={handleCloseModal}
@@ -689,43 +809,111 @@ export default function AdminDashboardPage() {
                     可一次上传全部源文件，也可只上传需要更新的部分文件；同一类型的新文件会替换该账套里已有的归档文件。点击“开始计算”后才会生成并持久化考勤数据。
                   </div>
 
-                  <div className="account-upload-group">
-                    <div className="account-upload-title">员工原始数据</div>
-                    {FILE_INPUT_LABELS.slice(0, 4).map((label, index) => (
-                      <label className="account-field" key={label}>
-                        <span className="account-field-label">{label}</span>
-                        <input
-                          className="account-file-input"
-                          onChange={(event) => {
-                            const nextFiles = [...uploadFiles];
-                            nextFiles[index] = event.target.files?.[0] ?? null;
-                            setUploadFiles(nextFiles);
+                  <div className="premium-upload-grid">
+                    {FILE_INPUT_LABELS.map((label, index) => {
+                      const file = uploadFiles[index];
+                      const isDragOver = dragOverIndex[index];
+                      const fileInputId = `file-input-${index}`;
+                      return (
+                        <div
+                          className={`upload-slot-card ${file ? "has-file" : ""} ${isDragOver ? "is-dragover" : ""}`}
+                          key={label}
+                          onClick={() => {
+                            document.getElementById(fileInputId)?.click();
                           }}
-                          type="file"
-                        />
-                      </label>
-                    ))}
+                          onDragLeave={(e) => {
+                            e.preventDefault();
+                            const nextDrag = [...dragOverIndex];
+                            nextDrag[index] = false;
+                            setDragOverIndex(nextDrag);
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            const nextDrag = [...dragOverIndex];
+                            nextDrag[index] = true;
+                            setDragOverIndex(nextDrag);
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            const nextDrag = [...dragOverIndex];
+                            nextDrag[index] = false;
+                            setDragOverIndex(nextDrag);
+
+                            const droppedFile = e.dataTransfer.files?.[0] ?? null;
+                            if (droppedFile) {
+                              const nextFiles = [...uploadFiles];
+                              nextFiles[index] = droppedFile;
+                              setUploadFiles(nextFiles);
+                            }
+                          }}
+                        >
+                          <input
+                            id={fileInputId}
+                            style={{ display: "none" }}
+                            onChange={(event) => {
+                              const nextFiles = [...uploadFiles];
+                              nextFiles[index] = event.target.files?.[0] ?? null;
+                              setUploadFiles(nextFiles);
+                            }}
+                            type="file"
+                          />
+
+                          {file && (
+                            <button
+                              className="upload-slot-clear"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const nextFiles = [...uploadFiles];
+                                nextFiles[index] = null;
+                                setUploadFiles(nextFiles);
+                              }}
+                              title="清除选择"
+                              type="button"
+                            >
+                              ×
+                            </button>
+                          )}
+
+                           <div className="upload-slot-icon">
+                             {file ? (
+                               <svg
+                                 width="24"
+                                 height="24"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 strokeWidth="1.5"
+                                 strokeLinecap="round"
+                                 strokeLinejoin="round"
+                               >
+                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                 <polyline points="14 2 14 8 20 8" />
+                               </svg>
+                             ) : (
+                               <svg
+                                 width="24"
+                                 height="24"
+                                 viewBox="0 0 24 24"
+                                 fill="none"
+                                 stroke="currentColor"
+                                 strokeWidth="1.5"
+                                 strokeLinecap="round"
+                                 strokeLinejoin="round"
+                               >
+                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                               </svg>
+                             )}
+                           </div>
+                          <div className="upload-slot-title">{label}</div>
+                          <div className="upload-slot-status">
+                            {file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "点击选择或拖拽文件"}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <div className="account-upload-group">
-                    <div className="account-upload-title">管理人员原始数据</div>
-                    {FILE_INPUT_LABELS.slice(4).map((label, index) => (
-                      <label className="account-field" key={label}>
-                        <span className="account-field-label">{label}</span>
-                        <input
-                          className="account-file-input"
-                          onChange={(event) => {
-                            const nextFiles = [...uploadFiles];
-                            nextFiles[index + 4] = event.target.files?.[0] ?? null;
-                            setUploadFiles(nextFiles);
-                          }}
-                          type="file"
-                        />
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="toolbar">
+                  <div className="toolbar-premium">
                     <button
                       className="legacy-btn-primary account-primary-button"
                       disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
@@ -739,49 +927,43 @@ export default function AdminDashboardPage() {
                             setError("请至少选择一个要上传的源文件");
                             return;
                           }
-                          await uploadAccountSetRawFiles(selectedAccountSet.id, files);
-                          setResultMessage("上传成功，已归档到账套。");
-                          setUploadFiles(Array.from({ length: 6 }, () => null));
-                          await reloadAccountSets(selectedAccountSet.id);
+
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在上传并归档原始文件...");
+
+                          let current = 0;
+                          const interval = setInterval(() => {
+                            current += Math.floor(Math.random() * 15) + 8;
+                            if (current >= 95) current = 95;
+                            setProgress(current);
+                          }, 100);
+
+                          try {
+                            await uploadAccountSetRawFiles(selectedAccountSet.id, files);
+                            clearInterval(interval);
+                            setProgress(100);
+                            setLoadingText("文件上传成功！正在同步账套状态...");
+                            setUploadFiles(Array.from({ length: 6 }, () => null));
+                            await reloadAccountSets(selectedAccountSet.id);
+                            setResultMessage("上传成功，已归档到账套。");
+                          } catch (caughtError) {
+                            clearInterval(interval);
+                            setError(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
                         })
                       }
+                      style={{
+                        background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+                        color: "#ffffff"
+                      }}
                       type="button"
                     >
                       上传原始文件
-                    </button>
-                    <button
-                      className="account-action-button account-action-button--success"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          await calculateAccountSet(selectedAccountSet.id, "employee");
-                          setResultMessage("员工计算成功");
-                          await reloadAccountSets(selectedAccountSet.id);
-                        })
-                      }
-                      type="button"
-                    >
-                      员工计算
-                    </button>
-                    <button
-                      className="account-action-button account-action-button--warning"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          await calculateAccountSet(selectedAccountSet.id, "manager");
-                          setResultMessage("管理人员计算成功");
-                          await reloadAccountSets(selectedAccountSet.id);
-                        })
-                      }
-                      type="button"
-                    >
-                      管理人员计算
                     </button>
                   </div>
                 </div>
