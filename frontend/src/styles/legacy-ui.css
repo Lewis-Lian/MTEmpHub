@@ -4952,20 +4952,12 @@ input[type="checkbox"] {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: var(--ent-blue) !important;
   color: #ffffff !important;
   cursor: pointer !important;
   font-size: 13.5px !important;
   font-weight: 500 !important;
   transition: var(--ent-transition) !important;
   box-shadow: none !important;
-}
-
-.query-filter-actions .btn-primary:hover:not(:disabled),
-.account-panel-selector .btn-primary:hover:not(:disabled),
-.summary-download-panel .legacy-btn-primary:hover:not(:disabled) {
-  background: var(--ent-blue-hover) !important;
-  transform: translateY(-1px) !important;
 }
 
 .query-filter-actions .btn-primary:disabled,
@@ -5512,7 +5504,7 @@ input[type="checkbox"] {
 }
 
 /* ==========================================================================
-   全局查询按钮极光渐变流光与点击物理微动效
+   全局查询按钮渐变流光与点击物理微动效
    ========================================================================== */
 .query-filter-actions .btn-primary,
 .account-panel-selector .btn-primary,
@@ -5521,13 +5513,15 @@ input[type="checkbox"] {
   background-size: 200% 100% !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.18) !important;
   transition: all 0.3s ease !important;
 }
 
 .query-filter-actions .btn-primary:hover:not(:disabled),
 .account-panel-selector .btn-primary:hover:not(:disabled),
 .summary-download-panel .legacy-btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%) !important;
+  background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
   transform: translateY(-2px) !important;
@@ -5539,5 +5533,96 @@ input[type="checkbox"] {
 .summary-download-panel .legacy-btn-primary:active:not(:disabled) {
   transform: translateY(0px) scale(0.96) !important;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
+}
+
+/* ==========================================================================
+   表格点击弹窗与交互视觉重构 (毛玻璃与极简无下划线微动效链接)
+   ========================================================================== */
+
+/* 1. 可点击单元格的极简无下划线链接样式与微动效 */
+.query-table-click-cell {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: transparent !important;
+  color: #334155 !important; /* 暗灰蓝色，自然融入表格 */
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  font-size: inherit !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  user-select: none !important;
+  line-height: inherit !important;
+  vertical-align: middle !important;
+}
+
+.query-table-click-cell:hover {
+  color: #0284c7 !important; /* 悬浮时变蓝 */
+}
+
+.query-table-click-cell:active {
+  transform: scale(0.97) !important; /* 轻微按压物理反馈 */
+  opacity: 0.8 !important;
+}
+
+.query-table-click-icon {
+  display: inline-block !important;
+  font-size: 11px !important;
+  color: #0284c7 !important;
+  opacity: 0.45 !important; /* 默认半透明，降低视觉干扰 */
+  transition: all 0.2s ease !important;
+}
+
+.query-table-click-cell:hover .query-table-click-icon {
+  opacity: 1 !important; /* 悬浮时全显 */
+  transform: translate(1px, -1px) !important; /* 悬浮时箭头微移 */
+}
+
+/* 2. 详情弹窗毛玻璃与圆角升级 */
+.master-modal-backdrop {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  z-index: 99990 !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 24px !important;
+}
+
+.master-modal {
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25) !important;
+  z-index: 99991 !important;
+}
+
+/* 3. 弹窗极光 Loading 样式 */
+.query-modal-loading-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 48px 24px !important;
+  gap: 16px !important;
+  width: 100% !important;
+  min-height: 200px !important;
+}
+
+.query-modal-loading-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+  letter-spacing: 0.5px !important;
+  margin: 0 !important;
+  animation: textFade 1.5s infinite alternate ease-in-out !important;
 }
 

@@ -132,6 +132,11 @@ export default function SummaryDownloadPage() {
   const [mgrAnnualLeaveHeaders, setMgrAnnualLeaveHeaders] = useState<string[]>(MGR_ANNUAL_LEAVE_HEADERS);
   const [mgrDeptHoursHeaders, setMgrDeptHoursHeaders] = useState<string[]>(MGR_DEPT_HOURS_HEADERS);
 
+  // 进度条状态
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState("");
+
   useEffect(() => {
     let mounted = true;
 
@@ -238,7 +243,29 @@ export default function SummaryDownloadPage() {
     if (includeMgrAnnualLeave) query.set("mgr_annual_leave_headers", mgrAnnualLeaveHeaders.join(","));
     if (includeMgrDeptHours) query.set("mgr_dept_hours_headers", mgrDeptHoursHeaders.join(","));
 
-    window.location.href = buildDownloadUrl("/api/query/summary-download/export", query);
+    setProgressVisible(true);
+    setProgress(0);
+    setLoadingText("正在为您生成并下载汇总工作簿...");
+
+    let current = 0;
+    const interval = setInterval(() => {
+      current += Math.floor(Math.random() * 15) + 5;
+      if (current >= 99) {
+        current = 99;
+      }
+      setProgress(current);
+    }, 150);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      setProgress(100);
+      setLoadingText("下载已准备就绪！");
+      window.location.href = buildDownloadUrl("/api/query/summary-download/export", query);
+
+      setTimeout(() => {
+        setProgressVisible(false);
+      }, 500);
+    }, 1500);
   }
 
   if (isLoading) {
@@ -299,8 +326,22 @@ export default function SummaryDownloadPage() {
 
   return (
     <section className="legacy-page-section summary-download-container">
+      {/* 全覆盖式极光磨砂玻璃加载遮罩 */}
+      <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} role="status">
+        <div className="query-loading-spinner-wrap">
+          <div className="query-loading-spinner-ring" />
+          <div className="query-loading-spinner-pulse" />
+          <div className="query-loading-percent">{progress}%</div>
+        </div>
+        <div className="query-loading-text">{loadingText}</div>
+      </div>
+
       {/* 载入高级页内 CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
+        .summary-download-container .query-workspace-loading {
+          position: fixed !important;
+          border-radius: 0 !important;
+        }
         .summary-download-container {
           max-width: 1200px;
           margin: 0 auto;
@@ -915,7 +956,7 @@ export default function SummaryDownloadPage() {
             onClick={handleDownload}
             type="button"
           >
-            <span>开始下载汇总工作簿</span>
+            <span>点击下载汇总工作簿</span>
             <svg className="chevron-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="9 18 15 12 9 6"></polyline>
             </svg>

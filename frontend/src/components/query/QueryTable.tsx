@@ -233,7 +233,15 @@ export default function QueryTable({
           </button>
         </div>
         <div className="master-modal-body">
-          {isModalLoading ? <p>正在加载...</p> : null}
+          {isModalLoading ? (
+            <div className="query-modal-loading-wrap">
+              <div className="query-loading-spinner-wrap">
+                <div className="query-loading-spinner-ring" />
+                <div className="query-loading-spinner-pulse" />
+              </div>
+              <p className="query-modal-loading-text">正在加载详情，请稍后...</p>
+            </div>
+          ) : null}
           {!isModalLoading && modalError ? <p className="legacy-inline-error">{modalError}</p> : null}
           {!isModalLoading && !modalError ? modalBodyContent : null}
         </div>
@@ -287,33 +295,32 @@ export default function QueryTable({
                   {safeHeaders.map((_, columnIndex) => (
                     <td key={`cell-${rowIndex}-${columnIndex}`} className="legacy-table-body-cell">
                       {(() => {
+                        const cellValue = item.row[columnIndex];
                         const headerLabel = String(safeHeaders[columnIndex]?.label ?? "");
                         const modalSpec = cellModal?.getModal({
                           headerLabel,
                           headerIndex: columnIndex,
                           rowIndex: (safePage - 1) * pageSize + rowIndex,
-                          cell: item.row[columnIndex],
+                          cell: cellValue,
                           row: item.row,
                           rowMeta: item.rowMeta,
                         });
-                        if (!modalSpec) {
-                          return item.row[columnIndex] ?? "";
+
+                        const strVal = String(cellValue ?? "").trim();
+                        const isNoData = !strVal || strVal === "-" || strVal === "0" || strVal === "0.0" || strVal === "0.00";
+
+                        if (!modalSpec || isNoData) {
+                          return cellValue ?? "";
                         }
                         return (
                           <button
                             aria-label={modalSpec.triggerLabel}
+                            className="query-table-click-cell"
                             onClick={() => void openCellModal(modalSpec)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              color: "var(--ent-color-primary, #2563eb)",
-                              cursor: "pointer",
-                              padding: 0,
-                              textDecoration: "underline",
-                            }}
                             type="button"
                           >
-                            {item.row[columnIndex] ?? ""}
+                            <span>{cellValue ?? ""}</span>
+                            <span className="query-table-click-icon">↗</span>
                           </button>
                         );
                       })()}
