@@ -324,6 +324,34 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(rows[0], ("部门", "姓名", "日期", "原始打卡数据"))
         self.assertEqual(rows[1], ("制造一部", "员工甲", "2026-05-01", "08:00,17:30"))
 
+    def test_employee_dashboard_only_user_can_open_dashboard_punch_record_modal(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=employee.id,
+                    record_date=date(2026, 5, 1),
+                    actual_hours=8,
+                    raw_data={"刷卡时间数据": "08:00,17:30"},
+                    employee_payload={
+                        "actual_hours": 8,
+                        "raw_data": {"刷卡时间数据": "08:00,17:30"},
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("blocked", "blocked123")
+
+        records_response = self.client.get("/api/query/punch-records?month=2026-05&emp_ids=1")
+        export_response = self.client.get("/api/query/punch-records/modal-export?month=2026-05&emp_ids=1")
+        standalone_export_response = self.client.get("/api/query/punch-records/export?month=2026-05&emp_ids=1")
+
+        self.assertEqual(records_response.status_code, 200)
+        self.assertEqual(export_response.status_code, 200)
+        self.assertEqual(standalone_export_response.status_code, 403)
+        self.assertEqual(records_response.get_json()[0]["raw_punch_data"], "08:00,17:30")
+
     def test_punch_records_api_falls_back_to_manager_slot_times_for_raw_punch_data(self) -> None:
         with self.app.app_context():
             employee = Employee.query.filter_by(emp_no="E001").first()

@@ -4,7 +4,7 @@ from flask import Blueprint, Response, g, jsonify
 from sqlalchemy.orm import joinedload
 
 from models.employee import Employee
-from routes.auth_helpers import login_required, page_permission_required
+from routes.auth_helpers import any_page_permission_required, login_required, page_permission_required
 from routes.query_core import (
     _accessible_emp_ids,
     account_sets_api,
@@ -127,7 +127,7 @@ def abnormal_export():
 
 
 @api_query_bp.get("/punch-records")
-@page_permission_required("punch_records")
+@any_page_permission_required(("punch_records", "employee_dashboard"))
 def punch_records():
     return punch_records_api()
 
@@ -139,7 +139,7 @@ def punch_records_export():
 
 
 @api_query_bp.get("/punch-records/modal-export")
-@page_permission_required("punch_records")
+@any_page_permission_required(("punch_records", "employee_dashboard"))
 def punch_records_modal_export():
     return punch_records_modal_export_api()
 

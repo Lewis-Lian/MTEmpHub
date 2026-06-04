@@ -8,6 +8,7 @@ import EmployeePicker from "../query/EmployeePicker";
 import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
 import type { AccountSet, QueryBootstrap } from "../../types/query";
+import MonthPicker from "../common/MonthPicker";
 
 interface OverrideEmployee {
   id: number;
@@ -182,8 +183,8 @@ export default function AttendanceOverridesPage({
     }
   }
 
-  function handleMonthChange(event: ChangeEvent<HTMLInputElement>) {
-    setSelectedMonth(event.target.value);
+  function handleMonthChange(val: string) {
+    setSelectedMonth(val);
     setEditingRow(null);
   }
 
@@ -327,8 +328,7 @@ export default function AttendanceOverridesPage({
           </div>
 
           <div className="query-filter-field">
-            <label className="form-label">月份</label>
-            <input className="form-control" onChange={handleMonthChange} type="month" value={selectedMonth} />
+            <MonthPicker onChange={handleMonthChange} value={selectedMonth} />
           </div>
 
           <div className="query-filter-field">

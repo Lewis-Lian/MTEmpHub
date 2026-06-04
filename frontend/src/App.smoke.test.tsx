@@ -717,9 +717,9 @@ describe("App smoke regression", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/employee/dashboard"));
   });
 
-  it("员工考勤数据查询页点击考勤天数会弹出原始刷卡记录", async () => {
+  it("只有员工考勤权限时点击考勤天数会弹出原始刷卡记录", async () => {
     window.history.replaceState({}, "", "/employee/dashboard");
-    fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
+    fetchMock.mockImplementation((input) => mockDashboardOnlyEmployeeAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
     render(<App />);
@@ -730,6 +730,7 @@ describe("App smoke regression", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "查看员工甲在 2026-05 的原始刷卡记录" }));
 
+    await waitFor(() => expect(hasRequestedPath("/api/query/punch-records")).toBe(true));
     expect(await screen.findByRole("heading", { name: "员工甲 2026-05 原始刷卡记录" })).toBeInTheDocument();
     expect(await screen.findByText("08:00,17:30")).toBeInTheDocument();
     expect(screen.getByText("部门")).toBeInTheDocument();
@@ -1211,6 +1212,37 @@ function normalizePath(input: RequestInfo | URL): string {
 
 function hasRequestedPath(pathname: string): boolean {
   return fetchMock.mock.calls.some(([input]) => normalizePath(input) === pathname);
+}
+
+function mockDashboardOnlyEmployeeAppResponse(path: string): Promise<Response> {
+  if (path === "/api/query/navigation") {
+    return Promise.resolve(
+      jsonResponse({
+        modules: [
+          {
+            slug: "query",
+            label: "查询中心",
+            short_label: "查询",
+            home_href: "/employee/home",
+            entries: [
+              {
+                key: "employee_home",
+                label: "首页",
+                href: "/employee/home",
+              },
+              {
+                key: "employee_dashboard",
+                label: "员工考勤数据查询",
+                href: "/employee/dashboard",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+  }
+
+  return mockEmployeeAppResponse(path);
 }
 
 function mockEmployeeAppResponse(path: string): Promise<Response> {
