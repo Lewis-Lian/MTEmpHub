@@ -1,0 +1,199 @@
+.employee-picker-modal {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+.employee-picker-modal .modal-dialog {
+  width: min(1080px, 100%);
+  max-height: min(760px, calc(100vh - 48px));
+  display: grid;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.employee-picker-modal .modal-content {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  box-shadow: 0 24px 60px rgba(24, 49, 83, 0.18);
+}
+
+.employee-picker-modal .modal-header,
+.employee-picker-modal .modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #d9e4ef;
+}
+
+.employee-picker-modal .modal-footer {
+  justify-content: flex-end;
+  border-top: 1px solid #d9e4ef;
+  border-bottom: 0;
+}
+
+.employee-picker-modal .modal-title {
+  margin: 0;
+  color: #183153;
+  font-size: 18px;
+}
+
+.employee-picker-modal .modal-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  background: #fbfdff;
+}
+
+.employee-picker-modal .btn,
+.employee-picker-modal .btn-close {
+  border: 1px solid #bfcbd7;
+  background: #ffffff;
+  color: #183153;
+  cursor: pointer;
+}
+
+.employee-picker-modal .btn {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.employee-picker-modal .btn-sm {
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.employee-picker-modal .btn-primary {
+  border-color: #1f4f7c;
+  background: #245b8a;
+  color: #ffffff;
+}
+
+.employee-picker-modal .btn-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 0;
+}
+
+.employee-picker-modal .btn-close::before {
+  content: "×";
+  font-size: 18px;
+  line-height: 1;
+}
+
+.employee-picker-modal .form-control {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  border: 1px solid #c7d2de;
+  background: #ffffff;
+  color: #183153;
+  font-size: 13px;
+}
+
+.employee-picker-modal .form-check-input {
+  margin: 0;
+}
+
+.employee-picker-modal .row {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(300px, 5fr);
+  gap: 16px;
+}
+
+.employee-picker-modal .d-flex {
+  display: flex;
+}
+
+.employee-picker-modal .flex-column {
+  flex-direction: column;
+}
+
+.employee-picker-modal .align-items-center {
+  align-items: center;
+}
+
+.employee-picker-modal .justify-content-between {
+  justify-content: space-between;
+}
+
+.employee-picker-modal .gap-1 {
+  gap: 4px;
+}
+
+.employee-picker-modal .gap-2 {
+  gap: 8px;
+}
+
+.employee-picker-modal .mb-0 {
+  margin-bottom: 0;
+}
+
+.employee-picker-modal .mb-2 {
+  margin-bottom: 8px;
+}
+
+.employee-picker-modal .text-nowrap {
+  white-space: nowrap;
+}
+
+.employee-picker-modal .small {
+  font-size: 12px;
+}
+
+.employee-picker-modal .badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 8px;
+  border: 1px solid #d9e4ef;
+  background: #f8fafc;
+  color: #31475f;
+  font-size: 12px;
+}
+
+.employee-picker-panel {
+  border: 1px solid #d9e4ef;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px;
+}
+
+.employee-picker-panel-title {
+  margin-bottom: 8px;
+  color: #2a3d55;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.employee-picker-tree {
+  min-height: 190px;
+}
+
+.employee-picker-candidates {
+  min-height: 290px;
+}
+
+.employee-picker-selected-wrap {
+  min-height: 492px;
+}

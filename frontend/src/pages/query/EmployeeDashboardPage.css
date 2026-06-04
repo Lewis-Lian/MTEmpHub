@@ -3,40 +3,34 @@
    ========================================================================== */
 
 /* 极光背景流光球 */
-.query-page-shell {
+.employee-dashboard-page {
   padding: 24px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  min-width: 0;
+  min-height: calc(100vh - 86px);
   box-sizing: border-box;
   background-color: #f8fafc;
   background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1.5px, transparent 0);
   background-size: 28px 28px;
-  height: calc(100vh - 86px) !important;
-  max-height: calc(100vh - 86px) !important;
-  overflow: hidden !important;
   position: relative;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
-  gap: 20px !important;
+  gap: 20px;
   align-items: start;
 }
 
 /* 保证内容在上层，并使筛选栏的层级高于结果表格以解决下拉框遮挡问题 */
-.query-filter-rail {
+.employee-dashboard-page .query-filter-rail {
   position: relative;
-  z-index: 15 !important;
+  z-index: 15;
 }
-.query-workspace {
+.employee-dashboard-page .query-workspace {
   position: relative;
-  z-index: 5 !important;
-}
-
-/* 确保人员选择弹窗悬浮于系统最上层 */
-.employee-picker-modal {
-  z-index: 9999 !important;
+  z-index: 5;
 }
 
 /* 极光动态流光背景球 */
-.qh-glow-sphere {
+.employee-dashboard-page .qh-glow-sphere {
   position: absolute;
   border-radius: 50%;
   filter: blur(120px);
@@ -45,7 +39,7 @@
   z-index: 0;
   animation: auroraFlow 22s infinite alternate ease-in-out;
 }
-.qh-glow-sphere.sphere-1 {
+.employee-dashboard-page .qh-glow-sphere.sphere-1 {
   width: 450px;
   height: 450px;
   background: radial-gradient(circle, #38bdf8 0%, #818cf8 100%);
@@ -53,7 +47,7 @@
   left: 5%;
   animation-duration: 18s;
 }
-.qh-glow-sphere.sphere-2 {
+.employee-dashboard-page .qh-glow-sphere.sphere-2 {
   width: 500px;
   height: 500px;
   background: radial-gradient(circle, #f472b6 0%, #c084fc 100%);
@@ -61,7 +55,7 @@
   right: 5%;
   animation-duration: 25s;
 }
-.qh-glow-sphere.sphere-3 {
+.employee-dashboard-page .qh-glow-sphere.sphere-3 {
   width: 350px;
   height: 350px;
   background: radial-gradient(circle, #34d399 0%, #38bdf8 100%);
@@ -82,110 +76,110 @@
 /* ==========================================================================
    筛选栏面板重构（高透磨砂玻璃）
    ========================================================================== */
-.query-filter-rail {
-  background: rgba(255, 255, 255, 0.75) !important;
+.employee-dashboard-page .query-filter-rail {
+  background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.8) !important;
-  border-radius: 16px !important;
-  padding: 24px 28px !important;
-  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   position: relative;
   top: 0;
   transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
-  gap: 16px !important;
+  gap: 16px;
 }
 
-.query-filter-rail:hover {
-  top: -2px !important;
-  box-shadow: 0 16px 35px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6) !important;
-  border-color: rgba(203, 213, 225, 0.8) !important;
+.employee-dashboard-page .query-filter-rail:hover {
+  top: -2px;
+  box-shadow: 0 16px 35px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  border-color: rgba(203, 213, 225, 0.8);
 }
 
-.query-filter-heading {
-  gap: 8px 20px !important;
+.employee-dashboard-page .query-filter-heading {
+  gap: 8px 20px;
 }
 
-.query-filter-kicker {
-  color: #0284c7 !important;
-  font-weight: 700 !important;
-  letter-spacing: 1.8px !important;
+.employee-dashboard-page .query-filter-kicker {
+  color: #0284c7;
+  font-weight: 700;
+  letter-spacing: 1.8px;
 }
 
-.query-filter-heading h2 {
-  font-size: 18px !important;
-  font-weight: 700 !important;
-  color: #0f172a !important;
-  margin: 0 !important;
+.employee-dashboard-page .query-filter-heading h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
 }
 
-.query-filter-heading p {
-  font-size: 12px !important;
-  color: #64748b !important;
+.employee-dashboard-page .query-filter-heading p {
+  font-size: 12px;
+  color: #64748b;
 }
 
-.query-filter-body {
-  gap: 16px !important;
+.employee-dashboard-page .query-filter-body {
+  gap: 16px;
 }
 
-.query-filter-field .form-label {
-  font-size: 13px !important;
-  font-weight: 700 !important;
-  color: #475569 !important;
-  margin-bottom: 8px !important;
+.employee-dashboard-page .query-filter-field .form-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  margin-bottom: 8px;
 }
 
 /* ==========================================================================
    输入组件高度、尺寸、边框完全对齐 (38px)
    ========================================================================== */
-.query-page-shell .employee-lookup .input-group {
-  height: 38px !important;
+.employee-dashboard-page .employee-lookup .input-group {
+  height: 38px;
 }
 
-.query-page-shell .employee-lookup .form-control {
-  height: 38px !important;
-  min-height: 38px !important;
-  border: 1px solid #cbd5e1 !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-  font-size: 13.5px !important;
-  padding: 8px 12px !important;
-  border-radius: 8px 0 0 8px !important;
-  box-sizing: border-box !important;
+.employee-dashboard-page .employee-lookup .form-control {
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  border-radius: 8px 0 0 8px;
+  box-sizing: border-box;
 }
 
-.query-page-shell .employee-lookup .btn {
-  height: 38px !important;
-  min-height: 38px !important;
-  border: 1px solid #cbd5e1 !important;
-  border-left: none !important;
-  background: #f8fafc !important;
-  color: #64748b !important;
-  box-sizing: border-box !important;
+.employee-dashboard-page .employee-lookup .btn {
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  background: #f8fafc;
+  color: #64748b;
+  box-sizing: border-box;
 }
 
-.query-page-shell .employee-lookup-clear {
-  height: 38px !important;
-  min-height: 38px !important;
-  line-height: 36px !important;
-  box-sizing: border-box !important;
-  padding: 0 10px !important;
+.employee-dashboard-page .employee-lookup-clear {
+  height: 38px;
+  min-height: 38px;
+  line-height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
 }
 
-.query-page-shell .employee-picker-trigger {
-  border-radius: 0 8px 8px 0 !important;
+.employee-dashboard-page .employee-picker-trigger {
+  border-radius: 0 8px 8px 0;
 }
 
-.query-page-shell .form-select {
-  height: 38px !important;
-  min-height: 38px !important;
-  border: 1px solid #cbd5e1 !important;
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-  border-radius: 8px !important;
-  font-size: 13.5px !important;
-  padding: 8px 36px 8px 12px !important;
-  box-sizing: border-box !important;
+.employee-dashboard-page .form-select {
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  background-color: #ffffff;
+  color: #0f172a;
+  border-radius: 8px;
+  font-size: 13.5px;
+  padding: 8px 36px 8px 12px;
+  box-sizing: border-box;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230284c7' stroke-width='3'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19.5 8.25l-7.5 7.5-7.5-7.5' /%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -193,7 +187,7 @@
   background-size: 11px;
 }
 
-.query-page-shell .form-select:hover {
+.employee-dashboard-page .form-select:hover {
   border-color: #94a3b8;
   background-color: #f8fafc;
 }
@@ -201,13 +195,13 @@
 /* ==========================================================================
    多选显示选项重构为微型高光卡片药丸
    ========================================================================== */
-.query-page-shell .dashboard-check-stack {
+.employee-dashboard-page .dashboard-check-stack {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
 }
 
-.query-page-shell .dashboard-check-option {
+.employee-dashboard-page .dashboard-check-option {
   display: inline-flex;
   align-items: center;
   padding: 8px 16px;
@@ -224,20 +218,20 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
-.query-page-shell .dashboard-check-option:hover {
+.employee-dashboard-page .dashboard-check-option:hover {
   border-color: #94a3b8;
   background: #f8fafc;
   transform: translateY(-1px);
 }
 
-.query-page-shell .dashboard-check-option:has(input:checked) {
+.employee-dashboard-page .dashboard-check-option:has(input:checked) {
   border-color: #0284c7;
   background: rgba(56, 189, 248, 0.08);
   color: #0284c7;
   box-shadow: 0 2px 8px rgba(56, 189, 248, 0.12);
 }
 
-.query-page-shell .dashboard-check-option input[type="checkbox"] {
+.employee-dashboard-page .dashboard-check-option input[type="checkbox"] {
   accent-color: #0284c7;
   width: 15px;
   height: 15px;
@@ -248,207 +242,207 @@
 /* ==========================================================================
    按钮组件与发光、渐变效果
    ========================================================================== */
-.query-page-shell .query-filter-actions {
+.employee-dashboard-page .query-filter-actions {
   display: flex;
   gap: 12px;
 }
 
-.query-page-shell .query-filter-actions .btn {
-  height: 38px !important;
-  font-weight: 600 !important;
-  font-size: 13.5px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  transition: var(--qh-transition) !important;
+.employee-dashboard-page .query-filter-actions .btn {
+  height: 38px;
+  font-weight: 600;
+  font-size: 13.5px;
+  border: none;
+  border-radius: 8px;
+  transition: var(--qh-transition);
   cursor: pointer;
 }
 
-.query-page-shell .query-filter-actions .btn-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%) !important;
-  background-size: 200% 100% !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
-  transition: all 0.3s ease !important;
+.employee-dashboard-page .query-filter-actions .btn-primary {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%);
+  background-size: 200% 100%;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+  transition: all 0.3s ease;
 }
 
-.query-page-shell .query-filter-actions .btn-primary:hover:not(:disabled) {
-  background-position: right center !important;
-  color: #ffffff !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35) !important;
+.employee-dashboard-page .query-filter-actions .btn-primary:hover:not(:disabled) {
+  background-position: right center;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35);
 }
 
-.query-page-shell .query-filter-actions .btn-primary:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
-  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
+.employee-dashboard-page .query-filter-actions .btn-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96);
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2);
 }
 
-.query-page-shell .query-filter-actions .btn-outline-success {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
-  background-size: 200% 100% !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
-  transition: all 0.3s ease !important;
+.employee-dashboard-page .query-filter-actions .btn-outline-success {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background-size: 200% 100%;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
+  transition: all 0.3s ease;
 }
 
-.query-page-shell .query-filter-actions .btn-outline-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
-  background-size: 200% 100% !important;
-  background-position: right center !important;
-  color: #ffffff !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
+.employee-dashboard-page .query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background-size: 200% 100%;
+  background-position: right center;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
 }
 
-.query-page-shell .query-filter-actions .btn-outline-success:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+.employee-dashboard-page .query-filter-actions .btn-outline-success:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
 }
 
-.master-modal .query-filter-actions {
+.dashboard-modal-actions {
   display: flex;
   gap: 12px;
 }
 
-.master-modal .query-filter-actions .btn {
-  height: 38px !important;
-  font-weight: 600 !important;
-  font-size: 13.5px !important;
-  border: none !important;
-  border-radius: 8px !important;
-  transition: var(--qh-transition) !important;
+.dashboard-modal-actions .btn {
+  height: 38px;
+  font-weight: 600;
+  font-size: 13.5px;
+  border: none;
+  border-radius: 8px;
+  transition: var(--qh-transition);
   cursor: pointer;
-  width: auto !important;
-  flex: 0 0 auto !important;
+  width: auto;
+  flex: 0 0 auto;
 }
 
-.master-modal .query-filter-actions .btn-outline-success {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
-  background-size: 200% 100% !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
-  transition: all 0.3s ease !important;
+.dashboard-modal-actions .btn-outline-success {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background-size: 200% 100%;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
+  transition: all 0.3s ease;
 }
 
-.master-modal .query-filter-actions .btn-outline-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
-  background-size: 200% 100% !important;
-  background-position: right center !important;
-  color: #ffffff !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
+.dashboard-modal-actions .btn-outline-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background-size: 200% 100%;
+  background-position: right center;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35);
 }
 
-.master-modal .query-filter-actions .btn-outline-success:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
-  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+.dashboard-modal-actions .btn-outline-success:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
 }
 
 /* ==========================================================================
    右侧结果面板磨砂玻璃化
    ========================================================================== */
-.query-page-shell .query-workspace {
+.employee-dashboard-page .query-workspace {
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 16px;
-  padding: 12px 16px 12px !important;
+  padding: 12px 16px 12px;
   box-shadow: 0 10px 30px rgba(148, 163, 184, 0.06);
   box-sizing: border-box;
   transition: all 0.3s ease;
-  height: 100% !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
 }
 
-.query-page-shell .query-workspace:hover {
+.employee-dashboard-page .query-workspace:hover {
   box-shadow: 0 16px 35px rgba(148, 163, 184, 0.1);
   border-color: rgba(226, 232, 240, 1);
 }
 
-.query-page-shell .query-workspace .query-result-panel,
-.query-page-shell .query-workspace .legacy-table-panel {
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  height: 100% !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
+.employee-dashboard-page .query-workspace .query-result-panel,
+.employee-dashboard-page .query-workspace .legacy-table-panel {
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 让表格内容区在超出时在内部产生滚动条，刚好占满 */
-.query-page-shell .query-workspace .legacy-table-wrap {
-  flex: 1 !important;
-  min-height: 0 !important;
-  overflow: auto !important;
+.employee-dashboard-page .query-workspace .legacy-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
-.query-page-shell .query-workspace .query-result-table {
-  display: flex !important;
-  flex-direction: column !important;
-  flex: 1 !important;
-  height: 100% !important;
-  min-height: 0 !important;
+.employee-dashboard-page .query-workspace .query-result-table {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-height: 0;
 }
 
-.query-page-shell .query-workspace .table-pager {
-  flex-shrink: 0 !important;
-  margin-top: 12px !important;
-  display: flex !important;
-  justify-content: flex-end !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
+.employee-dashboard-page .query-workspace .table-pager {
+  flex-shrink: 0;
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 992px) {
-  .query-filter-body {
-    grid-template-columns: 1fr 1fr !important;
+  .employee-dashboard-page .query-filter-body {
+    grid-template-columns: 1fr 1fr;
   }
 }
 
 @media (max-width: 600px) {
-  .query-page-shell {
+  .employee-dashboard-page {
     padding: 16px;
   }
   
-  .query-filter-body {
-    grid-template-columns: 1fr !important;
+  .employee-dashboard-page .query-filter-body {
+    grid-template-columns: 1fr;
   }
 }
 
 /* ==========================================================================
    查询进度条 (极光流光玻璃拟物化效果)
    ========================================================================== */
-.query-progress-bar-wrap {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  height: 4px !important;
-  background: rgba(226, 232, 240, 0.4) !important;
-  z-index: 100 !important;
-  overflow: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  transition: opacity 0.3s ease !important;
-  border-radius: 16px 16px 0 0 !important; /* 与结果面板的圆角贴合 */
+.employee-dashboard-page .query-progress-bar-wrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(226, 232, 240, 0.4);
+  z-index: var(--z-sticky);
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  border-radius: 16px 16px 0 0; /* 与结果面板的圆角贴合 */
 }
 
-.query-progress-bar-wrap.is-active {
-  opacity: 1 !important;
+.employee-dashboard-page .query-progress-bar-wrap.is-active {
+  opacity: 1;
 }
 
-.query-progress-bar-inner {
-  height: 100% !important;
-  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #818cf8 100%) !important;
-  background-size: 200% 100% !important;
-  animation: barShimmer 1.5s infinite linear !important;
-  transition: width 0.3s cubic-bezier(0.1, 0.8, 0.25, 1) !important;
+.employee-dashboard-page .query-progress-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #818cf8 100%);
+  background-size: 200% 100%;
+  animation: barShimmer 1.5s infinite linear;
+  transition: width 0.3s cubic-bezier(0.1, 0.8, 0.25, 1);
 }
 
 @keyframes barShimmer {
