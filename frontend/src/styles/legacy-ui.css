@@ -4689,12 +4689,12 @@ body {
 }
 
 .factory-rest-day--pm {
-  background: rgba(59, 130, 246, 0.06) !important;
-  border-color: rgba(59, 130, 246, 0.2) !important;
+  background: rgba(235, 156, 77, 0.06) !important;
+  border-color: rgba(235, 156, 77, 0.2) !important;
 }
 .factory-rest-day--pm .factory-rest-day-state {
-  color: #2563eb !important;
-  background: rgba(59, 130, 246, 0.08) !important;
+  color: #b45309 !important;
+  background: rgba(235, 156, 77, 0.08) !important;
 }
 
 /* 自定义复选框颜色 */
@@ -5872,4 +5872,467 @@ input[type="checkbox"] {
   background: linear-gradient(135deg, #fbbf24 0%, #b45309 100%) !important;
   box-shadow: 0 8px 24px rgba(180, 83, 9, 0.4) !important;
 }
+
+/* ==========================================================================
+   账套设置双面板布局与拟物表单样式 (SaaS 精致风格)
+   ========================================================================== */
+.settings-double-panel {
+  display: flex !important;
+  gap: 20px !important;
+  width: 100% !important;
+  margin-top: 12px !important;
+}
+
+@media (max-width: 768px) {
+  .settings-double-panel {
+    flex-direction: column !important;
+  }
+}
+
+.settings-panel-left {
+  flex: 0 0 280px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+.settings-panel-right {
+  flex: 1 !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+}
+
+.settings-card-module {
+  background: #ffffff !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+  transition: border-color 0.2s !important;
+}
+
+.settings-card-module:hover {
+  border-color: rgba(203, 213, 225, 0.8) !important;
+}
+
+.settings-card-title {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 11.5px !important;
+  color: #64748b !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  margin-bottom: 12px !important;
+  border-left: 3px solid #0f172a !important;
+  padding-left: 8px !important;
+  line-height: 1.2 !important;
+}
+
+/* 高端拟物表单框 */
+.settings-field {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  margin-bottom: 12px !important;
+  width: 100% !important;
+}
+
+.settings-field-label {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: #475569 !important;
+}
+
+.settings-input,
+.settings-select {
+  width: 100% !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  font-size: 13.5px !important;
+  color: #1e293b !important;
+  background: #ffffff !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-sizing: border-box !important;
+}
+
+.settings-input:focus,
+.settings-select:focus {
+  outline: none !important;
+  border-color: #0f172a !important;
+  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08) !important;
+}
+
+.settings-input:disabled,
+.settings-select:disabled {
+  background: #f1f5f9 !important;
+  color: #94a3b8 !important;
+  cursor: not-allowed !important;
+}
+
+/* 建立/创建账套一体化表单行 */
+.settings-form-row {
+  display: flex !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
+}
+
+.settings-form-row .settings-field {
+  margin-bottom: 0 !important;
+}
+
+.settings-form-row > button {
+  height: 38px !important;
+  padding: 0 16px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  border-radius: 8px !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: #ffffff !important;
+  background: linear-gradient(135deg, #334155 0%, #0f172a 100%) !important;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.12) !important;
+  transition: all 0.22s !important;
+}
+
+.settings-form-row > button:hover:not(:disabled) {
+  transform: scale(1.03) !important;
+  box-shadow: 0 6px 15px rgba(15, 23, 42, 0.22) !important;
+}
+
+.settings-form-row > button:active:not(:disabled) {
+  transform: scale(0.96) !important;
+}
+
+/* 弹窗专用控制按钮栏 */
+.settings-toolbar {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  margin-top: 8px !important;
+}
+
+.settings-toolbar button {
+  width: 100% !important;
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+  border-radius: 10px !important;
+  border: none !important;
+  cursor: pointer !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.settings-toolbar button:hover:not(:disabled) {
+  transform: scale(1.02) !important;
+}
+
+.settings-toolbar button:active:not(:disabled) {
+  transform: scale(0.96) !important;
+}
+
+.settings-toolbar button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+/* 各个控制按钮的主题样式 */
+.settings-toolbar .btn-save-params {
+  background: linear-gradient(135deg, #10b981 0%, #047857 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
+}
+.settings-toolbar .btn-save-params:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(4, 120, 87, 0.4) !important;
+}
+
+.settings-toolbar .btn-set-current {
+  background: linear-gradient(135deg, #475569 0%, #1e293b 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.12) !important;
+}
+.settings-toolbar .btn-set-current:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25) !important;
+}
+
+.settings-toolbar .btn-lock-set {
+  background: linear-gradient(135deg, #f59e0b 0%, #b45309 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.18) !important;
+}
+.settings-toolbar .btn-lock-set:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(180, 83, 9, 0.4) !important;
+}
+
+.settings-toolbar .btn-unlock-set {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
+}
+.settings-toolbar .btn-unlock-set:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.4) !important;
+}
+
+.settings-toolbar .btn-delete-set {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.18) !important;
+}
+
+/* ==========================================================================
+   仿参考图风格月份选择器 MonthPicker 专属样式 (极简高雅现代风 - 无蓝底款)
+   ========================================================================== */
+.month-picker-container {
+  position: relative !important;
+  display: inline-block !important;
+  width: 100% !important;
+}
+
+/* 分栏式触发框 */
+.month-picker-split-trigger {
+  width: 100% !important;
+  min-height: 38px !important;
+  display: flex !important;
+  align-items: stretch !important;
+  border-radius: 4px !important;
+  border: 1px solid #d9d9d9 !important;
+  background: #ffffff !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  transition: all 0.15s ease !important;
+}
+
+.month-picker-split-trigger:hover:not(.is-disabled) {
+  border-color: #a3a3a3 !important;
+}
+
+.month-picker-split-trigger.is-open {
+  border-color: #595959 !important;
+  box-shadow: 0 0 0 2px rgba(89, 89, 89, 0.1) !important;
+}
+
+.month-picker-split-trigger.is-disabled {
+  background: #f5f5f5 !important;
+  border-color: #d9d9d9 !important;
+  cursor: not-allowed !important;
+}
+
+/* 左侧数值展示区 */
+.month-picker-split-value {
+  flex: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  font-size: 13px !important; /* 微调字号 */
+  color: #262626 !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 8px !important; /* 缩减 padding，增加可用宽度 */
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+}
+
+.month-picker-split-value span {
+  white-space: nowrap !important; /* 强制单行，绝对不折行 */
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+  text-align: left !important;
+}
+
+.month-picker-split-value:disabled {
+  color: #bfbfbf !important;
+  cursor: not-allowed !important;
+}
+
+/* 右侧独立下拉小按钮 */
+.month-picker-split-arrow {
+  width: 30px !important; /* 从 38px 缩减到 30px 腾出空间 */
+  background: #fafafa !important;
+  border: none !important;
+  border-left: 1px solid #d9d9d9 !important;
+  cursor: pointer !important;
+  color: #bfbfbf !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: all 0.15s ease !important;
+  flex-shrink: 0 !important;
+  padding: 0 !important;
+}
+
+.month-picker-split-arrow:hover:not(:disabled) {
+  background: #f0f0f0 !important;
+  color: #595959 !important;
+}
+
+.month-picker-split-arrow:disabled {
+  background: #f5f5f5 !important;
+  color: #d9d9d9 !important;
+  cursor: not-allowed !important;
+}
+
+.month-picker-icon {
+  color: #8c8c8c !important;
+  margin-right: 6px !important; /* 从 8px 缩至 6px 腾出空间 */
+  flex-shrink: 0 !important;
+}
+
+.month-picker-placeholder {
+  color: #bfbfbf !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* 下拉面板 */
+.month-picker-dropdown {
+  position: absolute !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  z-index: 1000 !important;
+  width: 280px !important;
+  background: #ffffff !important;
+  border: 1px solid #f0f0f0 !important;
+  border-radius: 4px !important;
+  box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  transform-origin: top left !important;
+  animation: monthPickerSlideDown 0.15s cubic-bezier(0.23, 1, 0.32, 1) !important;
+}
+
+@keyframes monthPickerSlideDown {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.month-picker-panel-body {
+  padding: 12px 12px 4px 12px !important;
+}
+
+/* 年份导航栏 */
+.month-picker-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-bottom: 12px !important;
+}
+
+.month-picker-year-label {
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  color: #262626 !important;
+  user-select: none !important;
+}
+
+.month-picker-nav-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.month-picker-nav-btn {
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: #bfbfbf !important;
+  padding: 2px 6px !important;
+  border-radius: 2px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  transition: all 0.15s ease !important;
+}
+
+.month-picker-nav-btn:hover {
+  background: #f5f5f5 !important;
+  color: #595959 !important;
+}
+
+/* 月份网格 */
+.month-picker-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, 1fr) !important;
+  gap: 8px !important;
+}
+
+.month-picker-cell {
+  background: transparent !important;
+  border: 1px solid transparent !important; /* 统一使用 1px 透明边框占位，彻底消除抖动 */
+  border-radius: 2px !important;
+  padding: 8px 0 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #595959 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.month-picker-cell:hover {
+  background: #f5f5f5 !important;
+  color: #262626 !important;
+}
+
+.month-picker-cell.is-selected {
+  background: #f1f5f9 !important; /* 极浅灰色背景代替蓝底 */
+  color: #0f172a !important; /* 加深字色 */
+  font-weight: bold !important;
+  border: 1px solid #cbd5e1 !important;
+}
+
+/* 底部操作区 */
+.month-picker-footer {
+  border-top: 1px solid #f0f0f0 !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  background: #ffffff !important;
+  border-radius: 0 0 4px 4px !important;
+}
+
+.month-picker-btn-confirm {
+  background: #1e293b !important; /* 深灰色现代高质感背景代替蓝底 */
+  color: #ffffff !important;
+  border: none !important;
+  padding: 4px 15px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.month-picker-btn-confirm:hover {
+  background: #0f172a !important;
+}
+
+.month-picker-btn-confirm:active {
+  background: #000000 !important;
+}
+
 
