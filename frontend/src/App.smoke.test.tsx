@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 interface MockResponseInit {
@@ -716,6 +717,58 @@ describe("App smoke regression", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/employee/dashboard"));
   });
 
+  it("员工考勤数据查询页点击考勤天数会弹出原始刷卡记录", async () => {
+    window.history.replaceState({}, "", "/employee/dashboard");
+    fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "查询" }));
+
+    expect(await screen.findByRole("button", { name: "查看员工甲在 2026-05 的原始刷卡记录" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看员工甲在 2026-05 的原始刷卡记录" }));
+
+    expect(await screen.findByRole("heading", { name: "员工甲 2026-05 原始刷卡记录" })).toBeInTheDocument();
+    expect(await screen.findByText("08:00,17:30")).toBeInTheDocument();
+    expect(screen.getByText("部门")).toBeInTheDocument();
+    expect(screen.getByText("姓名")).toBeInTheDocument();
+    expect(screen.getByText("日期")).toBeInTheDocument();
+    expect(screen.getByText("原始打卡数据")).toBeInTheDocument();
+    expect(screen.queryByText("异常原因")).toBeNull();
+    expect(screen.queryByText("打卡次数")).toBeNull();
+    expect(screen.queryByText("实出勤小时")).toBeNull();
+    const dialog = screen.getByRole("dialog", { name: "查询详情" });
+    expect(within(dialog).getByRole("button", { name: "下载XLSX" })).toBeInTheDocument();
+  });
+
+  it("员工考勤数据查询页点击请假列会弹出对应请假明细", async () => {
+    window.history.replaceState({}, "", "/employee/dashboard");
+    fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "查询" }));
+
+    const leaveButtons = await screen.findAllByRole("button", { name: "查看员工甲在 2026-05 的病假明细" });
+    expect(leaveButtons.length).toBeGreaterThan(0);
+
+    fireEvent.click(leaveButtons[0]);
+
+    expect(await screen.findByRole("heading", { name: "员工甲 2026-05 病假明细" })).toBeInTheDocument();
+    expect(screen.getByText("请假类型")).toBeInTheDocument();
+    expect(screen.getByText("开始时间")).toBeInTheDocument();
+    expect(screen.getByText("结束时间")).toBeInTheDocument();
+    expect(screen.getByText("时长")).toBeInTheDocument();
+    expect(screen.getByText("事由")).toBeInTheDocument();
+    expect(screen.getByText("发烧")).toBeInTheDocument();
+    expect(screen.getByText("病假")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "查询详情" });
+    expect(within(dialog).getByRole("button", { name: "下载XLSX" })).toBeInTheDocument();
+  });
+
   it("员工异常查询页会严格复用员工考勤数据查询的筛选与结果结构", async () => {
     window.history.replaceState({}, "", "/employee/abnormal-query");
     fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
@@ -741,6 +794,31 @@ describe("App smoke regression", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/employee/abnormal-query"));
   });
 
+  it("员工异常查询页点击异常考勤次数会弹出异常打卡时间", async () => {
+    window.history.replaceState({}, "", "/employee/abnormal-query");
+    fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "查询" }));
+
+    expect(await screen.findByRole("button", { name: "查看员工甲在 2026-05 的异常打卡时间" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "查看员工甲在 2026-05 的异常打卡时间" }));
+
+    expect(await screen.findByRole("heading", { name: "员工甲 2026-05 异常打卡时间" })).toBeInTheDocument();
+    expect(screen.getByText("序号")).toBeInTheDocument();
+    expect(screen.getByText("部门")).toBeInTheDocument();
+    expect(screen.getByText("姓名")).toBeInTheDocument();
+    expect(screen.getByText("日期")).toBeInTheDocument();
+    expect(screen.getByText("原始打卡数据")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-03")).toBeInTheDocument();
+    expect(screen.getByText("08:01")).toBeInTheDocument();
+    expect(screen.queryByText("2026-05-04")).toBeNull();
+    expect(screen.queryByText("09:00,18:00")).toBeNull();
+  });
+
   it("员工打卡数据查询页会挂载统一双栏结构并保留打卡显示选项", async () => {
     window.history.replaceState({}, "", "/employee/punch-records");
     fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
@@ -757,7 +835,7 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByText("原始打卡数据")).toBeInTheDocument();
     expect(screen.getByText("异常原因")).toBeInTheDocument();
-    expect(screen.getByText("共 1 条记录")).toBeInTheDocument();
+    expect(screen.getByText("共 3 条记录")).toBeInTheDocument();
   });
 
   it("员工部门工时页会挂载统一双栏结构", async () => {
@@ -791,8 +869,50 @@ describe("App smoke regression", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
-    expect(await screen.findByText("管理人员姓名")).toBeInTheDocument();
+    expect(await screen.findByText("姓名")).toBeInTheDocument();
     expect(screen.getByText("共 1 条记录")).toBeInTheDocument();
+  });
+
+  it("管理人员考勤数据查询页点击关键字段会弹出对应明细", async () => {
+    window.history.replaceState({}, "", "/employee/manager-query");
+    fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "查询" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "查看经理甲在 2026-05 的出勤打卡明细" }));
+    expect(await screen.findByRole("heading", { name: "经理甲 2026-05 出勤打卡明细" })).toBeInTheDocument();
+    const attendanceDialog = screen.getByRole("dialog", { name: "查询详情" });
+    expect(within(attendanceDialog).getByText("部门")).toBeInTheDocument();
+    expect(within(attendanceDialog).getByText("姓名")).toBeInTheDocument();
+    expect(within(attendanceDialog).getByText("原始打卡数据")).toBeInTheDocument();
+    expect(within(attendanceDialog).getByText("08:00,12:00,13:00")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+
+    fireEvent.click((await screen.findAllByRole("button", { name: "查看经理甲在 2026-05 的请假明细" }))[0]);
+    expect(await screen.findByRole("heading", { name: "经理甲 2026-05 请假明细" })).toBeInTheDocument();
+    const leaveDialog = screen.getByRole("dialog", { name: "查询详情" });
+    expect(within(leaveDialog).getByText("请假类型")).toBeInTheDocument();
+    expect(within(leaveDialog).getByText("婚假")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "查看经理甲在 2026-05 的迟到明细" }));
+    expect(await screen.findByRole("heading", { name: "经理甲 2026-05 迟到明细" })).toBeInTheDocument();
+    const lateDialog = screen.getByRole("dialog", { name: "查询详情" });
+    expect(within(lateDialog).getByText("迟到分钟")).toBeInTheDocument();
+    expect(within(lateDialog).queryByText("早退分钟")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "查看经理甲在 2026-05 的福利天数说明" }));
+    expect(await screen.findByRole("heading", { name: "经理甲 2026-05 福利天数说明" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "查询详情" })).getByText((content) => content.includes("本月福利天数"))).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "查看经理甲在 2026-05 的加班变化说明" }));
+    expect(await screen.findByRole("heading", { name: "经理甲 2026-05 加班变化说明" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "查询详情" })).getByText((content) => content.includes("本月加班变化"))).toBeInTheDocument();
   });
 
   it("管理人员加班查询页会挂载统一双栏结构", async () => {
@@ -1179,6 +1299,14 @@ function mockEmployeeAppResponse(path: string): Promise<Response> {
               name: "员工甲",
               dept_id: 10,
               dept_name: "制造一部",
+              is_manager: false,
+            },
+            {
+              id: 3,
+              emp_no: "M001",
+              name: "经理甲",
+              dept_id: 10,
+              dept_name: "制造一部",
               is_manager: true,
             },
           ],
@@ -1221,8 +1349,8 @@ function mockEmployeeAppResponse(path: string): Promise<Response> {
     case "/api/query/employee-dashboard":
       return Promise.resolve(
         jsonResponse({
-          headers: ["人员编号", "人员名称", "考勤天数"],
-          rows: [["E001", "员工甲", "20"]],
+          headers: ["人员编号", "人员名称", "考勤天数", "病假（次数）", "病假时长（天）"],
+          rows: [["E001", "员工甲", "20", "1", "1"]],
         }),
       );
     case "/api/query/abnormal":
@@ -1253,6 +1381,48 @@ function mockEmployeeAppResponse(path: string): Promise<Response> {
             early_leave_minutes: 0,
             exception_reason: "",
           },
+          {
+            date: "2026-05-03",
+            emp_no: "E001",
+            name: "员工甲",
+            dept_name: "制造一部",
+            raw_punch_data: "08:01",
+            check_in_times: "08:01",
+            check_out_times: "",
+            punch_count: 1,
+            actual_hours: 0.5,
+            late_minutes: 1,
+            early_leave_minutes: 0,
+            exception_reason: "缺卡",
+          },
+          {
+            date: "2026-05-04",
+            emp_no: "E001",
+            name: "员工甲",
+            dept_name: "制造一部",
+            raw_punch_data: "09:00,18:00",
+            check_in_times: "",
+            check_out_times: "",
+            punch_count: 2,
+            actual_hours: 0,
+            late_minutes: 0,
+            early_leave_minutes: 0,
+            exception_reason: "缺卡",
+          },
+        ]),
+      );
+    case "/api/query/leave-records":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            dept_name: "制造一部",
+            name: "员工甲",
+            leave_type: "病假",
+            start_time: "2026-05-02 09:00",
+            end_time: "2026-05-03 09:00",
+            duration: 1,
+            reason: "发烧",
+          },
         ]),
       );
     case "/api/query/department-hours":
@@ -1267,9 +1437,36 @@ function mockEmployeeAppResponse(path: string): Promise<Response> {
     case "/api/query/manager-attendance":
       return Promise.resolve(
         jsonResponse({
-          headers: ["管理人员姓名", "部门", "实际出勤天数"],
-          rows: [["经理甲", "制造一部", "20"]],
+          headers: ["部   门", "姓名", "出勤天数", "实际出勤天数", "事/病假", "工伤", "出差", "婚假", "丧假", "迟到\\早退", "汇总", "福利天数", "加班变化", "备注"],
+          rows: [["制造一部", "经理甲", "20", "18", "0", "0", "0", "1", "0", "5", "5元", "1", "-0.5", "迟到"]],
         }),
+      );
+    case "/api/query/manager-punch-records":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            date: "2026-05-01",
+            dept_name: "制造一部",
+            name: "经理甲",
+            raw_punch_data: "08:00,12:00,13:00",
+            late_minutes: 5,
+            early_leave_minutes: 0,
+          },
+        ]),
+      );
+    case "/api/query/manager-leave-records":
+      return Promise.resolve(
+        jsonResponse([
+          {
+            dept_name: "制造一部",
+            name: "经理甲",
+            leave_type: "婚假",
+            start_time: "2026-05-02 09:00",
+            end_time: "2026-05-03 09:00",
+            duration: 1,
+            reason: "结婚",
+          },
+        ]),
       );
     case "/api/query/manager-overtime":
       return Promise.resolve(

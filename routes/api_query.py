@@ -16,15 +16,20 @@ from routes.query_core import (
     final_data_api,
     final_data_export_api,
     home_manager_summary_api,
+    leave_records_api,
+    leave_records_export_api,
     manager_annual_leave_query_api,
     manager_attendance_api,
     manager_attendance_export_api,
+    manager_leave_records_api,
     manager_attendance_template_export_api,
     manager_department_hours_api,
     manager_department_hours_export_api,
     manager_overtime_query_api,
+    manager_punch_records_api,
     punch_records_api,
     punch_records_export_api,
+    punch_records_modal_export_api,
     summary_download_export_api,
 )
 from utils.app_navigation import nav_payload
@@ -133,6 +138,24 @@ def punch_records_export():
     return punch_records_export_api()
 
 
+@api_query_bp.get("/punch-records/modal-export")
+@page_permission_required("punch_records")
+def punch_records_modal_export():
+    return punch_records_modal_export_api()
+
+
+@api_query_bp.get("/leave-records")
+@page_permission_required("employee_dashboard")
+def leave_records():
+    return leave_records_api()
+
+
+@api_query_bp.get("/leave-records/export")
+@page_permission_required("employee_dashboard")
+def leave_records_export():
+    return leave_records_export_api()
+
+
 @api_query_bp.get("/department-hours")
 @page_permission_required("department_hours_query")
 def department_hours():
@@ -161,6 +184,18 @@ def manager_attendance_export():
 @page_permission_required("manager_query")
 def manager_attendance_export_template():
     return manager_attendance_template_export_api()
+
+
+@api_query_bp.get("/manager-punch-records")
+@page_permission_required("manager_query")
+def manager_punch_records():
+    return manager_punch_records_api()
+
+
+@api_query_bp.get("/manager-leave-records")
+@page_permission_required("manager_query")
+def manager_leave_records():
+    return manager_leave_records_api()
 
 
 @api_query_bp.get("/manager-overtime")
