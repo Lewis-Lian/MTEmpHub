@@ -109,9 +109,11 @@ export default function QueryHomePage() {
   return (
     <div className="query-home-container">
       {/* 极光背景流动球 */}
-      <div className="qh-glow-sphere sphere-1" />
-      <div className="qh-glow-sphere sphere-2" />
-      <div className="qh-glow-sphere sphere-3" />
+      <div className="query-home-decoration-layer" aria-hidden="true">
+        <div className="qh-glow-sphere sphere-1" />
+        <div className="qh-glow-sphere sphere-2" />
+        <div className="qh-glow-sphere sphere-3" />
+      </div>
 
       {/* 仪表盘头部信息区 */}
       <header className="qh-dashboard-header">
