@@ -5202,18 +5202,24 @@ input[type="checkbox"] {
   border-bottom: 1px solid #cbd5e1 !important; /* 父容器底横线 */
   background-color: #f8fafc !important;
   background-image: none !important;
-  overflow: visible !important; /* 关键：允许子元素溢出以盖住底线 */
+  overflow: hidden !important;
   align-items: flex-end !important; /* 贴靠底部对齐，使页签底部直接接触底线 */
+  min-width: 0 !important;
 }
 
-/* 页签列表容器也允许溢出 */
 .app-tab-list {
-  overflow: visible !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  white-space: nowrap !important;
 }
 
 /* 右侧额外元素区保持垂直居中 */
 .app-tab-extra {
   align-self: center !important;
+  flex: 0 0 auto !important;
 }
 
 /* 去除上一版添加的占位伪元素以防线条多余 */
@@ -5232,6 +5238,8 @@ input[type="checkbox"] {
   position: relative !important;
   z-index: 1 !important;
   box-shadow: none !important;
+  flex: 0 0 auto !important;
+  max-width: min(240px, calc(100vw - 160px)) !important;
 }
 
 /* 修复未激活页签悬停（Hover）时因半透明背景导致底线穿透透出的视觉缺陷 */
@@ -5503,4 +5511,33 @@ input[type="checkbox"] {
   box-shadow: 0 2px 8px rgba(71, 85, 105, 0.2) !important;
 }
 
+/* ==========================================================================
+   全局查询按钮极光渐变流光与点击物理微动效
+   ========================================================================== */
+.query-filter-actions .btn-primary,
+.account-panel-selector .btn-primary,
+.summary-download-panel .legacy-btn-primary {
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%) !important;
+  background-size: 200% 100% !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+  transition: all 0.3s ease !important;
+}
+
+.query-filter-actions .btn-primary:hover:not(:disabled),
+.account-panel-selector .btn-primary:hover:not(:disabled),
+.summary-download-panel .legacy-btn-primary:hover:not(:disabled) {
+  background-position: right center !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35) !important;
+}
+
+.query-filter-actions .btn-primary:active:not(:disabled),
+.account-panel-selector .btn-primary:active:not(:disabled),
+.summary-download-panel .legacy-btn-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
+}
 

@@ -108,6 +108,14 @@ def build_attendance_record_view(record: DailyRecord, employee: Employee, contex
         return None
 
     payload = deepcopy(_payload_for_source(record, selected_source))
+    if isinstance(payload, dict):
+        if selected_source == ATTENDANCE_SOURCE_EMPLOYEE:
+            fallback_payload = record.manager_payload if isinstance(record.manager_payload, dict) else {}
+        else:
+            fallback_payload = record.employee_payload if isinstance(record.employee_payload, dict) else {}
+        fallback_raw = fallback_payload.get("raw_data") if isinstance(fallback_payload.get("raw_data"), dict) else {}
+        if fallback_raw:
+            payload.setdefault("fallback_raw_data", deepcopy(fallback_raw))
     if selected_source == ATTENDANCE_SOURCE_MANAGER:
         actual_hours = float((payload.get("actual_hours") if isinstance(payload, dict) else None) or record.actual_hours or 0)
         late_minutes = int((payload.get("late_minutes") if isinstance(payload, dict) else None) or record.late_minutes or 0)

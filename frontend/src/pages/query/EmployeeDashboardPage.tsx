@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { ApiError } from "../../api/client";
-import { buildDownloadUrl, fetchHeaderRows, fetchQueryBootstrap } from "../../api/query";
+import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap } from "../../api/query";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
@@ -8,6 +9,44 @@ import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
 import "./EmployeeDashboardPage.css";
+
+interface DashboardRowMeta {
+  employeeId: number | null;
+  employeeName: string;
+  month: string;
+}
+
+interface PunchRecordRow {
+  dept_name?: string;
+  name?: string;
+  date: string;
+  raw_punch_data?: string;
+}
+
+interface LeaveRecordRow {
+  dept_name?: string;
+  name?: string;
+  leave_type?: string;
+  start_time: string;
+  end_time: string;
+  duration?: number | string;
+  reason?: string;
+}
+
+const LEAVE_MODAL_HEADER_MAP: Record<string, string> = {
+  "病假（次数）": "病假",
+  "病假时长（天）": "病假",
+  "工伤（次数）": "工伤",
+  "工伤时长（天）": "工伤",
+  "丧假（次数）": "丧假",
+  "丧假时长（天）": "丧假",
+  "事假（次数）": "事假",
+  "事假时长（天）": "事假",
+  "补休（调休）(次)": "补休（调休）",
+  "补休（调休）(天)": "补休（调休）",
+  "婚假（次）": "婚假",
+  "婚假（天）": "婚假",
+};
 
 export default function EmployeeDashboardPage() {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
@@ -20,6 +59,7 @@ export default function EmployeeDashboardPage() {
   const [showLeaveDurations, setShowLeaveDurations] = useState(false);
   const [tableHeaders, setTableHeaders] = useState<string[]>(["暂无数据"]);
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
+  const [tableRowMeta, setTableRowMeta] = useState<DashboardRowMeta[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
 
   // 进度条控制状态
@@ -111,6 +151,11 @@ export default function EmployeeDashboardPage() {
   }
 
   async function handleQuery() {
+    if (!bootstrap) {
+      setError("员工考勤数据查询页基础数据尚未就绪");
+      return;
+    }
+
     setLoadingText("正在为您查询考勤数据...");
     setIsQuerying(true);
     setError("");
@@ -119,12 +164,14 @@ export default function EmployeeDashboardPage() {
       const payload = await fetchHeaderRows("/api/query/employee-dashboard", buildQuery());
       setTableHeaders(payload.headers.length ? payload.headers : ["暂无数据"]);
       setTableRows(payload.rows);
+      setTableRowMeta(buildDashboardRowMeta(payload.headers, payload.rows, bootstrap.employees, selectedMonth));
       setHasQueried(true);
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : "查询失败，请稍后重试");
       setHasQueried(false);
       setTableHeaders(["暂无数据"]);
       setTableRows([]);
+      setTableRowMeta([]);
     } finally {
       setIsQuerying(false);
     }
@@ -241,9 +288,266 @@ export default function EmployeeDashboardPage() {
           <div className="query-loading-text">{loadingText}</div>
         </div>
         <QueryResultPanel>
-          <QueryTable emptyText={queryTableEmptyText} headers={tableHeaders} rows={tableRows} />
+          <QueryTable
+            cellModal={{
+              getModal: ({ headerLabel, rowMeta }) => {
+                const meta = rowMeta as DashboardRowMeta | undefined;
+                if (!meta?.employeeId || !meta.month) {
+                  return null;
+                }
+                if (headerLabel === "考勤天数") {
+                  return {
+                    title: `${meta.employeeName} ${meta.month} 原始刷卡记录`,
+                    triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的原始刷卡记录`,
+                    loadContent: async () => {
+                      const query = new URLSearchParams();
+                      query.set("month", meta.month);
+                      query.append("emp_ids", String(meta.employeeId));
+                      const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
+                      return renderPunchRecordModal(rows, meta.employeeId, meta.month);
+                    },
+                  };
+                }
+
+                const leaveType = LEAVE_MODAL_HEADER_MAP[headerLabel];
+                if (!leaveType) {
+                  return null;
+                }
+                return {
+                  title: `${meta.employeeName} ${meta.month} ${leaveType}明细`,
+                  triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的${leaveType}明细`,
+                  loadContent: async () => {
+                    const query = new URLSearchParams();
+                    query.set("month", meta.month);
+                    query.set("leave_type", leaveType);
+                    query.append("emp_ids", String(meta.employeeId));
+                    const rows = await fetchObjectRows<LeaveRecordRow>("/api/query/leave-records", query);
+                    return renderLeaveRecordModal(rows, meta.employeeId, meta.month, leaveType);
+                  },
+                };
+              },
+            }}
+            emptyText={queryTableEmptyText}
+            headers={tableHeaders}
+            rowMeta={tableRowMeta}
+            rows={tableRows}
+          />
         </QueryResultPanel>
       </section>
+    </div>
+  );
+}
+
+function buildDashboardRowMeta(
+  headers: string[],
+  rows: Array<Array<string | number | null>>,
+  employees: QueryBootstrap["employees"],
+  month: string,
+): DashboardRowMeta[] {
+  const empNoIndex = headers.indexOf("人员编号");
+  const nameIndex = headers.indexOf("人员名称");
+  return rows.map((row) => {
+    const empNo = empNoIndex >= 0 ? String(row[empNoIndex] ?? "").trim() : "";
+    const employeeName = nameIndex >= 0 ? String(row[nameIndex] ?? "").trim() : "";
+    const employee = employees.find((item) => item.emp_no === empNo);
+    return {
+      employeeId: employee?.id ?? null,
+      employeeName: employeeName || employee?.name || empNo,
+      month,
+    };
+  });
+}
+
+function renderPunchRecordModal(rows: PunchRecordRow[], employeeId: number | null, month: string) {
+  if (!rows.length) {
+    return <p>当前月份暂无原始刷卡记录。</p>;
+  }
+
+  return <PunchRecordModalTable rows={rows} employeeId={employeeId} month={month} />;
+}
+
+function renderLeaveRecordModal(rows: LeaveRecordRow[], employeeId: number | null, month: string, leaveType: string) {
+  if (!rows.length) {
+    return <p>当前月份暂无{leaveType}明细。</p>;
+  }
+
+  return <LeaveRecordModalTable rows={rows} employeeId={employeeId} leaveType={leaveType} month={month} />;
+}
+
+function useDragScroll(containerRef: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) {
+      return undefined;
+    }
+    const activeContainer = container;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let scrollTop = 0;
+
+    function handleMouseDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase() ?? "";
+      if (["input", "select", "button", "a", "label", "textarea"].includes(tagName)) {
+        return;
+      }
+
+      isDragging = true;
+      startX = event.clientX;
+      startY = event.clientY;
+      scrollLeft = activeContainer.scrollLeft;
+      scrollTop = activeContainer.scrollTop;
+      activeContainer.classList.add("is-dragging");
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      if (!isDragging) {
+        return;
+      }
+
+      activeContainer.scrollLeft = scrollLeft - (event.clientX - startX);
+      activeContainer.scrollTop = scrollTop - (event.clientY - startY);
+    }
+
+    function handleMouseUp() {
+      if (!isDragging) {
+        return;
+      }
+
+      isDragging = false;
+      activeContainer.classList.remove("is-dragging");
+    }
+
+    activeContainer.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      activeContainer.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [containerRef]);
+}
+
+function PunchRecordModalTable({
+  rows,
+  employeeId,
+  month,
+}: {
+  rows: PunchRecordRow[];
+  employeeId: number | null;
+  month: string;
+}) {
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  useDragScroll(tableWrapRef);
+
+  function handleDownload() {
+    if (!employeeId || !month) {
+      return;
+    }
+    const query = new URLSearchParams();
+    query.set("month", month);
+    query.append("emp_ids", String(employeeId));
+    window.location.href = buildDownloadUrl("/api/query/punch-records/modal-export", query);
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <div className="query-filter-actions" style={{ justifyContent: "flex-start" }}>
+        <button className="btn btn-outline-success" onClick={handleDownload} type="button">
+          下载XLSX
+        </button>
+      </div>
+      <div className="legacy-table-wrap" ref={tableWrapRef} style={{ maxHeight: "60vh", overflow: "auto" }}>
+        <table className="legacy-table">
+          <thead>
+            <tr>
+              <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">日期</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">原始打卡数据</div></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.date}-${index}`}>
+                <td className="legacy-table-body-cell">{row.dept_name || ""}</td>
+                <td className="legacy-table-body-cell">{row.name || ""}</td>
+                <td className="legacy-table-body-cell">{row.date || ""}</td>
+                <td className="legacy-table-body-cell">{row.raw_punch_data || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function LeaveRecordModalTable({
+  rows,
+  employeeId,
+  leaveType,
+  month,
+}: {
+  rows: LeaveRecordRow[];
+  employeeId: number | null;
+  leaveType: string;
+  month: string;
+}) {
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+  useDragScroll(tableWrapRef);
+
+  function handleDownload() {
+    if (!employeeId || !month) {
+      return;
+    }
+    const query = new URLSearchParams();
+    query.set("month", month);
+    query.set("leave_type", leaveType);
+    query.append("emp_ids", String(employeeId));
+    window.location.href = buildDownloadUrl("/api/query/leave-records/export", query);
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 12 }}>
+      <div className="query-filter-actions" style={{ justifyContent: "flex-start" }}>
+        <button className="btn btn-outline-success" onClick={handleDownload} type="button">
+          下载XLSX
+        </button>
+      </div>
+      <div className="legacy-table-wrap" ref={tableWrapRef} style={{ maxHeight: "60vh", overflow: "auto" }}>
+        <table className="legacy-table">
+          <thead>
+            <tr>
+              <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">请假类型</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">开始时间</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">结束时间</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">时长</div></th>
+              <th className="legacy-table-head-cell"><div className="master-static-head">事由</div></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={`${row.start_time}-${row.end_time}-${index}`}>
+                <td className="legacy-table-body-cell">{row.dept_name || ""}</td>
+                <td className="legacy-table-body-cell">{row.name || ""}</td>
+                <td className="legacy-table-body-cell">{row.leave_type || leaveType}</td>
+                <td className="legacy-table-body-cell">{row.start_time || ""}</td>
+                <td className="legacy-table-body-cell">{row.end_time || ""}</td>
+                <td className="legacy-table-body-cell">{row.duration ?? 0}</td>
+                <td className="legacy-table-body-cell">{row.reason || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import tempfile
 import unittest
+from datetime import datetime
 from datetime import timedelta
+from datetime import date
 
 from flask import Flask
 
@@ -8,6 +10,8 @@ from models import db
 from models.account_set import AccountSet
 from models.department import Department
 from models.employee import Employee
+from models.daily_record import DailyRecord
+from models.leave import LeaveRecord
 from models.manager_month_stat import ManagerMonthStat
 from models.user import User, UserEmployeeAssignment
 from routes import register_routes
@@ -103,8 +107,13 @@ class ApiQueryTests(unittest.TestCase):
                 "/api/query/employee-dashboard",
                 "/api/query/abnormal",
                 "/api/query/punch-records",
+                "/api/query/punch-records/modal-export",
+                "/api/query/leave-records",
+                "/api/query/leave-records/export",
                 "/api/query/department-hours",
                 "/api/query/manager-attendance",
+                "/api/query/manager-punch-records",
+                "/api/query/manager-leave-records",
                 "/api/query/manager-overtime",
                 "/api/query/manager-annual-leave",
                 "/api/query/manager-department-hours",
@@ -215,6 +224,230 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual([row["name"] for row in annual_leave_payload["rows"]], ["经理甲"])
         self.assertEqual(overtime_payload["rows"][0]["remaining"], 0)
         self.assertEqual(annual_leave_payload["rows"][0]["remaining"], 0)
+
+    def test_manager_punch_records_returns_manager_attendance_rows(self) -> None:
+        with self.app.app_context():
+            manager = Employee.query.filter_by(emp_no="M001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=manager.id,
+                    record_date=date(2026, 5, 1),
+                    actual_hours=240,
+                    raw_data={
+                        "姓名": "经理甲",
+                        "上班1打卡时间": "08:00",
+                        "下班1打卡时间": "12:00",
+                        "上班2打卡时间": "13:00",
+                    },
+                    manager_payload={
+                        "actual_hours": 240,
+                        "late_minutes": 5,
+                        "early_leave_minutes": 0,
+                        "raw_data": {
+                            "姓名": "经理甲",
+                            "上班1打卡时间": "08:00",
+                            "下班1打卡时间": "12:00",
+                            "上班2打卡时间": "13:00",
+                        },
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get("/api/query/manager-punch-records?month=2026-05&emp_ids=3")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload[0]["name"], "经理甲")
+        self.assertEqual(payload[0]["raw_punch_data"], "08:00,12:00,13:00")
+        self.assertEqual(payload[0]["late_minutes"], 5)
+
+    def test_manager_leave_records_filters_manager_leave_bucket(self) -> None:
+        with self.app.app_context():
+            manager = Employee.query.filter_by(emp_no="M001").first()
+            db.session.add(
+                LeaveRecord(
+                    emp_id=manager.id,
+                    leave_no="ML001",
+                    leave_type="婚假",
+                    start_time=datetime(2026, 5, 2, 9, 0),
+                    end_time=datetime(2026, 5, 3, 9, 0),
+                    duration=1,
+                    reason="结婚",
+                )
+            )
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get("/api/query/manager-leave-records?month=2026-05&emp_ids=3&leave_bucket=marriage")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload[0]["name"], "经理甲")
+        self.assertEqual(payload[0]["leave_type"], "婚假")
+        self.assertEqual(payload[0]["reason"], "结婚")
+
+    def test_punch_records_modal_export_returns_requested_xlsx_columns(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=employee.id,
+                    record_date=date(2026, 5, 1),
+                    actual_hours=8,
+                    check_in_times=["08:00"],
+                    check_out_times=["17:30"],
+                    raw_data={"打卡记录": ["08:00", "17:30"]},
+                    employee_payload={
+                        "actual_hours": 8,
+                        "check_in_times": ["08:00"],
+                        "check_out_times": ["17:30"],
+                        "raw_data": {"打卡记录": ["08:00", "17:30"]},
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get("/api/query/punch-records/modal-export?month=2026-05&emp_ids=1")
+
+        self.assertEqual(response.status_code, 200)
+
+        import io
+        import openpyxl
+
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        ws = wb.active
+        rows = list(ws.values)
+
+        self.assertEqual(rows[0], ("部门", "姓名", "日期", "原始打卡数据"))
+        self.assertEqual(rows[1], ("制造一部", "员工甲", "2026-05-01", "08:00,17:30"))
+
+    def test_punch_records_api_falls_back_to_manager_slot_times_for_raw_punch_data(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=employee.id,
+                    record_date=date(2026, 5, 2),
+                    actual_hours=4,
+                    check_in_times=[],
+                    check_out_times=[],
+                    raw_data={
+                        "姓名": "员工甲",
+                        "上班1打卡时间": "06:33",
+                        "下班1打卡时间": "11:30",
+                        "上班2打卡时间": None,
+                        "下班2打卡时间": None,
+                    },
+                    employee_payload={
+                        "actual_hours": 0,
+                        "check_in_times": [],
+                        "check_out_times": [],
+                        "raw_data": {"刷卡时间数据": " "},
+                    },
+                    manager_payload={
+                        "actual_hours": 240,
+                        "late_minutes": 0,
+                        "early_leave_minutes": 0,
+                        "raw_data": {
+                            "姓名": "员工甲",
+                            "上班1打卡时间": "06:33",
+                            "下班1打卡时间": "11:30",
+                            "上班2打卡时间": None,
+                            "下班2打卡时间": None,
+                        },
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get("/api/query/punch-records?month=2026-05&emp_ids=1")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        target = next(row for row in payload if row["date"] == "2026-05-02")
+        self.assertEqual(target["raw_punch_data"], "06:33,11:30")
+
+    def test_leave_records_api_filters_details_by_leave_bucket(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add_all(
+                [
+                    LeaveRecord(
+                        emp_id=employee.id,
+                        leave_no="L001",
+                        leave_type="病假",
+                        start_time=datetime(2026, 5, 2, 9, 0),
+                        end_time=datetime(2026, 5, 3, 9, 0),
+                        duration=1,
+                        reason="发烧",
+                    ),
+                    LeaveRecord(
+                        emp_id=employee.id,
+                        leave_no="L002",
+                        leave_type="事假",
+                        start_time=datetime(2026, 5, 4, 9, 0),
+                        end_time=datetime(2026, 5, 5, 9, 0),
+                        duration=1,
+                        reason="家中有事",
+                    ),
+                ]
+            )
+            db.session.commit()
+
+        self._login("viewer", "viewer123")
+        response = self.client.get("/api/query/leave-records?month=2026-05&emp_ids=1&leave_type=病假")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(
+            payload,
+            [
+                {
+                    "dept_name": "制造一部",
+                    "name": "员工甲",
+                    "leave_type": "病假",
+                    "start_time": "2026-05-02 09:00",
+                    "end_time": "2026-05-03 09:00",
+                    "duration": 1.0,
+                    "reason": "发烧",
+                }
+            ],
+        )
+
+    def test_leave_records_export_returns_requested_xlsx_columns(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add(
+                LeaveRecord(
+                    emp_id=employee.id,
+                    leave_no="L003",
+                    leave_type="补休(调休)",
+                    start_time=datetime(2026, 5, 6, 9, 0),
+                    end_time=datetime(2026, 5, 7, 9, 0),
+                    duration=1,
+                    reason="调休",
+                )
+            )
+            db.session.commit()
+
+        self._login("viewer", "viewer123")
+        response = self.client.get("/api/query/leave-records/export?month=2026-05&emp_ids=1&leave_type=补休（调休）")
+
+        self.assertEqual(response.status_code, 200)
+
+        import io
+        import openpyxl
+
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        ws = wb.active
+        rows = list(ws.values)
+
+        self.assertEqual(rows[0], ("部门", "姓名", "请假类型", "开始时间", "结束时间", "时长", "事由"))
+        self.assertEqual(rows[1], ("制造一部", "员工甲", "补休（调休）", "2026-05-06 09:00", "2026-05-07 09:00", 1, "调休"))
 
 
 if __name__ == "__main__":

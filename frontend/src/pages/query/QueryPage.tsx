@@ -4,6 +4,7 @@ import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import type { QueryTableCellModalConfig } from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { AccountSet, HeaderRowsResponse, QueryBootstrap } from "../../types/query";
@@ -39,6 +40,8 @@ interface QueryPageProps {
   resolveColumns?: (state: QueryState) => QueryColumn[];
   transformHeaderRows?: (payload: HeaderRowsResponse, state: QueryState) => HeaderRowsResponse;
   transformObjectRows?: (rows: Record<string, unknown>[], state: QueryState) => Record<string, unknown>[];
+  buildHeaderRowMeta?: (payload: HeaderRowsResponse, state: QueryState, bootstrap: QueryBootstrap) => unknown[];
+  cellModal?: QueryTableCellModalConfig;
 }
 
 interface QueryState {
@@ -64,6 +67,8 @@ export default function QueryPage({
   resolveColumns,
   transformHeaderRows,
   transformObjectRows,
+  buildHeaderRowMeta,
+  cellModal,
 }: QueryPageProps) {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -77,6 +82,7 @@ export default function QueryPage({
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
   const [rawHeaderResult, setRawHeaderResult] = useState<HeaderRowsResponse | null>(null);
   const [rawObjectRows, setRawObjectRows] = useState<Record<string, unknown>[]>([]);
+  const [tableRowMeta, setTableRowMeta] = useState<unknown[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
 
   // 进度条控制状态
@@ -184,6 +190,11 @@ export default function QueryPage({
     const nextPayload = transformHeaderRows ? transformHeaderRows(payload, state) : payload;
     setTableHeaders(nextPayload.headers.length ? nextPayload.headers : ["暂无数据"]);
     setTableRows(Array.isArray(nextPayload.rows) ? nextPayload.rows : []);
+    if (buildHeaderRowMeta && bootstrap) {
+      setTableRowMeta(buildHeaderRowMeta(nextPayload, state, bootstrap));
+    } else {
+      setTableRowMeta([]);
+    }
   }
 
   function applyObjectResult(payload: Record<string, unknown>[], state: QueryState) {
@@ -198,6 +209,7 @@ export default function QueryPage({
         }),
       ),
     );
+    setTableRowMeta([]);
   }
 
   function buildQueryFromState(state: QueryState): URLSearchParams {
@@ -248,6 +260,7 @@ export default function QueryPage({
       setRawObjectRows([]);
       setTableHeaders(["暂无数据"]);
       setTableRows([]);
+      setTableRowMeta([]);
     } finally {
       setIsQuerying(false);
     }
@@ -398,7 +411,13 @@ export default function QueryPage({
           <div className="query-loading-text">{loadingText}</div>
         </div>
         <QueryResultPanel>
-          <QueryTable emptyText={queryTableEmptyText} headers={tableHeaders} rows={tableRows} />
+          <QueryTable
+            cellModal={cellModal}
+            emptyText={queryTableEmptyText}
+            headers={tableHeaders}
+            rowMeta={tableRowMeta}
+            rows={tableRows}
+          />
         </QueryResultPanel>
       </section>
     </div>
