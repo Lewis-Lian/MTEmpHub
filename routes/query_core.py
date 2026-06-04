@@ -592,6 +592,11 @@ def _calc_record_work_hours(record) -> tuple[float, int]:
             unmatched += 1
 
     unmatched += max(len(out_times) - len(used_out), 0)
+    if total_hours <= 0 and (record.actual_hours or 0) > 0:
+        source_hours = float(record.actual_hours or 0)
+        if getattr(record, "source", "") == "manager":
+            source_hours = source_hours / 60.0
+        return round(source_hours, 2), unmatched
     return round(total_hours, 2), unmatched
 
 
