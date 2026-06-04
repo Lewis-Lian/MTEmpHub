@@ -50,7 +50,15 @@
   background-size: 28px 28px;
   min-height: 100vh;
   position: relative;
+  overflow: visible;
+}
+
+.query-home-decoration-layer {
+  position: absolute;
+  inset: 0;
   overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* 极光背景流光球（在亮底上调低透明度，呈现水粉画般流体感） */

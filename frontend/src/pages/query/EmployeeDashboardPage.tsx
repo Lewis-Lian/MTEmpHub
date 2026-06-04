@@ -199,7 +199,7 @@ export default function EmployeeDashboardPage() {
   }
 
   return (
-    <div className="query-page-shell">
+    <div className="query-page-shell employee-dashboard-page">
       {/* 极光背景流动球 */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
@@ -457,7 +457,7 @@ function PunchRecordModalTable({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div className="query-filter-actions" style={{ justifyContent: "flex-start" }}>
+      <div className="dashboard-modal-actions query-filter-actions" style={{ justifyContent: "flex-start" }}>
         <button className="btn btn-outline-success" onClick={handleDownload} type="button">
           下载XLSX
         </button>
@@ -515,7 +515,7 @@ function LeaveRecordModalTable({
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
-      <div className="query-filter-actions" style={{ justifyContent: "flex-start" }}>
+      <div className="dashboard-modal-actions query-filter-actions" style={{ justifyContent: "flex-start" }}>
         <button className="btn btn-outline-success" onClick={handleDownload} type="button">
           下载XLSX
         </button>
