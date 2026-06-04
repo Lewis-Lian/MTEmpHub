@@ -122,4 +122,65 @@ describe("QueryTable", () => {
     expect(bodyRows[0]).toHaveTextContent("20");
     expect(bodyRows[2]).toHaveTextContent("8");
   });
+
+  it("支持点击指定单元格后以弹框展示异步加载内容", async () => {
+    render(
+      <QueryTable
+        headers={["工号", "考勤天数"]}
+        rows={[["E001", "20"]]}
+        rowMeta={[{ empId: 1 }]}
+        cellModal={{
+          getModal: ({ headerLabel, rowMeta }) => {
+            if (headerLabel !== "考勤天数") {
+              return null;
+            }
+            return {
+              title: `员工 ${String((rowMeta as { empId: number }).empId)} 原始刷卡记录`,
+              triggerLabel: "查看员工 1 的原始刷卡记录",
+              loadContent: async () => <div>08:00,17:30</div>,
+            };
+          },
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "查看员工 1 的原始刷卡记录" }));
+
+    expect(await screen.findByRole("heading", { name: "员工 1 原始刷卡记录" })).toBeInTheDocument();
+    expect(await screen.findByText("08:00,17:30")).toBeInTheDocument();
+  });
+
+  it("详情弹框会通过 portal 挂到 document.body，避免被表格容器裁切", async () => {
+    const originalNodeEnv = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
+    const originalWindowNodeEnv = (window as Window & { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
+    (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process = { env: { NODE_ENV: "development" } };
+    (window as Window & { process?: { env?: { NODE_ENV?: string } } }).process = { env: { NODE_ENV: "development" } };
+
+    render(
+      <QueryTable
+        headers={["工号", "考勤天数"]}
+        rows={[["E001", "20"]]}
+        rowMeta={[{ empId: 1 }]}
+        cellModal={{
+          getModal: ({ headerLabel }) =>
+            headerLabel === "考勤天数"
+              ? {
+                  title: "详情弹框",
+                  triggerLabel: "打开详情弹框",
+                  loadContent: async () => <div>详情内容</div>,
+                }
+              : null,
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "打开详情弹框" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "查询详情" });
+    expect(dialog.parentElement).toBe(document.body);
+    expect(await screen.findByText("详情内容")).toBeInTheDocument();
+
+    (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process = { env: { NODE_ENV: originalNodeEnv } };
+    (window as Window & { process?: { env?: { NODE_ENV?: string } } }).process = { env: { NODE_ENV: originalWindowNodeEnv } };
+  });
 });

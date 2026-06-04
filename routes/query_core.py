@@ -33,6 +33,7 @@ from services.attendance_source_service import (
 )
 from services.manager_attendance_service import (
     MANAGER_HEADERS,
+    _leave_bucket as _manager_leave_bucket,
     ManagerAttendanceOptions,
     build_manager_rows,
     manager_headers,
@@ -217,6 +218,12 @@ def _month_datetime_range(month: str) -> tuple[datetime, datetime] | None:
     return datetime.combine(start, time.min), datetime.combine(end, time.min)
 
 
+def _format_datetime_value(value: datetime | None) -> str:
+    if not value:
+        return ""
+    return value.strftime("%Y-%m-%d %H:%M")
+
+
 def _has_punch_record(record) -> bool:
     raw = record.raw_data or {}
     if not isinstance(raw, dict):
@@ -377,27 +384,63 @@ def _repair_mojibake(text: str) -> str:
         return text
 
 
-def _extract_raw_punch_data(record) -> str:
-    raw = record.raw_data or {}
+def _stringify_raw_punch_value(value: object) -> str:
+    if isinstance(value, list):
+        normalized = [str(item).strip() for item in value if str(item).strip()]
+        return ",".join(normalized)
+    return str(value).strip()
+
+
+def _extract_raw_punch_data_from_dict(raw: dict) -> str:
     if not isinstance(raw, dict):
-        raw = {}
-    if isinstance(raw.get("raw_data"), dict):
-        raw = raw.get("raw_data") or {}
+        return ""
 
     direct_keys = {"刷卡时间数据", "原始刷卡数据", "刷卡时间", "打卡记录"}
     for key in direct_keys:
         value = raw.get(key)
-        if value is not None and str(value).strip():
-            return str(value).strip()
+        if value is not None and _stringify_raw_punch_value(value):
+            return _stringify_raw_punch_value(value)
 
     for key, value in raw.items():
-        if value is None or not str(value).strip():
+        if value is None or not _stringify_raw_punch_value(value):
             continue
         repaired = _repair_mojibake(str(key))
         if ("刷卡" in repaired and "时间" in repaired) or ("打卡" in repaired and "记录" in repaired):
-            return str(value).strip()
+            return _stringify_raw_punch_value(value)
+
+    manager_time_keys = (
+        "上班1打卡时间",
+        "下班1打卡时间",
+        "上班2打卡时间",
+        "下班2打卡时间",
+        "上班3打卡时间",
+        "下班3打卡时间",
+        "上班4打卡时间",
+        "下班4打卡时间",
+    )
+    manager_times: list[str] = []
+    for key in manager_time_keys:
+        token = _normalize_punch_token(raw.get(key))
+        if token:
+            manager_times.append(token)
+    if manager_times:
+        return ",".join(manager_times)
 
     return ""
+
+
+def _extract_raw_punch_data(record) -> str:
+    raw = record.raw_data or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    fallback_raw = raw.get("fallback_raw_data") if isinstance(raw.get("fallback_raw_data"), dict) else {}
+    if isinstance(raw.get("raw_data"), dict):
+        raw = raw.get("raw_data") or {}
+
+    primary_value = _extract_raw_punch_data_from_dict(raw)
+    if primary_value:
+        return primary_value
+    return _extract_raw_punch_data_from_dict(fallback_raw)
 
 
 def _raw_punch_count(record) -> int:
@@ -860,6 +903,48 @@ def _build_abnormal_rows(month: str, emp_ids: list[int]) -> list[dict[str, objec
     return data
 
 
+def _build_leave_detail_rows(month: str, emp_ids: list[int], leave_type: str | None) -> list[dict[str, object]]:
+    employees = (
+        Employee.query.options(joinedload(Employee.department))
+        .filter(Employee.id.in_(emp_ids))
+        .order_by(Employee.emp_no.asc())
+        .all()
+    )
+    employee_by_id = {employee.id: employee for employee in employees}
+    datetime_range = _month_datetime_range(month)
+    if not datetime_range or not employees:
+        return []
+
+    start_dt, end_dt = datetime_range
+    normalized_target = _normalize_leave_type(leave_type)
+    rows: list[dict[str, object]] = []
+    leave_records = (
+        LeaveRecord.query.filter(LeaveRecord.emp_id.in_(emp_ids))
+        .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+        .order_by(LeaveRecord.start_time.asc(), LeaveRecord.id.asc())
+        .all()
+    )
+    for record in leave_records:
+        bucket = _leave_bucket(record.leave_type)
+        if normalized_target and bucket != normalized_target:
+            continue
+        employee = employee_by_id.get(record.emp_id)
+        if not employee:
+            continue
+        rows.append(
+            {
+                "dept_name": employee.department.dept_name if employee.department else "",
+                "name": employee.name,
+                "leave_type": bucket or _normalize_leave_type(record.leave_type),
+                "start_time": _format_datetime_value(record.start_time),
+                "end_time": _format_datetime_value(record.end_time),
+                "duration": round(_normalized_leave_days(_leave_days_in_month(record, month)), 2),
+                "reason": record.reason or "",
+            }
+        )
+    return rows
+
+
 def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[str, object]]:
     employees = (
         Employee.query.options(joinedload(Employee.department))
@@ -1233,6 +1318,183 @@ def punch_records_export_api():
         output,
         as_attachment=True,
         download_name=f"打卡数据查询_{month}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def punch_records_modal_export_api():
+    emp_ids = _pick_emp_ids()
+    if not emp_ids:
+        return jsonify({"error": "No employee assigned"}), 400
+
+    month = _resolve_query_month()
+    employees = (
+        Employee.query.options(joinedload(Employee.department))
+        .filter(Employee.id.in_(emp_ids))
+        .order_by(Employee.emp_no.asc())
+        .all()
+    )
+    rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "原始刷卡记录"
+    ws.append(["部门", "姓名", "日期", "原始打卡数据"])
+
+    for employee in employees:
+        for row in rows_by_emp.get(employee.id, []):
+            ws.append(
+                [
+                    employee.department.dept_name if employee.department else "",
+                    employee.name,
+                    row.record_date.isoformat() if row.record_date else "",
+                    _extract_raw_punch_data(row),
+                ]
+            )
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"原始刷卡记录_{month}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
+def manager_punch_records_api():
+    emp_ids = _accessible_manager_emp_ids()
+    requested_ids = _requested_emp_ids()
+    if requested_ids:
+        allowed = set(emp_ids)
+        emp_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
+    if not emp_ids:
+        return jsonify([])
+
+    month = _resolve_query_month()
+    employees = (
+        Employee.query.options(joinedload(Employee.department))
+        .filter(Employee.id.in_(emp_ids))
+        .order_by(Employee.emp_no.asc())
+        .all()
+    )
+    rows = []
+    rows_by_emp = attendance_views_by_employee(month, employees, MANAGER_STATS_CONTEXT)
+    for employee in employees:
+        rows.extend(rows_by_emp.get(employee.id, []))
+    rows.sort(key=lambda row: ((row.employee.emp_no if row.employee else ""), row.record_date or date.min), reverse=True)
+
+    return jsonify(
+        [
+            {
+                "date": r.record_date.isoformat() if r.record_date else "",
+                "name": r.employee.name if r.employee else "",
+                "dept_name": r.employee.department.dept_name if r.employee and r.employee.department else "",
+                "raw_punch_data": _extract_raw_punch_data(r),
+                "late_minutes": r.late_minutes or 0,
+                "early_leave_minutes": r.early_leave_minutes or 0,
+            }
+            for r in rows
+        ]
+    )
+
+
+def leave_records_api():
+    emp_ids = _pick_emp_ids()
+    if not emp_ids:
+        return jsonify({"error": "No employee assigned"}), 400
+
+    month = _resolve_query_month()
+    leave_type = request.args.get("leave_type")
+    return jsonify(_build_leave_detail_rows(month, emp_ids, leave_type))
+
+
+def manager_leave_records_api():
+    emp_ids = _accessible_manager_emp_ids()
+    requested_ids = _requested_emp_ids()
+    if requested_ids:
+        allowed = set(emp_ids)
+        emp_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
+    if not emp_ids:
+        return jsonify([])
+
+    month = _resolve_query_month()
+    leave_bucket = request.args.get("leave_bucket")
+    employees = (
+        Employee.query.options(joinedload(Employee.department))
+        .filter(Employee.id.in_(emp_ids))
+        .order_by(Employee.emp_no.asc())
+        .all()
+    )
+    employee_by_id = {employee.id: employee for employee in employees}
+    datetime_range = _month_datetime_range(month)
+    if not datetime_range:
+        return jsonify([])
+
+    start_dt, end_dt = datetime_range
+    rows = []
+    leave_records = (
+        LeaveRecord.query.filter(LeaveRecord.emp_id.in_(emp_ids))
+        .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+        .order_by(LeaveRecord.start_time.asc(), LeaveRecord.id.asc())
+        .all()
+    )
+    for record in leave_records:
+        bucket = _manager_leave_bucket(record.leave_type)
+        if leave_bucket and bucket != leave_bucket:
+            continue
+        employee = employee_by_id.get(record.emp_id)
+        if not employee:
+            continue
+        rows.append(
+            {
+                "dept_name": employee.department.dept_name if employee.department else "",
+                "name": employee.name,
+                "leave_type": _normalize_leave_type(record.leave_type),
+                "start_time": _format_datetime_value(record.start_time),
+                "end_time": _format_datetime_value(record.end_time),
+                "duration": round(normalize_days(_leave_days_in_month(record, month)), 2),
+                "reason": record.reason or "",
+            }
+        )
+    return jsonify(rows)
+
+
+def leave_records_export_api():
+    emp_ids = _pick_emp_ids()
+    if not emp_ids:
+        return jsonify({"error": "No employee assigned"}), 400
+
+    month = _resolve_query_month()
+    leave_type = request.args.get("leave_type")
+    rows = _build_leave_detail_rows(month, emp_ids, leave_type)
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "请假明细"
+    ws.append(["部门", "姓名", "请假类型", "开始时间", "结束时间", "时长", "事由"])
+    for row in rows:
+        ws.append(
+            [
+                row["dept_name"],
+                row["name"],
+                row["leave_type"],
+                row["start_time"],
+                row["end_time"],
+                row["duration"],
+                row["reason"],
+            ]
+        )
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    export_name = _normalize_leave_type(leave_type) or "请假"
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"{export_name}明细_{month}.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 

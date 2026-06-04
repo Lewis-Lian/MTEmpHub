@@ -264,16 +264,23 @@
 }
 
 .query-page-shell .query-filter-actions .btn-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%) !important;
+  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%) !important;
+  background-size: 200% 100% !important;
   color: #ffffff !important;
   box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+  transition: all 0.3s ease !important;
 }
 
 .query-page-shell .query-filter-actions .btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%) !important;
+  background-position: right center !important;
   color: #ffffff !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 6px 16px rgba(2, 132, 199, 0.3) !important;
+  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35) !important;
+}
+
+.query-page-shell .query-filter-actions .btn-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
 }
 
 .query-page-shell .query-filter-actions .btn-outline-success {
@@ -294,6 +301,45 @@
 }
 
 .query-page-shell .query-filter-actions .btn-outline-success:active:not(:disabled) {
+  transform: translateY(0px) scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
+}
+
+.master-modal .query-filter-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.master-modal .query-filter-actions .btn {
+  height: 38px !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  transition: var(--qh-transition) !important;
+  cursor: pointer;
+  width: auto !important;
+  flex: 0 0 auto !important;
+}
+
+.master-modal .query-filter-actions .btn-outline-success {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18) !important;
+  transition: all 0.3s ease !important;
+}
+
+.master-modal .query-filter-actions .btn-outline-success:hover:not(:disabled) {
+  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%) !important;
+  background-size: 200% 100% !important;
+  background-position: right center !important;
+  color: #ffffff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
+}
+
+.master-modal .query-filter-actions .btn-outline-success:active:not(:disabled) {
   transform: translateY(0px) scale(0.96) !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
 }

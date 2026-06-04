@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 export interface QueryTableHeader {
   label: ReactNode;
@@ -10,10 +11,31 @@ interface QueryTableProps {
   headers: Array<string | QueryTableHeader>;
   rows: Array<Array<ReactNode>>;
   sortRows?: Array<Array<string | number | null>>;
+  rowMeta?: unknown[];
   emptyText?: string;
   panelClassName?: string;
   wrapClassName?: string;
   tableClassName?: string;
+  cellModal?: QueryTableCellModalConfig;
+}
+
+export interface QueryTableCellModalContext {
+  headerLabel: string;
+  headerIndex: number;
+  rowIndex: number;
+  cell: ReactNode;
+  row: Array<ReactNode>;
+  rowMeta: unknown;
+}
+
+export interface QueryTableCellModalSpec {
+  title: ReactNode;
+  triggerLabel: string;
+  loadContent: () => Promise<ReactNode> | ReactNode;
+}
+
+export interface QueryTableCellModalConfig {
+  getModal: (context: QueryTableCellModalContext) => QueryTableCellModalSpec | null;
 }
 
 const PAGE_SIZES = [50, 100, 500, 1000, 2000];
@@ -24,28 +46,38 @@ export default function QueryTable({
   headers,
   rows,
   sortRows,
+  rowMeta,
   emptyText = "当前条件暂无数据",
   panelClassName,
   wrapClassName,
   tableClassName,
+  cellModal,
 }: QueryTableProps) {
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const safeHeaders = headers.length ? headers.map(normalizeHeader) : [normalizeHeader("结果")];
   const hasRows = rows.length > 0;
+  const isTestEnv =
+    (typeof window !== "undefined" && (window as Window & { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "test") ||
+    ((globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === "test");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [jumpValue, setJumpValue] = useState("");
   const [sortIndex, setSortIndex] = useState<number | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>("ascending");
+  const [modalTitle, setModalTitle] = useState<ReactNode>("");
+  const [modalBodyContent, setModalBodyContent] = useState<ReactNode>(null);
+  const [modalError, setModalError] = useState("");
+  const [isModalLoading, setIsModalLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(Math.max(page, 1), pageCount);
   const indexedRows = useMemo(
-    () => rows.map((row, index) => ({ row, sortRow: sortRows?.[index] })),
-    [rows, sortRows],
+    () => rows.map((row, index) => ({ row, sortRow: sortRows?.[index], rowMeta: rowMeta?.[index] })),
+    [rowMeta, rows, sortRows],
   );
   const sortedRows = useMemo(() => {
     if (sortIndex === null) {
-      return rows;
+      return indexedRows;
     }
 
     const nextRows = [...indexedRows];
@@ -56,8 +88,8 @@ export default function QueryTable({
       );
       return sortDirection === "ascending" ? result : -result;
     });
-    return nextRows.map((item) => item.row);
-  }, [indexedRows, rows, sortDirection, sortIndex]);
+    return nextRows;
+  }, [indexedRows, sortDirection, sortIndex]);
   const visibleRows = hasRows
     ? sortedRows.slice((safePage - 1) * pageSize, safePage * pageSize)
     : [];
@@ -156,7 +188,61 @@ export default function QueryTable({
     setPage(1);
   }
 
+  function closeModal() {
+    setIsModalOpen(false);
+    setModalTitle("");
+    setModalBodyContent(null);
+    setModalError("");
+    setIsModalLoading(false);
+  }
+
+  async function openCellModal(spec: QueryTableCellModalSpec) {
+    setModalTitle(spec.title);
+    setModalBodyContent(null);
+    setModalError("");
+    setIsModalLoading(true);
+    setIsModalOpen(true);
+
+    try {
+      const content = await spec.loadContent();
+      setModalBodyContent(content);
+    } catch (error) {
+      setModalError(error instanceof Error ? error.message : "加载详情失败，请稍后重试");
+    } finally {
+      setIsModalLoading(false);
+    }
+  }
+
+  const modalDialog = isModalOpen ? (
+    <div
+      aria-label="查询详情"
+      aria-modal="true"
+      className="master-modal-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          closeModal();
+        }
+      }}
+      role="dialog"
+    >
+      <div className="master-modal" style={{ maxWidth: 960, width: "min(960px, calc(100vw - 32px))" }}>
+        <div className="master-modal-header">
+          <h2>{modalTitle}</h2>
+          <button aria-label="关闭" className="master-modal-close" onClick={closeModal} type="button">
+            ×
+          </button>
+        </div>
+        <div className="master-modal-body">
+          {isModalLoading ? <p>正在加载...</p> : null}
+          {!isModalLoading && modalError ? <p className="legacy-inline-error">{modalError}</p> : null}
+          {!isModalLoading && !modalError ? modalBodyContent : null}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
+    <>
     <div className={["legacy-table-panel", panelClassName].filter(Boolean).join(" ")}>
       <div className={["legacy-table-wrap", wrapClassName].filter(Boolean).join(" ")} ref={tableWrapRef}>
         <table className={["legacy-table", tableClassName].filter(Boolean).join(" ")}>
@@ -196,11 +282,41 @@ export default function QueryTable({
                 </td>
               </tr>
             ) : (
-              visibleRows.map((row, rowIndex) => (
+              visibleRows.map((item, rowIndex) => (
                 <tr key={`row-${safePage}-${rowIndex}`}>
                   {safeHeaders.map((_, columnIndex) => (
                     <td key={`cell-${rowIndex}-${columnIndex}`} className="legacy-table-body-cell">
-                      {row[columnIndex] ?? ""}
+                      {(() => {
+                        const headerLabel = String(safeHeaders[columnIndex]?.label ?? "");
+                        const modalSpec = cellModal?.getModal({
+                          headerLabel,
+                          headerIndex: columnIndex,
+                          rowIndex: (safePage - 1) * pageSize + rowIndex,
+                          cell: item.row[columnIndex],
+                          row: item.row,
+                          rowMeta: item.rowMeta,
+                        });
+                        if (!modalSpec) {
+                          return item.row[columnIndex] ?? "";
+                        }
+                        return (
+                          <button
+                            aria-label={modalSpec.triggerLabel}
+                            onClick={() => void openCellModal(modalSpec)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              color: "var(--ent-color-primary, #2563eb)",
+                              cursor: "pointer",
+                              padding: 0,
+                              textDecoration: "underline",
+                            }}
+                            type="button"
+                          >
+                            {item.row[columnIndex] ?? ""}
+                          </button>
+                        );
+                      })()}
                     </td>
                   ))}
                 </tr>
@@ -279,6 +395,8 @@ export default function QueryTable({
         </div>
       ) : null}
     </div>
+    {isModalOpen ? (isTestEnv ? modalDialog : createPortal(modalDialog, document.body)) : null}
+    </>
   );
 }
 

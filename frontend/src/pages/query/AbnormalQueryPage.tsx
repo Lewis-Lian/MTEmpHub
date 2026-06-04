@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchObjectRows, fetchQueryBootstrap } from "../../api/query";
 import EmployeePicker from "../../components/query/EmployeePicker";
@@ -15,6 +15,21 @@ interface AbnormalQueryRow {
   abnormal_count: number;
 }
 
+interface AbnormalRowMeta {
+  employeeId: number | null;
+  employeeName: string;
+  month: string;
+}
+
+interface PunchRecordRow {
+  dept_name?: string;
+  name?: string;
+  date: string;
+  raw_punch_data?: string;
+  punch_count?: number | string;
+  exception_reason?: string;
+}
+
 export default function AbnormalQueryPage() {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -26,6 +41,7 @@ export default function AbnormalQueryPage() {
   const [rawRows, setRawRows] = useState<AbnormalQueryRow[]>([]);
   const [tableHeaders, setTableHeaders] = useState<string[]>(["暂无数据"]);
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
+  const [tableRowMeta, setTableRowMeta] = useState<AbnormalRowMeta[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
 
   // 进度条控制状态
@@ -130,6 +146,11 @@ export default function AbnormalQueryPage() {
   }, [hasQueried, rawRows, showEmpNo]);
 
   async function handleQuery() {
+    if (!bootstrap) {
+      setError("员工异常查询页基础数据尚未就绪");
+      return;
+    }
+
     setLoadingText("正在为您查询考勤数据...");
     setIsQuerying(true);
     setError("");
@@ -140,6 +161,7 @@ export default function AbnormalQueryPage() {
       const nextTable = buildTablePayload(payload);
       setTableHeaders(nextTable.headers);
       setTableRows(nextTable.rows);
+      setTableRowMeta(buildAbnormalRowMeta(payload, bootstrap.employees, selectedMonth));
       setHasQueried(true);
     } catch (caughtError) {
       setError(caughtError instanceof ApiError ? caughtError.message : "查询失败，请稍后重试");
@@ -147,6 +169,7 @@ export default function AbnormalQueryPage() {
       setHasQueried(false);
       setTableHeaders(["暂无数据"]);
       setTableRows([]);
+      setTableRowMeta([]);
     } finally {
       setIsQuerying(false);
     }
@@ -258,9 +281,148 @@ export default function AbnormalQueryPage() {
           <div className="query-loading-text">{loadingText}</div>
         </div>
         <QueryResultPanel>
-          <QueryTable emptyText={queryTableEmptyText} headers={tableHeaders} rows={tableRows} />
+          <QueryTable
+            cellModal={{
+              getModal: ({ headerLabel, rowMeta }) => {
+                const meta = rowMeta as AbnormalRowMeta | undefined;
+                if (headerLabel !== "异常考勤次数" || !meta?.employeeId || !meta.month) {
+                  return null;
+                }
+                return {
+                  title: `${meta.employeeName} ${meta.month} 异常打卡时间`,
+                  triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的异常打卡时间`,
+                  loadContent: async () => {
+                    const query = new URLSearchParams();
+                    query.set("month", meta.month);
+                    query.append("emp_ids", String(meta.employeeId));
+                    const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
+                    return renderAbnormalPunchModal(rows);
+                  },
+                };
+              },
+            }}
+            emptyText={queryTableEmptyText}
+            headers={tableHeaders}
+            rowMeta={tableRowMeta}
+            rows={tableRows}
+          />
         </QueryResultPanel>
       </section>
+    </div>
+  );
+}
+
+function buildAbnormalRowMeta(rows: AbnormalQueryRow[], employees: QueryBootstrap["employees"], month: string): AbnormalRowMeta[] {
+  return rows.map((row) => {
+    const employee = employees.find((item) => item.emp_no === row.emp_no);
+    return {
+      employeeId: employee?.id ?? null,
+      employeeName: row.name || employee?.name || row.emp_no,
+      month,
+    };
+  });
+}
+
+function renderAbnormalPunchModal(rows: PunchRecordRow[]) {
+  const abnormalRows = rows.filter((row) => {
+    const punchCount = Number(row.punch_count ?? 0);
+    if (punchCount !== 1 && punchCount !== 3) {
+      return false;
+    }
+    return Boolean(String(row.raw_punch_data || "").trim());
+  });
+
+  if (!abnormalRows.length) {
+    return <p>当前月份暂无异常打卡记录。</p>;
+  }
+
+  return <AbnormalPunchModalTable rows={abnormalRows} />;
+}
+
+function AbnormalPunchModalTable({ rows }: { rows: PunchRecordRow[] }) {
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = tableWrapRef.current;
+    if (!container) {
+      return undefined;
+    }
+    const activeContainer = container;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let scrollTop = 0;
+
+    function handleMouseDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase() ?? "";
+      if (["input", "select", "button", "a", "label", "textarea"].includes(tagName)) {
+        return;
+      }
+
+      isDragging = true;
+      startX = event.clientX;
+      startY = event.clientY;
+      scrollLeft = activeContainer.scrollLeft;
+      scrollTop = activeContainer.scrollTop;
+      activeContainer.classList.add("is-dragging");
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      if (!isDragging) {
+        return;
+      }
+
+      activeContainer.scrollLeft = scrollLeft - (event.clientX - startX);
+      activeContainer.scrollTop = scrollTop - (event.clientY - startY);
+    }
+
+    function handleMouseUp() {
+      if (!isDragging) {
+        return;
+      }
+
+      isDragging = false;
+      activeContainer.classList.remove("is-dragging");
+    }
+
+    activeContainer.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      activeContainer.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
+  return (
+    <div className="legacy-table-wrap" ref={tableWrapRef} style={{ maxHeight: "60vh", overflow: "auto" }}>
+      <table className="legacy-table">
+        <thead>
+          <tr>
+            <th className="legacy-table-head-cell"><div className="master-static-head">序号</div></th>
+            <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
+            <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
+            <th className="legacy-table-head-cell"><div className="master-static-head">日期</div></th>
+            <th className="legacy-table-head-cell"><div className="master-static-head">原始打卡数据</div></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row.date}-${index}`}>
+              <td className="legacy-table-body-cell">{index + 1}</td>
+              <td className="legacy-table-body-cell">{row.dept_name || ""}</td>
+              <td className="legacy-table-body-cell">{row.name || ""}</td>
+              <td className="legacy-table-body-cell">{row.date || ""}</td>
+              <td className="legacy-table-body-cell">{row.raw_punch_data || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
