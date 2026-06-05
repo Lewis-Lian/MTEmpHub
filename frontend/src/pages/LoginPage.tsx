@@ -4,12 +4,14 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { login, type AuthUser } from "../api/auth";
 import AnimatedCharacters from "../components/AnimatedCharacters";
+import { triggerNotification } from "../components/feedback/Notification";
 
 interface LoginPageProps {
   onLogin: (user: AuthUser) => void;
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
+
   const location = useLocation();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
@@ -36,11 +38,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       onLogin(user);
       navigate(redirectTo ?? defaultLandingPath(user), { replace: true });
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : "登录失败，请稍后重试");
+      const errMsg = caughtError instanceof ApiError ? caughtError.message : "登录失败，请稍后重试";
+      setError(errMsg);
+      triggerNotification(errMsg, "error");
     } finally {
       setIsSubmitting(false);
     }
   }
+
 
   return (
     <div className="login-page">

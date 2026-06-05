@@ -4,6 +4,10 @@ import { createAdminShift, deleteAdminShift, fetchAdminShifts, updateAdminShift 
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminShift } from "../../types/admin";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
+import { useNotification } from "../../components/feedback/Notification";
+
+
 
 type ShiftFormState = {
   shift_no: string;
@@ -64,32 +68,30 @@ function shiftToForm(shift: AdminShift): ShiftFormState {
 }
 
 export default function ShiftsPage() {
+  const confirm = useConfirm();
+  const notification = useNotification();
   const [rows, setRows] = useState<AdminShift[]>([]);
   const [form, setForm] = useState<ShiftFormState>(emptyShiftForm);
   const [editing, setEditing] = useState<AdminShift | null>(null);
   const [editForm, setEditForm] = useState<ShiftFormState>(emptyShiftForm);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | null>(null);
 
   const handleCloseModal = () => {
     setShowModal(null);
-    setMessage("");
-    setError("");
   };
 
   async function loadRows() {
     setLoading(true);
-    setError("");
     try {
       setRows(await fetchAdminShifts());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "班次列表加载失败");
+      notification.error(err instanceof Error ? err.message : "班次列表加载失败");
     } finally {
       setLoading(false);
     }
   }
+
 
   useEffect(() => {
     void loadRows();
@@ -120,8 +122,6 @@ export default function ShiftsPage() {
 
   async function submitCreate(event: FormEvent) {
     event.preventDefault();
-    setMessage("");
-    setError("");
     try {
       const timeSlots = validateShiftSlots(form.time_slots);
       await createAdminShift({
@@ -129,10 +129,10 @@ export default function ShiftsPage() {
         time_slots: timeSlots,
       });
       setForm(emptyShiftForm);
-      setMessage("班次已创建");
+      notification.success(`班次 ${form.shift_name} 已创建`);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建班次失败");
+      notification.error(err instanceof Error ? err.message : "创建班次失败");
     }
   }
 
@@ -141,8 +141,6 @@ export default function ShiftsPage() {
     if (!editing) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       const timeSlots = validateShiftSlots(editForm.time_slots);
       await updateAdminShift(editing.id, {
@@ -150,27 +148,31 @@ export default function ShiftsPage() {
         time_slots: timeSlots,
       });
       setEditing(null);
-      setMessage("班次已保存");
+      notification.success(`班次 ${editForm.shift_name} 已保存`);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存班次失败");
+      notification.error(err instanceof Error ? err.message : "保存班次失败");
     }
   }
 
   async function removeShift(row: AdminShift) {
-    if (!window.confirm(`确定删除班次 ${row.shift_no} - ${row.shift_name}？`)) {
+    const isConfirmed = await confirm({
+      message: `确定删除班次 ${row.shift_no} - ${row.shift_name}？`,
+      type: "danger",
+    });
+    if (!isConfirmed) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await deleteAdminShift(row.id);
-      setMessage("班次已删除");
+      notification.success(`班次 ${row.shift_name} 已删除`);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除班次失败");
+      notification.error(err instanceof Error ? err.message : "删除班次失败");
     }
   }
+
+
 
   function openEdit(row: AdminShift) {
     setEditing(row);
@@ -383,8 +385,6 @@ export default function ShiftsPage() {
               创建班次
             </button>
           </form>
-          {message ? <div className="account-result-message" style={{ marginTop: "12px" }}>{message}</div> : null}
-          {error ? <div className="legacy-inline-error" style={{ marginTop: "12px" }}>{error}</div> : null}
         </div>
       </div>
 

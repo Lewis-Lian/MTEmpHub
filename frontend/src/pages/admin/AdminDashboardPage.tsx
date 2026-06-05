@@ -19,6 +19,8 @@ import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminAccountSet, AdminAccountSetFactoryRestEntry, AdminAccountSetImport } from "../../types/admin";
 import MonthPicker from "../../components/common/MonthPicker";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
+import { useNotification } from "../../components/feedback/Notification";
 
 const FILE_INPUT_LABELS = [
   "1. 请假单",
@@ -32,7 +34,10 @@ const FILE_INPUT_LABELS = [
 type FactoryRestPeriod = "none" | "full" | "am" | "pm";
 
 export default function AdminDashboardPage() {
+  const confirm = useConfirm();
+  const notification = useNotification();
   const [accountSets, setAccountSets] = useState<AdminAccountSet[]>([]);
+
   const [imports, setImports] = useState<AdminAccountSetImport[]>([]);
   const [selectedAccountSetId, setSelectedAccountSetId] = useState<number | null>(null);
   const [createMonth, setCreateMonth] = useState("");
@@ -44,7 +49,6 @@ export default function AdminDashboardPage() {
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
-  const [resultMessage, setResultMessage] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isWorking, setIsWorking] = useState(false);
@@ -52,8 +56,6 @@ export default function AdminDashboardPage() {
 
   const handleCloseModal = () => {
     setShowModal(null);
-    setResultMessage("");
-    setError("");
     setUploadFiles(Array.from({ length: 6 }, () => null));
     setDragOverIndex(Array.from({ length: 6 }, () => false));
     setProgressVisible(false);
@@ -103,7 +105,6 @@ export default function AdminDashboardPage() {
         setAccountSets(rows);
         const preferredAccountSet = rows.find((row) => row.is_active) ?? rows[0] ?? null;
         setSelectedAccountSetId(preferredAccountSet?.id ?? null);
-        setResultMessage("");
         setError("");
       } catch (caughtError) {
         if (!mounted) {
@@ -156,7 +157,7 @@ export default function AdminDashboardPage() {
         if (!mounted) {
           return;
         }
-        setError(caughtError instanceof ApiError ? caughtError.message : "账套导入记录加载失败");
+        notification.error(caughtError instanceof ApiError ? caughtError.message : "账套导入记录加载失败");
       }
     }
 
@@ -180,11 +181,10 @@ export default function AdminDashboardPage() {
 
   async function runAction(action: () => Promise<void>) {
     setIsWorking(true);
-    setError("");
     try {
       await action();
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : "操作失败，请稍后重试");
+      notification.error(caughtError instanceof ApiError ? caughtError.message : "操作失败，请稍后重试");
     } finally {
       setIsWorking(false);
     }
@@ -301,10 +301,10 @@ export default function AdminDashboardPage() {
                   setProgress(100);
                   setLoadingText("员工考勤结算成功！");
                   await reloadAccountSets(selectedAccountSet.id);
-                  setResultMessage("员工计算成功");
+                  notification.success("员工计算成功");
                 } catch (caughtError) {
                   clearInterval(interval);
-                  setError(caughtError instanceof ApiError ? caughtError.message : "员工考勤结算失败");
+                  notification.error(caughtError instanceof ApiError ? caughtError.message : "员工考勤结算失败");
                 } finally {
                   setTimeout(() => {
                     setProgressVisible(false);
@@ -347,10 +347,10 @@ export default function AdminDashboardPage() {
                   setProgress(100);
                   setLoadingText("管理人员考勤计算成功！");
                   await reloadAccountSets(selectedAccountSet.id);
-                  setResultMessage("管理人员计算成功");
+                  notification.success("管理人员计算成功");
                 } catch (caughtError) {
                   clearInterval(interval);
-                  setError(caughtError instanceof ApiError ? caughtError.message : "管理人员考勤计算失败");
+                  notification.error(caughtError instanceof ApiError ? caughtError.message : "管理人员考勤计算失败");
                 } finally {
                   setTimeout(() => {
                     setProgressVisible(false);
@@ -530,7 +530,7 @@ export default function AdminDashboardPage() {
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (!createMonth) {
-                          setError("请选择账套月份");
+                          notification.warning("请选择账套月份");
                           return;
                         }
                         void runAction(async () => {
@@ -549,11 +549,11 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("新账套创建成功！");
-                            setResultMessage(`创建成功：${payload.account_set.name}`);
+                            notification.success(`创建成功：${payload.account_set.name}`);
                             await reloadAccountSets(payload.account_set.id);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "创建账套失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "创建账套失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -629,13 +629,13 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("当前账套设置成功！");
-                            setResultMessage(`已切换当前账套：${selectedAccountSet.name}`);
+                            notification.success(`已切换当前账套：${selectedAccountSet.name}`);
                             clearQueryBootstrapCache();
                             window.dispatchEvent(new CustomEvent("account-set-active-changed"));
                             await reloadAccountSets(selectedAccountSet.id);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "设置当前账套失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "设置当前账套失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -652,7 +652,14 @@ export default function AdminDashboardPage() {
                       disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
                       onClick={() =>
                         void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。")) {
+                          if (!selectedAccountSet) {
+                            return;
+                          }
+                          const isConfirmed = await confirm({
+                            message: "确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。",
+                            type: "warning",
+                          });
+                          if (!isConfirmed) {
                             return;
                           }
                           setProgressVisible(true);
@@ -669,11 +676,11 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("账套已锁定！");
-                            setResultMessage(`账套已锁定：${selectedAccountSet.name}`);
+                            notification.success(`账套已锁定：${selectedAccountSet.name}`);
                             await reloadAccountSets(selectedAccountSet.id);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "锁定账套失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "锁定账套失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -690,7 +697,14 @@ export default function AdminDashboardPage() {
                       disabled={!selectedAccountSet || !selectedAccountSet.is_locked || isWorking}
                       onClick={() =>
                         void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认解锁该账套吗？解锁后将恢复修改能力。")) {
+                          if (!selectedAccountSet) {
+                            return;
+                          }
+                          const isConfirmed = await confirm({
+                            message: "确认解锁该账套吗？解锁后将恢复修改能力。",
+                            type: "info",
+                          });
+                          if (!isConfirmed) {
                             return;
                           }
                           setProgressVisible(true);
@@ -707,11 +721,11 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("账套已解锁！");
-                            setResultMessage(`账套已解锁：${selectedAccountSet.name}`);
+                            notification.success(`账套已解锁：${selectedAccountSet.name}`);
                             await reloadAccountSets(selectedAccountSet.id);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "解锁账套失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "解锁账套失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -728,7 +742,14 @@ export default function AdminDashboardPage() {
                       disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
                       onClick={() =>
                         void runAction(async () => {
-                          if (!selectedAccountSet || !window.confirm("确认删除该账套吗？将同时删除账套下的归档文件记录。")) {
+                          if (!selectedAccountSet) {
+                            return;
+                          }
+                          const isConfirmed = await confirm({
+                            message: "确认删除该账套吗？将同时删除账套下的归档文件记录。",
+                            type: "danger",
+                          });
+                          if (!isConfirmed) {
                             return;
                           }
                           setProgressVisible(true);
@@ -745,11 +766,11 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("账套已成功删除！");
-                            setResultMessage("账套已删除");
+                            notification.success("账套已删除");
                             await reloadAccountSets(null);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "删除账套失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "删除账套失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -761,6 +782,7 @@ export default function AdminDashboardPage() {
                     >
                       删除
                     </button>
+
                     <button
                       className="settings-select"
                       style={{
@@ -780,8 +802,6 @@ export default function AdminDashboardPage() {
                       刷新
                     </button>
                   </div>
-                  {resultMessage ? <div className="account-result-message" style={{ marginTop: "12px" }}>{resultMessage}</div> : null}
-                  {error ? <p className="legacy-inline-error" style={{ marginTop: "12px" }}>{error}</p> : null}
                 </div>
 
                 {/* 右面板 */}
@@ -929,11 +949,11 @@ export default function AdminDashboardPage() {
                             clearInterval(interval);
                             setProgress(100);
                             setLoadingText("账套参数已保存！");
-                            setResultMessage("账套参数已保存");
+                            notification.success("账套参数已保存");
                             await reloadAccountSets(selectedAccountSet.id);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "保存参数失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "保存参数失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
@@ -1075,7 +1095,7 @@ export default function AdminDashboardPage() {
                           }
                           const files = uploadFiles.filter((file): file is File => Boolean(file));
                           if (!files.length) {
-                            setError("请至少选择一个要上传的源文件");
+                            notification.warning("请至少选择一个要上传的源文件");
                             return;
                           }
 
@@ -1097,10 +1117,11 @@ export default function AdminDashboardPage() {
                             setLoadingText("文件上传成功！正在同步账套状态...");
                             setUploadFiles(Array.from({ length: 6 }, () => null));
                             await reloadAccountSets(selectedAccountSet.id);
-                            setResultMessage("上传成功，已归档到账套。");
+                            notification.success("上传成功，已归档到账套。");
+                            setShowModal(null);
                           } catch (caughtError) {
                             clearInterval(interval);
-                            setError(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
                           } finally {
                             setTimeout(() => {
                               setProgressVisible(false);
