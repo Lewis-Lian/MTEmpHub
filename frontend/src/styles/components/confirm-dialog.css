@@ -1,0 +1,173 @@
+/* 遮罩背景 */
+.confirm-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 9998;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.confirm-backdrop.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 弹窗卡片 */
+.confirm-card {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(24, 49, 83, 0.15), 0 10px 10px -5px rgba(24, 49, 83, 0.08);
+  border: 1px solid #e2e8f0;
+  overflow: hidden;
+  transform: scale(0.95) translate3d(0, 10px, 0);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+.confirm-backdrop.is-open .confirm-card {
+  transform: scale(1) translate3d(0, 0, 0);
+}
+
+/* 弹窗头部 */
+.confirm-header {
+  padding: 20px 20px 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 弹窗内容 */
+.confirm-body {
+  padding: 0 20px 20px 52px; /* 留出图标位置的缩进 */
+}
+
+/* 弹窗底部操作栏 */
+.confirm-footer {
+  padding: 12px 20px;
+  background: #f8fafc;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 统一的按钮样式 */
+.confirm-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+  min-width: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-btn:active {
+  transform: scale(0.96);
+}
+
+/* 取消按钮 */
+.confirm-btn-cancel {
+  background: #ffffff;
+  color: #475569;
+}
+
+.confirm-btn-cancel:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+
+/* 确认按钮基础 */
+.confirm-btn-confirm {
+  color: #ffffff;
+  border: none;
+}
+
+/* 各种类型主题变体 */
+.confirm-theme-danger .confirm-btn-confirm {
+  background: #ef4444;
+}
+
+.confirm-theme-danger .confirm-btn-confirm:hover {
+  background: #dc2626;
+}
+
+.confirm-theme-warning .confirm-btn-confirm {
+  background: #d97706;
+}
+
+.confirm-theme-warning .confirm-btn-confirm:hover {
+  background: #b45309;
+}
+
+.confirm-theme-info .confirm-btn-confirm {
+  background: #183153;
+}
+
+.confirm-theme-info .confirm-btn-confirm:hover {
+  background: #234570;
+}
+
+/* 图标样式 */
+.confirm-icon-wrapper {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-icon-wrapper svg {
+  width: 20px;
+  height: 20px;
+}
+
+.confirm-theme-danger .confirm-icon-wrapper {
+  color: #ef4444;
+}
+
+.confirm-theme-warning .confirm-icon-wrapper {
+  color: #d97706;
+}
+
+.confirm-theme-info .confirm-icon-wrapper {
+  color: #0284c7;
+}
+
+/* 标题样式 */
+.confirm-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+/* 内容文字样式 */
+.confirm-message {
+  margin: 0;
+  font-size: 14px;
+  color: #475569;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

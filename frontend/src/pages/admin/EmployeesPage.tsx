@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 
 import { buildApiUrl } from "../../api/client";
+import { useNotification } from "../../components/feedback/Notification";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import {
   batchAdminEmployees,
   createAdminEmployee,
@@ -11,6 +13,7 @@ import {
   importAdminEmployees,
   updateAdminEmployee,
 } from "../../api/admin";
+
 import DepartmentPicker from "../../components/query/DepartmentPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
@@ -75,27 +78,29 @@ export default function EmployeesPage() {
   const [filterEmployeeIds, setFilterEmployeeIds] = useState<number[]>([]);
   const [batchAction, setBatchAction] = useState("");
   const [batchValue, setBatchValue] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [importMessage, setImportMessage] = useState("");
-  const [importError, setImportError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importInputKey, setImportInputKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
 
+  const notification = useNotification();
+  const confirm = useConfirm();
+
+
+  const handleCancelEdit = () => {
+    if (editing) {
+      notification.info(`已取消编辑员工 ${editing.name}`);
+    }
+    setEditing(null);
+  };
+
   const handleCloseModal = () => {
     setShowModal(null);
-    setMessage("");
-    setError("");
-    setImportMessage("");
-    setImportError("");
   };
 
   async function loadRows() {
     setLoading(true);
-    setError("");
     try {
       const [nextEmployees, nextDepartments, nextShifts] = await Promise.all([
         fetchAdminEmployees(),
@@ -107,11 +112,12 @@ export default function EmployeesPage() {
       setShifts(nextShifts);
       setSelectedIds((current) => current.filter((id) => nextEmployees.some((row) => row.id === id)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "员工列表加载失败");
+      notification.error(err instanceof Error ? err.message : "员工列表加载失败");
     } finally {
       setLoading(false);
     }
   }
+
 
   useEffect(() => {
     void loadRows();
@@ -158,15 +164,15 @@ export default function EmployeesPage() {
 
   async function submitCreate(event: FormEvent) {
     event.preventDefault();
-    setMessage("");
-    setError("");
     try {
       await createAdminEmployee(form);
+      const successMsg = `员工 ${form.name} 创建成功`;
       setForm(emptyEmployeeForm);
-      setMessage("员工已创建");
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建员工失败");
+      const errMsg = err instanceof Error ? err.message : "创建员工失败";
+      notification.error(errMsg);
     }
   }
 
@@ -175,30 +181,34 @@ export default function EmployeesPage() {
     if (!editing) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await updateAdminEmployee(editing.id, editForm);
       setEditing(null);
-      setMessage("员工已保存");
+      const successMsg = `员工 ${editForm.name} 保存成功`;
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存员工失败");
+      const errMsg = err instanceof Error ? err.message : "保存员工失败";
+      notification.error(errMsg);
     }
   }
 
   async function removeEmployee(row: AdminEmployee) {
-    if (!window.confirm(`确定删除员工 ${row.emp_no} - ${row.name}？`)) {
+    const isConfirmed = await confirm({
+      message: `确定删除员工 ${row.emp_no} - ${row.name}？`,
+      type: "danger",
+    });
+    if (!isConfirmed) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await deleteAdminEmployee(row.id);
-      setMessage("员工已删除");
+      const successMsg = `员工 ${row.name} 已删除`;
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除员工失败");
+      const errMsg = err instanceof Error ? err.message : "删除员工失败";
+      notification.error(errMsg);
     }
   }
 
@@ -217,37 +227,42 @@ export default function EmployeesPage() {
 
   async function applyBatchAction() {
     if (!batchAction) {
-      setError("请选择批量操作");
+      const warningMsg = "请选择批量操作";
+      notification.warning(warningMsg);
       return;
     }
     if (selectedIds.length === 0) {
-      setError("请先选择员工");
+      const warningMsg = "请先选择员工";
+      notification.warning(warningMsg);
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await batchAdminEmployees(batchPayload());
       setSelectedIds([]);
       setBatchAction("");
       setBatchValue("");
-      setMessage("批量操作已完成");
+      const successMsg = "批量操作已完成";
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "批量操作失败");
+      const errMsg = err instanceof Error ? err.message : "批量操作失败";
+      notification.error(errMsg);
     }
   }
 
   async function applyBatchDelete() {
     if (selectedIds.length === 0) {
-      setError("请先选择员工");
+      const warningMsg = "请先选择员工";
+      notification.warning(warningMsg);
       return;
     }
-    if (!window.confirm(`确定要批量删除已选的 ${selectedIds.length} 名员工吗？此操作不可逆！`)) {
+    const isConfirmed = await confirm({
+      message: `确定要批量删除已选的 ${selectedIds.length} 名员工吗？此操作不可逆！`,
+      type: "danger",
+    });
+    if (!isConfirmed) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await batchAdminEmployees({
         ids: selectedIds,
@@ -256,12 +271,16 @@ export default function EmployeesPage() {
       setSelectedIds([]);
       setBatchAction("");
       setBatchValue("");
-      setMessage("批量删除已完成");
+      const successMsg = "批量删除已完成";
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "批量删除失败");
+      const errMsg = err instanceof Error ? err.message : "批量删除失败";
+      notification.error(errMsg);
     }
   }
+
+
 
   function openEdit(row: AdminEmployee) {
     setEditing(row);
@@ -272,15 +291,14 @@ export default function EmployeesPage() {
     event.preventDefault();
     const form = event.currentTarget;
 
-    setImportMessage("");
-    setImportError("");
-
     if (!importFile?.name) {
-      setImportError("请选择要导入的 xlsx 文件");
+      const warningMsg = "请选择要导入的 xlsx 文件";
+      notification.warning(warningMsg);
       return;
     }
     if (!importFile.name.toLowerCase().endsWith(".xlsx")) {
-      setImportError("仅支持 .xlsx 文件");
+      const warningMsg = "仅支持 .xlsx 文件";
+      notification.warning(warningMsg);
       return;
     }
 
@@ -290,14 +308,18 @@ export default function EmployeesPage() {
       form.reset();
       setImportFile(null);
       setImportInputKey((current) => current + 1);
-      setImportMessage(`导入成功，处理 ${String(result.imported)} 条`);
+      const successMsg = `导入成功，处理 ${String(result.imported)} 条`;
+      notification.success(successMsg);
       await loadRows();
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "导入失败");
+      const errMsg = err instanceof Error ? err.message : "导入失败";
+      notification.error(errMsg);
     } finally {
       setIsImporting(false);
     }
   }
+
+
 
   function buildFilteredExportUrl() {
     const query = new URLSearchParams();
@@ -845,18 +867,19 @@ export default function EmployeesPage() {
           <form className="master-modal employee-dept-modal" onSubmit={submitEdit}>
             <div className="master-modal-header">
               <h2>编辑员工</h2>
-              <button className="master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
+              <button className="master-modal-close" onClick={handleCancelEdit} type="button">×</button>
             </div>
             <div className="master-modal-body">
               {renderEmployeeForm(editForm, setEditForm, "保存", "edit", false)}
             </div>
             <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setEditing(null)} type="button">取消</button>
+              <button className="account-action-button" onClick={handleCancelEdit} type="button">取消</button>
               <button className="account-action-button account-action-button--primary" type="submit">保存</button>
             </div>
           </form>
         </div>
       ) : null}
+
 
       <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }} style={{
         position: "fixed",
@@ -883,8 +906,7 @@ export default function EmployeesPage() {
           <form className="account-create-form" onSubmit={submitCreate}>
             {renderEmployeeForm(form, setForm, "创建员工", "create")}
           </form>
-          {message ? <div className="account-result-message" style={{ marginTop: "12px" }}>{message}</div> : null}
-          {error ? <div className="legacy-inline-error" style={{ marginTop: "12px" }}>{error}</div> : null}
+
         </div>
       </div>
 
@@ -930,8 +952,7 @@ export default function EmployeesPage() {
             </div>
           </form>
           <div className="panel-note" style={{ marginTop: "12px" }}>模板列：人员编号、人员姓名、部门名称、班次编号、是否管理人员、是否哺乳假、员工考勤统计来源、管理人员考勤统计来源。</div>
-          {importMessage ? <div className="account-result-message" style={{ marginTop: "12px" }}>{importMessage}</div> : null}
-          {importError ? <div className="legacy-inline-error" style={{ marginTop: "12px" }}>{importError}</div> : null}
+
         </div>
       </div>
     </main>

@@ -13,6 +13,9 @@ import DepartmentPicker from "../../components/query/DepartmentPicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminDepartment } from "../../types/admin";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
+import { useNotification } from "../../components/feedback/Notification";
+
 
 type DepartmentFormState = {
   dept_no: string;
@@ -38,7 +41,10 @@ function departmentToForm(row: AdminDepartment): DepartmentFormState {
 }
 
 export default function DepartmentsPage() {
+  const confirm = useConfirm();
+  const notification = useNotification();
   const [rows, setRows] = useState<AdminDepartment[]>([]);
+
   const [form, setForm] = useState<DepartmentFormState>(emptyDepartmentForm);
   const [editing, setEditing] = useState<AdminDepartment | null>(null);
   const [editForm, setEditForm] = useState<DepartmentFormState>(emptyDepartmentForm);
@@ -46,10 +52,6 @@ export default function DepartmentsPage() {
   const [batchAction, setBatchAction] = useState("");
   const [batchParentId, setBatchParentId] = useState("");
   const [batchParentModalOpen, setBatchParentModalOpen] = useState(false);
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [importMessage, setImportMessage] = useState("");
-  const [importError, setImportError] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importInputKey, setImportInputKey] = useState(0);
@@ -58,21 +60,16 @@ export default function DepartmentsPage() {
 
   const handleCloseModal = () => {
     setShowModal(null);
-    setMessage("");
-    setError("");
-    setImportMessage("");
-    setImportError("");
   };
 
   async function loadRows() {
     setLoading(true);
-    setError("");
     try {
       const nextRows = await fetchAdminDepartments();
       setRows(nextRows);
       setSelectedIds((current) => current.filter((id) => nextRows.some((row) => row.id === id)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "部门列表加载失败");
+      notification.error(err instanceof Error ? err.message : "部门列表加载失败");
     } finally {
       setLoading(false);
     }
@@ -97,15 +94,14 @@ export default function DepartmentsPage() {
 
   async function submitCreate(event: FormEvent) {
     event.preventDefault();
-    setMessage("");
-    setError("");
     try {
       await createAdminDepartment(payloadFromForm(form));
       setForm(emptyDepartmentForm);
-      setMessage("部门已创建");
+      notification.success("部门已创建");
+      setShowModal(null);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "创建部门失败");
+      notification.error(err instanceof Error ? err.message : "创建部门失败");
     }
   }
 
@@ -114,40 +110,41 @@ export default function DepartmentsPage() {
     if (!editing) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await updateAdminDepartment(editing.id, payloadFromForm(editForm));
       setEditing(null);
-      setMessage("部门已保存");
+      notification.success("部门已保存");
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存部门失败");
+      notification.error(err instanceof Error ? err.message : "保存部门失败");
     }
   }
 
   async function removeDepartment(row: AdminDepartment) {
-    if (!window.confirm(`确定删除部门 ${row.dept_name}？`)) {
+    const isConfirmed = await confirm({
+      message: `确定删除部门 ${row.dept_name}？`,
+      type: "danger",
+    });
+    if (!isConfirmed) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await deleteAdminDepartment(row.id);
-      setMessage("部门已删除");
+      notification.success("部门已删除");
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除部门失败");
+      notification.error(err instanceof Error ? err.message : "删除部门失败");
     }
   }
 
+
   async function applyBatchAction() {
     if (!batchAction) {
-      setError("请选择批量操作");
+      notification.warning("请选择批量操作");
       return;
     }
     if (selectedIds.length === 0) {
-      setError("请先选择部门");
+      notification.warning("请先选择部门");
       return;
     }
     if (batchAction === "set_parent") {
@@ -155,8 +152,6 @@ export default function DepartmentsPage() {
       setBatchParentModalOpen(true);
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await batchAdminDepartments({
         ids: selectedIds,
@@ -165,20 +160,18 @@ export default function DepartmentsPage() {
       setSelectedIds([]);
       setBatchAction("");
       setBatchParentId("");
-      setMessage("批量操作已完成");
+      notification.success("批量操作已完成");
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "批量操作失败");
+      notification.error(err instanceof Error ? err.message : "批量操作失败");
     }
   }
 
   async function applyBatchParent() {
     if (selectedIds.length === 0) {
-      setError("请先选择部门");
+      notification.warning("请先选择部门");
       return;
     }
-    setMessage("");
-    setError("");
     try {
       await batchAdminDepartments({
         ids: selectedIds,
@@ -189,27 +182,30 @@ export default function DepartmentsPage() {
       setBatchAction("");
       setBatchParentId("");
       setBatchParentModalOpen(false);
-      setMessage("批量操作已完成");
+      notification.success("批量操作已完成");
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "批量操作失败");
+      notification.error(err instanceof Error ? err.message : "批量操作失败");
     }
   }
 
   async function removeUnboundDepartments() {
-    if (!window.confirm("确定一键删除空部门？锁定、绑定员工或账号权限的部门会被跳过。")) {
+    const isConfirmed = await confirm({
+      message: "确定一键删除空部门？锁定、绑定员工或账号权限的部门会被跳过。",
+      type: "danger",
+    });
+    if (!isConfirmed) {
       return;
     }
-    setMessage("");
-    setError("");
     try {
       const result = await deleteUnboundAdminDepartments();
-      setMessage(`已删除 ${String(result.deleted ?? 0)} 个空部门`);
+      notification.success(`已删除 ${String(result.deleted ?? 0)} 个空部门`);
       await loadRows();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "删除空部门失败");
+      notification.error(err instanceof Error ? err.message : "删除空部门失败");
     }
   }
+
 
   function openEdit(row: AdminDepartment) {
     setEditing(row);
@@ -220,15 +216,12 @@ export default function DepartmentsPage() {
     event.preventDefault();
     const form = event.currentTarget;
 
-    setImportMessage("");
-    setImportError("");
-
     if (!importFile?.name) {
-      setImportError("请选择要导入的 xlsx 文件");
+      notification.warning("请选择要导入的 xlsx 文件");
       return;
     }
     if (!importFile.name.toLowerCase().endsWith(".xlsx")) {
-      setImportError("仅支持 .xlsx 文件");
+      notification.warning("仅支持 .xlsx 文件");
       return;
     }
 
@@ -238,10 +231,11 @@ export default function DepartmentsPage() {
       form.reset();
       setImportFile(null);
       setImportInputKey((current) => current + 1);
-      setImportMessage(`导入成功，处理 ${String(result.imported)} 条`);
+      notification.success(`导入成功，处理 ${String(result.imported)} 条`);
+      setShowModal(null);
       await loadRows();
     } catch (err) {
-      setImportError(err instanceof Error ? err.message : "导入失败");
+      notification.error(err instanceof Error ? err.message : "导入失败");
     } finally {
       setIsImporting(false);
     }
@@ -554,8 +548,6 @@ export default function DepartmentsPage() {
               创建部门
             </button>
           </form>
-          {message ? <div className="account-result-message" style={{ marginTop: "12px" }}>{message}</div> : null}
-          {error ? <div className="legacy-inline-error" style={{ marginTop: "12px" }}>{error}</div> : null}
         </div>
       </div>
 
@@ -599,8 +591,6 @@ export default function DepartmentsPage() {
             </div>
           </form>
           <div className="panel-note" style={{ marginTop: "12px" }}>模板字段：部门编号、部门名称、上级部门编号（可空）。</div>
-          {importMessage ? <div className="account-result-message" style={{ marginTop: "12px" }}>{importMessage}</div> : null}
-          {importError ? <div className="legacy-inline-error" style={{ marginTop: "12px" }}>{importError}</div> : null}
         </div>
       </div>
     </main>

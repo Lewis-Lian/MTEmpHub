@@ -10,6 +10,7 @@ import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminDepartment, AdminEmployee } from "../../types/admin";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
+import { useNotification } from "../../components/feedback/Notification";
 
 interface AccountUser {
   id: number;
@@ -47,13 +48,12 @@ const allPermissionKeys = permissionCatalog.map((item) => item.key);
 const ACCOUNT_LIST_PATH = "/api/admin/accounts";
 
 export default function AccountsPage() {
+  const notification = useNotification();
   const [users, setUsers] = useState<AccountUser[]>([]);
   const [employees, setEmployees] = useState<AdminEmployee[]>([]);
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [resultMessage, setResultMessage] = useState("");
-  const [resultError, setResultError] = useState("");
 
   const [createUsername, setCreateUsername] = useState("");
   const [createPassword, setCreatePassword] = useState("");
@@ -244,10 +244,8 @@ export default function AccountsPage() {
   }
 
   async function submitCreate() {
-    setResultMessage("");
-    setResultError("");
     if (!createUsername.trim() || !createPassword.trim()) {
-      setResultError("用户名和密码不能为空");
+      notification.warning("用户名和密码不能为空");
       return;
     }
 
@@ -270,24 +268,22 @@ export default function AccountsPage() {
       setCreateDeptIds([]);
       setCreatePermissionKeys(allPermissionKeys);
       setCreateModalOpen(false);
-      setResultMessage("创建成功");
+      notification.success("创建成功");
       await refreshUsers();
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "创建失败");
+      notification.error(error instanceof Error ? error.message : "创建失败");
     }
   }
 
   async function createManagerAccounts() {
-    setResultMessage("");
-    setResultError("");
     try {
       const result = await apiRequest<{ created_count: number; skipped_count: number }>("/api/admin/users/manager-batch", {
         method: "POST",
       });
-      setResultMessage(`成功创建 ${result.created_count} 个账号，跳过 ${result.skipped_count} 个员工`);
+      notification.success(`成功创建 ${result.created_count} 个账号，跳过 ${result.skipped_count} 个员工`);
       await refreshUsers();
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "一键创建失败");
+      notification.error(error instanceof Error ? error.message : "一键创建失败");
     }
   }
 
@@ -310,10 +306,8 @@ export default function AccountsPage() {
     if (!editingUser) {
       return;
     }
-    setResultMessage("");
-    setResultError("");
     if (!editProfileEmpNo.trim() || !editProfileName.trim() || !editProfileDeptId) {
-      setResultError("工号、姓名和部门信息不能为空");
+      notification.warning("工号、姓名和部门信息不能为空");
       return;
     }
     try {
@@ -330,44 +324,38 @@ export default function AccountsPage() {
         method: "PUT",
       });
       setEditingUser(null);
-      setResultMessage("账号已保存");
+      notification.success("账号已保存");
       await refreshUsers();
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "保存失败");
+      notification.error(error instanceof Error ? error.message : "保存失败");
     }
   }
 
   async function resetPassword(userId: number) {
-    setResultMessage("");
-    setResultError("");
     try {
       await apiRequest(`/api/admin/users/${userId}/password`, {
         body: { password: "mt@123" },
         method: "PUT",
       });
-      setResultMessage("密码已重置为 mt@123");
+      notification.success("密码已重置为 mt@123");
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "重置密码失败");
+      notification.error(error instanceof Error ? error.message : "重置密码失败");
     }
   }
 
   async function deleteUser(userId: number) {
-    setResultMessage("");
-    setResultError("");
     try {
       await apiRequest(`/api/admin/users/${userId}`, { method: "DELETE" });
-      setResultMessage("账号已删除");
+      notification.success("账号已删除");
       await refreshUsers();
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "删除失败");
+      notification.error(error instanceof Error ? error.message : "删除失败");
     }
   }
 
   async function runBatch(action: string, payload: Record<string, unknown> = {}) {
-    setResultMessage("");
-    setResultError("");
     if (!selectedUserIds.length) {
-      setResultError("请先选择账号");
+      notification.warning("请先选择账号");
       return false;
     }
     try {
@@ -375,11 +363,12 @@ export default function AccountsPage() {
         body: { action, user_ids: selectedUserIds, ...payload },
         method: "POST",
       });
-      setResultMessage("批量操作已完成");
+      notification.success("批量操作已完成");
+      setSelectedUserIds([]);
       await refreshUsers();
       return true;
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "批量操作失败");
+      notification.error(error instanceof Error ? error.message : "批量操作失败");
       return false;
     }
   }
@@ -449,8 +438,7 @@ export default function AccountsPage() {
           </div>
         </div>
 
-        {resultMessage ? <div className="account-result-message" style={{ marginBottom: "12px" }}>{resultMessage}</div> : null}
-        {resultError ? <div className="legacy-inline-error" style={{ marginBottom: "12px" }}>{resultError}</div> : null}
+
 
         <div className="account-card-header master-list-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 4px", borderBottom: "none", background: "transparent", flexWrap: "wrap", gap: "12px" }}>
           <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>账号列表</span>
