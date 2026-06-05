@@ -377,7 +377,7 @@ export default function EmployeesPage() {
 
   function renderShiftSelect(value: string, onChange: (value: string) => void) {
     return (
-      <select className="account-select" onChange={(event) => onChange(event.target.value)} value={value}>
+      <select className="form-select" onChange={(event) => onChange(event.target.value)} value={value} style={{ height: "36px", padding: "0 36px 0 12px", borderRadius: "8px", minWidth: "150px" }}>
         <option value="">不绑定</option>
         {shifts.map((row) => (
           <option key={row.id} value={row.shift_no}>
@@ -390,7 +390,7 @@ export default function EmployeesPage() {
 
   function renderSourceSelect(value: string, onChange: (value: string) => void) {
     return (
-      <select className="account-select" onChange={(event) => onChange(event.target.value)} value={value}>
+      <select className="form-select" onChange={(event) => onChange(event.target.value)} value={value} style={{ height: "36px", padding: "0 36px 0 12px", borderRadius: "8px", minWidth: "220px" }}>
         <option value="employee">员工考勤源文件取值</option>
         <option value="manager">管理人员考勤源文件取值</option>
         <option value="auto_fallback">自动回退</option>
@@ -477,7 +477,7 @@ export default function EmployeesPage() {
     }
     if (batchAction === "set_manager") {
       return (
-        <select className="account-select" onChange={(event) => setBatchValue(event.target.value)} value={batchValue}>
+        <select className="form-select" onChange={(event) => setBatchValue(event.target.value)} value={batchValue} style={{ height: "36px", padding: "0 36px 0 12px", borderRadius: "8px", minWidth: "150px" }}>
           <option value="">选择人员类型</option>
           <option value="0">普通员工</option>
           <option value="1">管理人员</option>
@@ -486,7 +486,7 @@ export default function EmployeesPage() {
     }
     if (batchAction === "set_nursing") {
       return (
-        <select className="account-select" onChange={(event) => setBatchValue(event.target.value)} value={batchValue}>
+        <select className="form-select" onChange={(event) => setBatchValue(event.target.value)} value={batchValue} style={{ height: "36px", padding: "0 36px 0 12px", borderRadius: "8px", minWidth: "150px" }}>
           <option value="">选择哺乳假</option>
           <option value="0">否</option>
           <option value="1">是</option>
@@ -498,11 +498,12 @@ export default function EmployeesPage() {
     }
     return (
       <input
-        className="account-input"
+        className="form-control"
         disabled={!batchAction || batchAction === "delete"}
         onChange={(event) => setBatchValue(event.target.value)}
         placeholder="操作值"
         value={batchValue}
+        style={{ height: "36px", borderRadius: "8px", boxSizing: "border-box" }}
       />
     );
   }
@@ -560,7 +561,7 @@ export default function EmployeesPage() {
   }
 
   return (
-    <main className="master-data-page employee-master-page">
+    <main className="master-data-page employee-master-page employee-dashboard-page">
       {/* 顶部控制与摘要行 */}
       <div className="account-top-control-row" style={{
         display: "flex",
@@ -568,34 +569,48 @@ export default function EmployeesPage() {
         alignItems: "center",
         flexWrap: "wrap",
         gap: "12px",
-        marginBottom: "16px",
+        marginBottom: "12px",
         marginTop: "16px"
       }}>
-        {/* 左侧控制按钮组 */}
-        <div className="account-panel-selector" style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => setShowModal("create")}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            新建员工
-          </button>
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => setShowModal("import")}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            导入员工
-          </button>
+        {/* 左侧控制按钮与状态组 */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+          <div className="account-panel-selector" style={{ display: "flex", gap: "10px" }}>
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => setShowModal("create")}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              新建员工
+            </button>
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => setShowModal("import")}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              导入员工
+            </button>
+          </div>
+          
+          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
+          
+          {/* 已选计数与刷新按钮，和新建导入及状态栏合在同一行 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <span className="master-selected-count" style={{ fontSize: "13.5px", color: "var(--ent-text-secondary)", fontWeight: "500", userSelect: "none" }}>
+              已选 {selectedIds.length} 人
+            </span>
+            <button className="account-action-button" onClick={loadRows} type="button" style={{ padding: "6px 12px" }}>
+              刷新
+            </button>
+          </div>
         </div>
 
         {/* 右侧信息摘要状态条 */}
@@ -636,27 +651,10 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      <div className="account-card-header master-list-header" style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "12px 4px",
-        borderBottom: "none",
-        background: "transparent",
-        flexWrap: "wrap",
-        gap: "12px"
-      }}>
-        <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>员工列表</span>
-        <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-          <span className="master-selected-count">已选 {selectedIds.length} 人</span>
-          <button className="account-action-button" onClick={loadRows} type="button">刷新</button>
-        </div>
-      </div>
-
-      <div className="master-filter-panel" style={{ marginBottom: "16px" }}>
+      <div className="master-filter-panel" style={{ marginBottom: "12px", position: "relative" }}>
         <div className="master-filter-grid">
-          <label className="account-field">
-            <span className="account-field-label">员工筛选器</span>
+          <div className="query-filter-field">
+            <label className="form-label">员工筛选器</label>
             <EmployeePicker
               departments={pickerDepartments}
               employees={pickerEmployees}
@@ -664,46 +662,173 @@ export default function EmployeesPage() {
               selectedIds={filterEmployeeIds}
               showFieldChrome={false}
             />
-          </label>
-          <label className="account-field">
-            <span className="account-field-label">人员类型</span>
-            <select className="account-select" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">人员类型</label>
+            <select className="form-select" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
               <option value="">全部</option>
               <option value="employee">普通员工</option>
               <option value="manager">管理人员</option>
             </select>
-          </label>
-          <label className="account-field">
-            <span className="account-field-label">哺乳假</span>
-            <select className="account-select" onChange={(event) => setNursingFilter(event.target.value)} value={nursingFilter}>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">哺乳假</label>
+            <select className="form-select" onChange={(event) => setNursingFilter(event.target.value)} value={nursingFilter}>
               <option value="">全部</option>
               <option value="1">是</option>
               <option value="0">否</option>
             </select>
-          </label>
-          <label className="account-field">
-            <span className="account-field-label">员工考勤统计来源</span>
-            <select className="account-select" onChange={(event) => setEmployeeSourceFilter(event.target.value)} value={employeeSourceFilter}>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">员工考勤统计来源</label>
+            <select className="form-select" onChange={(event) => setEmployeeSourceFilter(event.target.value)} value={employeeSourceFilter}>
               <option value="">全部</option>
               <option value="employee">员工考勤源文件取值</option>
               <option value="manager">管理人员考勤源文件取值</option>
               <option value="auto_fallback">自动回退</option>
             </select>
-          </label>
-          <label className="account-field">
-            <span className="account-field-label">管理人员考勤统计来源</span>
-            <select className="account-select" onChange={(event) => setManagerSourceFilter(event.target.value)} value={managerSourceFilter}>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">管理人员考勤统计来源</label>
+            <select className="form-select" onChange={(event) => setManagerSourceFilter(event.target.value)} value={managerSourceFilter}>
               <option value="">全部</option>
               <option value="manager">管理人员考勤源文件取值</option>
               <option value="employee">员工考勤源文件取值</option>
               <option value="auto_fallback">自动回退</option>
             </select>
-          </label>
+          </div>
         </div>
         <div className="master-filter-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
           <button className="account-action-button" onClick={clearFilters} type="button">清空筛选</button>
         </div>
+
+        {/* 批量操作工具条（作为多选修改器，悬浮显示在筛选器下方） */}
+        {selectedIds.length > 0 && (
+          <div className="inline-batch-bar" style={{
+            position: "absolute",
+            bottom: "-24px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 100,
+            background: "var(--ent-bg, #ffffff)",
+            border: "1px solid var(--ent-border-strong, #cbd5e1)",
+            borderRadius: "8px",
+            padding: "8px 20px",
+            boxShadow: "var(--ent-shadow-card, 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.08))",
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            boxSizing: "border-box",
+            flexWrap: "nowrap",
+            whiteSpace: "nowrap",
+            maxWidth: "95%"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", userSelect: "none" }}>
+              <span style={{ color: "#64748b" }}>已选择</span>
+              <strong style={{ color: "var(--ent-primary, #2563eb)", fontSize: "15px", fontWeight: "600" }}>{selectedIds.length}</strong>
+              <span style={{ color: "#64748b" }}>人</span>
+            </div>
+
+            <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong, #cbd5e1)" }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <select
+                className="form-select"
+                onChange={(event) => { setBatchAction(event.target.value); setBatchValue(""); }}
+                value={batchAction}
+                style={{
+                  minWidth: "150px",
+                  height: "36px",
+                  borderRadius: "8px",
+                  padding: "0 36px 0 12px",
+                  fontSize: "13px",
+                }}
+              >
+                <option value="">选择批量操作</option>
+                <option value="set_name">更改姓名</option>
+                <option value="set_emp_no">更改人员编号</option>
+                <option value="set_department">更改部门</option>
+                <option value="set_shift">更改班次</option>
+                <option value="set_manager">设置人员类型</option>
+                <option value="set_nursing">设置哺乳假</option>
+                <option value="set_employee_stats_attendance_source">设置员工考勤统计来源</option>
+                <option value="set_manager_stats_attendance_source">设置管理人员考勤统计来源</option>
+              </select>
+              <div style={{ display: "inline-flex", alignItems: "center", height: "36px" }}>
+                {renderBatchValueControl()}
+              </div>
+            </div>
+
+            <button
+              className="account-action-button account-action-button--primary btn btn-primary"
+              onClick={applyBatchAction}
+              type="button"
+              style={{
+                borderRadius: "8px",
+                height: "36px",
+                padding: "0 14px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+                boxShadow: "none",
+                fontSize: "13px"
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              应用到已选
+            </button>
+
+            <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong, #cbd5e1)" }} />
+
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <button
+                className="account-action-button account-action-button--danger btn btn-danger"
+                onClick={applyBatchDelete}
+                type="button"
+                style={{
+                  borderRadius: "8px",
+                  height: "36px",
+                  padding: "0 14px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
+                  background: "#ef4444",
+                  border: "none",
+                  color: "#fff",
+                  fontSize: "13px"
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"></polyline>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+                批量删除
+              </button>
+
+              <button
+                className="account-action-button"
+                onClick={() => { setSelectedIds([]); setBatchAction(""); setBatchValue(""); }}
+                type="button"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "#64748b",
+                  fontSize: "13px",
+                  cursor: "pointer",
+                  padding: "0 4px"
+                }}
+              >
+                清空选择
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+
+
       <QueryResultPanel>
         {loading ? (
           <div className="legacy-table-panel master-table-panel master-table-panel--with-filter">
@@ -727,138 +852,7 @@ export default function EmployeesPage() {
         )}
       </QueryResultPanel>
 
-      <div className="master-side-note" style={{ marginTop: "16px", fontSize: "12.5px" }}>
-        班次维护已迁移到独立页面：<a href="/admin/shifts/manage">前往班次管理</a>
-      </div>
 
-      <div className="floating-batch-bar" style={{
-        position: "fixed",
-        top: "72px",
-        left: selectedIds.length > 0 ? "50%" : "-9999px",
-        transform: selectedIds.length > 0 ? "translate(-50%, 0)" : "translate(-50%, -20px)",
-        background: "rgba(255, 255, 255, 0.95)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        border: "1px solid #cbd5e1",
-        borderRadius: "9999px",
-        padding: "10px 24px",
-        boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.08)",
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        gap: "16px",
-        boxSizing: "border-box",
-        flexWrap: "wrap",
-        opacity: selectedIds.length > 0 ? 1 : 0,
-        pointerEvents: selectedIds.length > 0 ? "auto" : "none",
-        transition: "opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)"
-      }}>
-        {/* 左侧：已选计数 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px", userSelect: "none" }}>
-          <span style={{ color: "#64748b" }}>已选择</span>
-          <strong style={{ color: "var(--ent-primary, #2563eb)", fontSize: "15px", fontWeight: "600" }}>{selectedIds.length}</strong>
-          <span style={{ color: "#64748b" }}>人</span>
-        </div>
-
-        <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
-
-        {/* 中间：批量修改字段及控件 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <select
-            className="account-select"
-            onChange={(event) => { setBatchAction(event.target.value); setBatchValue(""); }}
-            value={batchAction}
-            style={{
-              minWidth: "140px",
-              height: "32px",
-              borderRadius: "9999px",
-              padding: "0 12px",
-              fontSize: "13px",
-              background: "#f8fafc",
-              border: "1px solid #cbd5e1"
-            }}
-          >
-            <option value="">选择批量操作</option>
-            <option value="set_name">更改姓名</option>
-            <option value="set_emp_no">更改人员编号</option>
-            <option value="set_department">更改部门</option>
-            <option value="set_shift">更改班次</option>
-            <option value="set_manager">设置人员类型</option>
-            <option value="set_nursing">设置哺乳假</option>
-            <option value="set_employee_stats_attendance_source">设置员工考勤统计来源</option>
-            <option value="set_manager_stats_attendance_source">设置管理人员考勤统计来源</option>
-          </select>
-          <div style={{ display: "inline-flex", alignItems: "center", height: "32px" }}>
-            {renderBatchValueControl()}
-          </div>
-        </div>
-
-        <button
-          className="account-action-button account-action-button--primary btn btn-primary"
-          onClick={applyBatchAction}
-          type="button"
-          style={{
-            borderRadius: "9999px",
-            height: "32px",
-            padding: "0 14px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "4px",
-            boxShadow: "none",
-            fontSize: "13px"
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          应用到已选
-        </button>
-
-        <div style={{ width: "1px", height: "16px", background: "#e2e8f0" }} />
-
-        {/* 右侧：危险操作与清空 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <button
-            className="account-action-button account-action-button--danger btn btn-danger"
-            onClick={applyBatchDelete}
-            type="button"
-            style={{
-              borderRadius: "9999px",
-              height: "32px",
-              padding: "0 14px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "4px",
-              background: "#ef4444",
-              border: "none",
-              color: "#fff",
-              fontSize: "13px"
-            }}
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            批量删除
-          </button>
-
-          <button
-            className="account-action-button"
-            onClick={() => { setSelectedIds([]); setBatchAction(""); setBatchValue(""); }}
-            type="button"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#64748b",
-              fontSize: "13px",
-              cursor: "pointer",
-              padding: "0 4px"
-            }}
-          >
-            清空选择
-          </button>
-        </div>
-      </div>
 
 
 
