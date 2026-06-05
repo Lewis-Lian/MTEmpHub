@@ -339,7 +339,6 @@ body {
   background: transparent;
   color: #71717a;
   cursor: pointer;
-  transform: translateY(-50%);
   transition: color 0.2s ease;
 }
 
@@ -449,7 +448,6 @@ body {
 
 .login-submit-btn:hover:not(:disabled) {
   background: #27272a;
-  transform: translateY(-1px);
 }
 
 .login-submit-btn:disabled {
@@ -862,11 +860,9 @@ body {
 @keyframes tab-pane-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -3402,7 +3398,6 @@ body {
 }
 
 .factory-rest-day:hover:not(:disabled) {
-  transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(37, 67, 110, 0.12);
   border-color: #aac2dc;
 }
@@ -4365,7 +4360,6 @@ input[type="checkbox"] {
 }
 
 .stat-card:hover {
-  transform: translateY(-4px);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   border-color: #cbd5e1;
 }
@@ -4541,11 +4535,9 @@ input[type="checkbox"] {
 
 @keyframes stat-pulse {
   0% {
-    transform: scale(0.8);
     opacity: 0.8;
   }
   100% {
-    transform: scale(1.6);
     opacity: 0;
   }
 }
@@ -4618,7 +4610,6 @@ input[type="checkbox"] {
   background: rgba(16, 185, 129, 0.08) !important;
   color: #10b981 !important;
   border-color: #10b981 !important;
-  transform: translateY(-1px) !important;
 }
 
 .query-filter-actions .btn-outline-secondary,
@@ -4649,7 +4640,6 @@ input[type="checkbox"] {
 .query-filter-actions .btn-outline-info:hover:not(:disabled) {
   background: var(--ent-bg-secondary) !important;
   border-color: var(--ent-border-stronger) !important;
-  transform: translateY(-1px) !important;
 }
 
 /* 悬浮批量操作条样式 */
@@ -4807,11 +4797,9 @@ input[type="checkbox"] {
 
 @keyframes spinnerPulse {
   0%, 100% {
-    transform: scale(0.8);
     opacity: 0.3;
   }
   50% {
-    transform: scale(1.1);
     opacity: 0.8;
   }
 }
@@ -4860,12 +4848,10 @@ input[type="checkbox"] {
   background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
-  transform: translateY(-2px) !important;
   box-shadow: 0 6px 18px rgba(16, 185, 129, 0.35) !important;
 }
 
 .query-filter-actions .btn-outline-success:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
   box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2) !important;
 }
 
@@ -4883,12 +4869,10 @@ input[type="checkbox"] {
   background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
-  transform: translateY(-2px) !important;
   box-shadow: 0 6px 18px rgba(71, 85, 105, 0.35) !important;
 }
 
 .query-filter-actions .btn-outline-secondary:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
   box-shadow: 0 2px 8px rgba(71, 85, 105, 0.2) !important;
 }
 
@@ -4913,14 +4897,12 @@ input[type="checkbox"] {
   background-size: 200% 100% !important;
   background-position: right center !important;
   color: #ffffff !important;
-  transform: translateY(-2px) !important;
   box-shadow: 0 6px 18px rgba(2, 132, 199, 0.35) !important;
 }
 
 .query-filter-actions .btn-primary:active:not(:disabled),
 .account-panel-selector .btn-primary:active:not(:disabled),
 .summary-download-panel .legacy-btn-primary:active:not(:disabled) {
-  transform: translateY(0px) scale(0.96) !important;
   box-shadow: 0 2px 8px rgba(2, 132, 199, 0.2) !important;
 }
 
@@ -4951,8 +4933,7 @@ input[type="checkbox"] {
   color: #0284c7 !important; /* 悬浮时变蓝 */
 }
 
-.query-table-click-cell:active {
-  transform: scale(0.97) !important; /* 轻微按压物理反馈 */
+.query-table-click-cell:active { /* 轻微按压物理反馈 */
   opacity: 0.8 !important;
 }
 
@@ -5054,14 +5035,12 @@ input[type="checkbox"] {
 .upload-slot-card:hover {
   border-color: #3b82f6 !important;
   background: rgba(59, 130, 246, 0.04) !important;
-  transform: translateY(-2px) !important;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.05) !important;
 }
 
 .upload-slot-card.is-dragover {
   border-color: #2563eb !important;
   background: rgba(37, 99, 235, 0.08) !important;
-  transform: scale(1.02) !important;
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.12) !important;
 }
 
@@ -5074,7 +5053,6 @@ input[type="checkbox"] {
 .upload-slot-card.has-file:hover {
   border-color: #059669 !important;
   background: rgba(16, 185, 129, 0.05) !important;
-  transform: translateY(-2px) !important;
 }
 
 .upload-slot-icon {
@@ -5087,7 +5065,6 @@ input[type="checkbox"] {
 }
 
 .upload-slot-card:hover .upload-slot-icon {
-  transform: scale(1.1) !important;
 }
 
 .upload-slot-title {
@@ -5160,7 +5137,6 @@ input[type="checkbox"] {
 
 .upload-slot-card:hover .upload-slot-icon svg {
   color: #3b82f6 !important;
-  transform: scale(1.1) !important;
 }
 
 .upload-slot-card.has-file .upload-slot-icon svg {
@@ -5181,7 +5157,6 @@ input[type="checkbox"] {
 }
 
 .toolbar-premium button:active {
-  transform: scale(0.97) !important;
 }
 
 .toolbar-premium button:disabled {
@@ -5210,7 +5185,6 @@ input[type="checkbox"] {
 /* 移除 hover 缩放 */
 
 .account-panel-selector button:active:not(:disabled) {
-  transform: scale(0.96) !important;
 }
 
 .account-panel-selector button:disabled {
@@ -5280,6 +5254,7 @@ input[type="checkbox"] {
   display: flex !important;
   flex-direction: column !important;
   gap: 16px !important;
+  padding-top: 24px !important;
 }
 
 .settings-panel-right {
@@ -5288,6 +5263,7 @@ input[type="checkbox"] {
   display: flex !important;
   flex-direction: column !important;
   gap: 16px !important;
+  padding-top: 24px !important;
 }
 
 .settings-card-module {
@@ -5389,7 +5365,6 @@ input[type="checkbox"] {
 }
 
 .settings-form-row > button:active:not(:disabled) {
-  transform: scale(0.96) !important;
 }
 
 .settings-form-row > button:disabled {
@@ -5425,7 +5400,6 @@ input[type="checkbox"] {
 /* 移除 hover 缩放 */
 
 .settings-toolbar button:active:not(:disabled) {
-  transform: scale(0.96) !important;
 }
 
 .settings-toolbar button:disabled {
@@ -5481,16 +5455,15 @@ input[type="checkbox"] {
 }
 
 .settings-toolbar .btn-refresh-set {
-  background: #f1f5f9 !important;
-  color: #475569 !important;
-  border: 1px solid #cbd5e1 !important;
-  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.06) !important;
+  background: #ffffff !important;
+  color: #0284c7 !important;
+  border: 1px solid #0284c7 !important;
+  box-shadow: 0 1px 2px rgba(2,132,199,0.1) !important;
 }
 .settings-toolbar .btn-refresh-set:hover:not(:disabled) {
-  background: #e2e8f0 !important;
-  color: #1e293b !important;
-  border-color: #94a3b8 !important;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.12) !important;
+  background: #f0f9ff !important;
+  color: #0369a1 !important;
+  border-color: #0369a1 !important;
 }
 
 /* ==========================================================================
@@ -5622,11 +5595,9 @@ input[type="checkbox"] {
 @keyframes monthPickerSlideDown {
   from {
     opacity: 0;
-    transform: scale(0.97) translateY(-2px);
   }
   to {
     opacity: 1;
-    transform: scale(1) translateY(0);
   }
 }
 
@@ -5740,3 +5711,24 @@ input[type="checkbox"] {
 .month-picker-btn-confirm:active {
   background: #000000 !important;
 }
+
+/* 移除员工管理页面表格的卡片重叠与双重包裹感 */
+.employee-dashboard-page .query-result-panel {
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.employee-dashboard-page .query-result-panel .query-result-table {
+  background: transparent !important;
+}
+
+.employee-dashboard-page .legacy-table-panel {
+  border: 1px solid var(--ent-border-strong, #cbd5e1) !important;
+  border-radius: 8px !important;
+  background: var(--ent-bg, #ffffff) !important;
+  box-shadow: none !important;
+}
+
