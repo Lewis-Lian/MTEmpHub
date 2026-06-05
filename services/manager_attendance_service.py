@@ -25,6 +25,7 @@ from utils.helpers import overlap_duration_days
 
 MANAGER_HEADERS = [
     "部   门",
+    "员工编号",
     "姓名",
     "出勤天数",
     "实际出勤天数",
@@ -41,10 +42,13 @@ MANAGER_HEADERS = [
 ]
 
 
-def manager_headers(include_actual_attendance_days: bool = True) -> list[str]:
-    if include_actual_attendance_days:
-        return list(MANAGER_HEADERS)
-    return [header for header in MANAGER_HEADERS if header != "实际出勤天数"]
+def manager_headers(include_actual_attendance_days: bool = True, include_emp_no: bool = False) -> list[str]:
+    headers = list(MANAGER_HEADERS)
+    if not include_actual_attendance_days:
+        headers = [h for h in headers if h != "实际出勤天数"]
+    if not include_emp_no:
+        headers = [h for h in headers if h != "员工编号"]
+    return headers
 
 
 def _month_date_range(month: str) -> tuple[date, date] | None:
@@ -764,6 +768,7 @@ def build_manager_rows(
             {
                 "emp_id": employee.id,
                 "dept_name": employee.department.dept_name if employee.department else "",
+                "emp_no": employee.emp_no,
                 "name": employee.name,
                 "attendance_days": attendance_days,
                 "actual_attendance_days": actual_attendance_days,
@@ -783,41 +788,27 @@ def build_manager_rows(
     return rows
 
 
-def rows_as_table(rows: list[dict[str, object]], include_actual_attendance_days: bool = True) -> list[list[object]]:
-    return [
-        (
-            [
-                row.get("dept_name", ""),
-                row.get("name", ""),
-                row.get("attendance_days", 0),
-                row.get("actual_attendance_days", 0),
-                row.get("personal_sick_days", 0),
-                row.get("injury_days", 0),
-                row.get("business_trip_days", 0),
-                row.get("marriage_days", 0),
-                row.get("funeral_days", 0),
-                row.get("late_early_minutes", 0),
-                row.get("summary", ""),
-                row.get("benefit_days", 0),
-                row.get("overtime_change", 0),
-                row.get("remark", ""),
-            ]
-            if include_actual_attendance_days
-            else [
-                row.get("dept_name", ""),
-                row.get("name", ""),
-                row.get("attendance_days", 0),
-                row.get("personal_sick_days", 0),
-                row.get("injury_days", 0),
-                row.get("business_trip_days", 0),
-                row.get("marriage_days", 0),
-                row.get("funeral_days", 0),
-                row.get("late_early_minutes", 0),
-                row.get("summary", ""),
-                row.get("benefit_days", 0),
-                row.get("overtime_change", 0),
-                row.get("remark", ""),
-            ]
-        )
-        for row in rows
-    ]
+def rows_as_table(rows: list[dict[str, object]], include_actual_attendance_days: bool = True, include_emp_no: bool = False) -> list[list[object]]:
+    table_rows = []
+    for row in rows:
+        item = [row.get("dept_name", "")]
+        if include_emp_no:
+            item.append(row.get("emp_no", ""))
+        item.append(row.get("name", ""))
+        item.append(row.get("attendance_days", 0))
+        if include_actual_attendance_days:
+            item.append(row.get("actual_attendance_days", 0))
+        item.extend([
+            row.get("personal_sick_days", 0),
+            row.get("injury_days", 0),
+            row.get("business_trip_days", 0),
+            row.get("marriage_days", 0),
+            row.get("funeral_days", 0),
+            row.get("late_early_minutes", 0),
+            row.get("summary", ""),
+            row.get("benefit_days", 0),
+            row.get("overtime_change", 0),
+            row.get("remark", ""),
+        ])
+        table_rows.append(item)
+    return table_rows

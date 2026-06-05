@@ -8,6 +8,7 @@ import type { QueryTableCellModalConfig } from "../../components/query/QueryTabl
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { AccountSet, HeaderRowsResponse, QueryBootstrap } from "../../types/query";
+import "./EmployeeDashboardPage.css";
 
 type FieldType = "month" | "year" | "employees";
 type PageKind = "headerRows" | "objectRows";
@@ -293,7 +294,12 @@ export default function QueryPage({
   const employeePickerLabel = employeeFilterMode === "manager" ? "管理人员范围" : "员工范围";
 
   return (
-    <div className="query-page-shell">
+    <div className="query-page-shell employee-dashboard-page">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
           <span className="query-filter-kicker">Query Filters</span>
@@ -302,6 +308,24 @@ export default function QueryPage({
         </div>
 
         <div className="query-filter-body">
+          {fields.includes("employees") ? (
+            <div className="query-filter-field">
+              <label className="form-label">{employeeFieldLabel}</label>
+              <EmployeePicker
+                departments={bootstrap.departments}
+                employees={bootstrap.employees}
+                filterMode={employeeFilterMode}
+                label={employeePickerLabel}
+                onChange={(ids) => {
+                  setSelectedEmployeeIds(ids);
+                  setHasQueried(false);
+                }}
+                selectedIds={selectedEmployeeIds}
+                showFieldChrome={false}
+              />
+            </div>
+          ) : null}
+
           {fields.includes("month") ? (
             <div className="query-filter-field">
               <label className="form-label">账套</label>
@@ -334,24 +358,6 @@ export default function QueryPage({
                 }}
                 type="number"
                 value={selectedYear}
-              />
-            </div>
-          ) : null}
-
-          {fields.includes("employees") ? (
-            <div className="query-filter-field">
-              <label className="form-label">{employeeFieldLabel}</label>
-              <EmployeePicker
-                departments={bootstrap.departments}
-                employees={bootstrap.employees}
-                filterMode={employeeFilterMode}
-                label={employeePickerLabel}
-                onChange={(ids) => {
-                  setSelectedEmployeeIds(ids);
-                  setHasQueried(false);
-                }}
-                selectedIds={selectedEmployeeIds}
-                showFieldChrome={false}
               />
             </div>
           ) : null}

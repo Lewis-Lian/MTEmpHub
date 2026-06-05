@@ -478,7 +478,7 @@ export default function AdminDashboardPage() {
               maxHeight: "90vh",
               overflowY: "auto",
               position: "relative",
-              padding: "24px",
+              padding: "48px 24px 24px 24px",
               boxSizing: "border-box",
             }}
           >
@@ -569,7 +569,7 @@ export default function AdminDashboardPage() {
                           value={createMonth}
                         />
                       </label>
-                      <button className="legacy-btn-primary account-primary-button" disabled={isWorking} type="submit">
+                      <button disabled={isWorking} type="submit">
                         创建
                       </button>
                     </form>
@@ -784,17 +784,7 @@ export default function AdminDashboardPage() {
                     </button>
 
                     <button
-                      className="settings-select"
-                      style={{
-                        height: "38px",
-                        fontSize: "13px",
-                        fontWeight: "600",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        border: "1px solid #cbd5e1"
-                      }}
+                      className="btn-refresh-set"
                       disabled={isWorking}
                       onClick={() => void runAction(async () => reloadAccountSets(selectedAccountSetId))}
                       type="button"
