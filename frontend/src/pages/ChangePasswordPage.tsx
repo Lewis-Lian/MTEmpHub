@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { changePassword } from "../api/auth";
 import { ApiError } from "../api/client";
 import AnimatedCharacters from "../components/AnimatedCharacters";
+import { useNotification } from "../components/feedback/Notification";
 
 export default function ChangePasswordPage() {
   const [username, setUsername] = useState("");
@@ -16,6 +17,7 @@ export default function ChangePasswordPage() {
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const notification = useNotification();
   const passwordLength = currentPassword.length + newPassword.length + confirmPassword.length;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -34,13 +36,18 @@ export default function ChangePasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setSuccess("密码修改成功，请使用新密码登录。");
+      const successMsg = "密码修改成功，请使用新密码登录。";
+      setSuccess(successMsg);
+      notification.success(successMsg);
     } catch (caughtError) {
-      setError(caughtError instanceof ApiError ? caughtError.message : "修改失败，请稍后重试");
+      const errMsg = caughtError instanceof ApiError ? caughtError.message : "修改失败，请稍后重试";
+      setError(errMsg);
+      notification.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }
   }
+
 
   return (
     <div className="login-page">
