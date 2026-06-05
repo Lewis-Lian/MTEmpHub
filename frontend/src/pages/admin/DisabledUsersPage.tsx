@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNotification } from "../../components/feedback/Notification";
 
 import { fetchDisabledUsers, unlockDisabledUser } from "../../api/admin";
 import type { AdminDisabledUser } from "../../types/admin";
@@ -8,11 +9,10 @@ import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 
 export default function DisabledUsersPage() {
+  const notification = useNotification();
   const [users, setUsers] = useState<AdminDisabledUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [resultMessage, setResultMessage] = useState("");
-  const [resultError, setResultError] = useState("");
   const [workingUserId, setWorkingUserId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -33,14 +33,12 @@ export default function DisabledUsersPage() {
 
   async function handleUnlock(user: AdminDisabledUser) {
     setWorkingUserId(user.id);
-    setResultMessage("");
-    setResultError("");
     try {
       await unlockDisabledUser(user.id);
-      setResultMessage(`已解锁账号：${user.username}`);
+      notification.success(`已解锁账号：${user.username}`);
       await loadUsers();
     } catch (error) {
-      setResultError(error instanceof Error ? error.message : "解锁失败");
+      notification.error(error instanceof Error ? error.message : "解锁失败");
     } finally {
       setWorkingUserId(null);
     }
@@ -101,8 +99,7 @@ export default function DisabledUsersPage() {
           </div>
         </div>
 
-        {resultMessage ? <div className="account-result-message" style={{ marginBottom: "12px" }}>{resultMessage}</div> : null}
-        {resultError ? <div className="legacy-inline-error" style={{ marginBottom: "12px" }}>{resultError}</div> : null}
+
 
         <QueryResultPanel>
           <QueryTable
