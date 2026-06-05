@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { ApiError } from "./api/client";
 import { fetchMe, type AuthUser } from "./api/auth";
 import AppRouter from "./router";
+import { NotificationProvider } from "./components/feedback/Notification";
+import { ConfirmProvider } from "./components/feedback/ConfirmDialog";
 
 export default function App() {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -63,5 +65,13 @@ export default function App() {
     );
   }
 
-  return <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />;
+  return (
+    <NotificationProvider>
+      <ConfirmProvider>
+        <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />
+      </ConfirmProvider>
+    </NotificationProvider>
+  );
 }
+
+
