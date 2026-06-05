@@ -5139,7 +5139,6 @@ input[type="checkbox"] {
   background: #ef4444 !important;
   border-color: #ef4444 !important;
   color: #ffffff !important;
-  transform: scale(1.1) !important;
 }
 
 .toolbar-premium {
@@ -5208,9 +5207,7 @@ input[type="checkbox"] {
   box-sizing: border-box !important;
 }
 
-.account-panel-selector button:hover:not(:disabled) {
-  transform: scale(1.02) !important;
-}
+/* 移除 hover 缩放 */
 
 .account-panel-selector button:active:not(:disabled) {
   transform: scale(0.96) !important;
@@ -5388,12 +5385,18 @@ input[type="checkbox"] {
 }
 
 .settings-form-row > button:hover:not(:disabled) {
-  transform: scale(1.03) !important;
   box-shadow: 0 6px 15px rgba(15, 23, 42, 0.22) !important;
 }
 
 .settings-form-row > button:active:not(:disabled) {
   transform: scale(0.96) !important;
+}
+
+.settings-form-row > button:disabled {
+  opacity: 0.55 !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 /* 弹窗专用控制按钮栏 */
@@ -5419,9 +5422,7 @@ input[type="checkbox"] {
   transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-.settings-toolbar button:hover:not(:disabled) {
-  transform: scale(1.02) !important;
-}
+/* 移除 hover 缩放 */
 
 .settings-toolbar button:active:not(:disabled) {
   transform: scale(0.96) !important;
@@ -5474,6 +5475,22 @@ input[type="checkbox"] {
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%) !important;
   color: #ffffff !important;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.18) !important;
+}
+.settings-toolbar .btn-delete-set:hover:not(:disabled) {
+  box-shadow: 0 8px 24px rgba(185, 28, 28, 0.4) !important;
+}
+
+.settings-toolbar .btn-refresh-set {
+  background: #f1f5f9 !important;
+  color: #475569 !important;
+  border: 1px solid #cbd5e1 !important;
+  box-shadow: 0 2px 6px rgba(148, 163, 184, 0.06) !important;
+}
+.settings-toolbar .btn-refresh-set:hover:not(:disabled) {
+  background: #e2e8f0 !important;
+  color: #1e293b !important;
+  border-color: #94a3b8 !important;
+  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.12) !important;
 }
 
 /* ==========================================================================

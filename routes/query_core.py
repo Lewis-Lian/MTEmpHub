@@ -1857,10 +1857,14 @@ def manager_attendance_api():
         emp_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
     options = _manager_options()
     rows = build_manager_rows(options, emp_ids)
+
+    include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
+    include_emp_no = request.args.get("show_emp_no") == "1"
+
     return jsonify(
         {
-            "headers": MANAGER_HEADERS,
-            "rows": rows_as_table(rows),
+            "headers": manager_headers(include_actual_attendance_days, include_emp_no),
+            "rows": rows_as_table(rows, include_actual_attendance_days, include_emp_no),
             "month": options.month,
             "factory_rest_days": options.factory_rest_days,
             "monthly_benefit_days": options.monthly_benefit_days,
@@ -2173,12 +2177,13 @@ def manager_attendance_export_api():
     options = _manager_options()
     rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, emp_ids))
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
+    include_emp_no = request.args.get("show_emp_no") == "1"
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "管理人员查询"
-    ws.append(manager_headers(include_actual_attendance_days))
-    for row in rows_as_table(rows, include_actual_attendance_days):
+    ws.append(manager_headers(include_actual_attendance_days, include_emp_no))
+    for row in rows_as_table(rows, include_actual_attendance_days, include_emp_no):
         ws.append(row)
 
     output = BytesIO()
