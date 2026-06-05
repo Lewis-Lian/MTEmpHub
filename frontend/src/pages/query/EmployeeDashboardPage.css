@@ -85,13 +85,11 @@
   padding: 24px 28px;
   box-shadow: 0 10px 30px rgba(148, 163, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   position: relative;
-  top: 0;
-  transition: top 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
   gap: 16px;
 }
 
 .employee-dashboard-page .query-filter-rail:hover {
-  top: -2px;
   box-shadow: 0 16px 35px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
   border-color: rgba(203, 213, 225, 0.8);
 }

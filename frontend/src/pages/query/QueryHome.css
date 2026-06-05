@@ -342,7 +342,7 @@
 
 
 .qh-kpi-card-hero:hover {
-  transform: translateY(-4px) scale(1.01);
+  transform: translateY(-4px);
   border-color: rgba(56, 189, 248, 0.3);
   box-shadow: var(--qh-hover-shadow);
 }

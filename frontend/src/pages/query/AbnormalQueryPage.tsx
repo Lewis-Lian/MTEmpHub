@@ -7,6 +7,7 @@ import QueryTable from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
+import "./EmployeeDashboardPage.css";
 
 interface AbnormalQueryRow {
   dept_name: string;
@@ -197,7 +198,12 @@ export default function AbnormalQueryPage() {
   }
 
   return (
-    <div className="query-page-shell">
+    <div className="query-page-shell employee-dashboard-page">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
           <span className="query-filter-kicker">Query Filters</span>
