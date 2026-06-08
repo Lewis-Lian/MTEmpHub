@@ -1038,7 +1038,7 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
 
 
 def account_sets_api():
-    if not g.current_user.can_access_page("query_home"):
+    if not _can_access_query_center():
         return jsonify({"error": "Forbidden"}), 403
     rows = AccountSet.query.order_by(AccountSet.month.desc()).all()
     return jsonify(
