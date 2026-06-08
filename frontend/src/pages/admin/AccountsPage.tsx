@@ -502,12 +502,14 @@ export default function AccountsPage() {
           zIndex: 1500,
           background: "rgba(15, 23, 42, 0.3)",
           backdropFilter: "blur(8px)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          overflowY: "auto",
+          padding: "40px 24px",
           boxSizing: "border-box",
         }}>
-          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>创建账号</span>
@@ -542,8 +544,8 @@ export default function AccountsPage() {
               {/* 数据与权限范围 */}
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
-                <div style={{ display: "grid", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field" style={{ margin: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -553,7 +555,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field" style={{ margin: 0 }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -562,7 +564,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field" style={{ margin: 0 }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">功能导航权限</span>
                     <PickerSummaryField
                       buttonLabel="配置导航可见性"
@@ -630,12 +632,14 @@ export default function AccountsPage() {
           zIndex: 1500,
           background: "rgba(15, 23, 42, 0.3)",
           backdropFilter: "blur(8px)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          overflowY: "auto",
+          padding: "40px 24px",
           boxSizing: "border-box",
         }}>
-          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>编辑账号</span>
@@ -680,8 +684,8 @@ export default function AccountsPage() {
               {/* 数据与权限范围 */}
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
-                <div style={{ display: "grid", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field" style={{ margin: 0 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -692,7 +696,7 @@ export default function AccountsPage() {
                     />
                   </label>
 
-                  <label className="account-field" style={{ margin: 0 }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -702,7 +706,7 @@ export default function AccountsPage() {
                     />
                   </label>
 
-                  <label className="account-field" style={{ margin: 0 }}>
+                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
                     <span className="account-field-label">功能导航权限</span>
                     <PickerSummaryField
                       buttonLabel="配置导航可见性"
@@ -732,19 +736,38 @@ export default function AccountsPage() {
       ) : null}
 
       {permissionContext ? (
-        <div className="master-modal-backdrop">
-          <div className="master-modal account-permission-modal">
-            <div className="master-modal-header">
-              <h2>{permissionContext === "create" ? "创建账号页面权限" : permissionContext === "edit" ? "编辑页面权限" : "批量修改页面权限"}</h2>
-              <button className="master-modal-close" onClick={() => setPermissionContext(null)} type="button">×</button>
+        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setPermissionContext(null); }} style={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 1500,
+          background: "rgba(15, 23, 42, 0.3)",
+          backdropFilter: "blur(8px)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}>
+          <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>
+                  {permissionContext === "create" ? "创建账号页面权限" : permissionContext === "edit" ? "编辑页面权限" : "批量修改页面权限"}
+                </span>
+                <span className="page-tag">系统管理</span>
+              </div>
+              <button className="master-modal-close" onClick={() => setPermissionContext(null)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
             </div>
-            <div className="master-modal-body">
-              <div className="account-grid-two">
-                <label className="account-field">
+            
+            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "20px", overflow: "visible" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                <label className="account-field" style={{ margin: 0 }}>
                   <span className="account-field-label">搜索权限</span>
                   <input className="account-input" onChange={(event) => setPermissionKeyword(event.target.value)} placeholder="搜索页面名称" value={permissionKeyword} />
                 </label>
-                <label className="account-field">
+                <label className="account-field" style={{ margin: 0 }}>
                   <span className="account-field-label">权限分组</span>
                   <select className="account-select" onChange={(event) => setPermissionGroup(event.target.value)} value={permissionGroup}>
                     <option value="">全部</option>
@@ -753,9 +776,15 @@ export default function AccountsPage() {
                   </select>
                 </label>
               </div>
-              <div className="account-permission-list">
-                {filteredPermissionRows.map((row) => (
-                  <label className="master-check-option" key={row.key}>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto", paddingRight: "8px" }} className="custom-scrollbar">
+                {filteredPermissionRows.length > 0 ? filteredPermissionRows.map((row) => (
+                  <label key={row.key} style={{
+                    display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", 
+                    background: currentPermissionKeys().includes(row.key) ? "#eff6ff" : "#f8fafc", 
+                    border: `1px solid ${currentPermissionKeys().includes(row.key) ? "#bfdbfe" : "#e2e8f0"}`, 
+                    borderRadius: "8px", cursor: "pointer", transition: "all 0.2s"
+                  }}>
                     <input
                       checked={currentPermissionKeys().includes(row.key)}
                       onChange={(event) =>
@@ -766,15 +795,22 @@ export default function AccountsPage() {
                         )
                       }
                       type="checkbox"
+                      style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer" }}
                     />
-                    <span>{row.label}</span>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <span style={{ fontSize: "14px", fontWeight: currentPermissionKeys().includes(row.key) ? "500" : "400", color: "#1e293b" }}>{row.label}</span>
+                      <span style={{ fontSize: "12px", color: "#64748b" }}>分组: {row.group}</span>
+                    </div>
                   </label>
-                ))}
+                )) : (
+                  <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>未找到匹配的权限</div>
+                )}
               </div>
             </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setPermissionContext(null)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={() => setPermissionContext(null)} type="button">确定</button>
+
+            <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+              <button className="account-action-button" onClick={() => setPermissionContext(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
+              <button className="account-action-button account-action-button--primary" onClick={() => setPermissionContext(null)} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>完成配置</button>
             </div>
           </div>
         </div>
@@ -899,11 +935,32 @@ function PickerSummaryField({
   buttonLabel: string;
 }) {
   return (
-    <div className="account-picker-summary">
-      <input className="account-input" readOnly value={value} />
-      <button className="account-action-button" onClick={onClick} type="button">
-        {buttonLabel}
-      </button>
+    <div 
+      className="account-picker-summary" 
+      onClick={onClick} 
+      style={{ 
+        display: "grid", 
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        alignItems: "center", 
+        gap: "12px",
+        width: "100%",
+        boxSizing: "border-box",
+        padding: "8px 14px", 
+        background: "#f8fafc", 
+        border: "1px solid #cbd5e1", 
+        borderRadius: "8px", 
+        cursor: "pointer",
+        transition: "all 0.2s ease"
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#94a3b8"; e.currentTarget.style.background = "#f1f5f9"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.background = "#f8fafc"; }}
+    >
+      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: value === "未选择页面权限" ? "#94a3b8" : "#334155", fontSize: "14px" }}>
+        {value}
+      </div>
+      <div style={{ color: "#2563eb", fontSize: "13px", fontWeight: "500" }}>
+        {buttonLabel} &rarr;
+      </div>
     </div>
   );
 }
