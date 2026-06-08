@@ -156,46 +156,6 @@
   margin-bottom: 8px;
 }
 
-/* ==========================================================================
-   输入组件高度、尺寸、边框完全对齐 (38px)
-   ========================================================================== */
-.employee-dashboard-page .employee-lookup .input-group {
-  height: 38px;
-}
-
-.employee-dashboard-page .employee-lookup .form-control {
-  height: 38px;
-  min-height: 38px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #0f172a;
-  font-size: 13.5px;
-  padding: 8px 12px;
-  border-radius: 8px 0 0 8px;
-  box-sizing: border-box;
-}
-
-.employee-dashboard-page .employee-lookup .btn {
-  height: 38px;
-  min-height: 38px;
-  border: 1px solid #cbd5e1;
-  border-left: none;
-  background: #f8fafc;
-  color: #64748b;
-  box-sizing: border-box;
-}
-
-.employee-dashboard-page .employee-lookup-clear {
-  height: 38px;
-  min-height: 38px;
-  line-height: 36px;
-  box-sizing: border-box;
-  padding: 0 10px;
-}
-
-.employee-dashboard-page .employee-picker-trigger {
-  border-radius: 0 8px 8px 0;
-}
 
 .employee-dashboard-page .form-select {
   height: 38px;
