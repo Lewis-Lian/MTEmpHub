@@ -1749,32 +1749,17 @@ body {
   border-radius: 8px;
 }
 
+.department-picker-modal {
+  z-index: 10000 !important;
+}
+
 .department-picker-tree-panel {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
 }
 
 .department-picker-tree-list {
-  max-height: none;
-  min-height: 0;
-  height: 100%;
-}
-
-.department-picker-modal .modal-dialog {
-  height: min(760px, calc(100vh - 48px));
-}
-
-.department-picker-modal .modal-body {
-  overflow: hidden;
-}
-
-.department-picker-modal .row,
-.department-picker-modal .col-lg-7,
-.department-picker-modal .col-lg-5,
-.department-picker-modal .department-picker-tree-panel,
-.department-picker-modal .department-picker-selected-panel {
-  min-height: 0;
-  height: 100%;
+  max-height: 420px;
 }
 
 .department-picker-modal .employee-picker-selected-wrap,
@@ -1806,6 +1791,52 @@ body {
 .department-parent-modal .master-modal-body,
 .department-parent-modal .account-field {
   overflow: visible;
+}
+
+.department-parent-modal .employee-lookup .input-group {
+  height: 38px !important;
+}
+
+.department-parent-modal .employee-lookup .form-control {
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 13.5px !important;
+  padding: 8px 12px !important;
+  border-top-left-radius: 8px !important;
+  border-bottom-left-radius: 8px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  box-sizing: border-box !important;
+  box-shadow: none !important;
+}
+
+.department-parent-modal .employee-lookup .btn {
+  height: 38px !important;
+  min-height: 38px !important;
+  border: 1px solid #cbd5e1 !important;
+  border-left: none !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  box-sizing: border-box !important;
+}
+
+.department-parent-modal .employee-lookup .employee-lookup-clear {
+  height: 38px !important;
+  min-height: 38px !important;
+  line-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 0 10px !important;
+  border-radius: 0 !important;
+}
+
+.department-parent-modal .employee-lookup .employee-picker-trigger {
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
 }
 
 .department-parent-modal .employee-lookup {
