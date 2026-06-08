@@ -3674,6 +3674,8 @@ body {
   padding: 14px 18px;
   border-bottom: 1px solid #dce6ef;
   background: #fbfdff;
+  position: relative;
+  z-index: 30;
 }
 
 .master-filter-grid {
@@ -5732,3 +5734,17 @@ input[type="checkbox"] {
   box-shadow: none !important;
 }
 
+
+.employee-dashboard-page .query-result-panel,
+.employee-dashboard-page .legacy-table-panel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.employee-dashboard-page .legacy-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
