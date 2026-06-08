@@ -181,23 +181,26 @@ export default function ShiftsPage() {
 
   function renderSlotEditor(target: "create" | "edit", state: ShiftFormState) {
     return (
-      <div className="master-slot-list">
+      <div className="master-slot-list" style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
         {state.time_slots.map((slot, index) => (
-          <div className="master-slot-row" key={index}>
+          <div className="master-slot-row" key={index} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <input
               className="account-input"
               type="time"
               onChange={(event) => updateSlot(target, index, 0, event.target.value)}
               value={slot[0]}
+              style={{ flex: 1 }}
             />
+            <span style={{ color: "#94a3b8" }}>-</span>
             <input
               className="account-input"
               type="time"
               onChange={(event) => updateSlot(target, index, 1, event.target.value)}
               value={slot[1]}
+              style={{ flex: 1 }}
             />
-            <button className="account-action-button account-action-button--danger master-slot-remove" onClick={() => removeSlot(target, index)} type="button">
-              删
+            <button className="account-action-button account-action-button--danger" onClick={() => removeSlot(target, index)} type="button" style={{ padding: "8px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} title="删除此时间段">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             </button>
           </div>
         ))}
@@ -353,72 +356,97 @@ export default function ShiftsPage() {
         pointerEvents: showModal === "create" ? "auto" : "none",
         transition: "opacity 0.15s ease"
       }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "24px", boxSizing: "border-box", position: "relative" }}>
-          <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
-          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增班次</span>
-            <span className="page-tag">排班规则</span>
-          </div>
-          <form className="account-create-form" onSubmit={submitCreate}>
-            <label className="account-field">
-              <span className="account-field-label">班次编号</span>
-              <input className="account-input" onChange={(event) => setForm({ ...form, shift_no: event.target.value })} required value={form.shift_no} />
-            </label>
-            <label className="account-field">
-              <span className="account-field-label">班次名称</span>
-              <input className="account-input" onChange={(event) => setForm({ ...form, shift_name: event.target.value })} required value={form.shift_name} />
-            </label>
-            <label className="master-check-option" style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "16px" }}>
-              <input checked={form.is_cross_day} onChange={(event) => setForm({ ...form, is_cross_day: event.target.checked })} type="checkbox" />
-              <span>跨天班次</span>
-            </label>
-            <div className="account-field">
-              <div className="master-field-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                <span className="account-field-label" style={{ marginBottom: 0 }}>班次时间段</span>
-                <button className="account-action-button" onClick={() => addSlot("create")} type="button">
-                  新增时间段
-                </button>
-              </div>
-              {renderSlotEditor("create", form)}
+        <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增班次</span>
+              <span className="page-tag">排班规则</span>
             </div>
-            <button className="account-action-button account-action-button--primary account-primary-button" type="submit" style={{ width: "100%", marginTop: "16px" }}>
-              创建班次
-            </button>
+            <button className="master-modal-close" onClick={handleCloseModal} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
+          </div>
+          <form className="account-create-form" onSubmit={submitCreate} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* 基础信息 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <label className="account-field" style={{ margin: 0 }}>
+                  <span className="account-field-label">班次编号</span>
+                  <input className="account-input" onChange={(event) => setForm({ ...form, shift_no: event.target.value })} required value={form.shift_no} placeholder="例如: A0001" />
+                </label>
+                <label className="account-field" style={{ margin: 0 }}>
+                  <span className="account-field-label">班次名称</span>
+                  <input className="account-input" onChange={(event) => setForm({ ...form, shift_name: event.target.value })} required value={form.shift_name} placeholder="例如: 行政通用班次" />
+                </label>
+              </div>
+            </div>
+
+            {/* 时间规则 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span>时间规则</span>
+                <button className="account-action-button" onClick={() => addSlot("create")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
+              </h4>
+              
+              <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: form.time_slots.length > 0 ? "16px" : "0" }}>
+                  <input checked={form.is_cross_day} onChange={(event) => setForm({ ...form, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
+                  <span style={{ fontSize: "14px", color: "#334155" }}>允许跨天班次 (下班时间在次日)</span>
+                </label>
+                {renderSlotEditor("create", form)}
+              </div>
+            </div>
+
+            <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+              <button className="account-action-button account-action-button--primary account-primary-button" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>
+                创建班次
+              </button>
+            </div>
           </form>
         </div>
       </div>
 
       {editing ? (
         <div className="master-modal-backdrop">
-          <form className="master-modal" onSubmit={submitEdit}>
-            <div className="master-modal-header">
-              <h2>编辑班次</h2>
+          <form className="master-modal" onSubmit={submitEdit} style={{ maxWidth: "600px", width: "100%", padding: 0 }}>
+            <div className="master-modal-header" style={{ padding: "20px 24px", borderBottom: "1px solid var(--ent-border)" }}>
+              <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)", margin: 0 }}>编辑班次</h2>
               <button className="master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
             </div>
-            <div className="master-modal-body">
-              <label className="account-field">
-                <span className="account-field-label">班次编号</span>
-                <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_no: event.target.value })} required value={editForm.shift_no} />
-              </label>
-              <label className="account-field">
-                <span className="account-field-label">班次名称</span>
-                <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_name: event.target.value })} required value={editForm.shift_name} />
-              </label>
-              <label className="master-check-option">
-                <input checked={editForm.is_cross_day} onChange={(event) => setEditForm({ ...editForm, is_cross_day: event.target.checked })} type="checkbox" />
-                <span>跨天班次</span>
-              </label>
-              <div className="account-field">
-                <div className="master-field-head">
-                  <span className="account-field-label">班次时间段</span>
-                  <button className="account-action-button" onClick={() => addSlot("edit")} type="button">新增时间段</button>
+            <div className="master-modal-body" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* 基础信息 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">班次编号</span>
+                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_no: event.target.value })} required value={editForm.shift_no} placeholder="例如: A0001" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">班次名称</span>
+                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_name: event.target.value })} required value={editForm.shift_name} placeholder="例如: 行政通用班次" />
+                  </label>
                 </div>
-                {renderSlotEditor("edit", editForm)}
+              </div>
+
+              {/* 时间规则 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>时间规则</span>
+                  <button className="account-action-button" onClick={() => addSlot("edit")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
+                </h4>
+                
+                <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                  <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: editForm.time_slots.length > 0 ? "16px" : "0" }}>
+                    <input checked={editForm.is_cross_day} onChange={(event) => setEditForm({ ...editForm, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
+                    <span style={{ fontSize: "14px", color: "#334155" }}>允许跨天班次 (下班时间在次日)</span>
+                  </label>
+                  {renderSlotEditor("edit", editForm)}
+                </div>
               </div>
             </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setEditing(null)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" type="submit">保存</button>
+            <div className="master-modal-footer" style={{ padding: "16px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button className="account-action-button" onClick={() => setEditing(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
+              <button className="account-action-button account-action-button--primary" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>保存</button>
             </div>
           </form>
         </div>
