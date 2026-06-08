@@ -1063,36 +1063,6 @@ body {
   display: block;
 }
 
-.query-filter-rail .employee-lookup .form-control,
-.query-filter-rail .employee-lookup .btn {
-  min-height: 36px;
-  height: 36px;
-  box-sizing: border-box;
-}
-
-.query-filter-rail .employee-lookup .form-control {
-  padding: 5px 8px;
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.query-filter-rail .employee-picker-trigger {
-  min-width: 36px;
-  width: 36px;
-  padding: 0;
-}
-
-.query-filter-rail .employee-lookup-clear {
-  min-width: 32px;
-  width: 32px;
-  padding: 0;
-  font-size: 16px;
-}
-
-.query-filter-rail .employee-picker-icon {
-  font-size: 14px;
-}
-
 .query-filter-rail .dashboard-check-option {
   border-color: #dbe5ef;
   background: #f8fbff;
@@ -1617,17 +1587,22 @@ body {
 .employee-lookup .input-group {
   display: flex;
   align-items: stretch;
+  height: 38px;
 }
 
 .employee-lookup .form-control {
   min-width: 0;
   flex: 1;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid #c7d2de;
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
   background: #ffffff;
-  color: #183153;
-  font-size: 13px;
+  color: #0f172a;
+  font-size: 13.5px;
+  padding: 8px 12px;
+  border-radius: 8px 0 0 8px;
+  box-sizing: border-box;
+  box-shadow: none;
 }
 
 .employee-lookup.has-clear .form-control {
@@ -1636,19 +1611,26 @@ body {
 }
 
 .employee-lookup .btn {
-  min-height: 34px;
-  border: 1px solid #c7d2de;
-  background: #ffffff;
-  color: #183153;
+  height: 38px;
+  min-height: 38px;
+  border: 1px solid #cbd5e1;
+  border-left: none;
+  background: #f8fafc;
+  color: #64748b;
+  box-sizing: border-box;
   cursor: pointer;
 }
 
 .employee-lookup-clear {
   min-width: 34px;
+  height: 38px;
+  min-height: 38px;
+  line-height: 36px;
+  box-sizing: border-box;
   padding: 0 10px;
   color: #667085;
   font-size: 18px;
-  line-height: 1;
+  border-radius: 0 !important;
 }
 
 .employee-lookup-clear:hover {
@@ -1657,6 +1639,10 @@ body {
 
 .employee-picker-trigger {
   min-width: 42px;
+  border-top-right-radius: 8px !important;
+  border-bottom-right-radius: 8px !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
 }
 
 .employee-picker-icon {
@@ -1793,51 +1779,6 @@ body {
   overflow: visible;
 }
 
-.department-parent-modal .employee-lookup .input-group {
-  height: 38px !important;
-}
-
-.department-parent-modal .employee-lookup .form-control {
-  height: 38px !important;
-  min-height: 38px !important;
-  border: 1px solid #cbd5e1 !important;
-  background: #ffffff !important;
-  color: #0f172a !important;
-  font-size: 13.5px !important;
-  padding: 8px 12px !important;
-  border-top-left-radius: 8px !important;
-  border-bottom-left-radius: 8px !important;
-  border-top-right-radius: 0 !important;
-  border-bottom-right-radius: 0 !important;
-  box-sizing: border-box !important;
-  box-shadow: none !important;
-}
-
-.department-parent-modal .employee-lookup .btn {
-  height: 38px !important;
-  min-height: 38px !important;
-  border: 1px solid #cbd5e1 !important;
-  border-left: none !important;
-  background: #f8fafc !important;
-  color: #64748b !important;
-  box-sizing: border-box !important;
-}
-
-.department-parent-modal .employee-lookup .employee-lookup-clear {
-  height: 38px !important;
-  min-height: 38px !important;
-  line-height: 36px !important;
-  box-sizing: border-box !important;
-  padding: 0 10px !important;
-  border-radius: 0 !important;
-}
-
-.department-parent-modal .employee-lookup .employee-picker-trigger {
-  border-top-right-radius: 8px !important;
-  border-bottom-right-radius: 8px !important;
-  border-top-left-radius: 0 !important;
-  border-bottom-left-radius: 0 !important;
-}
 
 .department-parent-modal .employee-lookup {
   z-index: 2;
