@@ -283,13 +283,13 @@ export default function DepartmentPicker({
             </button>
           ) : null}
           <button
-            className="btn btn-outline-secondary"
+            className="btn btn-outline-secondary employee-picker-trigger"
             id={triggerId}
             onClick={openPicker}
             title={title}
             type="button"
           >
-            <span className="employee-picker-icon" aria-hidden="true">⎇</span>
+            <span className="employee-picker-icon" aria-hidden="true">🏢</span>
           </button>
         </div>
         <input id={hiddenId} readOnly type="hidden" value={value} />

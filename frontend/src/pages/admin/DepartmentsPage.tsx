@@ -510,7 +510,7 @@ export default function DepartmentsPage() {
         pointerEvents: showModal === "create" ? "auto" : "none",
         transition: "opacity 0.15s ease"
       }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "24px", boxSizing: "border-box", position: "relative" }}>
+        <div className="master-modal-container department-parent-modal" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "24px", boxSizing: "border-box", position: "relative" }}>
           <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
           <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增部门</span>
