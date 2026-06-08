@@ -69,6 +69,9 @@ export default function AccountsPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
 
   const [editingUser, setEditingUser] = useState<AccountUser | null>(null);
+  const [editProfileEmployeeId, setEditProfileEmployeeId] = useState<number | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<"readonly" | "admin">("readonly");
   const [editProfileEmpNo, setEditProfileEmpNo] = useState("");
   const [editProfileName, setEditProfileName] = useState("");
@@ -279,7 +282,11 @@ export default function AccountsPage() {
   }
 
   function openEdit(user: AccountUser) {
+    const matchedEmployee = employees.find((e) => e.emp_no === user.profile_emp_no);
+    setEditProfileEmployeeId(matchedEmployee ? matchedEmployee.id : null);
     setEditingUser(user);
+    setEditUsername(user.username);
+    setEditPassword("");
     setEditRole(user.role);
     setEditProfileEmpNo(user.profile_emp_no);
     setEditProfileName(user.profile_name);
@@ -293,17 +300,37 @@ export default function AccountsPage() {
     );
   }
 
+  function handleSelectProfileEmployee(ids: number[]) {
+    if (ids.length === 0) {
+      setEditProfileEmployeeId(null);
+      setEditProfileEmpNo("");
+      setEditProfileName("");
+      setEditProfileDeptId("");
+      return;
+    }
+    const id = ids[ids.length - 1];
+    setEditProfileEmployeeId(id);
+    const employee = employees.find((e) => e.id === id);
+    if (employee) {
+      setEditProfileEmpNo(employee.emp_no);
+      setEditProfileName(employee.name);
+      setEditProfileDeptId(employee.dept_id ? String(employee.dept_id) : "");
+    }
+  }
+
   async function saveEdit() {
     if (!editingUser) {
       return;
     }
-    if (!editProfileEmpNo.trim() || !editProfileName.trim() || !editProfileDeptId) {
-      notification.warning("工号、姓名和部门信息不能为空");
+    if (!editUsername.trim() || !editProfileEmpNo.trim() || !editProfileName.trim() || !editProfileDeptId) {
+      notification.warning("用户名、工号、姓名和部门信息不能为空");
       return;
     }
     try {
       await apiRequest(`/api/admin/users/${editingUser.id}`, {
         body: {
+          username: editUsername.trim(),
+          password: editPassword,
           role: editRole,
           profile_emp_no: editProfileEmpNo.trim(),
           profile_name: editProfileName.trim(),
@@ -594,90 +621,111 @@ export default function AccountsPage() {
       </div>
 
       {editingUser ? (
-        <div className="master-modal-backdrop">
-          <div className="master-modal account-edit-modal">
-            <div className="master-modal-header">
-              <h2>编辑账号</h2>
-              <button className="master-modal-close" onClick={() => setEditingUser(null)} type="button">×</button>
+        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setEditingUser(null); }} style={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 1500,
+          background: "rgba(15, 23, 42, 0.3)",
+          backdropFilter: "blur(8px)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}>
+          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>编辑账号</span>
+                <span className="page-tag">系统管理</span>
+              </div>
+              <button className="master-modal-close" onClick={() => setEditingUser(null)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
             </div>
-            <div className="master-modal-body" style={{ overflow: "visible" }}>
-              <div className="account-grid-two">
-                <label className="account-field">
-                  <span className="account-field-label">工号</span>
-                  <input className="account-input" onChange={(event) => setEditProfileEmpNo(event.target.value)} value={editProfileEmpNo} />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">姓名</span>
-                  <input className="account-input" onChange={(event) => setEditProfileName(event.target.value)} value={editProfileName} />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">部门信息</span>
-                  <DepartmentPicker
-                    departments={departments}
-                    onChange={setEditProfileDeptId}
-                    pickerTitle="选择部门信息"
-                    placeholder="选择部门信息"
-                    quickEmptyValueLabel="无匹配部门"
-                    rootOptionLabel="请选择部门"
-                    searchPlaceholder="搜索部门名称/编号"
-                    selectedEmptyLabel="未选择"
-                    title="选择部门"
-                    value={editProfileDeptId}
-                  />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">用户名</span>
-                  <input className="account-input" readOnly value={editingUser.username} />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">角色</span>
-                  <select className="account-select" onChange={(event) => setEditRole(event.target.value as "readonly" | "admin")} value={editRole}>
-                    <option value="readonly">只读</option>
-                    <option value="admin">管理员</option>
-                  </select>
-                </label>
+            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
+              {/* 基础信息 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                    <span className="account-field-label">关联档案人员 (自动提取工号/姓名/部门)</span>
+                    <EmployeePicker
+                      departments={pickerDepartments}
+                      employees={pickerEmployees}
+                      onChange={handleSelectProfileEmployee}
+                      selectedIds={editProfileEmployeeId ? [editProfileEmployeeId] : []}
+                      showFieldChrome={true}
+                      singleSelect={true}
+                    />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">用户名</span>
+                    <input className="account-input" onChange={(event) => setEditUsername(event.target.value)} value={editUsername} />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">密码 (留空则不修改)</span>
+                    <input className="account-input" type="password" onChange={(event) => setEditPassword(event.target.value)} value={editPassword} placeholder="留空则不修改" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                    <span className="account-field-label">角色</span>
+                    <select className="account-select" onChange={(event) => setEditRole(event.target.value as "readonly" | "admin")} value={editRole}>
+                      <option value="readonly">只读权限</option>
+                      <option value="admin">系统管理员</option>
+                    </select>
+                  </label>
+                </div>
               </div>
 
-              <label className="account-field account-employee-picker-field">
-                <span className="account-field-label">关联员工</span>
-                <EmployeePicker
-                  departments={pickerDepartments}
-                  employees={pickerEmployees}
-                  onChange={setEditEmpIds}
-                  selectedIds={editEmpIds}
-                  showFieldChrome={false}
-                />
-              </label>
+              {/* 数据与权限范围 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
+                <div style={{ display: "grid", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">关联员工 (限定可见个人数据)</span>
+                    <EmployeePicker
+                      departments={pickerDepartments}
+                      employees={pickerEmployees}
+                      onChange={setEditEmpIds}
+                      selectedIds={editEmpIds}
+                      showFieldChrome={false}
+                    />
+                  </label>
 
-              <label className="account-field">
-                <span className="account-field-label">关联部门</span>
-                <DepartmentMultiPicker
-                  departments={departments}
-                  onChange={setEditDeptIds}
-                  selectedIds={editDeptIds}
-                  showFieldChrome={false}
-                />
-              </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">关联部门 (限定可见部门数据)</span>
+                    <DepartmentMultiPicker
+                      departments={departments}
+                      onChange={setEditDeptIds}
+                      selectedIds={editDeptIds}
+                      showFieldChrome={false}
+                    />
+                  </label>
 
-              <label className="account-field">
-                <span className="account-field-label">编辑页面权限</span>
-                <PickerSummaryField
-                  buttonLabel="选择"
-                  onClick={() => setPermissionContext("edit")}
-                  value={summarizePermissions(editPermissionKeys)}
-                />
-              </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">功能导航权限</span>
+                    <PickerSummaryField
+                      buttonLabel="配置导航可见性"
+                      onClick={() => setPermissionContext("edit")}
+                      value={summarizePermissions(editPermissionKeys)}
+                    />
+                  </label>
+                </div>
+              </div>
             </div>
-            <div className="master-modal-footer">
+            <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
               <button
                 className="account-action-button account-action-button--warning"
                 onClick={() => void resetPassword(editingUser.id)}
                 type="button"
+                style={{ borderRadius: "8px", fontSize: "14px" }}
               >
-                重置密码
+                重置默认密码
               </button>
-              <button className="account-action-button" onClick={() => setEditingUser(null)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={saveEdit} type="button">保存</button>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button className="account-action-button" onClick={() => setEditingUser(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
+                <button className="account-action-button account-action-button--primary" onClick={saveEdit} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>保存修改</button>
+              </div>
             </div>
           </div>
         </div>

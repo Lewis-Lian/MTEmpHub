@@ -12,6 +12,7 @@ interface EmployeePickerProps {
   showFieldChrome?: boolean;
   selectedIds: number[];
   onChange: (ids: number[]) => void;
+  singleSelect?: boolean;
 }
 
 type DepartmentFilter = number | "all";
@@ -30,6 +31,7 @@ export default function EmployeePicker({
   showFieldChrome = true,
   selectedIds,
   onChange,
+  singleSelect = false,
 }: EmployeePickerProps) {
   const [draftSelectedIds, setDraftSelectedIds] = useState<number[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -120,11 +122,15 @@ export default function EmployeePicker({
   }
 
   function toggleDraftEmployee(employeeId: number) {
-    setDraftSelectedIds((currentIds) =>
-      currentIds.includes(employeeId)
-        ? currentIds.filter((id) => id !== employeeId)
-        : [...currentIds, employeeId],
-    );
+    if (singleSelect) {
+      setDraftSelectedIds([employeeId]);
+    } else {
+      setDraftSelectedIds((currentIds) =>
+        currentIds.includes(employeeId)
+          ? currentIds.filter((id) => id !== employeeId)
+          : [...currentIds, employeeId],
+      );
+    }
   }
 
   function toggleSelectVisible() {
@@ -154,11 +160,18 @@ export default function EmployeePicker({
   }
 
   function toggleCommittedEmployee(employeeId: number) {
-    onChange(
-      selectedIds.includes(employeeId)
-        ? selectedIds.filter((id) => id !== employeeId)
-        : [...selectedIds, employeeId],
-    );
+    if (singleSelect) {
+      onChange([employeeId]);
+      setIsQuickListOpen(false);
+      setQuickKeyword("");
+      setIsInputEditing(false);
+    } else {
+      onChange(
+        selectedIds.includes(employeeId)
+          ? selectedIds.filter((id) => id !== employeeId)
+          : [...selectedIds, employeeId],
+      );
+    }
   }
 
   function toggleQuickVisibleEmployees() {
@@ -310,16 +323,19 @@ export default function EmployeePicker({
                             data-name={employee.name}
                             key={employee.id}
                           >
-                            <input
-                              aria-label={candidateLabel}
-                              checked={checked}
-                              className="form-check-input employee-picker-item"
-                              data-id={employee.id}
-                              onChange={() => toggleDraftEmployee(employee.id)}
-                              type="checkbox"
-                              value={employee.id}
-                            />
-                            <span className="employee-picker-main">{candidateLabel}</span>
+                            <div className="employee-item-row" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                              <input
+                                aria-label={candidateLabel}
+                                checked={draftSelectedIds.includes(employee.id)}
+                                className="form-check-input employee-picker-item"
+                                data-id={employee.id}
+                                onChange={() => toggleDraftEmployee(employee.id)}
+                                type={singleSelect ? "radio" : "checkbox"}
+                                name={singleSelect ? "employee-picker-radio" : undefined}
+                                value={employee.id}
+                              />
+                              <span className="employee-picker-main">{candidateLabel}</span>
+                            </div>
                           </label>
                         );
                       })
@@ -425,26 +441,28 @@ export default function EmployeePicker({
         <div className={`employee-float-list${isQuickListOpen ? " show" : ""}`}>
           {quickFilteredEmployees.length ? (
             <>
-              <button
-                className={`employee-option quick-employee-select-all${allQuickSelected ? " active" : ""}`}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={toggleQuickVisibleEmployees}
-                type="button"
-              >
-                <input
-                  checked={allQuickSelected}
-                  className="form-check-input quick-option-check"
-                  disabled
-                  readOnly
-                  tabIndex={-1}
-                  type="checkbox"
-                />
-                <span className="quick-option-label">{allQuickSelected ? "取消全选" : "全选"}当前列表</span>
-                <span className="quick-option-count">
-                  {quickFilteredEmployees.filter((employee) => selectedIds.includes(employee.id)).length}/
-                  {quickFilteredEmployees.length}
-                </span>
-              </button>
+              {!singleSelect && (
+                <button
+                  className={`employee-option quick-employee-select-all${allQuickSelected ? " active" : ""}`}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={toggleQuickVisibleEmployees}
+                  type="button"
+                >
+                  <input
+                    checked={allQuickSelected}
+                    className="form-check-input quick-option-check"
+                    disabled
+                    readOnly
+                    tabIndex={-1}
+                    type="checkbox"
+                  />
+                  <span className="quick-option-label">{allQuickSelected ? "取消全选" : "全选"}当前列表</span>
+                  <span className="quick-option-count">
+                    {quickFilteredEmployees.filter((employee) => selectedIds.includes(employee.id)).length}/
+                    {quickFilteredEmployees.length}
+                  </span>
+                </button>
+              )}
               {quickFilteredEmployees.map((employee) => {
                 const checked = selectedIds.includes(employee.id);
                 return (
@@ -461,7 +479,8 @@ export default function EmployeePicker({
                       disabled
                       readOnly
                       tabIndex={-1}
-                      type="checkbox"
+                      type={singleSelect ? "radio" : "checkbox"}
+                      name={singleSelect ? "quick-employee-picker-radio" : undefined}
                     />
                     <span className="quick-option-label">
                       {employee.emp_no} - {employee.name}

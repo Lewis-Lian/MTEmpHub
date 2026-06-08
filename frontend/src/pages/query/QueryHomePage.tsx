@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
+import { fetchMe } from "../../api/auth";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
@@ -16,15 +17,18 @@ export default function QueryHomePage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
+  const [isAdmin, setIsAdmin] = useState(false);
+
   useEffect(() => {
     let mounted = true;
 
     async function bootstrapPage() {
       try {
-        const payload = await fetchQueryBootstrap();
+        const [payload, me] = await Promise.all([fetchQueryBootstrap(), fetchMe()]);
         if (!mounted) {
           return;
         }
+        setIsAdmin(me.role === "admin");
         const nextMonth = payload.account_sets.find((item) => item.is_active)?.month ?? payload.account_sets[0]?.month ?? "";
         setBootstrap(payload);
         setMonth(nextMonth);
@@ -128,7 +132,10 @@ export default function QueryHomePage() {
               {managerInfo?.name ? managerInfo.name.charAt(0) : "管"}
             </div>
             <div className="qh-flat-meta">
-              <h3 className="qh-flat-name">{managerInfo?.name || "未绑定管理人员"}</h3>
+              <h3 className="qh-flat-name">
+                {managerInfo?.name || "未绑定管理人员"}
+                {isAdmin && <span className="qh-admin-badge">高级管理员</span>}
+              </h3>
               <div className="qh-flat-sub">
                 <span>工号: {managerInfo?.emp_no || "-"}</span>
                 <span>所属部门: {managerInfo?.dept_name || "-"}</span>
