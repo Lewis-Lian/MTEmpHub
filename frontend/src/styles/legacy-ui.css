@@ -1584,6 +1584,12 @@ body {
   position: relative;
 }
 
+.employee-lookup:has(.employee-float-list.show),
+.account-field:has(.employee-float-list.show) {
+  z-index: 100;
+  position: relative;
+}
+
 .employee-lookup .input-group {
   display: flex;
   align-items: stretch;

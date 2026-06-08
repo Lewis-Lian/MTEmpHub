@@ -3,7 +3,7 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: var(--z-modal);
+  z-index: 9999;
   display: grid;
   place-items: center;
   padding: 24px;
