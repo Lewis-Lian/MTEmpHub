@@ -5722,3 +5722,7 @@ input[type="checkbox"] {
   min-height: 0;
   overflow: auto;
 }
+
+.time-picker-list::-webkit-scrollbar {
+  display: none;
+}
