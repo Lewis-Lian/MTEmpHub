@@ -31,9 +31,10 @@ export default function AppPageNav({ collapsed, currentEntry, currentModule, mod
                 key={entry.key}
                 title={collapsed ? entry.label : undefined}
                 to={entry.href}
+                style={entry.label.includes("管理人员考勤") ? { fontSize: "11.5px", letterSpacing: "-0.2px" } : undefined}
               >
                 {Icon && <Icon className="nav-icon" />}
-                {!collapsed && <span className="app-side-label">{entry.label}</span>}
+                {!collapsed && <span className="app-side-label" style={entry.label.includes("管理人员考勤") ? { fontSize: "11.5px" } : undefined}>{entry.label}</span>}
               </NavLink>
             );
           })}
@@ -69,9 +70,10 @@ export default function AppPageNav({ collapsed, currentEntry, currentModule, mod
                 }
                 key={`${entry.key}-bottom`}
                 to={entry.href}
+                style={entry.label.includes("管理人员考勤") ? { fontSize: "11.5px", letterSpacing: "-0.2px" } : undefined}
               >
                 {Icon && <Icon className="nav-icon" />}
-                <span className="app-side-label">{entry.label}</span>
+                <span className="app-side-label" style={entry.label.includes("管理人员考勤") ? { fontSize: "11.5px" } : undefined}>{entry.label}</span>
               </NavLink>
             );
           })}
