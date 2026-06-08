@@ -274,6 +274,8 @@ def register_admin_account_routes(admin_bp) -> None:
     def update_user(user_id: int):
         data = request.json or {}
         role = (data.get("role") or "").strip()
+        username = (data.get("username") or "").strip() if "username" in data else None
+        password = (data.get("password") or "").strip() if "password" in data else None
         profile_emp_no = (data.get("profile_emp_no") or "").strip()
         profile_name = (data.get("profile_name") or "").strip()
         profile_dept_id = data.get("profile_dept_id")
@@ -289,6 +291,17 @@ def register_admin_account_routes(admin_bp) -> None:
             if role not in {"admin", "readonly"}:
                 return jsonify({"error": "invalid role"}), 400
             user.role = role
+
+        if username is not None:
+            if not username:
+                return jsonify({"error": "用户名不能为空"}), 400
+            existing = admin_module.User.query.filter_by(username=username).first()
+            if existing and existing.id != user.id:
+                return jsonify({"error": "用户名已存在"}), 400
+            user.username = username
+
+        if password:
+            user.set_password(password)
 
         if "profile_emp_no" in data:
             if not profile_emp_no:
