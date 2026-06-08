@@ -28,10 +28,18 @@
   flex-direction: column;
 }
 
+.employee-dashboard-page > .query-result-panel,
+.employee-dashboard-page > .query-workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 /* 保证内容在上层，并使筛选栏的层级高于结果表格以解决下拉框遮挡问题 */
 .employee-dashboard-page .query-filter-rail {
   position: relative;
-  z-index: 15;
+  z-index: 30;
 }
 .employee-dashboard-page .query-workspace {
   background: transparent;
