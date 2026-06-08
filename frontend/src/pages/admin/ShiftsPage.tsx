@@ -6,6 +6,7 @@ import QueryTable from "../../components/query/QueryTable";
 import type { AdminShift } from "../../types/admin";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
+import TimePicker from "../../components/common/TimePicker";
 
 
 
@@ -184,19 +185,15 @@ export default function ShiftsPage() {
       <div className="master-slot-list" style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
         {state.time_slots.map((slot, index) => (
           <div className="master-slot-row" key={index} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <input
-              className="account-input"
-              type="time"
-              onChange={(event) => updateSlot(target, index, 0, event.target.value)}
+            <TimePicker
               value={slot[0]}
+              onChange={(val) => updateSlot(target, index, 0, val)}
               style={{ flex: 1 }}
             />
             <span style={{ color: "#94a3b8" }}>-</span>
-            <input
-              className="account-input"
-              type="time"
-              onChange={(event) => updateSlot(target, index, 1, event.target.value)}
+            <TimePicker
               value={slot[1]}
+              onChange={(val) => updateSlot(target, index, 1, val)}
               style={{ flex: 1 }}
             />
             <button className="account-action-button account-action-button--danger" onClick={() => removeSlot(target, index)} type="button" style={{ padding: "8px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} title="删除此时间段">

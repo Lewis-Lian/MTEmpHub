@@ -40,22 +40,69 @@ export default function MonthPicker({
     };
   }, [isOpen]);
 
-  // 当外部 value 改变时，同步更新面板年份和临时选中的月份
+  const displayLabelStr = (val: string) => {
+    if (!val) return "";
+    const parts = val.split("-");
+    if (parts.length === 2) {
+      return `${parts[0]}年${parts[1]}月`;
+    }
+    return val;
+  };
+
+  const [inputValue, setInputValue] = useState(displayLabelStr(value));
+
+  // 当外部 value 改变时，同步更新面板年份和临时选中的月份，以及输入框文本
   useEffect(() => {
     if (value) {
+      setInputValue(displayLabelStr(value));
       const [yStr, mStr] = value.split("-");
       const year = parseInt(yStr, 10);
       const month = parseInt(mStr, 10);
       if (!isNaN(year)) setPanelYear(year);
       if (!isNaN(month)) setTempMonth(month);
     } else {
+      setInputValue("");
       setTempMonth(null);
     }
   }, [value]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputBlur = () => {
+    const cleanStr = inputValue.replace(/[^\d]/g, "");
+    let formattedStr = "";
+
+    if (cleanStr.length === 6) {
+      formattedStr = `${cleanStr.substring(0, 4)}-${cleanStr.substring(4, 6)}`;
+    } else if (cleanStr.length === 5) {
+      formattedStr = `${cleanStr.substring(0, 4)}-0${cleanStr.substring(4, 5)}`;
+    } else {
+      const regex = /^(\d{4})[^\d]?(\d{1,2})[^\d]?$/;
+      const match = inputValue.match(regex);
+      if (match) {
+        const y = match[1];
+        const m = match[2].padStart(2, "0");
+        formattedStr = `${y}-${m}`;
+      }
+    }
+
+    const finalRegex = /^(\d{4})-(0[1-9]|1[0-2])$/;
+    const finalMatch = formattedStr.match(finalRegex);
+
+    if (finalMatch) {
+      const validValue = `${finalMatch[1]}-${finalMatch[2]}`;
+      setInputValue(displayLabelStr(validValue));
+      onChange(validValue);
+    } else {
+      setInputValue(displayLabelStr(value));
+    }
+  };
+
   const handleTriggerClick = () => {
     if (disabled) return;
-    setIsOpen(!isOpen);
+    setIsOpen(true);
   };
 
   // 年份导航操作
@@ -97,15 +144,7 @@ export default function MonthPicker({
     setIsOpen(false);
   };
 
-  // 文本展示格式化 (比如 "2026-06" -> "2026年06月")
-  const displayLabel = () => {
-    if (!value) return <span className="month-picker-placeholder">{placeholder}</span>;
-    const parts = value.split("-");
-    if (parts.length === 2) {
-      return `${parts[0]}年${parts[1]}月`;
-    }
-    return value;
-  };
+  // 已在 displayLabelStr 处理
 
   const months = [
     { num: 1, label: "1月" },
@@ -127,11 +166,10 @@ export default function MonthPicker({
       {/* 分栏式触发输入框 */}
       <div className={`month-picker-split-trigger${isOpen ? " is-open" : ""}${disabled ? " is-disabled" : ""}`}>
         {/* 左侧值区域 */}
-        <button
+        <div
           className="month-picker-split-value"
-          disabled={disabled}
           onClick={handleTriggerClick}
-          type="button"
+          style={{ cursor: disabled ? "not-allowed" : "text" }}
         >
           {/* 日历小图标 */}
           <svg
@@ -150,28 +188,25 @@ export default function MonthPicker({
             <line x1="8" y1="2" x2="8" y2="6" />
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
-          <span>{displayLabel()}</span>
-        </button>
-
-        {/* 右侧独立下拉小箭头 */}
-        <button
-          className="month-picker-split-arrow"
-          disabled={disabled}
-          onClick={handleTriggerClick}
-          type="button"
-          aria-label={isOpen ? "收起" : "展开"}
-        >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            stroke="none"
-            style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.15s ease" }}
-          >
-            <path d="M7 10l5 5 5-5z" />
-          </svg>
-        </button>
+          <input
+            type="text"
+            disabled={disabled}
+            value={inputValue}
+            onChange={handleInputChange}
+            onBlur={handleInputBlur}
+            placeholder={placeholder}
+            style={{
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              color: "inherit",
+              fontSize: "inherit",
+              width: "100%",
+              padding: 0,
+              cursor: disabled ? "not-allowed" : "text"
+            }}
+          />
+        </div>
       </div>
 
       {/* 下拉面板 */}
