@@ -55,6 +55,7 @@ export default function DepartmentsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importInputKey, setImportInputKey] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
 
@@ -320,7 +321,7 @@ export default function DepartmentsPage() {
               <polyline points="17 8 12 3 7 8"></polyline>
               <line x1="12" y1="3" x2="12" y2="15"></line>
             </svg>
-            导入部门
+            导入/导出部门
           </button>
           <button
             className="btn btn-outline-secondary"
@@ -416,45 +417,58 @@ export default function DepartmentsPage() {
 
       {editing ? (
         <div className="master-modal-backdrop">
-          <form className="master-modal department-parent-modal" onSubmit={submitEdit}>
+          <form className="master-modal department-parent-modal" onSubmit={submitEdit} style={{ maxWidth: "550px", width: "100%" }}>
             <div className="master-modal-header">
               <h2>编辑部门</h2>
               <button className="master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
             </div>
-            <div className="master-modal-body">
-              <label className="account-field">
-                <span className="account-field-label">部门编号</span>
-                <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_no: event.target.value })} required value={editForm.dept_no} />
-              </label>
-              <label className="account-field">
-                <span className="account-field-label">部门名称</span>
-                <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_name: event.target.value })} required value={editForm.dept_name} />
-              </label>
-              <label className="account-field">
-                <span className="account-field-label">上级部门</span>
-                <DepartmentPicker
-                  departments={rows}
-                  excludedId={editing.id}
-                  hiddenId="editDeptParentId"
-                  inputId="editDeptParentInput"
-                  lookupId="editDeptParentLookup"
-                  onChange={(value) => setEditForm({ ...editForm, parent_id: value })}
-                  pickerTitle="选择上级部门"
-                  placeholder="选择上级部门"
-                  quickListId="editDeptParentQuickList"
-                  title="选择上级部门"
-                  triggerId="openEditDeptParentPickerBtn"
-                  value={editForm.parent_id}
-                />
-              </label>
-              <label className="master-check-option">
-                <input checked={editForm.is_locked} onChange={(event) => setEditForm({ ...editForm, is_locked: event.target.checked })} type="checkbox" />
-                <span>锁定部门</span>
-              </label>
+            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+              {/* 基础信息 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">部门编号</span>
+                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_no: event.target.value })} required value={editForm.dept_no} placeholder="请输入部门编号" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">部门名称</span>
+                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_name: event.target.value })} required value={editForm.dept_name} placeholder="请输入部门名称" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                    <span className="account-field-label">上级部门</span>
+                    <DepartmentPicker
+                      departments={rows}
+                      excludedId={editing.id}
+                      hiddenId="editDeptParentId"
+                      inputId="editDeptParentInput"
+                      lookupId="editDeptParentLookup"
+                      onChange={(value) => setEditForm({ ...editForm, parent_id: value })}
+                      pickerTitle="选择上级部门"
+                      placeholder="选择上级部门"
+                      quickListId="editDeptParentQuickList"
+                      title="选择上级部门"
+                      triggerId="openEditDeptParentPickerBtn"
+                      value={editForm.parent_id}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* 附加状态 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>附加状态</h4>
+                <div style={{ display: "flex", gap: "32px", padding: "12px 16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                    <input checked={editForm.is_locked} onChange={(event) => setEditForm({ ...editForm, is_locked: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
+                    <span style={{ fontSize: "14px", color: "#334155" }}>锁定部门</span>
+                  </label>
+                </div>
+              </div>
             </div>
             <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setEditing(null)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" type="submit">保存</button>
+              <button className="account-action-button" onClick={() => setEditing(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
+              <button className="account-action-button account-action-button--primary" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>保存</button>
             </div>
           </form>
         </div>
@@ -510,43 +524,59 @@ export default function DepartmentsPage() {
         pointerEvents: showModal === "create" ? "auto" : "none",
         transition: "opacity 0.15s ease"
       }}>
-        <div className="master-modal-container department-parent-modal" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "24px", boxSizing: "border-box", position: "relative" }}>
+        <div className="master-modal-container department-parent-modal" style={{ width: "100%", maxWidth: "550px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
           <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
-          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
+          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增部门</span>
           </div>
-          <form className="account-create-form" onSubmit={submitCreate}>
-            <label className="account-field">
-              <span className="account-field-label">部门编号</span>
-              <input className="account-input" onChange={(event) => setForm({ ...form, dept_no: event.target.value })} required value={form.dept_no} />
-            </label>
-            <label className="account-field">
-              <span className="account-field-label">部门名称</span>
-              <input className="account-input" onChange={(event) => setForm({ ...form, dept_name: event.target.value })} required value={form.dept_name} />
-            </label>
-            <label className="account-field">
-              <span className="account-field-label">上级部门</span>
-              <DepartmentPicker
-                departments={rows}
-                hiddenId="createDeptParentId"
-                inputId="createDeptParentInput"
-                lookupId="createDeptParentLookup"
-                onChange={(value) => setForm({ ...form, parent_id: value })}
-                pickerTitle="选择上级部门"
-                placeholder="选择上级部门"
-                quickListId="createDeptParentQuickList"
-                title="选择上级部门"
-                triggerId="openCreateDeptParentPickerBtn"
-                value={form.parent_id}
-              />
-            </label>
-            <label className="master-check-option" style={{ marginBottom: "16px", display: "flex", alignItems: "center", gap: "6px" }}>
-              <input checked={form.is_locked} onChange={(event) => setForm({ ...form, is_locked: event.target.checked })} type="checkbox" />
-              <span>锁定部门</span>
-            </label>
-            <button className="account-action-button account-action-button--primary account-primary-button" type="submit" style={{ width: "100%" }}>
-              创建部门
-            </button>
+          <form className="account-create-form" onSubmit={submitCreate} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* 基础信息 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <label className="account-field" style={{ margin: 0 }}>
+                  <span className="account-field-label">部门编号</span>
+                  <input className="account-input" onChange={(event) => setForm({ ...form, dept_no: event.target.value })} required value={form.dept_no} placeholder="请输入部门编号" />
+                </label>
+                <label className="account-field" style={{ margin: 0 }}>
+                  <span className="account-field-label">部门名称</span>
+                  <input className="account-input" onChange={(event) => setForm({ ...form, dept_name: event.target.value })} required value={form.dept_name} placeholder="请输入部门名称" />
+                </label>
+                <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  <span className="account-field-label">上级部门</span>
+                  <DepartmentPicker
+                    departments={rows}
+                    hiddenId="createDeptParentId"
+                    inputId="createDeptParentInput"
+                    lookupId="createDeptParentLookup"
+                    onChange={(value) => setForm({ ...form, parent_id: value })}
+                    pickerTitle="选择上级部门"
+                    placeholder="选择上级部门"
+                    quickListId="createDeptParentQuickList"
+                    title="选择上级部门"
+                    triggerId="openCreateDeptParentPickerBtn"
+                    value={form.parent_id}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* 附加状态 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>附加状态</h4>
+              <div style={{ display: "flex", gap: "32px", padding: "12px 16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                  <input checked={form.is_locked} onChange={(event) => setForm({ ...form, is_locked: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
+                  <span style={{ fontSize: "14px", color: "#334155" }}>锁定部门</span>
+                </label>
+              </div>
+            </div>
+
+            <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+              <button className="account-action-button account-action-button--primary account-primary-button" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>
+                创建部门
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -568,29 +598,118 @@ export default function DepartmentsPage() {
         pointerEvents: showModal === "import" ? "auto" : "none",
         transition: "opacity 0.15s ease"
       }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "24px", boxSizing: "border-box", position: "relative" }}>
+        <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
           <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
-          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
-            <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>导入部门（xlsx）</span>
+          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
+            <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>数据导入与导出</span>
           </div>
-          <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport}>
-            <input
-              key={importInputKey}
-              className="account-file-input"
-              name="file"
-              required
-              type="file"
-              accept=".xlsx"
-              onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-            />
-            <div className="toolbar" style={{ display: "flex", gap: "10px", marginTop: "12px" }}>
-              <button className="account-action-button account-action-button--primary" disabled={isImporting} type="submit" style={{ flex: 1 }}>
-                {isImporting ? "导入中..." : "上传导入"}
-              </button>
-              <a className="account-action-button" href="/api/admin/departments/template" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center" }}>下载示例模板</a>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            {/* 批量导入专区 */}
+            <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
+              <div
+                style={{
+                  padding: "32px 20px",
+                  background: isDragOver ? "#eff6ff" : "#f8fafc",
+                  border: isDragOver ? "2px dashed #3b82f6" : "1px dashed #cbd5e1",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                  transition: "all 0.2s ease",
+                  cursor: "pointer",
+                }}
+                onClick={() => document.getElementById("department-import-input")?.click()}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(true);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  const droppedFile = e.dataTransfer.files?.[0] ?? null;
+                  if (droppedFile) {
+                    setImportFile(droppedFile);
+                  }
+                }}
+              >
+                <div style={{ marginBottom: "16px", color: importFile ? "#3b82f6" : "#64748b" }}>
+                  {importFile ? (
+                    <svg
+                      width="36"
+                      height="36"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ display: "inline-block" }}
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="36"
+                      height="36"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      style={{ display: "inline-block" }}
+                    >
+                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                    </svg>
+                  )}
+                </div>
+                <div style={{ marginBottom: "8px", fontSize: "15px", color: "#1e293b", fontWeight: "600" }}>
+                  {importFile ? importFile.name : "点击选择，或将 Excel 文件拖拽到这里"}
+                </div>
+                <div style={{ fontSize: "13px", color: "#64748b" }}>
+                  {importFile ? `大小: ${(importFile.size / 1024).toFixed(1)} KB` : "支持 .xlsx 格式文件"}
+                </div>
+                <input
+                  id="department-import-input"
+                  key={importInputKey}
+                  className="account-file-input"
+                  name="file"
+                  type="file"
+                  accept=".xlsx"
+                  style={{ display: "none" }}
+                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <a className="account-action-button" href="/api/admin/departments/template" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13.5px", padding: "8px 16px", borderRadius: "6px", color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe", fontWeight: "500", textDecoration: "none" }}>
+                  ↓ 下载示例模板
+                </a>
+                <button className="account-action-button account-action-button--primary" disabled={isImporting} type="submit" style={{ padding: "8px 32px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>
+                  {isImporting ? "导入中..." : "开始导入"}
+                </button>
+              </div>
+            </form>
+
+            <div style={{ height: "1px", background: "#e2e8f0" }}></div>
+
+            {/* 数据导出专区 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#1e293b" }}>数据导出</h4>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <a className="account-action-button" href="/api/admin/departments/export" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", borderRadius: "6px", fontSize: "13.5px", textDecoration: "none" }}>导出全部部门数据</a>
+              </div>
             </div>
-          </form>
-          <div className="panel-note" style={{ marginTop: "12px" }}>模板字段：部门编号、部门名称、上级部门编号（可空）。</div>
+
+            <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "#fffbeb", borderRadius: "8px", color: "#92400e", fontSize: "13px", border: "1px solid #fde68a", lineHeight: "1.6" }}>
+              <strong style={{ color: "#78350f" }}>模板列要求：</strong><br/>
+              部门编号、部门名称、上级部门编号（可空）。
+            </div>
+          </div>
         </div>
       </div>
     </main>
