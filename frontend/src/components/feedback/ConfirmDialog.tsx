@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 
 // 定义确认框可配置参数
 export interface ConfirmOptions {
@@ -131,7 +132,7 @@ function ConfirmDialogComponent({
     }
   };
 
-  return (
+  const content = (
     <div
       className={`confirm-backdrop${state.isOpen ? " is-open" : ""}`}
       onClick={handleBackdropClick}
@@ -157,4 +158,6 @@ function ConfirmDialogComponent({
       </div>
     </div>
   );
+
+  return typeof document !== "undefined" ? createPortal(content, document.body) : <>{content}</>;
 }

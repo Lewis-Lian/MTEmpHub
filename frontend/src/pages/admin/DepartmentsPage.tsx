@@ -422,7 +422,7 @@ export default function DepartmentsPage() {
               <h2>编辑部门</h2>
               <button className="master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
             </div>
-            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
               {/* 基础信息 */}
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
