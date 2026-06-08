@@ -5,6 +5,7 @@ import { apiRequest } from "../../api/client";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import DepartmentPicker from "../../components/query/DepartmentPicker";
+import DepartmentMultiPicker from "../../components/query/DepartmentMultiPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
@@ -79,10 +80,6 @@ export default function AccountsPage() {
   const [permissionContext, setPermissionContext] = useState<null | "create" | "edit" | "batch">(null);
   const [permissionKeyword, setPermissionKeyword] = useState("");
   const [permissionGroup, setPermissionGroup] = useState("");
-
-  const [departmentContext, setDepartmentContext] = useState<null | "create" | "edit" | "batch">(null);
-  const [departmentKeyword, setDepartmentKeyword] = useState("");
-  const [draftDepartmentIds, setDraftDepartmentIds] = useState<number[]>([]);
 
   const [batchRoleOpen, setBatchRoleOpen] = useState(false);
   const [batchRole, setBatchRole] = useState<"" | "admin" | "readonly">("");
@@ -164,12 +161,6 @@ export default function AccountsPage() {
     return true;
   });
 
-  const filteredDepartmentRows = departments.filter((row) => {
-    if (!departmentKeyword.trim()) {
-      return true;
-    }
-    return `${row.dept_no ?? ""} ${row.dept_name}`.toLowerCase().includes(departmentKeyword.trim().toLowerCase());
-  });
   const accountTableHeaders = [
     {
       label: (
@@ -395,18 +386,6 @@ export default function AccountsPage() {
     setBatchPermissionKeys(nextKeys);
   }
 
-  function commitDepartmentSelection() {
-    if (departmentContext === "create") {
-      setCreateDeptIds(draftDepartmentIds);
-    } else if (departmentContext === "edit") {
-      setEditDeptIds(draftDepartmentIds);
-    } else {
-      setBatchDepartmentIds(draftDepartmentIds);
-    }
-    setDepartmentContext(null);
-    setDepartmentKeyword("");
-  }
-
   return (
     <main className="account-center-page">
       <section className="account-page-stack">
@@ -487,63 +466,90 @@ export default function AccountsPage() {
       </section>
 
       {createModalOpen ? (
-        <div className="master-modal-backdrop">
-          <div className="master-modal account-edit-modal">
-            <div className="master-modal-header">
-              <h2>创建账号</h2>
-              <button className="master-modal-close" onClick={() => setCreateModalOpen(false)} type="button">×</button>
+        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setCreateModalOpen(false); }} style={{
+          position: "fixed",
+          left: 0,
+          top: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 1500,
+          background: "rgba(15, 23, 42, 0.3)",
+          backdropFilter: "blur(8px)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}>
+          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>创建账号</span>
+                <span className="page-tag">系统管理</span>
+              </div>
+              <button className="master-modal-close" onClick={() => setCreateModalOpen(false)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
             </div>
-            <div className="master-modal-body">
-              <div className="account-create-form">
-                <label className="account-field">
-                  <span className="account-field-label">用户名</span>
-                  <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">密码</span>
-                  <input className="account-input" onChange={(event) => setCreatePassword(event.target.value)} type="password" value={createPassword} />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">角色</span>
-                  <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
-                    <option value="readonly">只读</option>
-                    <option value="admin">管理员</option>
-                  </select>
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">关联员工（可搜索、多选）</span>
-                  <EmployeePicker
-                    departments={pickerDepartments}
-                    employees={pickerEmployees}
-                    onChange={setCreateEmpIds}
-                    selectedIds={createEmpIds}
-                    showFieldChrome={false}
-                  />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">关联部门（可搜索、多选）</span>
-                  <PickerSummaryField
-                    buttonLabel="选择"
-                    onClick={() => {
-                      setDraftDepartmentIds(createDeptIds);
-                      setDepartmentContext("create");
-                    }}
-                    value={summarizeDepartments(createDeptIds, departments)}
-                  />
-                </label>
-                <label className="account-field">
-                  <span className="account-field-label">账号页面权限</span>
-                  <PickerSummaryField
-                    buttonLabel="选择"
-                    onClick={() => setPermissionContext("create")}
-                    value={summarizePermissions(createPermissionKeys)}
-                  />
-                </label>
+            
+            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
+              {/* 基础信息 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">用户名</span>
+                    <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} placeholder="例如: admin01" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">初始密码</span>
+                    <input className="account-input" type="password" onChange={(event) => setCreatePassword(event.target.value)} value={createPassword} placeholder="请输入初始密码" />
+                  </label>
+                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                    <span className="account-field-label">账号角色</span>
+                    <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
+                      <option value="readonly">只读权限</option>
+                      <option value="admin">系统管理员</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              {/* 数据与权限范围 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
+                <div style={{ display: "grid", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">关联员工 (限定可见个人数据)</span>
+                    <EmployeePicker
+                      departments={pickerDepartments}
+                      employees={pickerEmployees}
+                      onChange={setCreateEmpIds}
+                      selectedIds={createEmpIds}
+                      showFieldChrome={false}
+                    />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">关联部门 (限定可见部门数据)</span>
+                    <DepartmentMultiPicker
+                      departments={departments}
+                      onChange={setCreateDeptIds}
+                      selectedIds={createDeptIds}
+                      showFieldChrome={false}
+                    />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">功能导航权限</span>
+                    <PickerSummaryField
+                      buttonLabel="配置导航可见性"
+                      onClick={() => setPermissionContext("create")}
+                      value={summarizePermissions(createPermissionKeys)}
+                    />
+                  </label>
+                </div>
               </div>
             </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setCreateModalOpen(false)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={submitCreate} type="button">创建账号</button>
+
+            <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+              <button className="account-action-button" onClick={() => setCreateModalOpen(false)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
+              <button className="account-action-button account-action-button--primary" onClick={submitCreate} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>创建账号</button>
             </div>
           </div>
         </div>
@@ -580,7 +586,7 @@ export default function AccountsPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
           <button className="account-action-button" onClick={() => setBatchRoleOpen(true)} type="button">批量修改角色</button>
           <button className="account-action-button" onClick={() => setBatchEmployeeOpen(true)} type="button">批量修改关联员工</button>
-          <button className="account-action-button" onClick={() => { setDraftDepartmentIds(batchDepartmentIds); setBatchDepartmentOpen(true); }} type="button">批量修改关联部门</button>
+          <button className="account-action-button" onClick={() => setBatchDepartmentOpen(true)} type="button">批量修改关联部门</button>
           <button className="account-action-button" onClick={() => setPermissionContext("batch")} type="button">批量修改页面权限</button>
           <button className="account-action-button account-action-button--warning" onClick={() => void runBatch("reset_password")} type="button">批量重置密码</button>
           <button className="account-action-button account-action-button--danger" onClick={() => void runBatch("delete")} type="button">批量删除账号</button>
@@ -594,7 +600,7 @@ export default function AccountsPage() {
               <h2>编辑账号</h2>
               <button className="master-modal-close" onClick={() => setEditingUser(null)} type="button">×</button>
             </div>
-            <div className="master-modal-body">
+            <div className="master-modal-body" style={{ overflow: "visible" }}>
               <div className="account-grid-two">
                 <label className="account-field">
                   <span className="account-field-label">工号</span>
@@ -645,13 +651,11 @@ export default function AccountsPage() {
 
               <label className="account-field">
                 <span className="account-field-label">关联部门</span>
-                <PickerSummaryField
-                  buttonLabel="选择"
-                  onClick={() => {
-                    setDraftDepartmentIds(editDeptIds);
-                    setDepartmentContext("edit");
-                  }}
-                  value={summarizeDepartments(editDeptIds, departments)}
+                <DepartmentMultiPicker
+                  departments={departments}
+                  onChange={setEditDeptIds}
+                  selectedIds={editDeptIds}
+                  showFieldChrome={false}
                 />
               </label>
 
@@ -728,42 +732,7 @@ export default function AccountsPage() {
         </div>
       ) : null}
 
-      {departmentContext ? (
-        <div className="master-modal-backdrop">
-          <div className="master-modal account-department-modal">
-            <div className="master-modal-header">
-              <h2>{departmentContext === "batch" ? "批量修改关联部门" : "选择关联部门"}</h2>
-              <button className="master-modal-close" onClick={() => setDepartmentContext(null)} type="button">×</button>
-            </div>
-            <div className="master-modal-body">
-              <label className="account-field">
-                <span className="account-field-label">搜索部门名称/编号</span>
-                <input className="account-input" onChange={(event) => setDepartmentKeyword(event.target.value)} value={departmentKeyword} />
-              </label>
-              <div className="account-permission-list">
-                {filteredDepartmentRows.map((department) => (
-                  <label className="master-check-option" key={department.id}>
-                    <input
-                      checked={draftDepartmentIds.includes(department.id)}
-                      onChange={(event) =>
-                        setDraftDepartmentIds((current) =>
-                          event.target.checked ? [...current, department.id] : current.filter((id) => id !== department.id),
-                        )
-                      }
-                      type="checkbox"
-                    />
-                    <span>{department.dept_name}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setDepartmentContext(null)} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={commitDepartmentSelection} type="button">确定</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+
 
       {batchRoleOpen ? (
         <div className="master-modal-backdrop">
@@ -807,7 +776,7 @@ export default function AccountsPage() {
               <h2>批量修改关联员工</h2>
               <button className="master-modal-close" onClick={() => setBatchEmployeeOpen(false)} type="button">×</button>
             </div>
-            <div className="master-modal-body">
+            <div className="master-modal-body" style={{ overflow: "visible" }}>
               <p className="master-form-text">选择后将直接覆盖所选账号的关联员工；留空并确认表示清空关联员工。</p>
               <EmployeePicker
                 departments={pickerDepartments}
@@ -842,31 +811,21 @@ export default function AccountsPage() {
               <h2>批量修改关联部门</h2>
               <button className="master-modal-close" onClick={() => setBatchDepartmentOpen(false)} type="button">×</button>
             </div>
-            <div className="master-modal-body">
+            <div className="master-modal-body" style={{ overflow: "visible" }}>
               <p className="master-form-text">选择后将直接覆盖所选账号的关联部门；留空并确认表示清空关联部门。</p>
-              <div className="account-permission-list">
-                {departments.map((department) => (
-                  <label className="master-check-option" key={department.id}>
-                    <input
-                      checked={draftDepartmentIds.includes(department.id)}
-                      onChange={(event) =>
-                        setDraftDepartmentIds((current) =>
-                          event.target.checked ? [...current, department.id] : current.filter((id) => id !== department.id),
-                        )
-                      }
-                      type="checkbox"
-                    />
-                    <span>{department.dept_name}</span>
-                  </label>
-                ))}
-              </div>
+              <DepartmentMultiPicker
+                departments={departments}
+                selectedIds={batchDepartmentIds}
+                onChange={setBatchDepartmentIds}
+                showFieldChrome={false}
+              />
             </div>
             <div className="master-modal-footer">
               <button className="account-action-button" onClick={() => setBatchDepartmentOpen(false)} type="button">取消</button>
               <button
                 className="account-action-button account-action-button--primary"
                 onClick={async () => {
-                  if (await runBatch("update_departments", { dept_ids: draftDepartmentIds })) {
+                  if (await runBatch("update_departments", { dept_ids: batchDepartmentIds })) {
                     setBatchDepartmentOpen(false);
                   }
                 }}
@@ -918,10 +877,6 @@ function summarizePermissions(keys: string[]): string {
   return labels.length ? labels.join("、") : "未选择页面权限";
 }
 
-function summarizeDepartments(ids: number[], departments: AdminDepartment[]): string {
-  const labels = departments.filter((department) => ids.includes(department.id)).map((department) => department.dept_name);
-  return labels.length ? labels.join("、") : "未选择关联部门";
-}
 
 function summarizeUserEmployees(user: AccountUser): string {
   if (user.role === "admin") {
