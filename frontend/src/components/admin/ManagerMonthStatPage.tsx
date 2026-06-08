@@ -8,6 +8,7 @@ import LoadingState from "../feedback/LoadingState";
 import EmployeePicker from "../query/EmployeePicker";
 import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
+import YearPicker from "../common/YearPicker";
 import type { QueryBootstrap } from "../../types/query";
 
 interface MonthField {
@@ -243,13 +244,9 @@ export default function ManagerMonthStatPage({
           </div>
           <div className="query-filter-field">
             <label className="form-label">年份</label>
-            <input
-              className="form-control"
-              max="2100"
-              min="2000"
-              onChange={(event) => setYear(event.target.value)}
-              type="number"
+            <YearPicker
               value={year}
+              onChange={setYear}
             />
           </div>
           <div className="query-filter-field">
