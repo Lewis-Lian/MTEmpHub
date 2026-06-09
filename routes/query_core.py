@@ -255,7 +255,10 @@ def _has_punch_record(record) -> bool:
 def _attendance_day_value(record) -> float:
     if not _has_punch_record(record):
         return 0.0
-    if (record.actual_hours or 0) < 2:
+    actual_hours = record.actual_hours or 0
+    if actual_hours <= 0:
+        actual_hours, _ = _calc_record_work_hours(record)
+    if actual_hours < 2:
         return 0.5
     return 1.0
 
