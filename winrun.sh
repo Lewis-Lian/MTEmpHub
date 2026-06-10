@@ -2,11 +2,14 @@
 
 set -euo pipefail
 
+# 闪退捕获：出错时暂停，方便查看错误信息
+trap 'echo ""; echo "========== 出错了！=========="; echo "退出码: $?"; echo "上面 ↑ 就是错误原因"; echo ""; echo "按回车键关闭窗口..."; read -r' ERR
+
 PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_DIR"
 
 BACKEND_HOST="${BACKEND_HOST:-0.0.0.0}"
-BACKEND_PORT="${BACKEND_PORT:-5000}"
+BACKEND_PORT="${BACKEND_PORT:-5001}"
 FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
 FRONTEND_PORT="${FRONTEND_PORT:-4173}"
 VENV_DIR="${VENV_DIR:-.venv-win-prod}"

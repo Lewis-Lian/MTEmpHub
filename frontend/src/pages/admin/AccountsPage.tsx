@@ -4,7 +4,6 @@ import { fetchAdminDepartments, fetchAdminEmployees } from "../../api/admin";
 import { apiRequest } from "../../api/client";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
-import DepartmentPicker from "../../components/query/DepartmentPicker";
 import DepartmentMultiPicker from "../../components/query/DepartmentMultiPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
