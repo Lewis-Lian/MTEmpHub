@@ -9,7 +9,8 @@ from models.user import User
 
 
 def initialize_database() -> None:
-    db.create_all()
+    from flask_migrate import upgrade
+    upgrade()
     ensure_schema_compatibility()
 
 
@@ -35,7 +36,10 @@ def ensure_schema_compatibility() -> None:
     if department_columns is not None:
         if "parent_id" not in department_columns:
             db.session.execute(text("ALTER TABLE departments ADD COLUMN parent_id INTEGER"))
-            db.session.execute(text("CREATE INDEX IF NOT EXISTS ix_departments_parent_id ON departments(parent_id)"))
+            try:
+                db.session.execute(text("CREATE INDEX ix_departments_parent_id ON departments(parent_id)"))
+            except Exception:
+                pass
             db.session.commit()
         if "is_locked" not in department_columns:
             db.session.execute(text("ALTER TABLE departments ADD COLUMN is_locked BOOLEAN NOT NULL DEFAULT 0"))

@@ -6,6 +6,11 @@ class Config:
     APP_ENV = os.getenv("APP_ENV", "development")
     SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///attendance.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = (
+        {"pool_pre_ping": True, "pool_recycle": 3600}
+        if os.getenv("DATABASE_URL", "").startswith("mysql")
+        else {}
+    )
     SECRET_KEY = os.getenv("SECRET_KEY") or ("dev-secret-key" if APP_ENV != "production" else None)
     JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "12"))
     JWT_EXPIRES_DELTA = timedelta(hours=JWT_EXPIRES_HOURS)

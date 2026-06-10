@@ -233,3 +233,58 @@ export function calculateAccountSet(
     },
   );
 }
+
+// ---- 数据库设置 ----
+
+export interface DatabaseSettings {
+  current: Array<{ item: string; value: string; description: string }>;
+  mysql_config: {
+    host?: string;
+    port?: number;
+    username?: string;
+    password?: string;
+    database?: string;
+  };
+}
+
+export function fetchDatabaseSettings(): Promise<DatabaseSettings> {
+  return apiRequest<DatabaseSettings>("/api/admin/database-settings");
+}
+
+export function saveDatabaseSettings(payload: {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+}): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>("/api/admin/database-settings", {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function testDatabaseConnection(payload: {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  database: string;
+}): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>("/api/admin/database-test-connection", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function migrateDatabase(): Promise<{
+  ok: boolean;
+  results?: Array<{ table: string; rows: number; status: string }>;
+  message?: string;
+}> {
+  return apiRequest("/api/admin/database-migrate", { method: "POST" });
+}
+
+export function switchToSqlite(): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>("/api/admin/database-switch-sqlite", { method: "POST" });
+}

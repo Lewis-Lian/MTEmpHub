@@ -8,6 +8,7 @@
 - 管理人员考勤、加班、年休、部门工时查询
 - Excel 数据导入与汇总
 - 管理后台账号、部门、班次、修正项维护
+- 数据库设置页面：MySQL 连接配置、测试连接、数据迁移、切回 SQLite
 - Windows 服务安装、托盘管理、备份与回滚
 
 ## 快速开始
@@ -129,6 +130,9 @@ python -m waitress --host=0.0.0.0 --port=5000 wsgi:app
 
 # 运行测试
 python3 -m pytest -q
+
+# MySQL 连不上时切回 SQLite（安全网，不依赖 Flask）
+python switch_sqlite.py
 ```
 
 ## 项目结构
@@ -393,11 +397,55 @@ python3 -m pytest -q
 
 ### 关于 migrations
 
-仓库当前保留了 `migrations/` 目录，但旧库兼容逻辑仍在显式命令中维护。当前建议是：
+项目已启用 Flask-Migrate（基于 Alembic）。`init-db` 命令会通过 migration 创建表结构。
 
-- 新环境：使用 `init-db`
+- 新环境：使用 `init-db`（内部执行 `flask db upgrade`）
 - 旧环境：升级前显式运行 `upgrade-legacy-schema`
-- 后续如需完全迁移到 Flask-Migrate/Alembic，再单独做结构化迁移整理
+- 后续 Model 变更后：执行 `flask db migrate -m "描述"` 生成迁移脚本，再 `flask db upgrade` 应用
+
+## 数据库设置
+
+系统默认使用 SQLite，支持切换到 MySQL。两种方式操作：
+
+### 方式一：网页操作（推荐）
+
+1. 登录管理后台 → 左侧菜单「数据库设置」
+2. 页面分三个区域：
+   - **当前连接**：显示当前使用的数据库类型和连接信息
+   - **MySQL 配置**：填写主机地址、端口、用户名、密码、数据库名
+     - 「测试连接」→ 验证 MySQL 是否可达
+     - 「保存配置」→ 写入 `.env`，重启应用后生效
+     - 「切回 SQLite」→ 一键切回 SQLite
+   - **数据迁移**：点击「开始迁移」将 SQLite 数据迁移到 MySQL
+
+### 方式二：手动修改 `.env`
+
+```bash
+# SQLite（默认）
+DATABASE_URL=sqlite:///attendance.db
+
+# MySQL
+DATABASE_URL=mysql+pymysql://user:password@host:3306/attendance_db?charset=utf8mb4
+```
+
+### ⚠️ MySQL 连不上怎么办
+
+如果 MySQL 配置有误导致应用无法启动或登录失败，在终端执行：
+
+```bash
+python switch_sqlite.py
+```
+
+此脚本不依赖 Flask，直接修改 `.env` 文件切回 SQLite，执行后重启应用即可恢复。
+
+### MySQL 环境要求
+
+- MySQL 版本 >= 5.7（需支持 JSON 字段），推荐 8.0+
+- 字符集必须为 `utf8mb4`
+- 提前创建好空数据库：
+  ```sql
+  CREATE DATABASE attendance_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  ```
 
 ## 补充说明
 

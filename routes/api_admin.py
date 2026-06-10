@@ -1,6 +1,7 @@
+import os
 from urllib.parse import urlparse
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app, jsonify, request
 
 from models.department import Department
 from models.shift import Shift
@@ -125,30 +126,138 @@ def database_settings():
 
     username = parsed.username or "-"
 
+    # 读取 .env 中已保存的 MySQL 配置（用于前端表单回填）
+    from utils.env_utils import read_env, parse_mysql_url
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_data = read_env(env_path)
+    mysql_config = {}
+    env_db_url = env_data.get("DATABASE_URL", "")
+    if env_db_url.startswith("mysql"):
+        mysql_config = parse_mysql_url(env_db_url)
+
     return jsonify(
-        [
-            {
-                "item": "数据库类型",
-                "value": dialect,
-                "description": "当前 SQLAlchemy 连接使用的数据库方言。",
-            },
-            {
-                "item": "数据库名称",
-                "value": database_name,
-                "description": "当前应用实际连接的数据库名称或本地文件名。",
-            },
-            {
-                "item": "主机地址",
-                "value": host,
-                "description": "远程数据库显示主机地址，本地 sqlite 显示为 - 。",
-            },
-            {
-                "item": "用户名",
-                "value": username,
-                "description": "数据库连接用户名；未配置时显示为 - 。",
-            },
-        ]
+        {
+            "current": [
+                {
+                    "item": "数据库类型",
+                    "value": dialect,
+                    "description": "当前 SQLAlchemy 连接使用的数据库方言。",
+                },
+                {
+                    "item": "数据库名称",
+                    "value": database_name,
+                    "description": "当前应用实际连接的数据库名称或本地文件名。",
+                },
+                {
+                    "item": "主机地址",
+                    "value": host,
+                    "description": "远程数据库显示主机地址，本地 sqlite 显示为 - 。",
+                },
+                {
+                    "item": "用户名",
+                    "value": username,
+                    "description": "数据库连接用户名；未配置时显示为 - 。",
+                },
+            ],
+            "mysql_config": mysql_config,
+        }
     )
+
+
+@api_admin_bp.put("/database-settings")
+@admin_required
+def save_database_settings():
+    """保存 MySQL 连接信息到 .env 文件。"""
+    data = request.get_json(force=True)
+    host = data.get("host", "").strip()
+    port = int(data.get("port", 3306) or 3306)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    database = data.get("database", "").strip()
+
+    if not all([host, username, database]):
+        return jsonify({"error": "主机地址、用户名和数据库名不能为空"}), 400
+
+    from utils.env_utils import build_mysql_url, write_env_value
+
+    mysql_url = build_mysql_url(host, port, username, password, database)
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    write_env_value(env_path, "DATABASE_URL", mysql_url)
+
+    return jsonify({"message": "配置已保存，重启应用后生效。"})
+
+
+@api_admin_bp.post("/database-test-connection")
+@admin_required
+def test_database_connection():
+    """测试 MySQL 连接是否可用。"""
+    data = request.get_json(force=True)
+    host = data.get("host", "").strip()
+    port = int(data.get("port", 3306) or 3306)
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    database = data.get("database", "").strip()
+
+    if not all([host, username, database]):
+        return jsonify({"error": "主机地址、用户名和数据库名不能为空"}), 400
+
+    from utils.env_utils import build_mysql_url
+    from services.migration_service import test_mysql_connection
+
+    mysql_url = build_mysql_url(host, port, username, password, database)
+    result = test_mysql_connection(mysql_url)
+
+    if result["ok"]:
+        return jsonify({"ok": True, "message": "连接成功"})
+    return jsonify({"ok": False, "message": result["message"]})
+
+
+@api_admin_bp.post("/database-migrate")
+@admin_required
+def database_migrate():
+    """执行 SQLite → MySQL 数据迁移。"""
+    from utils.env_utils import read_env, build_mysql_url
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_data = read_env(env_path)
+
+    # 确定 SQLite 来源
+    current_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if current_uri.startswith("sqlite"):
+        sqlite_url = current_uri
+    else:
+        # 如果当前已经是 MySQL，尝试从 instance 目录找 SQLite 文件
+        instance_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "instance")
+        sqlite_path = os.path.join(instance_dir, "attendance.db")
+        if not os.path.exists(sqlite_path):
+            return jsonify({"error": "未找到 SQLite 数据库文件"}), 400
+        sqlite_url = f"sqlite:///{sqlite_path}"
+
+    # 确定 MySQL 目标
+    db_url = env_data.get("DATABASE_URL", "")
+    if not db_url.startswith("mysql"):
+        return jsonify({"error": "请先保存 MySQL 连接配置"}), 400
+
+    try:
+        from services.migration_service import migrate_sqlite_to_mysql
+
+        results = migrate_sqlite_to_mysql(sqlite_url, db_url)
+        return jsonify({"ok": True, "results": results})
+    except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
+@api_admin_bp.post("/database-switch-sqlite")
+@admin_required
+def database_switch_sqlite():
+    """切回 SQLite 数据库。"""
+    from utils.env_utils import write_env_value
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    write_env_value(env_path, "DATABASE_URL", "sqlite:///attendance.db")
+
+    return jsonify({"message": "已切换回 SQLite，重启应用后生效。"})
 
 
 @api_admin_bp.get("/accounts")
