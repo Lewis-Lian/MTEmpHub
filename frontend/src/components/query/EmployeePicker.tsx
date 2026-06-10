@@ -311,7 +311,6 @@ export default function EmployeePicker({
                   <div className="employee-picker-list">
                     {filteredEmployees.length ? (
                       filteredEmployees.map((employee) => {
-                        const checked = draftSelectedIds.includes(employee.id);
                         const candidateLabel = `${employee.emp_no} - ${employee.name}`;
                         return (
                           <label
