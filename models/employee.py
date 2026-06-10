@@ -20,6 +20,7 @@ class Employee(db.Model):
     dept_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
     is_nursing = db.Column(db.Boolean, default=False, nullable=False)
+    include_in_manager_stats = db.Column(db.Boolean, default=False, nullable=False)
     employee_stats_attendance_source = db.Column(db.String(20), default=ATTENDANCE_SOURCE_EMPLOYEE, nullable=False)
     manager_stats_attendance_source = db.Column(db.String(20), default=ATTENDANCE_SOURCE_MANAGER, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

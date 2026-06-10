@@ -1,3 +1,5 @@
+import os
+
 from app import create_app
 from services.bootstrap_service import ensure_default_admin, ensure_schema_compatibility, initialize_database
 
