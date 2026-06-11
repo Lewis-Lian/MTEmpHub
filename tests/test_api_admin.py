@@ -157,8 +157,9 @@ class ApiAdminTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertIsInstance(payload, list)
-        labels = {row["item"]: row["value"] for row in payload}
+        self.assertIsInstance(payload, dict)
+        self.assertIn("current", payload)
+        labels = {row["item"]: row["value"] for row in payload["current"]}
         self.assertEqual(labels["数据库类型"], "sqlite")
         self.assertEqual(labels["用户名"], "-")
         self.assertIn("api-admin.db", labels["数据库名称"])
