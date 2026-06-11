@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from urllib.parse import urlparse, quote
+from urllib.parse import urlparse, quote, unquote
 
 
 def read_env(path: str | Path) -> dict[str, str]:
@@ -58,7 +58,7 @@ def parse_mysql_url(url: str) -> dict[str, str | int | None]:
     return {
         "host": parsed.hostname or "",
         "port": parsed.port or 3306,
-        "username": parsed.username or "",
-        "password": parsed.password or "",
+        "username": unquote(parsed.username) if parsed.username else "",
+        "password": unquote(parsed.password) if parsed.password else "",
         "database": parsed.path.lstrip("/") or "",
     }
