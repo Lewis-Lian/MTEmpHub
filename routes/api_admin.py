@@ -227,9 +227,11 @@ def database_migrate():
     if current_uri.startswith("sqlite"):
         sqlite_url = current_uri
     else:
-        # 如果当前已经是 MySQL，尝试从 instance 目录找 SQLite 文件
-        instance_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "instance")
-        sqlite_path = os.path.join(instance_dir, "attendance.db")
+        # 如果当前已经是 MySQL，尝试找 SQLite 文件
+        root_dir = os.path.dirname(os.path.dirname(__file__))
+        sqlite_path = os.path.join(root_dir, "attendance.db")
+        if not os.path.exists(sqlite_path):
+            sqlite_path = os.path.join(root_dir, "instance", "attendance.db")
         if not os.path.exists(sqlite_path):
             return jsonify({"error": "未找到 SQLite 数据库文件"}), 400
         sqlite_url = f"sqlite:///{sqlite_path}"

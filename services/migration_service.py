@@ -113,7 +113,10 @@ def test_mysql_connection(mysql_url: str) -> dict:
     app = Flask(__name__)
     app.config["SQLALCHEMY_DATABASE_URI"] = mysql_url
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"pool_pre_ping": True}
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_pre_ping": True,
+        "connect_args": {"connect_timeout": 10}
+    }
 
     test_db.init_app(app)
 
