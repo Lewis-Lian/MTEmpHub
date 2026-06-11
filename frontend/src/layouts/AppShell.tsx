@@ -172,7 +172,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     <div className="app-layout app-shell-grid">
       <aside className={`app-sidebar${sidebarCollapsed ? " is-collapsed" : ""}`}>
         <div className="app-sidebar-brand">
-          <h1>{sidebarCollapsed ? "考" : "考勤系统"}</h1>
+          <h1>{sidebarCollapsed ? "M" : "MTEmpHub"}</h1>
           {!sidebarCollapsed && <p>当前模块：{currentModule?.label ?? "系统导航"}</p>}
           {!sidebarCollapsed && <p>当前用户：{user.username}</p>}
         </div>
