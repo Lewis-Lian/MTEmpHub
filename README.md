@@ -175,6 +175,10 @@ sudo systemctl daemon-reload && sudo systemctl enable --now attendance_api
 ```bash
 sudo systemctl restart nginx
 ```
+### 5. 一键更新与重启
+在部署完成后，你可以使用提供的一键脚本来管理应用更新和重启：
+- **一键更新**：执行 `./scripts/ubuntu/update.sh` 会自动拉取代码、更新后端依赖、构建前端并重启服务。
+- **一键重启**：执行 `./scripts/ubuntu/restart.sh` 可快速重启后端进程并重载 Nginx 配置。
 </details>
 
 ---
