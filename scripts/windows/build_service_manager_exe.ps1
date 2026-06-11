@@ -44,7 +44,7 @@ Invoke-PS2EXE `
     -NoConsole `
     -Title "Attendance Service Manager" `
     -Description "Attendance system Windows background service manager" `
-    -Company "MtEmployeeAttendance-System" `
+    -Company "MTEmpHub" `
     -Product "Attendance Service Manager" `
     -Copyright "Lewis"
 

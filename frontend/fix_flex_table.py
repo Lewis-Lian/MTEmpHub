@@ -1,6 +1,6 @@
 import re
 
-path = "/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/frontend/src/pages/query/EmployeeDashboardPage.css"
+path = "/Users/lewis/Lewis/code/git/MTEmpHub/frontend/src/pages/query/EmployeeDashboardPage.css"
 
 with open(path, 'r', encoding='utf-8') as f:
     content = f.read()

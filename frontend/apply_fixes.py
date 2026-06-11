@@ -1,7 +1,7 @@
 import os
 import re
 
-frontend_dir = "/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/frontend"
+frontend_dir = "/Users/lewis/Lewis/code/git/MTEmpHub/frontend"
 legacy_ui_path = os.path.join(frontend_dir, "src/styles/legacy-ui.css")
 dashboard_css_path = os.path.join(frontend_dir, "src/pages/query/EmployeeDashboardPage.css")
 

@@ -51,14 +51,14 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     <div className="login-page">
       <div className="login-shell">
         <div className="login-surface">
-          <section className="login-brand-panel" aria-label="考勤系统品牌">
+          <section className="login-brand-panel" aria-label="MTEmpHub 品牌">
             <div className="login-brand-panel-inner">
               <div className="login-brand login-brand--career">
                 <Link className="login-brand-home" to="/login">
                   <span aria-hidden="true" className="login-brand-logo login-brand-logo--system">
                     MT
                   </span>
-                  <span className="login-brand-text">考勤系统</span>
+                  <span className="login-brand-text">MTEmpHub</span>
                 </Link>
               </div>
               <div className="login-brand-stage" aria-hidden="true">
@@ -84,7 +84,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 <span aria-hidden="true" className="login-career-logo login-career-logo--system">
                   MT
                 </span>
-                <span>考勤系统</span>
+                <span>MTEmpHub</span>
               </div>
               <div className="login-panel-top">
                 <h2 className="login-panel-title">欢迎回来！</h2>
