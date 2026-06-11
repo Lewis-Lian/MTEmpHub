@@ -81,6 +81,27 @@ from routes.auth_helpers import admin_required
 api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
 register_admin_account_routes(api_admin_bp)
 
+from functools import wraps
+def setup_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        from utils.env_utils import read_env
+        import os
+        
+        env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+        env_data = read_env(env_path)
+        required_password = env_data.get("SETUP_PASSWORD")
+        
+        if not required_password:
+            return jsonify({"error": "为了安全起见，请先在 .env 中设置 SETUP_PASSWORD"}), 403
+            
+        provided_password = request.headers.get("X-Setup-Password")
+        if not provided_password or provided_password != required_password:
+            return jsonify({"error": "向导访问密码不正确"}), 401
+            
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 @api_admin_bp.get("/bootstrap")
 @admin_required
@@ -111,7 +132,7 @@ def bootstrap():
 
 
 @api_admin_bp.get("/database-settings")
-@admin_required
+@setup_required
 def database_settings():
     uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "") or ""
     parsed = urlparse(uri)
@@ -132,9 +153,11 @@ def database_settings():
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
     env_data = read_env(env_path)
     mysql_config = {}
-    env_db_url = env_data.get("DATABASE_URL", "")
-    if env_db_url.startswith("mysql"):
-        mysql_config = parse_mysql_url(env_db_url)
+    saved_url = env_data.get("MYSQL_SAVED_URL", "")
+    if saved_url and saved_url.startswith("mysql"):
+        mysql_config = parse_mysql_url(saved_url)
+    elif env_data.get("DATABASE_URL", "").startswith("mysql"):
+        mysql_config = parse_mysql_url(env_data.get("DATABASE_URL", ""))
 
     return jsonify(
         {
@@ -166,7 +189,7 @@ def database_settings():
 
 
 @api_admin_bp.put("/database-settings")
-@admin_required
+@setup_required
 def save_database_settings():
     """保存 MySQL 连接信息到 .env 文件。"""
     data = request.get_json(force=True)
@@ -183,13 +206,13 @@ def save_database_settings():
 
     mysql_url = build_mysql_url(host, port, username, password, database)
     env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
-    write_env_value(env_path, "DATABASE_URL", mysql_url)
+    write_env_value(env_path, "MYSQL_SAVED_URL", mysql_url)
 
-    return jsonify({"message": "配置已保存，重启应用后生效。"})
+    return jsonify({"message": "配置已暂存，迁移完成后可点击【切换到 MySQL】使配置生效。"})
 
 
 @api_admin_bp.post("/database-test-connection")
-@admin_required
+@setup_required
 def test_database_connection():
     """测试 MySQL 连接是否可用。"""
     data = request.get_json(force=True)
@@ -214,7 +237,7 @@ def test_database_connection():
 
 
 @api_admin_bp.post("/database-migrate")
-@admin_required
+@setup_required
 def database_migrate():
     """执行 SQLite → MySQL 数据迁移。"""
     from utils.env_utils import read_env, build_mysql_url
@@ -237,7 +260,7 @@ def database_migrate():
         sqlite_url = f"sqlite:///{sqlite_path}"
 
     # 确定 MySQL 目标
-    db_url = env_data.get("DATABASE_URL", "")
+    db_url = env_data.get("MYSQL_SAVED_URL", "") or env_data.get("DATABASE_URL", "")
     if not db_url.startswith("mysql"):
         return jsonify({"error": "请先保存 MySQL 连接配置"}), 400
 
@@ -251,7 +274,7 @@ def database_migrate():
 
 
 @api_admin_bp.post("/database-switch-sqlite")
-@admin_required
+@setup_required
 def database_switch_sqlite():
     """切回 SQLite 数据库。"""
     from utils.env_utils import write_env_value
@@ -260,6 +283,22 @@ def database_switch_sqlite():
     write_env_value(env_path, "DATABASE_URL", "sqlite:///attendance.db")
 
     return jsonify({"message": "已切换回 SQLite，重启应用后生效。"})
+
+
+@api_admin_bp.post("/database-switch-mysql")
+@setup_required
+def database_switch_mysql():
+    """将保存的暂存 MySQL 配置写入实际连接，切换到 MySQL。"""
+    from utils.env_utils import read_env, write_env_value
+    
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_data = read_env(env_path)
+    saved_url = env_data.get("MYSQL_SAVED_URL", "")
+    if not saved_url.startswith("mysql"):
+        return jsonify({"error": "未找到有效的 MySQL 暂存配置，请先保存配置"}), 400
+
+    write_env_value(env_path, "DATABASE_URL", saved_url)
+    return jsonify({"message": "已切换到 MySQL，重启应用后生效。"})
 
 
 @api_admin_bp.get("/accounts")
