@@ -1,8 +1,8 @@
 import os
 import re
 
-legacy_ui_path = "/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/frontend/src/styles/legacy-ui.css"
-dashboard_css_path = "/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/frontend/src/pages/query/EmployeeDashboardPage.css"
+legacy_ui_path = "/Users/lewis/Lewis/code/git/MTEmpHub/frontend/src/styles/legacy-ui.css"
+dashboard_css_path = "/Users/lewis/Lewis/code/git/MTEmpHub/frontend/src/pages/query/EmployeeDashboardPage.css"
 
 with open(legacy_ui_path, 'r', encoding='utf-8') as f:
     content = f.read()

@@ -2,7 +2,7 @@ import os
 import re
 import subprocess
 
-frontend_dir = "/Users/lewis/Lewis/code/git/MtEmployeeAttendance-System/frontend/src"
+frontend_dir = "/Users/lewis/Lewis/code/git/MTEmpHub/frontend/src"
 
 # 1. 直接用 git checkout 还原那5个只在这步被动过的文件
 files_to_restore = [
