@@ -1185,18 +1185,7 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "重置密码" })).toBeInTheDocument();
   });
 
-  it("数据库设置页会展示当前数据库连接摘要", async () => {
-    window.history.replaceState({}, "", "/admin/database-settings");
-    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
-    const { default: App } = await import("./App");
-    render(<App />);
-
-    expect(await screen.findByRole("heading", { name: "数据库设置" })).toBeInTheDocument();
-    expect(screen.getByText("数据库类型")).toBeInTheDocument();
-    expect(screen.getByText("sqlite")).toBeInTheDocument();
-    expect(screen.getByText("attendance.db")).toBeInTheDocument();
-  });
 
 });
 
@@ -1602,11 +1591,7 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
                   label: "禁用用户",
                   href: "/admin/disabled-users",
                 },
-                {
-                  key: "database_settings",
-                  label: "数据库设置",
-                  href: "/admin/database-settings",
-                },
+
                 {
                   key: "employees",
                   label: "员工管理",
