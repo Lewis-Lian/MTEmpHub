@@ -67,10 +67,15 @@ def migrate_sqlite_to_mysql(sqlite_url: str, mysql_url: str) -> list[dict]:
     Migrate(app_write, write_db)
 
     with app_write.app_context():
-        # 用 migration 建表
-        from flask_migrate import upgrade
-
-        upgrade()
+        # 用 SQLAlchemy 建表，因为现存的 migration 历史可能不完整
+        from models import db as main_db
+        main_db.metadata.create_all(bind=write_db.engine)
+        
+        from flask_migrate import stamp
+        try:
+            stamp()
+        except Exception:
+            pass
 
         for table_name in MIGRATION_ORDER:
             rows = data_by_table[table_name]
@@ -93,12 +98,9 @@ def migrate_sqlite_to_mysql(sqlite_url: str, mysql_url: str) -> list[dict]:
         for table_name in MIGRATION_ORDER:
             rows = data_by_table[table_name]
             if rows and "id" in rows[0]:
-                write_db.session.execute(
-                    text(
-                        f"ALTER TABLE {table_name} AUTO_INCREMENT = "
-                        f"(SELECT COALESCE(MAX(id), 0) + 1 FROM {table_name})"
-                    )
-                )
+                max_id_row = write_db.session.execute(text(f"SELECT COALESCE(MAX(id), 0) FROM {table_name}")).fetchone()
+                next_id = (max_id_row[0] if max_id_row else 0) + 1
+                write_db.session.execute(text(f"ALTER TABLE {table_name} AUTO_INCREMENT = {next_id}"))
         write_db.session.commit()
 
     return results

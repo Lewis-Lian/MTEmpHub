@@ -247,44 +247,40 @@ export interface DatabaseSettings {
   };
 }
 
-export function fetchDatabaseSettings(): Promise<DatabaseSettings> {
-  return apiRequest<DatabaseSettings>("/api/admin/database-settings");
+export function getDatabaseSettings(setupPassword?: string): Promise<DatabaseSettings> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<DatabaseSettings>("/api/admin/database-settings", { headers });
 }
 
-export function saveDatabaseSettings(payload: {
-  host: string;
-  port: number;
-  username: string;
-  password: string;
-  database: string;
-}): Promise<{ message: string }> {
+export function saveDatabaseSettings(settings: Omit<DatabaseSettings["mysql_config"], "password"> & { password?: string }, setupPassword?: string): Promise<{ message: string }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
   return apiRequest<{ message: string }>("/api/admin/database-settings", {
-    body: payload,
     method: "PUT",
+    body: settings,
+    headers,
   });
 }
 
-export function testDatabaseConnection(payload: {
-  host: string;
-  port: number;
-  username: string;
-  password: string;
-  database: string;
-}): Promise<{ ok: boolean; message: string }> {
+export function testDatabaseConnection(settings: Omit<DatabaseSettings["mysql_config"], "password"> & { password?: string }, setupPassword?: string): Promise<{ ok: boolean; message: string }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
   return apiRequest<{ ok: boolean; message: string }>("/api/admin/database-test-connection", {
-    body: payload,
     method: "POST",
+    body: settings,
+    headers,
   });
 }
 
-export function migrateDatabase(): Promise<{
-  ok: boolean;
-  results?: Array<{ table: string; rows: number; status: string }>;
-  message?: string;
-}> {
-  return apiRequest("/api/admin/database-migrate", { method: "POST" });
+export function migrateDatabase(setupPassword?: string): Promise<{ ok: boolean; message?: string; results?: any }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<{ ok: boolean; message?: string; results?: any }>("/api/admin/database-migrate", { method: "POST", headers });
 }
 
-export function switchToSqlite(): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>("/api/admin/database-switch-sqlite", { method: "POST" });
+export function switchToSqlite(setupPassword?: string): Promise<{ message: string }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<{ message: string }>("/api/admin/database-switch-sqlite", { method: "POST", headers });
+}
+
+export function switchToMysql(setupPassword?: string): Promise<{ message: string }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<{ message: string }>("/api/admin/database-switch-mysql", { method: "POST", headers });
 }

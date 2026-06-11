@@ -4,6 +4,7 @@ import ProtectedRoute from "../components/auth/ProtectedRoute";
 import AppShell from "../layouts/AppShell";
 import ChangePasswordPage from "../pages/ChangePasswordPage";
 import LoginPage from "../pages/LoginPage";
+import DatabaseSettingsPage from "../pages/admin/DatabaseSettingsPage";
 import { protectedRoutes } from "./protectedRoutes";
 
 interface AppRouterProps {
@@ -19,6 +20,7 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
   return (
     <BrowserRouter>
       <Routes>
+        <Route element={<DatabaseSettingsPage />} path="/database-setup" />
         <Route
           element={user ? <Navigate to={landingPath} replace /> : <LoginPage onLogin={onLogin} />}
           path="/login"
