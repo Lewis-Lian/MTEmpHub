@@ -378,6 +378,143 @@ C:\tools\nssm\win64\nssm.exe restart attendance-system
 - `D:\attendance_system\logs\service-stdout.log`
 - `D:\attendance_system\logs\service-stderr.log`
 
+## Ubuntu 部署与运维
+
+如果你准备将本系统部署到 Linux (Ubuntu) 服务器上，这是最推荐的生产级方案（**Nginx + Systemd + Waitress/Gunicorn**）。
+
+### 1. 前置环境准备
+
+在服务器上安装 Python3、虚拟环境工具以及 Nginx：
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip nginx -y
+```
+
+> **提示**：如果是前端也需要在服务器端打包，还需要安装 Node.js (推荐通过 nvm 或 nodesource 安装 Node >= 18)。
+
+### 2. 获取代码与后端初始化
+
+将代码拉取到服务器，例如放到 `/var/www/attendance_system`：
+
+```bash
+cd /var/www/attendance_system
+
+# 创建并激活虚拟环境
+python3 -m venv .venv
+source .venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+# (推荐) Linux 生产环境下可额外安装 gunicorn 替代 waitress
+pip install gunicorn
+
+# 准备环境变量
+cp .env.example .env
+nano .env # 填入你的 SETUP_PASSWORD 及其它配置
+
+# 数据库初始化与管理员创建
+flask --app manage.py init-db
+flask --app manage.py init-admin
+```
+
+### 3. 前端构建部署
+
+在开发机或者直接在服务器上构建前端静态文件：
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+构建完成后，会生成 `dist/` 文件夹。
+
+### 4. 配置 Systemd 守护进程 (后端开机自启)
+
+创建服务配置文件：
+
+```bash
+sudo nano /etc/systemd/system/attendance_api.service
+```
+
+写入以下内容（注意替换 `/var/www/attendance_system` 为你的实际路径，并修改 `User` 为你的实际系统用户名）：
+
+```ini
+[Unit]
+Description=Attendance System Backend API
+After=network.target
+
+[Service]
+User=ubuntu
+WorkingDirectory=/var/www/attendance_system
+Environment="PATH=/var/www/attendance_system/.venv/bin"
+# 如果使用 waitress:
+ExecStart=/var/www/attendance_system/.venv/bin/waitress-serve --host=127.0.0.1 --port=5000 wsgi:app
+# 如果使用 gunicorn (推荐):
+# ExecStart=/var/www/attendance_system/.venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
+
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+启动并设置开机自启：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl start attendance_api
+sudo systemctl enable attendance_api
+```
+
+### 5. 配置 Nginx 反向代理
+
+Nginx 负责直接吐出前端静态文件，并将 `/api` 的请求转发给后端的 5000 端口。
+
+```bash
+sudo nano /etc/nginx/sites-available/attendance
+```
+
+写入以下配置：
+
+```nginx
+server {
+    listen 80;
+    server_name your_domain_or_ip;
+
+    # 1. 代理前端静态文件
+    root /var/www/attendance_system/frontend/dist;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 2. 代理后端 API
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+启用配置并重启 Nginx：
+
+```bash
+sudo ln -s /etc/nginx/sites-available/attendance /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default  # (可选) 移除默认配置
+sudo nginx -t
+sudo systemctl restart nginx
+```
+
+### 6. 完成！
+现在你可以在浏览器通过服务器的 IP 访问系统。
+如果是第一次部署并且还没切 MySQL，可以直接访问 `http://<服务器IP>/database-setup` 用你的 `SETUP_PASSWORD` 解锁页面，按引导连上本机的 MySQL 进行一键部署迁移！
+
 ## 开发与测试
 
 如果你准备继续维护项目，先看这一节。
@@ -403,20 +540,33 @@ python3 -m pytest -q
 - 旧环境：升级前显式运行 `upgrade-legacy-schema`
 - 后续 Model 变更后：执行 `flask db migrate -m "描述"` 生成迁移脚本，再 `flask db upgrade` 应用
 
-## 数据库设置
+## 数据库部署向导（SQLite 到 MySQL 迁移）
 
-系统默认使用 SQLite，支持切换到 MySQL。两种方式操作：
+系统默认使用 SQLite，且提供了一个独立的、无须后台登录的【部署向导页面】来支持一键切换和迁移到 MySQL。
 
-### 方式一：网页操作（推荐）
+### 安全要求
 
-1. 登录管理后台 → 左侧菜单「数据库设置」
-2. 页面分三个区域：
-   - **当前连接**：显示当前使用的数据库类型和连接信息
-   - **MySQL 配置**：填写主机地址、端口、用户名、密码、数据库名
-     - 「测试连接」→ 验证 MySQL 是否可达
-     - 「保存配置」→ 写入 `.env`，重启应用后生效
-     - 「切回 SQLite」→ 一键切回 SQLite
-   - **数据迁移**：点击「开始迁移」将 SQLite 数据迁移到 MySQL
+> **注意**：为了防止部署环境泄露，数据库部署页面配有一道强力“密码锁”。
+
+在使用前，你**必须**在项目根目录的 `.env` 文件中配置向导访问口令：
+
+```bash
+SETUP_PASSWORD=你的任意解锁密码
+```
+
+### 部署操作流程
+
+1. 在浏览器直接访问独立部署向导页面：`http://127.0.0.1:5173/database-setup`
+2. 输入你在 `.env` 中配置的 `SETUP_PASSWORD` 解锁页面。
+3. 页面分为三个核心区域，支持无缝的“边测边迁”：
+   - **当前连接**：显示应用目前正在运行的数据库状态。
+   - **MySQL 配置**：
+     - 填写 MySQL 信息后，点击「暂存配置」（配置只存在后台备用箱，不会导致当前系统断开）。
+     - 点击「测试连接」验证连通性。
+   - **数据迁移**：
+     - 点击「开始迁移」，系统会读取刚暂存的配置，自动建表并将旧库所有数据完美拷贝到新 MySQL 中。
+   - **一键切换**：
+     - 迁移成功确认无误后，在配置区点击「切换到 MySQL」，此时新配置才会正式覆盖生效，重启应用后完成彻底换库。
 
 ### 方式二：手动修改 `.env`
 

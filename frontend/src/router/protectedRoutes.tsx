@@ -1,7 +1,6 @@
 import type { ReactElement } from "react";
 import AccountsPage from "../pages/admin/AccountsPage";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage";
-import DatabaseSettingsPage from "../pages/admin/DatabaseSettingsPage";
 import DepartmentsPage from "../pages/admin/DepartmentsPage";
 import DisabledUsersPage from "../pages/admin/DisabledUsersPage";
 import EmployeeAttendanceOverridesPage from "../pages/admin/EmployeeAttendanceOverridesPage";
@@ -39,7 +38,6 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: <SummaryDownloadPage />, path: "/employee/summary-download" },
   { element: <AdminDashboardPage />, path: "/admin/dashboard" },
   { element: <AccountsPage />, path: "/admin/accounts" },
-  { element: <DatabaseSettingsPage />, path: "/admin/database-settings" },
   { element: <DisabledUsersPage />, path: "/admin/disabled-users" },
   { element: <EmployeesPage />, path: "/admin/employees/manage" },
   { element: <DepartmentsPage />, path: "/admin/departments/manage" },

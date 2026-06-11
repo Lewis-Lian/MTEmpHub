@@ -152,11 +152,21 @@ class ApiAdminTests(unittest.TestCase):
 
     def test_database_settings_returns_masked_database_summary(self) -> None:
         self._login()
+        
+        # 写入一个测试用的 SETUP_PASSWORD 到 .env 以绕过 403
+        from utils.env_utils import write_env_value
+        import os
+        env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+        write_env_value(env_path, "SETUP_PASSWORD", "testpass")
 
-        response = self.client.get("/api/admin/database-settings")
+        response = self.client.get("/api/admin/database-settings", headers={"X-Setup-Password": "testpass"})
 
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
+        
+        # 测试完清理
+        write_env_value(env_path, "SETUP_PASSWORD", "")
+        
         self.assertIsInstance(payload, dict)
         self.assertIn("current", payload)
         labels = {row["item"]: row["value"] for row in payload["current"]}
