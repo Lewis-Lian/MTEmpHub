@@ -647,15 +647,36 @@ def _calc_record_work_hours(record) -> tuple[float, int]:
 
 
 def _accessible_emp_ids() -> list[int]:
+    if getattr(g, "current_user", None) is None:
+        return []
     if g.current_user.role == "admin":
         return [e.id for e in Employee.query.with_entities(Employee.id).all()]
+        
     emp_rows = UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id).all()
     dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
+        
     ids = {r.emp_id for r in emp_rows}
-    dept_ids = [r.dept_id for r in dept_rows]
-    if dept_ids:
-        dept_emp_ids = Employee.query.with_entities(Employee.id).filter(Employee.dept_id.in_(dept_ids)).all()
+    assigned_dept_ids = {r.dept_id for r in dept_rows}
+    
+    if assigned_dept_ids:
+        # Find all descendant departments
+        all_departments = Department.query.with_entities(Department.id, Department.parent_id).all()
+        children_map = {}
+        for d in all_departments:
+            children_map.setdefault(d.parent_id, []).append(d.id)
+            
+        expanded_dept_ids = set(assigned_dept_ids)
+        queue = list(assigned_dept_ids)
+        while queue:
+            curr = queue.pop(0)
+            for child_id in children_map.get(curr, []):
+                if child_id not in expanded_dept_ids:
+                    expanded_dept_ids.add(child_id)
+                    queue.append(child_id)
+                    
+        dept_emp_ids = Employee.query.with_entities(Employee.id).filter(Employee.dept_id.in_(expanded_dept_ids)).all()
         ids.update(row.id for row in dept_emp_ids)
+        
     return list(ids)
 
 

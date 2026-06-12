@@ -63,6 +63,11 @@ export default function AccountsPage() {
   const [createPermissionKeys, setCreatePermissionKeys] = useState<string[]>(allPermissionKeys);
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
+  const [createProfileEmployeeId, setCreateProfileEmployeeId] = useState<number | null>(null);
+  const [createProfileEmpNo, setCreateProfileEmpNo] = useState("");
+  const [createProfileName, setCreateProfileName] = useState("");
+  const [createProfileDeptId, setCreateProfileDeptId] = useState("");
+
   const [filterEmpIds, setFilterEmpIds] = useState<number[]>([]);
   const [filterRole, setFilterRole] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
@@ -241,6 +246,10 @@ export default function AccountsPage() {
       notification.warning("用户名和密码不能为空");
       return;
     }
+    if (!createProfileEmpNo.trim() || !createProfileName.trim() || !createProfileDeptId) {
+      notification.warning("关联档案人员信息不能为空");
+      return;
+    }
 
     try {
       await apiRequest("/api/admin/users", {
@@ -248,6 +257,9 @@ export default function AccountsPage() {
           username: createUsername.trim(),
           password: createPassword,
           role: createRole,
+          profile_emp_no: createProfileEmpNo.trim(),
+          profile_name: createProfileName.trim(),
+          profile_dept_id: Number(createProfileDeptId),
           emp_ids: createEmpIds,
           dept_ids: createDeptIds,
           page_permissions: permissionMap(createPermissionKeys),
@@ -260,6 +272,10 @@ export default function AccountsPage() {
       setCreateEmpIds([]);
       setCreateDeptIds([]);
       setCreatePermissionKeys(allPermissionKeys);
+      setCreateProfileEmployeeId(null);
+      setCreateProfileEmpNo("");
+      setCreateProfileName("");
+      setCreateProfileDeptId("");
       setCreateModalOpen(false);
       notification.success("创建成功");
       await refreshUsers();
@@ -314,6 +330,24 @@ export default function AccountsPage() {
       setEditProfileEmpNo(employee.emp_no);
       setEditProfileName(employee.name);
       setEditProfileDeptId(employee.dept_id ? String(employee.dept_id) : "");
+    }
+  }
+
+  function handleSelectCreateProfileEmployee(ids: number[]) {
+    if (ids.length === 0) {
+      setCreateProfileEmployeeId(null);
+      setCreateProfileEmpNo("");
+      setCreateProfileName("");
+      setCreateProfileDeptId("");
+      return;
+    }
+    const id = ids[ids.length - 1];
+    setCreateProfileEmployeeId(id);
+    const employee = employees.find((e) => e.id === id);
+    if (employee) {
+      setCreateProfileEmpNo(employee.emp_no);
+      setCreateProfileName(employee.name);
+      setCreateProfileDeptId(employee.dept_id ? String(employee.dept_id) : "");
     }
   }
 
@@ -522,6 +556,17 @@ export default function AccountsPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                    <span className="account-field-label">关联档案人员 (自动提取工号/姓名/部门)</span>
+                    <EmployeePicker
+                      departments={pickerDepartments}
+                      employees={pickerEmployees}
+                      onChange={handleSelectCreateProfileEmployee}
+                      selectedIds={createProfileEmployeeId ? [createProfileEmployeeId] : []}
+                      showFieldChrome={true}
+                      singleSelect={true}
+                    />
+                  </label>
                   <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">用户名</span>
                     <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} placeholder="例如: admin01" />

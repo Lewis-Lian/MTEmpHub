@@ -134,6 +134,68 @@ def _unique_employees(rows):
         seen_ids.add(row.id)
         unique_rows.append(row)
     return unique_rows
+def _accessible_dept_ids_set() -> set[int]:
+    if getattr(g, "current_user", None) is None:
+        return set()
+    
+    if g.current_user.role == "admin":
+        return {d.id for d in Department.query.with_entities(Department.id).all()}
+        
+    dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
+    assigned_dept_ids = {r.dept_id for r in dept_rows}
+    
+    if not assigned_dept_ids:
+        return set()
+        
+    all_departments = Department.query.all()
+    dept_by_id = {d.id: d for d in all_departments}
+    
+    result_ids = set()
+    for d_id in assigned_dept_ids:
+        curr = dept_by_id.get(d_id)
+        while curr:
+            result_ids.add(curr.id)
+            if curr.parent_id:
+                curr = dept_by_id.get(curr.parent_id)
+            else:
+                curr = None
+                
+    return result_ids
+
+
+def _accessible_emp_ids_set() -> set[int]:
+    if getattr(g, "current_user", None) is None:
+        return set()
+        
+    if g.current_user.role == "admin":
+        return {e.id for e in Employee.query.with_entities(Employee.id).all()}
+        
+    emp_rows = UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id).all()
+    dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
+    
+    ids = {r.emp_id for r in emp_rows}
+    assigned_dept_ids = {r.dept_id for r in dept_rows}
+    
+    if assigned_dept_ids:
+        # Find all descendant departments
+        all_departments = Department.query.with_entities(Department.id, Department.parent_id).all()
+        children_map = {}
+        for d in all_departments:
+            children_map.setdefault(d.parent_id, []).append(d.id)
+            
+        expanded_dept_ids = set(assigned_dept_ids)
+        queue = list(assigned_dept_ids)
+        while queue:
+            curr = queue.pop(0)
+            for child_id in children_map.get(curr, []):
+                if child_id not in expanded_dept_ids:
+                    expanded_dept_ids.add(child_id)
+                    queue.append(child_id)
+                    
+        dept_emp_ids = Employee.query.with_entities(Employee.id).filter(Employee.dept_id.in_(expanded_dept_ids)).all()
+        ids.update(row.id for row in dept_emp_ids)
+        
+    return ids
 
 
 def _convert_uploaded_xls_to_xlsx(xls_path: str) -> str | None:
@@ -1100,12 +1162,24 @@ def delete_shift(shift_id: int):
 
 
 def employees_list():
-    rows = _unique_employees(Employee.query.order_by(Employee.emp_no.asc()).all())
+    allowed_ids = _accessible_emp_ids_set()
+    query = Employee.query
+    if getattr(g, "current_user", None) and g.current_user.role != "admin":
+        if not allowed_ids:
+            return jsonify([])
+        query = query.filter(Employee.id.in_(allowed_ids))
+    rows = _unique_employees(query.order_by(Employee.emp_no.asc()).all())
     return jsonify([_serialize_employee(e) for e in rows])
 
 
 def departments_list():
-    rows = Department.query.order_by(Department.dept_name.asc()).all()
+    allowed_ids = _accessible_dept_ids_set()
+    query = Department.query
+    if getattr(g, "current_user", None) and g.current_user.role != "admin":
+        if not allowed_ids:
+            return jsonify([])
+        query = query.filter(Department.id.in_(allowed_ids))
+    rows = query.order_by(Department.dept_name.asc()).all()
     return jsonify(
         [
             {

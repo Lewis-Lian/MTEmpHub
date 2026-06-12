@@ -275,6 +275,11 @@ export function migrateDatabase(setupPassword?: string): Promise<{ ok: boolean; 
   return apiRequest<{ ok: boolean; message?: string; results?: any }>("/api/admin/database-migrate", { method: "POST", headers });
 }
 
+export function migrateToSqliteDatabase(setupPassword?: string): Promise<{ ok: boolean; message?: string; results?: any }> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<{ ok: boolean; message?: string; results?: any }>("/api/admin/database-migrate-to-sqlite", { method: "POST", headers });
+}
+
 export function switchToSqlite(setupPassword?: string): Promise<{ message: string }> {
   const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
   return apiRequest<{ message: string }>("/api/admin/database-switch-sqlite", { method: "POST", headers });

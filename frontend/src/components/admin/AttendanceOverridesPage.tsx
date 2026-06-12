@@ -84,6 +84,9 @@ export default function AttendanceOverridesPage({
   const [editingRow, setEditingRow] = useState<AttendanceOverrideRow | null>(null);
   const [editDraft, setEditDraft] = useState<EditDraftState>({ remark: "", values: {} });
   const [showActionsModal, setShowActionsModal] = useState(false);
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -165,20 +168,37 @@ export default function AttendanceOverridesPage({
 
     setIsQuerying(true);
     setError("");
+    setProgressVisible(true);
+    setProgress(0);
+    setLoadingText("正在查询考勤数据...");
+    let current = 0;
+    const interval = setInterval(() => {
+      current += Math.floor(Math.random() * 20) + 10;
+      if (current >= 95) current = 95;
+      setProgress(current);
+    }, 80);
 
     try {
       const query = new URLSearchParams({ month: selectedMonth });
       selectedIds.forEach((id) => query.append("emp_ids", String(id)));
       const payload = await apiRequest<AttendanceOverrideResponse>(`${endpointBase}?${query.toString()}`);
+      
+      clearInterval(interval);
+      setProgress(100);
+      setLoadingText("查询完成");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       const nextRows = Array.isArray(payload.rows) ? payload.rows : [];
       setRows(nextRows);
       setHasQueried(true);
       setEditingRow(null);
     } catch (caughtError) {
+      clearInterval(interval);
       setRows([]);
       setHasQueried(true);
       setError(caughtError instanceof Error ? caughtError.message : "修正列表加载失败");
     } finally {
+      setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
     }
   }
@@ -266,6 +286,16 @@ export default function AttendanceOverridesPage({
       return;
     }
     try {
+      setProgressVisible(true);
+      setProgress(0);
+      setLoadingText("正在上传并处理导入，请稍候...");
+      let current = 0;
+      const interval = setInterval(() => {
+        current += Math.floor(Math.random() * 15) + 5;
+        if (current >= 95) current = 95;
+        setProgress(current);
+      }, 150);
+
       const form = new FormData();
       form.append("month", selectedMonth);
       form.append("file", file);
@@ -279,6 +309,10 @@ export default function AttendanceOverridesPage({
         body: form,
         method: "POST",
       });
+      clearInterval(interval);
+      setProgress(100);
+      setLoadingText("导入处理完成！");
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const summary = [
         `成功 ${result.success_count} 条`,
         `跳过 ${result.skipped_count} 条`,
@@ -295,6 +329,7 @@ export default function AttendanceOverridesPage({
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "导入失败");
     } finally {
+      setTimeout(() => setProgressVisible(false), 500);
       event.target.value = "";
     }
   }
@@ -355,6 +390,14 @@ export default function AttendanceOverridesPage({
       </aside>
 
       <section className="query-workspace">
+        <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} role="status">
+          <div className="query-loading-spinner-wrap">
+            <div className="query-loading-spinner-ring" />
+            <div className="query-loading-spinner-pulse" />
+            <div className="query-loading-percent">{progress}%</div>
+          </div>
+          <div className="query-loading-text">{loadingText}</div>
+        </div>
         <QueryResultPanel>
           <QueryTable
             emptyText={hasQueried ? listEmptyHint : `请先查询${pickerLabel}和月份`}

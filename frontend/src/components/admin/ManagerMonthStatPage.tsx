@@ -65,6 +65,9 @@ export default function ManagerMonthStatPage({
   const [importError, setImportError] = useState("");
   const [hasQueried, setHasQueried] = useState(false);
   const [showActionsModal, setShowActionsModal] = useState(false);
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [loadingText, setLoadingText] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -110,6 +113,15 @@ export default function ManagerMonthStatPage({
 
     setIsQuerying(true);
     setQueryError("");
+    setProgressVisible(true);
+    setProgress(0);
+    setLoadingText("正在查询统计数据...");
+    let current = 0;
+    const interval = setInterval(() => {
+      current += Math.floor(Math.random() * 20) + 10;
+      if (current >= 95) current = 95;
+      setProgress(current);
+    }, 80);
 
     try {
       const query = new URLSearchParams({ year, emp_ids: selectedEmployeeIds.join(",") });
@@ -117,15 +129,23 @@ export default function ManagerMonthStatPage({
         apiRequest<ManagerStatRow[]>(`${endpointBase}/records?${query.toString()}`),
         buildColumnStates(year, monthFields.map((field) => field.key)),
       ]);
+      
+      clearInterval(interval);
+      setProgress(100);
+      setLoadingText("查询完成");
+      await new Promise((resolve) => setTimeout(resolve, 300));
+
       setRows(Array.isArray(nextRows) ? nextRows : []);
       setColumnStates(states);
       setHasQueried(true);
       setEditingRow(null);
     } catch (error) {
+      clearInterval(interval);
       setRows([]);
       setHasQueried(true);
       setQueryError(error instanceof Error ? error.message : "后台数据加载失败");
     } finally {
+      setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
     }
   }
@@ -180,6 +200,16 @@ export default function ManagerMonthStatPage({
     formData.append("file", importFile);
 
     try {
+      setProgressVisible(true);
+      setProgress(0);
+      setLoadingText("正在上传并处理导入，请稍候...");
+      let current = 0;
+      const interval = setInterval(() => {
+        current += Math.floor(Math.random() * 15) + 5;
+        if (current >= 95) current = 95;
+        setProgress(current);
+      }, 150);
+
       const result = await apiRequest<{
         imported?: number;
         warning?: string;
@@ -189,6 +219,10 @@ export default function ManagerMonthStatPage({
         body: formData,
         method: "POST",
       });
+      clearInterval(interval);
+      setProgress(100);
+      setLoadingText("导入处理完成！");
+      await new Promise((resolve) => setTimeout(resolve, 500));
       const warnings = result.warning ? `\n${result.warning}` : "";
       const errors =
         result.error_count && result.errors?.length
@@ -203,6 +237,7 @@ export default function ManagerMonthStatPage({
     } catch (error) {
       setImportError(error instanceof Error ? error.message : "导入失败");
     } finally {
+      setTimeout(() => setProgressVisible(false), 500);
       event.target.value = "";
     }
   }
@@ -268,6 +303,14 @@ export default function ManagerMonthStatPage({
       </aside>
 
       <section className="query-workspace">
+        <div className={`query-workspace-loading ${progressVisible ? "is-active" : ""}`} role="status">
+          <div className="query-loading-spinner-wrap">
+            <div className="query-loading-spinner-ring" />
+            <div className="query-loading-spinner-pulse" />
+            <div className="query-loading-percent">{progress}%</div>
+          </div>
+          <div className="query-loading-text">{loadingText}</div>
+        </div>
         <QueryResultPanel>
           <QueryTable
             emptyText={isQuerying ? "正在加载..." : hasQueried ? "当前条件无数据" : "请先查询管理人员和年份"}

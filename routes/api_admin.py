@@ -1,13 +1,14 @@
 import os
 from urllib.parse import urlparse
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, g
 
 from models.department import Department
 from models.shift import Shift
 from routes.admin_core import (
     AccountSet,
     AccountSetImport,
+    _accessible_dept_ids_set,
     activate_account_set,
     calculate_account_set,
     batch_operate_departments,
@@ -106,6 +107,16 @@ def setup_required(f):
 @api_admin_bp.get("/bootstrap")
 @admin_required
 def bootstrap():
+    allowed_ids = _accessible_dept_ids_set()
+    query = Department.query
+    if getattr(g, "current_user", None) and g.current_user.role != "admin":
+        if not allowed_ids:
+            departments = []
+        else:
+            departments = query.filter(Department.id.in_(allowed_ids)).order_by(Department.dept_name.asc()).all()
+    else:
+        departments = query.order_by(Department.dept_name.asc()).all()
+
     return jsonify(
         {
             "departments": [
@@ -115,7 +126,7 @@ def bootstrap():
                     "dept_name": row.dept_name,
                     "parent_id": row.parent_id,
                 }
-                for row in Department.query.order_by(Department.dept_name.asc()).all()
+                for row in departments
             ],
             "shifts": [
                 {
@@ -270,6 +281,41 @@ def database_migrate():
         results = migrate_sqlite_to_mysql(sqlite_url, db_url)
         return jsonify({"ok": True, "results": results})
     except Exception as e:
+        return jsonify({"ok": False, "message": str(e)}), 500
+
+
+@api_admin_bp.post("/database-migrate-to-sqlite")
+@setup_required
+def database_migrate_to_sqlite():
+    """执行 MySQL → SQLite 数据迁移。"""
+    from utils.env_utils import read_env
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_data = read_env(env_path)
+
+    # 确定 SQLite 目标
+    root_dir = os.path.dirname(os.path.dirname(__file__))
+    sqlite_path = os.path.join(root_dir, "attendance.db")
+    sqlite_url = f"sqlite:///{sqlite_path}"
+
+    # 确定 MySQL 来源
+    current_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+    if current_uri.startswith("mysql"):
+        mysql_url = current_uri
+    else:
+        db_url = env_data.get("MYSQL_SAVED_URL", "") or env_data.get("DATABASE_URL", "")
+        if not db_url.startswith("mysql"):
+            return jsonify({"error": "未找到有效的 MySQL 来源配置"}), 400
+        mysql_url = db_url
+
+    try:
+        from services.migration_service import migrate_mysql_to_sqlite
+
+        results = migrate_mysql_to_sqlite(mysql_url, sqlite_url)
+        return jsonify({"ok": True, "results": results})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"ok": False, "message": str(e)}), 500
 
 

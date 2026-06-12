@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- 渐变配置：Indigo (#4F46E5) 到 Cyan (#06B6D4) -->
+    <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4F46E5" />
+      <stop offset="100%" stop-color="#06B6D4" />
+    </linearGradient>
+    <!-- 图标阴影过滤器，增加发光立体感 -->
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#4F46E5" flood-opacity="0.25" />
+    </filter>
+  </defs>
+  <!-- 渐变几何形状：平滑的“M”与“T”折线融合体 -->
+  <g filter="url(#glow)">
+    <!-- 左半部分倒 U 型弯折线 -->
+    <path d="M 28 94 V 46 C 28 34 38 24 50 24 A 1 1 0 0 1 50 24 C 62 24 72 34 72 46 V 78" fill="none" stroke="url(#logoGrad)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- 右半部分正 U 型弯折线 -->
+    <path d="M 56 50 V 82 C 56 94 66 104 78 104 A 1 1 0 0 0 78 104 C 90 104 100 94 100 82 V 34" fill="none" stroke="url(#logoGrad)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round" />
+    <!-- 核心连接节点 (Hub) -->
+    <circle cx="64" cy="64" r="10" fill="#FFFFFF" stroke="url(#logoGrad)" stroke-width="5" />
+  </g>
+</svg>
