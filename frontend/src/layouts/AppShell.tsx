@@ -8,6 +8,7 @@ import AppPageNav from "../components/nav/AppPageNav";
 import AppTabs, { type AppTabItem } from "../components/nav/AppTabs";
 import ErrorState from "../components/feedback/ErrorState";
 import LoadingState from "../components/feedback/LoadingState";
+import Logo from "../components/common/Logo";
 import { findProtectedRoute } from "../router/protectedRoutes";
 import type { QueryNavigationModule } from "../types/query";
 
@@ -123,6 +124,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
 
   async function handleLogout() {
     await logout();
+    import("../api/query").then(m => m.clearQueryBootstrapCache());
     onLogout(null);
     navigate("/login", { replace: true });
   }
@@ -171,8 +173,28 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
   return (
     <div className="app-layout app-shell-grid">
       <aside className={`app-sidebar${sidebarCollapsed ? " is-collapsed" : ""}`}>
-        <div className="app-sidebar-brand">
-          <h1>{sidebarCollapsed ? "M" : "MTEmpHub"}</h1>
+        <div
+          className="app-sidebar-brand"
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: sidebarCollapsed ? "center" : "stretch",
+            justifyContent: sidebarCollapsed ? "center" : "flex-start",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: sidebarCollapsed ? "center" : "flex-start",
+              width: "100%",
+            }}
+          >
+            <Logo
+              size={sidebarCollapsed ? 28 : 26}
+              variant={sidebarCollapsed ? "icon" : "full"}
+              textColor="var(--ent-text, #183153)"
+            />
+          </div>
           {!sidebarCollapsed && <p>当前模块：{currentModule?.label ?? "系统导航"}</p>}
           {!sidebarCollapsed && <p>当前用户：{user.username}</p>}
         </div>

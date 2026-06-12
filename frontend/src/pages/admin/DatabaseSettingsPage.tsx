@@ -5,6 +5,7 @@ import {
   saveDatabaseSettings,
   testDatabaseConnection,
   migrateDatabase,
+  migrateToSqliteDatabase,
   switchToSqlite,
   switchToMysql,
   type DatabaseSettings,
@@ -133,6 +134,25 @@ export default function DatabaseSettingsPage() {
       }
     } catch (err: any) {
       handleApiError(err, "迁移失败");
+    } finally {
+      setMigrating(false);
+    }
+  }
+
+  async function handleMigrateToSqlite() {
+    if (!confirm("确定要将 MySQL 数据全量迁移回 SQLite 吗？这将覆盖现有的 SQLite 数据库。请确保 MySQL 来源配置有效。")) return;
+    setMigrating(true);
+    setMigrationResults(null);
+    try {
+      const res = await migrateToSqliteDatabase(setupPassword);
+      if (res.ok && res.results) {
+        setMigrationResults(res.results);
+        notification.success(`反向迁移完成，共 ${res.results.filter((r: any) => r.status === "ok").length} 张表`);
+      } else {
+        notification.error(res.message || "反向迁移失败");
+      }
+    } catch (err: any) {
+      handleApiError(err, "反向迁移失败");
     } finally {
       setMigrating(false);
     }
@@ -302,22 +322,35 @@ export default function DatabaseSettingsPage() {
         <div className="admin-resource-panel-head">
           <div>
             <p className="admin-resource-panel-kicker">数据迁移</p>
-            <p className="admin-resource-panel-title">SQLite → MySQL 数据迁移</p>
+            <p className="admin-resource-panel-title">SQLite ↔ MySQL 数据迁移</p>
             <p className="admin-resource-panel-description">
-              将当前 SQLite 数据库中的所有数据迁移到 MySQL。请确保已暂存 MySQL 配置且目标数据库为空。
+              在 SQLite 和 MySQL 之间进行数据迁移。请确保已暂存 MySQL 配置。反向迁移会覆盖当前 SQLite。
             </p>
           </div>
-          <button
-            onClick={handleMigrate}
-            disabled={migrating}
-            style={{
-              ...btnStyle,
-              background: migrating ? "#9ca3af" : "#dc2626",
-              color: "#fff",
-            }}
-          >
-            {migrating ? "迁移中..." : "开始迁移"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleMigrate}
+              disabled={migrating}
+              style={{
+                ...btnStyle,
+                background: migrating ? "#9ca3af" : "#dc2626",
+                color: "#fff",
+              }}
+            >
+              {migrating ? "迁移中..." : "导出至 MySQL"}
+            </button>
+            <button
+              onClick={handleMigrateToSqlite}
+              disabled={migrating}
+              style={{
+                ...btnStyle,
+                background: migrating ? "#9ca3af" : "#f59e0b",
+                color: "#fff",
+              }}
+            >
+              {migrating ? "迁移中..." : "从 MySQL 导回"}
+            </button>
+          </div>
         </div>
         {migrationResults && (
           <div style={{ padding: "0 24px 16px" }}>

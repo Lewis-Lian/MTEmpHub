@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { changePassword } from "../api/auth";
 import { ApiError } from "../api/client";
 import AnimatedCharacters from "../components/AnimatedCharacters";
+import Logo from "../components/common/Logo";
 import { useNotification } from "../components/feedback/Notification";
 
 export default function ChangePasswordPage() {
@@ -57,10 +58,7 @@ export default function ChangePasswordPage() {
             <div className="login-brand-panel-inner">
               <div className="login-brand login-brand--career">
                 <Link className="login-brand-home" to="/login">
-                  <span aria-hidden="true" className="login-brand-logo login-brand-logo--system">
-                    MT
-                  </span>
-                  <span className="login-brand-text">MTEmpHub</span>
+                  <Logo size={36} variant="full" textColor="#ffffff" />
                 </Link>
               </div>
               <div className="login-brand-stage" aria-hidden="true">
@@ -83,10 +81,7 @@ export default function ChangePasswordPage() {
           <section className="login-panel-wrap">
             <div className="login-card">
               <div className="login-mobile-brand">
-                <span aria-hidden="true" className="login-career-logo login-career-logo--system">
-                  MT
-                </span>
-                <span>MTEmpHub</span>
+                <Logo size={32} variant="full" textColor="var(--ent-text, #183153)" />
               </div>
               <div className="login-panel-top">
                 <h2 className="login-panel-title">修改密码</h2>

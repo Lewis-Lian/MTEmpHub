@@ -1743,7 +1743,7 @@ body {
 }
 
 .department-picker-modal {
-  z-index: 10000 !important;
+  z-index: var(--z-overlay) !important;
 }
 
 .department-picker-tree-panel {
@@ -5733,3 +5733,22 @@ input[type="checkbox"] {
 .time-picker-list::-webkit-scrollbar {
   display: none;
 }
+
+/* Logo Hover Animations & Enhancements */
+.mtemphub-logo {
+  cursor: pointer;
+}
+
+.mtemphub-logo:hover .logo-icon-svg {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.mtemphub-logo:hover .logo-center-dot {
+  transform: scale(1.25);
+  fill: #eef2ff !important;
+}
+
+.mtemphub-logo:active .logo-icon-svg {
+  transform: translateY(0) scale(0.96);
+}
+

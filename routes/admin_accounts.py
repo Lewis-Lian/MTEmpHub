@@ -128,6 +128,9 @@ def register_admin_account_routes(admin_bp) -> None:
         username = (data.get("username") or "").strip()
         password = (data.get("password") or "").strip()
         role = (data.get("role") or "readonly").strip() or "readonly"
+        profile_emp_no = (data.get("profile_emp_no") or "").strip()
+        profile_name = (data.get("profile_name") or "").strip()
+        profile_dept_id = data.get("profile_dept_id")
         emp_ids = data.get("emp_ids") or []
         dept_ids = data.get("dept_ids") or []
         normalized_emp_ids = [int(x) for x in emp_ids if str(x).isdigit()]
@@ -142,6 +145,13 @@ def register_admin_account_routes(admin_bp) -> None:
 
         user = admin_module.User(username=username, role=role)
         user.set_password(password)
+        if profile_emp_no:
+            user.profile_emp_no = profile_emp_no
+        if profile_name:
+            user.profile_name = profile_name
+        if profile_dept_id and str(profile_dept_id).isdigit():
+            user.profile_dept_id = int(profile_dept_id)
+            
         user.page_permissions = admin_module._parse_page_permissions(data, role)
         admin_module.db.session.add(user)
         admin_module.db.session.flush()
