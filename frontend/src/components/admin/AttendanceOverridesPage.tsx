@@ -335,7 +335,7 @@ export default function AttendanceOverridesPage({
   }
 
   if (!bootstrap) {
-    return <ErrorState description={"" || `${title}初始化失败`} title={`${title}初始化失败`} />;
+    return <ErrorState description={`${title}初始化失败`} title={`${title}初始化失败`} />;
   }
 
   return (
