@@ -9,6 +9,7 @@ import EmployeePicker from "../query/EmployeePicker";
 import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
 import YearPicker from "../common/YearPicker";
+import { useNotification } from "../feedback/Notification";
 import type { QueryBootstrap } from "../../types/query";
 
 interface MonthField {
@@ -56,13 +57,12 @@ export default function ManagerMonthStatPage({
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [rows, setRows] = useState<ManagerStatRow[]>([]);
-  const [queryError, setQueryError] = useState("");
+  const notification = useNotification();
   const [isQuerying, setIsQuerying] = useState(false);
   const [editingRow, setEditingRow] = useState<ManagerStatRow | null>(null);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
   const [editRemark, setEditRemark] = useState("");
   const [columnStates, setColumnStates] = useState<Record<string, ColumnState>>({});
-  const [importError, setImportError] = useState("");
   const [hasQueried, setHasQueried] = useState(false);
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
@@ -103,16 +103,11 @@ export default function ManagerMonthStatPage({
 
   async function loadRows() {
     if (!year) {
-      setQueryError("请选择年份");
-      return;
-    }
-    if (!selectedEmployeeIds.length) {
-      setQueryError("请选择管理人员");
+      notification.error("请选择年份");
       return;
     }
 
     setIsQuerying(true);
-    setQueryError("");
     setProgressVisible(true);
     setProgress(0);
     setLoadingText("正在查询统计数据...");
@@ -143,7 +138,7 @@ export default function ManagerMonthStatPage({
       clearInterval(interval);
       setRows([]);
       setHasQueried(true);
-      setQueryError(error instanceof Error ? error.message : "后台数据加载失败");
+      notification.error(error instanceof Error ? error.message : "后台数据加载失败");
     } finally {
       setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
@@ -179,18 +174,17 @@ export default function ManagerMonthStatPage({
       });
       await loadRows();
     } catch (error) {
-      setQueryError(error instanceof Error ? error.message : "保存失败");
+      notification.error(error instanceof Error ? error.message : "保存失败");
     }
   }
 
   async function submitImport(event: ChangeEvent<HTMLInputElement>) {
-    setImportError("");
     const importFile = event.target.files?.[0];
     if (!importFile?.name) {
       return;
     }
     if (!importFile.name.toLowerCase().endsWith(".xlsx")) {
-      setImportError("仅支持 .xlsx 文件");
+      notification.error("仅支持 .xlsx 文件");
       event.target.value = "";
       return;
     }
@@ -232,10 +226,12 @@ export default function ManagerMonthStatPage({
         await loadRows();
       }
       if (warnings || errors) {
-        window.alert(`已导入 ${String(result.imported ?? 0)} 人${warnings}${errors}`);
+        notification.error(`已导入 ${String(result.imported ?? 0)} 人${warnings}${errors}`);
+      } else {
+        notification.success(`导入成功，共处理 ${result.imported ?? 0} 条记录`);
       }
     } catch (error) {
-      setImportError(error instanceof Error ? error.message : "导入失败");
+      notification.error(error instanceof Error ? error.message : "导入失败");
     } finally {
       setTimeout(() => setProgressVisible(false), 500);
       event.target.value = "";
@@ -244,7 +240,7 @@ export default function ManagerMonthStatPage({
 
   function handleExport() {
     if (!year) {
-      setQueryError("请选择年份");
+      notification.error("请选择年份");
       return;
     }
     window.location.assign(buildApiUrl(`${endpointBase}/export?year=${encodeURIComponent(year)}`));
@@ -298,8 +294,6 @@ export default function ManagerMonthStatPage({
             <div className="account-lock-notice" style={{ marginTop: "4px" }}>{buildLockNotice(year, columnStates)}</div>
           </div>
         </div>
-        {queryError ? <div className="legacy-inline-error">{queryError}</div> : null}
-        {importError ? <div className="legacy-inline-error">{importError}</div> : null}
       </aside>
 
       <section className="query-workspace">

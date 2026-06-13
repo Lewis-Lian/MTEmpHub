@@ -1436,7 +1436,9 @@ def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, obj
 
 def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
     if not emp_ids:
-        return {"rows": [], "month": month}, 200
+        emp_ids = list(_accessible_emp_ids_set())
+        if not emp_ids:
+            return {"rows": [], "month": month}, 200
     employees = {
         employee.id: employee
         for employee in Employee.query.filter(
@@ -2398,7 +2400,9 @@ def _employee_override_response(emp_id: int, month: str) -> tuple[dict[str, obje
 
 def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
     if not emp_ids:
-        return {"rows": [], "month": month}, 200
+        emp_ids = list(_accessible_emp_ids_set())
+        if not emp_ids:
+            return {"rows": [], "month": month}, 200
     employees = {
         employee.id: employee
         for employee in Employee.query.filter(

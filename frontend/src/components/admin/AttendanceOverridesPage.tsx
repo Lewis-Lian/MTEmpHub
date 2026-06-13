@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { apiRequest, buildApiUrl } from "../../api/client";
+import { useNotification } from "../feedback/Notification";
 import { fetchQueryBootstrap } from "../../api/query";
 import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
@@ -76,7 +77,7 @@ export default function AttendanceOverridesPage({
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isQuerying, setIsQuerying] = useState(false);
-  const [error, setError] = useState("");
+  const notification = useNotification();
   const [selectedMonth, setSelectedMonth] = useState("");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [rows, setRows] = useState<AttendanceOverrideRow[]>([]);
@@ -103,7 +104,7 @@ export default function AttendanceOverridesPage({
         if (!mounted) {
           return;
         }
-        setError(caughtError instanceof Error ? caughtError.message : "修正中心初始化失败");
+        notification.error(caughtError instanceof Error ? caughtError.message : "修正中心初始化失败");
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -115,7 +116,7 @@ export default function AttendanceOverridesPage({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [notification]);
 
   const currentAccountSet = useMemo(
     () => bootstrap?.account_sets.find((accountSet) => accountSet.month === selectedMonth) ?? null,
@@ -158,16 +159,11 @@ export default function AttendanceOverridesPage({
 
   async function handleQuery() {
     if (!selectedMonth) {
-      setError("请选择月份");
-      return;
-    }
-    if (!selectedIds.length) {
-      setError(`请选择${pickerLabel}`);
+      notification.error("请选择月份");
       return;
     }
 
     setIsQuerying(true);
-    setError("");
     setProgressVisible(true);
     setProgress(0);
     setLoadingText("正在查询考勤数据...");
@@ -196,7 +192,7 @@ export default function AttendanceOverridesPage({
       clearInterval(interval);
       setRows([]);
       setHasQueried(true);
-      setError(caughtError instanceof Error ? caughtError.message : "修正列表加载失败");
+      notification.error(caughtError instanceof Error ? caughtError.message : "修正列表加载失败");
     } finally {
       setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
@@ -263,13 +259,13 @@ export default function AttendanceOverridesPage({
       });
       window.alert(saveSuccessText);
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "保存失败");
+      notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
     }
   }
 
   function handleDownload(kind: "template" | "export") {
     if (!selectedMonth) {
-      setError("请选择月份");
+      notification.error("请选择月份");
       return;
     }
     window.location.assign(buildApiUrl(`${endpointBase}/${kind}?month=${encodeURIComponent(selectedMonth)}`));
@@ -281,7 +277,7 @@ export default function AttendanceOverridesPage({
       return;
     }
     if (!selectedMonth) {
-      setError("请选择月份");
+      notification.error("请选择月份");
       event.target.value = "";
       return;
     }
@@ -327,7 +323,7 @@ export default function AttendanceOverridesPage({
         await handleQuery();
       }
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : "导入失败");
+      notification.error(caughtError instanceof Error ? caughtError.message : "导入失败");
     } finally {
       setTimeout(() => setProgressVisible(false), 500);
       event.target.value = "";
@@ -339,7 +335,7 @@ export default function AttendanceOverridesPage({
   }
 
   if (!bootstrap) {
-    return <ErrorState description={error || `${title}初始化失败`} title={`${title}初始化失败`} />;
+    return <ErrorState description={"" || `${title}初始化失败`} title={`${title}初始化失败`} />;
   }
 
   return (
@@ -386,7 +382,6 @@ export default function AttendanceOverridesPage({
             ) : null}
           </div>
         </div>
-        {error ? <div className="legacy-inline-error">{error}</div> : null}
       </aside>
 
       <section className="query-workspace">
