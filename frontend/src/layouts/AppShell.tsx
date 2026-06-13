@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { logout, type AuthUser } from "../api/auth";
-import { fetchNavigation } from "../api/query";
+import { clearQueryBootstrapCache, fetchNavigation } from "../api/query";
 import AppModuleNav from "../components/nav/AppModuleNav";
 import AppPageNav from "../components/nav/AppPageNav";
 import AppTabs, { type AppTabItem } from "../components/nav/AppTabs";
@@ -124,7 +124,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
 
   async function handleLogout() {
     await logout();
-    import("../api/query").then(m => m.clearQueryBootstrapCache());
+    clearQueryBootstrapCache();
     onLogout(null);
     navigate("/login", { replace: true });
   }
