@@ -61,3 +61,4 @@ frontend/vite.config.d.ts
 *.egg-info/
 .worktrees/
 .superpowers/
+instance/migration_progress.json
