@@ -28,6 +28,14 @@ export default defineConfig(({ mode }) => {
       environment: "jsdom",
       globals: true,
       setupFiles: "./src/test/setup.ts",
+      env: {
+        NODE_ENV: "test",
+      },
+      server: {
+        deps: {
+          inline: [/node_modules\/(react|react-dom|scheduler)/],
+        },
+      },
     },
   };
 });
