@@ -63,7 +63,7 @@ class ApiQueryTests(unittest.TestCase):
             viewer.set_password("viewer123")
             blocked = User(username="blocked", role="readonly", page_permissions={"employee_dashboard": True})
             blocked.set_password("blocked123")
-            home_only = User(username="home-only", role="readonly", page_permissions={})
+            home_only = User(username="home-only", role="readonly", page_permissions={"query_home": True})
             home_only.set_password("home123")
             manager_viewer = User(
                 username="manager-viewer",
@@ -132,13 +132,18 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual([row["emp_no"] for row in payload["employees"]], ["E001"])
         self.assertEqual([row["dept_no"] for row in payload["departments"]], ["D001"])
 
-    def test_query_bootstrap_propagates_forbidden_from_nested_permissions(self) -> None:
+    def test_query_bootstrap_succeeds_for_home_only_user(self) -> None:
         self._login("home-only", "home123")
 
         response = self.client.get("/api/query/bootstrap")
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(response.get_json(), {"error": "Forbidden"})
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        # 纯首页权限用户也应拿到账套列表（首页月份选择器与摘要依赖它定位数据）
+        self.assertEqual([row["month"] for row in payload["account_sets"]], ["2026-05"])
+        # 但 departments 仍受查询中心权限约束，无查询权限时为空
+        self.assertEqual(payload["departments"], [])
+        self.assertEqual(payload["employees"], [])
 
     def test_query_navigation_api_returns_visible_query_entries(self) -> None:
         self._login("viewer", "viewer123")

@@ -7,6 +7,7 @@ from models.employee import Employee
 from routes.auth_helpers import any_page_permission_required, login_required, page_permission_required
 from routes.query_core import (
     _accessible_emp_ids,
+    _can_access_query_center,
     account_sets_api,
     abnormal_attendance_api,
     abnormal_attendance_export_api,
@@ -73,19 +74,25 @@ def bootstrap():
         else:
             employees = []
 
+    # 账套是首页摘要定位数据的依据，对所有登录用户返回；
+    # departments 仅查询中心需要，受其权限约束，无权限时留空。
     account_sets_response, account_sets_status = _coerce_response(account_sets_api())
     if account_sets_status != 200:
         return account_sets_response, account_sets_status
 
-    departments_response, departments_status = _coerce_response(departments_api())
-    if departments_status != 200:
-        return departments_response, departments_status
+    if _can_access_query_center():
+        departments_response, departments_status = _coerce_response(departments_api())
+        if departments_status != 200:
+            return departments_response, departments_status
+        departments = departments_response.get_json()
+    else:
+        departments = []
 
     return jsonify(
         {
             "employees": [_serialize_employee(row) for row in employees],
             "account_sets": account_sets_response.get_json(),
-            "departments": departments_response.get_json(),
+            "departments": departments,
         }
     )
 
