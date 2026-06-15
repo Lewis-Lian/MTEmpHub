@@ -21,6 +21,9 @@ ENV/
 # Runtime data
 .codex-pet-runs/
 attendance.db
+*.sqlite3
+*.sqlite
+*.db
 instance/*.db
 instance/*.sqlite
 instance/*.sqlite3
@@ -28,6 +31,11 @@ instance/*.sqlite3
 logs/
 static/uploads/
 backups/
+
+# Secrets / keys (defense in depth)
+*.pem
+*.key
+secrets/
 
 # OS and editor files
 .DS_Store
