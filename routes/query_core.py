@@ -1062,8 +1062,8 @@ def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list
 
 
 def account_sets_api():
-    if not _can_access_query_center():
-        return jsonify({"error": "Forbidden"}), 403
+    # 账套是首页月份选择器与查询中心共用的基础数据，
+    # 仅需登录即可读取（@login_required 由调用方 bootstrap 的路由提供）。
     rows = AccountSet.query.order_by(AccountSet.month.desc()).all()
     return jsonify(
         [
