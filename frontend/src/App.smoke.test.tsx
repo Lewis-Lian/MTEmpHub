@@ -530,11 +530,9 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
-    const { container } = render(<App />);
+    render(<App />);
 
     await screen.findByText("员工筛选器");
-
-    // 筛选区的"人员类型"label 后紧跟 select（EmployeesPage.tsx:691-692）
     const typeLabels = screen.getAllByText("人员类型");
     const typeSelect = typeLabels
       .map((node) => node.parentElement?.querySelector("select"))

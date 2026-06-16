@@ -22,7 +22,7 @@ export default function DatabaseSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const [setupPassword, setSetupPassword] = useState(localStorage.getItem("setup_password") || "");
+  const [setupPassword, setSetupPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [unlockError, setUnlockError] = useState("");
 
@@ -57,12 +57,10 @@ export default function DatabaseSettingsPage() {
       if (cfg.database) setDatabase(cfg.database);
       
       setUnlocked(true);
-      localStorage.setItem("setup_password", setupPassword);
       setLoadError("");
     } catch (err: any) {
       if (err.status === 401 || err.status === 403) {
         setUnlockError(err.message || "密码错误");
-        localStorage.removeItem("setup_password");
         setUnlocked(false);
       } else {
         setLoadError(err instanceof Error ? err.message : "加载失败");
@@ -74,18 +72,13 @@ export default function DatabaseSettingsPage() {
   }
 
   useEffect(() => {
-    if (setupPassword) {
-      handleUnlock();
-    } else {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // 部署密码仅保留在会话内存中，刷新页面需重新输入
+    setLoading(false);
   }, []);
 
   function handleApiError(err: any, defaultMsg: string) {
     if (err.status === 401 || err.status === 403) {
       setUnlocked(false);
-      localStorage.removeItem("setup_password");
       notification.error("访问凭证已过期，请重新解锁");
     } else {
       notification.error(err instanceof Error ? err.message : defaultMsg);
@@ -194,7 +187,6 @@ export default function DatabaseSettingsPage() {
       <div style={{ maxWidth: 800, margin: "0 auto", position: "relative" }}>
         <button 
           onClick={() => {
-            localStorage.removeItem("setup_password");
             setSetupPassword("");
             setUnlocked(false);
           }}
