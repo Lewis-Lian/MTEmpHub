@@ -60,10 +60,13 @@ class AttendanceService:
                 absent_hours += sum(float(row.absent_hours or 0) for row in rows)
                 overtime_hours += sum(float(row.overtime_hours or 0) for row in rows)
 
+        year_start = date(year, 1, 1)
+        next_year_start = date(year + 1, 1, 1)
         leave_total = (
             db.session.query(func.coalesce(func.sum(LeaveRecord.duration), 0))
             .filter(LeaveRecord.emp_id == emp_id)
-            .filter(func.strftime("%Y", LeaveRecord.start_time) == str(year))
+            .filter(LeaveRecord.start_time >= year_start)
+            .filter(LeaveRecord.start_time < next_year_start)
             .scalar()
         )
 
