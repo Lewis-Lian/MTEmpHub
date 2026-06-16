@@ -19,6 +19,7 @@ class Config:
     SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "access_token")
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
     SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
+    INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD")
     UPLOAD_FOLDER = os.getenv(
         "UPLOAD_FOLDER",
         os.path.join(os.path.dirname(__file__), "static", "uploads"),
