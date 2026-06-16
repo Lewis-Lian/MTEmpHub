@@ -11,7 +11,15 @@ class Config:
         if os.getenv("DATABASE_URL", "").startswith("mysql")
         else {}
     )
-    SECRET_KEY = os.getenv("SECRET_KEY") or ("dev-secret-key" if APP_ENV != "production" else None)
+    SECRET_KEY = os.getenv("SECRET_KEY")
+
+    # 已知的不安全占位符/默认值，任何环境都不应使用（JWT 用它签名）
+    _INSECURE_SECRET_KEYS = {
+        "dev-secret-key",
+        "replace-this-with-a-secure-key",
+        "change-me",
+        "secret",
+    }
     JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "12"))
     JWT_EXPIRES_DELTA = timedelta(hours=JWT_EXPIRES_HOURS)
     FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
@@ -27,5 +35,9 @@ class Config:
 
     @classmethod
     def validate(cls) -> None:
-        if cls.APP_ENV == "production" and not cls.SECRET_KEY:
-            raise RuntimeError("SECRET_KEY must be set in production")
+        if not cls.SECRET_KEY:
+            raise RuntimeError("SECRET_KEY 未设置，请在 .env 中配置一个安全的密钥")
+        if cls.SECRET_KEY in cls._INSECURE_SECRET_KEYS:
+            raise RuntimeError(
+                "SECRET_KEY 使用了不安全的占位符，请替换为随机生成的强密钥"
+            )
