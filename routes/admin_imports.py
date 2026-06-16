@@ -7,6 +7,7 @@ from io import BytesIO
 import openpyxl
 from flask import current_app, jsonify, request, send_file
 from sqlalchemy import func, or_
+from werkzeug.utils import secure_filename
 
 from routes.auth_helpers import admin_required
 
@@ -49,7 +50,11 @@ def register_admin_import_routes(admin_bp) -> None:
         if not file.filename:
             return jsonify({"error": "Invalid filename"}), 400
 
-        save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], file.filename)
+        safe_name = secure_filename(file.filename)
+        if not safe_name:
+            return jsonify({"error": "Invalid filename"}), 400
+
+        save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         file.save(save_path)
 
@@ -205,7 +210,7 @@ def import_raw_files():
 
         account_set_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "account_sets", account_set.month)
         os.makedirs(account_set_dir, exist_ok=True)
-        save_name = f"{int(datetime.now().timestamp())}_{filename}"
+        save_name = f"{int(datetime.now().timestamp())}_{secure_filename(filename)}"
         save_path = os.path.join(account_set_dir, save_name)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         file.save(save_path)
