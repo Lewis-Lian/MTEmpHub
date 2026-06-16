@@ -18,6 +18,7 @@ from models.user import User
 from routes import register_routes
 from routes.admin_core import _factory_rest_unit, _manager_attendance_options
 from routes.query_core import _manager_options
+from tests.csrf_helper import attach_origin
 from services.bootstrap_service import ensure_schema_compatibility
 from utils.app_navigation import nav_context, visible_modules
 
@@ -67,7 +68,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.employee_b_id = employee_b.id
             self.manager_id = manager.id
 
-        self.client = self.app.test_client()
+        self.client = attach_origin(self.app.test_client())
         self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
 
     def tearDown(self) -> None:
@@ -341,7 +342,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             AccountSet.query.delete()
             db.session.commit()
 
-        viewer_client = self.app.test_client()
+        viewer_client = attach_origin(self.app.test_client())
         with self.app.app_context():
             viewer = User(username="viewer", role="readonly", page_permissions={"query_home": True})
             viewer.set_password("viewer123")
@@ -367,7 +368,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             db.session.add(ManagerMonthStat(emp_id=self.manager_id, year=2026, stat_type="overtime", prev_dec=2, m4=1, m5=-0.5, m6=3))
             db.session.commit()
 
-        viewer_client = self.app.test_client()
+        viewer_client = attach_origin(self.app.test_client())
         viewer_client.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
         april_payload = viewer_client.get("/api/query/home-summary?month=2026-04").get_json()
         self.assertTrue(april_payload["has_data"])

@@ -16,6 +16,7 @@ from models.manager_attendance_override import ManagerAttendanceOverride
 from models.shift import Shift
 from models.user import User
 from routes import register_routes
+from tests.csrf_helper import attach_origin
 
 
 class ApiAdminTests(unittest.TestCase):
@@ -74,7 +75,7 @@ class ApiAdminTests(unittest.TestCase):
             self.manager_id = manager.id
             self.filtered_employee_id = nursing_employee.id
 
-        self.client = self.app.test_client()
+        self.client = attach_origin(self.app.test_client())
 
     def tearDown(self) -> None:
         with self.app.app_context():

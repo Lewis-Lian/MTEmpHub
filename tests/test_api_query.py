@@ -15,6 +15,7 @@ from models.leave import LeaveRecord
 from models.manager_month_stat import ManagerMonthStat
 from models.user import User, UserEmployeeAssignment
 from routes import register_routes
+from tests.csrf_helper import attach_origin
 
 
 class ApiQueryTests(unittest.TestCase):
@@ -87,7 +88,7 @@ class ApiQueryTests(unittest.TestCase):
             db.session.add(ManagerMonthStat(emp_id=manager.id, year=2026, stat_type="annual_leave", m5=1))
             db.session.commit()
 
-        self.client = self.app.test_client()
+        self.client = attach_origin(self.app.test_client())
 
     def tearDown(self) -> None:
         with self.app.app_context():
