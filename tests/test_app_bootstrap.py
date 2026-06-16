@@ -96,6 +96,34 @@ class AppBootstrapTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "SECRET_KEY"):
                 self._load_app_module().create_app()
 
+    def test_placeholder_secret_key_is_rejected_in_any_env(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "APP_ENV": "development",
+                "DATABASE_URL": "sqlite://",
+                "UPLOAD_FOLDER": tempfile.gettempdir(),
+                "SECRET_KEY": "replace-this-with-a-secure-key",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "不安全"):
+                self._load_app_module().create_app()
+
+    def test_dev_secret_key_fallback_is_rejected(self) -> None:
+        with mock.patch.dict(
+            os.environ,
+            {
+                "APP_ENV": "development",
+                "DATABASE_URL": "sqlite://",
+                "UPLOAD_FOLDER": tempfile.gettempdir(),
+                "SECRET_KEY": "dev-secret-key",
+            },
+            clear=False,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "不安全"):
+                self._load_app_module().create_app()
+
     def test_init_admin_command_creates_admin_explicitly(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
