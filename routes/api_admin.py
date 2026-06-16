@@ -1,7 +1,10 @@
+import logging
 import os
 from urllib.parse import urlparse
 
 from flask import Blueprint, current_app, jsonify, request, g
+
+logger = logging.getLogger(__name__)
 
 from models.department import Department
 from models.shift import Shift
@@ -280,8 +283,9 @@ def database_migrate():
 
         results = migrate_sqlite_to_mysql(sqlite_url, db_url)
         return jsonify({"ok": True, "results": results})
-    except Exception as e:
-        return jsonify({"ok": False, "message": str(e)}), 500
+    except Exception:
+        logger.exception("数据库迁移失败 sqlite→mysql")
+        return jsonify({"ok": False, "message": "数据库迁移失败，请查看服务端日志"}), 500
 
 
 @api_admin_bp.post("/database-migrate-to-sqlite")
@@ -313,10 +317,9 @@ def database_migrate_to_sqlite():
 
         results = migrate_mysql_to_sqlite(mysql_url, sqlite_url)
         return jsonify({"ok": True, "results": results})
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"ok": False, "message": str(e)}), 500
+    except Exception:
+        logger.exception("数据库迁移失败 mysql→sqlite")
+        return jsonify({"ok": False, "message": "数据库迁移失败，请查看服务端日志"}), 500
 
 
 @api_admin_bp.post("/database-switch-sqlite")

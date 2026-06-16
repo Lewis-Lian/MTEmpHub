@@ -111,7 +111,8 @@ def login_required(fn):
         if not payload:
             return jsonify({"error": "Invalid token"}), 401
 
-        user = db.session.get(User, payload["sub"])
+        user_id = payload.get("sub")
+        user = db.session.get(User, user_id) if user_id else None
         if not user:
             return jsonify({"error": "User not found"}), 401
         g.current_user = user
