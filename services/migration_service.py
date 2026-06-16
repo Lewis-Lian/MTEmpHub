@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy import text
+from sqlalchemy.exc import NoSuchTableError, OperationalError
+
+logger = logging.getLogger(__name__)
 
 # 按外键依赖排序（父表在前，子表在后）
 MIGRATION_ORDER = [
@@ -52,7 +57,7 @@ def migrate_sqlite_to_mysql(sqlite_url: str, mysql_url: str) -> list[dict]:
             try:
                 rows = read_db.session.execute(text(f"SELECT * FROM {table_name}")).mappings().all()
                 data_by_table[table_name] = [dict(row) for row in rows]
-            except Exception:
+            except (NoSuchTableError, OperationalError):
                 data_by_table[table_name] = []
 
     # ---- 第二步：写入 MySQL ----
@@ -75,8 +80,8 @@ def migrate_sqlite_to_mysql(sqlite_url: str, mysql_url: str) -> list[dict]:
         from flask_migrate import stamp
         try:
             stamp()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("迁移 stamp 失败（不影响本次数据写入）: %s", exc)
 
         for table_name in MIGRATION_ORDER:
             rows = data_by_table[table_name]
@@ -155,7 +160,7 @@ def migrate_mysql_to_sqlite(mysql_url: str, sqlite_url: str) -> list[dict]:
             try:
                 rows = read_db.session.execute(text(f"SELECT * FROM {table_name}")).mappings().all()
                 data_by_table[table_name] = [dict(row) for row in rows]
-            except Exception:
+            except (NoSuchTableError, OperationalError):
                 data_by_table[table_name] = []
 
     # ---- 第二步：写入 SQLite ----
@@ -166,17 +171,22 @@ def migrate_mysql_to_sqlite(mysql_url: str, sqlite_url: str) -> list[dict]:
     write_db.init_app(app_write)
 
     with app_write.app_context():
-        # 用 SQLAlchemy 删库重建保证干净
+        # 用 SQLAlchemy 建表（已存在的表跳过），清空旧数据用 DELETE（可回滚）
+        # 而非 drop_all（DDL 不可回滚，插入失败会导致目标库被清空）
         from models import db as main_db
-        main_db.metadata.drop_all(bind=write_db.engine)
         main_db.metadata.create_all(bind=write_db.engine)
-        
+
         from flask_migrate import stamp
         try:
             stamp()
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("迁移 stamp 失败（不影响本次数据写入）: %s", exc)
 
+        # 先清空目标表数据（DELETE 可在事务中回滚）
+        for table_name in MIGRATION_ORDER:
+            write_db.session.execute(text(f"DELETE FROM {table_name}"))
+
+        # 单事务写入所有表，全部成功才 commit，任何失败则整体回滚
         for table_name in MIGRATION_ORDER:
             rows = data_by_table.get(table_name, [])
             if not rows:
@@ -191,8 +201,9 @@ def migrate_mysql_to_sqlite(mysql_url: str, sqlite_url: str) -> list[dict]:
             for i in range(0, len(rows), BATCH_SIZE):
                 batch = rows[i : i + BATCH_SIZE]
                 write_db.session.execute(insert_sql, batch)
-            write_db.session.commit()
             results.append({"table": table_name, "rows": len(rows), "status": "ok"})
+
+        write_db.session.commit()
 
     return results
 
