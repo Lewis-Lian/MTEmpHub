@@ -169,7 +169,9 @@ class ApiQueryTests(unittest.TestCase):
         entry_hrefs = {entry["href"] for entry in settings_module["entries"]}
         self.assertIn("/admin/accounts", entry_hrefs)
         self.assertIn("/admin/disabled-users", entry_hrefs)
-        self.assertIn("/admin/database-settings", entry_hrefs)
+        # 数据库设置是部署/初始化阶段页面：能登录说明数据库已配好，
+        # 该入口不应出现在登录后的导航菜单中
+        self.assertNotIn("/admin/database-settings", entry_hrefs)
 
     def test_legacy_employee_dashboard_route_is_not_available(self) -> None:
         self._login("viewer", "viewer123")
