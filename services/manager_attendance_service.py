@@ -200,18 +200,6 @@ def _monthly_report_raw(employee: Employee, month: str) -> dict:
     return {}
 
 
-def _leave_rows(employee_id: int, month: str) -> list[LeaveRecord]:
-    datetime_range = _month_datetime_range(month)
-    if not datetime_range:
-        return []
-    start_dt, end_dt = datetime_range
-    return (
-        LeaveRecord.query.filter_by(emp_id=employee_id)
-        .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
-        .all()
-    )
-
-
 def _leave_rows_by_employee(employee_ids: list[int], month: str) -> dict[int, list[LeaveRecord]]:
     if not employee_ids:
         return {}
@@ -228,18 +216,6 @@ def _leave_rows_by_employee(employee_ids: list[int], month: str) -> dict[int, li
     for row in rows:
         rows_by_employee.setdefault(row.emp_id, []).append(row)
     return rows_by_employee
-
-
-def _overtime_rows(employee_id: int, month: str) -> list[OvertimeRecord]:
-    datetime_range = _month_datetime_range(month)
-    if not datetime_range:
-        return []
-    start_dt, end_dt = datetime_range
-    return (
-        OvertimeRecord.query.filter_by(emp_id=employee_id)
-        .filter(OvertimeRecord.start_time >= start_dt, OvertimeRecord.start_time < end_dt)
-        .all()
-    )
 
 
 def _overtime_rows_by_employee(employee_ids: list[int], month: str) -> dict[int, list[OvertimeRecord]]:
@@ -341,14 +317,6 @@ def _required_stat_month_value(row: ManagerMonthStat | None, month: str) -> floa
     return _round2(value or 0)
 
 
-def _stat_remaining(stat_type: str, emp_id: int, month: str) -> float:
-    """Get remaining balance before the current month's value is applied."""
-    row = _manager_month_stat(emp_id, month, stat_type)
-    if not row:
-        return 12.0 if stat_type == "annual_leave" else 0.0
-    return _round2(row.remaining or 0)
-
-
 def _stat_remaining_from_row(stat_type: str, row: ManagerMonthStat | None) -> float:
     if not row:
         return 12.0 if stat_type == "annual_leave" else 0.0
@@ -397,26 +365,6 @@ def _month_value_keys() -> list[str]:
     return ["prev_dec", *[f"m{m}" for m in range(1, 13)]]
 
 
-def _compute_overtime_used(emp_id: int, month: str) -> float:
-    """Compute how many overtime days can be used for deduction this month.
-    - Ignore the current month's saved value so ordinary queries do not overwrite manual stats.
-    - Then use from remaining balance, max 5 days, cannot go negative.
-    Returns: the number of overtime days used (as a negative number to indicate consumption).
-    """
-    year, key = _stat_year_key(month)
-    row = ManagerMonthStat.query.filter_by(emp_id=emp_id, year=year, stat_type="overtime").first()
-    if not row:
-        return 0.0
-
-    current = _float_value(getattr(row, key))
-    remaining = _round2((row.remaining or 0) - current)
-    if remaining <= 0:
-        return 0.0
-
-    # Max 5 days can be used
-    return min(remaining, 5.0)
-
-
 def _compute_overtime_used_from_row(row: ManagerMonthStat | None, month: str) -> float:
     if not row:
         return 0.0
@@ -427,38 +375,6 @@ def _compute_overtime_used_from_row(row: ManagerMonthStat | None, month: str) ->
     if remaining <= 0:
         return 0.0
     return min(remaining, 5.0)
-
-
-def _compute_benefit_used(emp_id: int, month: str, factory_rest_days: float) -> float:
-    """Compute how many annual leave (年休/福利) days can be used this month.
-    - Ignore the current month's saved value so ordinary queries do not overwrite manual stats.
-    - Then use from remaining balance.
-    Constraints:
-      - Max 3 days per month
-      - 厂休 + 年休 <= 7 days per month
-      - Cannot exceed remaining
-    Returns: the number of annual leave days used.
-    """
-    year, key = _stat_year_key(month)
-    row = ManagerMonthStat.query.filter_by(emp_id=emp_id, year=year, stat_type="annual_leave").first()
-    if not row:
-        return 0.0
-
-    current = _float_value(getattr(row, key))
-    remaining = _round2((row.remaining or 0) + current)
-    if remaining <= 0:
-        return 0.0
-
-    # Constraint 1: max 3 days per month
-    available = min(remaining, 3.0)
-
-    # Constraint 2: 厂休 + 年休 <= 7
-    max_benefit_for_rest = _round2(7.0 - factory_rest_days)
-    if max_benefit_for_rest < 0:
-        max_benefit_for_rest = 0.0
-    available = min(available, max_benefit_for_rest)
-
-    return available
 
 
 def _compute_benefit_used_from_row(
@@ -494,10 +410,6 @@ OVERRIDE_FIELDS = (
 
 def _override_values(override: ManagerAttendanceOverride | None) -> dict[str, float | int | None]:
     return {field: getattr(override, field) if override else None for field in OVERRIDE_FIELDS}
-
-
-def _override_row(employee_id: int, month: str) -> ManagerAttendanceOverride | None:
-    return ManagerAttendanceOverride.query.filter_by(emp_id=employee_id, month=month).first()
 
 
 def _override_rows_by_employee(employee_ids: list[int], month: str) -> dict[int, ManagerAttendanceOverride]:
@@ -539,43 +451,8 @@ def _has_manager_punch_record(record) -> bool:
     return any(str(raw.get(key) or "").strip() for key in _MANAGER_PUNCH_TIME_KEYS)
 
 
-def _manager_attendance_days(employee_id: int, month: str) -> float:
-    employee = db.session.get(Employee, employee_id)
-    if not employee:
-        return 0.0
-    rows = attendance_views_by_employee(month, [employee], MANAGER_STATS_CONTEXT).get(employee_id, [])
-    return _round2(sum(1 for row in rows if _has_manager_punch_record(row)))
-
-
 def _manager_attendance_days_from_views(rows: list[object]) -> float:
     return _round2(sum(1 for row in rows if _has_manager_punch_record(row)))
-
-
-def _manager_schedule_late_minutes(employee_id: int, month: str) -> int:
-    """Only count 上午 (上班1) late minutes from the daily record raw data.
-    哺乳假人员迟到计为0。
-    """
-    employee = db.session.get(Employee, employee_id)
-    if employee and employee.is_nursing:
-        return 0
-    rows = attendance_views_by_employee(month, [employee], MANAGER_STATS_CONTEXT).get(employee_id, [])
-    total = 0
-    for row in rows:
-        raw = row.raw_data if isinstance(row.raw_data, dict) else {}
-        nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
-        # Only check 上班1 (上午) for late
-        result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
-        if "迟到" not in result:
-            continue
-        day_minutes = (
-            _raw_minutes(raw, "迟到时长", "严重迟到时长")
-            or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
-            or int(row.late_minutes or 0)
-        )
-        if day_minutes >= 30:
-            continue
-        total += day_minutes
-    return total
 
 
 def _manager_schedule_late_minutes_from_views(employee: Employee, rows: list[object]) -> int:
