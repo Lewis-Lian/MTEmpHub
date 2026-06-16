@@ -145,7 +145,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                     <span>30 天内记住我</span>
                   </label>
                   <Link className="login-link" to="/change-password">
-                    忘记密码？
+                    修改密码
                   </Link>
                 </div>
                 {error ? <p className="login-error">{error}</p> : null}
