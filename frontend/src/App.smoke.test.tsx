@@ -41,7 +41,7 @@ describe("App smoke regression", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/login"));
   });
 
-  it("登录页提供 CareerCompass 同款忘记密码入口", async () => {
+  it("登录页提供 CareerCompass 同款修改密码入口", async () => {
     window.history.replaceState({}, "", "/login");
     fetchMock.mockImplementation((input) => {
       const path = normalizePath(input);
@@ -54,7 +54,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("link", { name: "忘记密码？" }));
+    fireEvent.click(await screen.findByRole("link", { name: "修改密码" }));
 
     expect(await screen.findByRole("heading", { name: "修改密码" })).toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe("/change-password"));
