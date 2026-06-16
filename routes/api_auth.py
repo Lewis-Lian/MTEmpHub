@@ -100,10 +100,24 @@ def api_change_password():
     if new_password != confirm_password:
         return jsonify({"error": "两次输入的新密码不一致"}), 400
 
+    now = datetime.utcnow()
     user = User.query.filter_by(username=username).first()
+    if user and user.is_login_disabled():
+        return jsonify({"error": "该账号已被禁用，请联系管理员解锁"}), 423
+    if user and user.is_temporarily_login_locked(now):
+        return jsonify({"error": "该账号已被临时禁用 10 分钟，请稍后再试"}), 423
+
     if not user or not user.check_password(current_password):
+        if user:
+            lock_state = user.register_failed_login(now)
+            db.session.commit()
+            if lock_state == "admin_unlock_required":
+                return jsonify({"error": "该账号已被禁用，请联系管理员解锁"}), 423
+            if lock_state == "temporary_lock":
+                return jsonify({"error": "该账号已被临时禁用 10 分钟，请稍后再试"}), 423
         return jsonify({"error": "用户名或原密码错误"}), 401
 
+    user.clear_login_lockout()
     user.set_password(new_password)
     db.session.commit()
     return jsonify({"ok": True})

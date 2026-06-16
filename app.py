@@ -57,6 +57,14 @@ def _get_compat_app() -> Flask:
     return _compat_app
 
 
+def _resolve_debug_flag() -> bool:
+    """根据 FLASK_DEBUG 环境变量决定是否开启调试模式，默认关闭。
+
+    仅显式置为 "1" 时才开启，避免在生产环境误暴露 Werkzeug 调试器。
+    """
+    return os.getenv("FLASK_DEBUG") == "1"
+
+
 def __getattr__(name: str):
     if name == "app":
         return _get_compat_app()
@@ -65,4 +73,4 @@ def __getattr__(name: str):
 
 if __name__ == "__main__":
     app = create_app()
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=5000, debug=_resolve_debug_flag())
