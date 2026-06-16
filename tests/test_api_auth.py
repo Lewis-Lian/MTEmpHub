@@ -203,6 +203,63 @@ class ApiAuthTests(unittest.TestCase):
         )
         self.assertEqual(new_login_response.status_code, 200)
 
+    def test_change_password_locks_account_after_five_failed_attempts(self) -> None:
+        for _ in range(4):
+            response = self.client.post(
+                "/api/auth/change-password",
+                json={
+                    "username": "admin",
+                    "current_password": "wrong-password",
+                    "new_password": "newpass123",
+                    "confirm_password": "newpass123",
+                },
+            )
+            self.assertEqual(response.status_code, 401)
+
+        fifth_response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "wrong-password",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+            },
+        )
+
+        self.assertEqual(fifth_response.status_code, 423)
+        self.assertEqual(
+            fifth_response.get_json()["error"],
+            "该账号已被临时禁用 10 分钟，请稍后再试",
+        )
+
+    def test_change_password_rejects_when_account_temporarily_locked(self) -> None:
+        for _ in range(5):
+            self.client.post(
+                "/api/auth/change-password",
+                json={
+                    "username": "admin",
+                    "current_password": "wrong-password",
+                    "new_password": "newpass123",
+                    "confirm_password": "newpass123",
+                },
+            )
+
+        locked_response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "admin123",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+            },
+        )
+
+        self.assertEqual(locked_response.status_code, 423)
+        self.assertEqual(
+            locked_response.get_json()["error"],
+            "该账号已被临时禁用 10 分钟，请稍后再试",
+        )
+
     def test_api_login_locks_account_for_ten_minutes_after_five_failed_attempts(self) -> None:
         for _ in range(5):
             response = self.client.post(

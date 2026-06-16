@@ -231,6 +231,24 @@ class AppBootstrapTests(unittest.TestCase):
                 self.assertEqual(compat_app.name, "app")
                 self.assertIs(app_module._compat_app, compat_app)
 
+    def test_debug_flag_defaults_to_false_when_flask_debug_unset(self) -> None:
+        app_module = self._load_app_module()
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("FLASK_DEBUG", None)
+            self.assertFalse(app_module._resolve_debug_flag())
+
+    def test_debug_flag_true_only_when_flask_debug_is_one(self) -> None:
+        app_module = self._load_app_module()
+        with mock.patch.dict(os.environ, {"FLASK_DEBUG": "1"}, clear=False):
+            self.assertTrue(app_module._resolve_debug_flag())
+
+    def test_debug_flag_false_for_other_flask_debug_values(self) -> None:
+        app_module = self._load_app_module()
+        for value in ("0", "true", "yes", "false", ""):
+            with self.subTest(value=value):
+                with mock.patch.dict(os.environ, {"FLASK_DEBUG": value}, clear=False):
+                    self.assertFalse(app_module._resolve_debug_flag())
+
     def test_schema_compatibility_adds_user_profile_columns(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(

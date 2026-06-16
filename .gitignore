@@ -55,6 +55,7 @@ DESIGN.md
 
 # AI-generated plans/specs (dev process artifacts)
 docs/superpowers/
+CODE_REVIEW_REPORT.md
 
 # Runtime config (auto-generated on deploy)
 instance/windows_service_manager.json
