@@ -96,6 +96,13 @@ export default function AccountsPage() {
   const [batchDepartmentIds, setBatchDepartmentIds] = useState<number[]>([]);
   const [batchPermissionKeys, setBatchPermissionKeys] = useState<string[]>(allPermissionKeys);
 
+  const [batchPasswordOpen, setBatchPasswordOpen] = useState(false);
+  const [batchPassword, setBatchPassword] = useState("");
+  const [managerPasswordOpen, setManagerPasswordOpen] = useState(false);
+  const [managerPassword, setManagerPassword] = useState("");
+  const [resetTargetUser, setResetTargetUser] = useState<AccountUser | null>(null);
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
+
   useEffect(() => {
     void loadPage();
   }, []);
@@ -284,12 +291,15 @@ export default function AccountsPage() {
     }
   }
 
-  async function createManagerAccounts() {
+  async function createManagerAccounts(password: string) {
     try {
       const result = await apiRequest<{ created_count: number; skipped_count: number }>("/api/admin/users/manager-batch", {
+        body: { password },
         method: "POST",
       });
       notification.success(`成功创建 ${result.created_count} 个账号，跳过 ${result.skipped_count} 个员工`);
+      setManagerPasswordOpen(false);
+      setManagerPassword("");
       await refreshUsers();
     } catch (error) {
       notification.error(error instanceof Error ? error.message : "一键创建失败");
@@ -382,13 +392,15 @@ export default function AccountsPage() {
     }
   }
 
-  async function resetPassword(userId: number) {
+  async function resetPassword(userId: number, password: string) {
     try {
       await apiRequest(`/api/admin/users/${userId}/password`, {
-        body: { password: "mt@123" },
+        body: { password },
         method: "PUT",
       });
-      notification.success("密码已重置为 mt@123");
+      notification.success("密码已重置");
+      setResetTargetUser(null);
+      setResetPasswordValue("");
     } catch (error) {
       notification.error(error instanceof Error ? error.message : "重置密码失败");
     }
@@ -454,7 +466,7 @@ export default function AccountsPage() {
             <button className="btn btn-outline-secondary" onClick={() => setCreateModalOpen(true)} type="button">
               创建账号
             </button>
-            <button className="btn btn-outline-secondary" onClick={createManagerAccounts} type="button">
+            <button className="btn btn-outline-secondary" onClick={() => setManagerPasswordOpen(true)} type="button">
               一键创建管理人员账号
             </button>
           </div>
@@ -661,7 +673,7 @@ export default function AccountsPage() {
           <button className="account-action-button" onClick={() => setBatchEmployeeOpen(true)} type="button">批量修改关联员工</button>
           <button className="account-action-button" onClick={() => setBatchDepartmentOpen(true)} type="button">批量修改关联部门</button>
           <button className="account-action-button" onClick={() => setPermissionContext("batch")} type="button">批量修改页面权限</button>
-          <button className="account-action-button account-action-button--warning" onClick={() => void runBatch("reset_password")} type="button">批量重置密码</button>
+          <button className="account-action-button account-action-button--warning" onClick={() => setBatchPasswordOpen(true)} type="button">批量重置密码</button>
           <button className="account-action-button account-action-button--danger" onClick={() => void runBatch("delete")} type="button">批量删除账号</button>
         </div>
       </div>
@@ -764,11 +776,14 @@ export default function AccountsPage() {
             <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
               <button
                 className="account-action-button account-action-button--warning"
-                onClick={() => void resetPassword(editingUser.id)}
+                onClick={() => {
+                  setResetTargetUser(editingUser);
+                  setResetPasswordValue("");
+                }}
                 type="button"
                 style={{ borderRadius: "8px", fontSize: "14px" }}
               >
-                重置默认密码
+                重置密码
               </button>
               <div style={{ display: "flex", gap: "12px" }}>
                 <button className="account-action-button" onClick={() => setEditingUser(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
@@ -957,6 +972,98 @@ export default function AccountsPage() {
                     setBatchDepartmentOpen(false);
                   }
                 }}
+                type="button"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {batchPasswordOpen ? (
+        <div className="master-modal-backdrop">
+          <div className="master-modal">
+            <div className="master-modal-header">
+              <h2>批量重置密码</h2>
+              <button className="master-modal-close" onClick={() => setBatchPasswordOpen(false)} type="button">×</button>
+            </div>
+            <div className="master-modal-body">
+              <p className="master-form-text">所选账号将被重置为同一个新密码，请告知用户尽快登录修改。</p>
+              <label className="account-field">
+                <span className="account-field-label">新密码</span>
+                <input className="account-input" type="password" onChange={(event) => setBatchPassword(event.target.value)} value={batchPassword} placeholder="请输入新密码" />
+              </label>
+            </div>
+            <div className="master-modal-footer">
+              <button className="account-action-button" onClick={() => setBatchPasswordOpen(false)} type="button">取消</button>
+              <button
+                className="account-action-button account-action-button--primary"
+                disabled={!batchPassword}
+                onClick={async () => {
+                  if (await runBatch("reset_password", { password: batchPassword })) {
+                    setBatchPasswordOpen(false);
+                    setBatchPassword("");
+                  }
+                }}
+                type="button"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {managerPasswordOpen ? (
+        <div className="master-modal-backdrop">
+          <div className="master-modal">
+            <div className="master-modal-header">
+              <h2>一键创建管理人员账号</h2>
+              <button className="master-modal-close" onClick={() => setManagerPasswordOpen(false)} type="button">×</button>
+            </div>
+            <div className="master-modal-body">
+              <p className="master-form-text">将为所有尚未建号的管理人员创建账号，统一使用下方初始密码，请告知用户尽快登录修改。</p>
+              <label className="account-field">
+                <span className="account-field-label">初始密码</span>
+                <input className="account-input" type="password" onChange={(event) => setManagerPassword(event.target.value)} value={managerPassword} placeholder="请输入初始密码" />
+              </label>
+            </div>
+            <div className="master-modal-footer">
+              <button className="account-action-button" onClick={() => setManagerPasswordOpen(false)} type="button">取消</button>
+              <button
+                className="account-action-button account-action-button--primary"
+                disabled={!managerPassword}
+                onClick={() => void createManagerAccounts(managerPassword)}
+                type="button"
+              >
+                确定
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {resetTargetUser ? (
+        <div className="master-modal-backdrop">
+          <div className="master-modal">
+            <div className="master-modal-header">
+              <h2>重置密码</h2>
+              <button className="master-modal-close" onClick={() => { setResetTargetUser(null); setResetPasswordValue(""); }} type="button">×</button>
+            </div>
+            <div className="master-modal-body">
+              <p className="master-form-text">为账号 {resetTargetUser.username} 设置新密码。</p>
+              <label className="account-field">
+                <span className="account-field-label">新密码</span>
+                <input className="account-input" type="password" onChange={(event) => setResetPasswordValue(event.target.value)} value={resetPasswordValue} placeholder="请输入新密码" />
+              </label>
+            </div>
+            <div className="master-modal-footer">
+              <button className="account-action-button" onClick={() => { setResetTargetUser(null); setResetPasswordValue(""); }} type="button">取消</button>
+              <button
+                className="account-action-button account-action-button--primary"
+                disabled={!resetPasswordValue}
+                onClick={() => void resetPassword(resetTargetUser.id, resetPasswordValue)}
                 type="button"
               >
                 确定

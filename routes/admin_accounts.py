@@ -164,6 +164,11 @@ def register_admin_account_routes(admin_bp) -> None:
     @admin_bp.route("/users/manager-batch", methods=["POST"])
     @admin_required
     def create_manager_users_batch():
+        data = request.json or {}
+        password = (data.get("password") or "").strip()
+        if not password:
+            return jsonify({"error": "请输入初始密码"}), 400
+
         created_users: list[dict] = []
         skipped_users: list[dict[str, str]] = []
         manager_permissions = _manager_self_query_permissions()
@@ -190,7 +195,7 @@ def register_admin_account_routes(admin_bp) -> None:
                 continue
 
             user = admin_module.User(username=username, role="readonly")
-            user.set_password("mt@123")
+            user.set_password(password)
             user.page_permissions = manager_permissions.copy()
             admin_module.db.session.add(user)
             admin_module.db.session.flush()
@@ -220,8 +225,11 @@ def register_admin_account_routes(admin_bp) -> None:
             return jsonify({"error": "请选择账号"}), 400
 
         if action == "reset_password":
+            password = (data.get("password") or "").strip()
+            if not password:
+                return jsonify({"error": "请输入新密码"}), 400
             for user in users:
-                user.set_password("mt@123")
+                user.set_password(password)
             admin_module.db.session.commit()
             return jsonify({"status": "ok", "updated_count": len(users)})
 

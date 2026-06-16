@@ -15,10 +15,17 @@ def initialize_database() -> None:
 
 
 def ensure_default_admin() -> None:
+    from flask import current_app
+
     admin = User.query.filter_by(username="admin").first()
     if admin is None:
+        password = current_app.config.get("INITIAL_ADMIN_PASSWORD")
+        if not password:
+            raise RuntimeError(
+                "未配置初始管理员密码，请在 .env 中设置 INITIAL_ADMIN_PASSWORD 后再执行 init-admin"
+            )
         admin = User(username="admin", role="admin")
-        admin.set_password("admin123")
+        admin.set_password(password)
         db.session.add(admin)
         db.session.commit()
 

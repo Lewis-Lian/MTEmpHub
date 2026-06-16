@@ -105,6 +105,7 @@ class AppBootstrapTests(unittest.TestCase):
                     "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'cli-bootstrap.db')}",
                     "SECRET_KEY": "test-secret",
                     "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                    "INITIAL_ADMIN_PASSWORD": "admin123",
                 },
                 clear=False,
             ):
@@ -124,6 +125,29 @@ class AppBootstrapTests(unittest.TestCase):
                     self.assertIsNotNone(admin)
                     self.assertEqual(admin.role, "admin")
                     self.assertTrue(admin.check_password("admin123"))
+
+    def test_init_admin_command_requires_initial_admin_password(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'cli-bootstrap-no-pass.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                os.environ.pop("INITIAL_ADMIN_PASSWORD", None)
+                manage_module = self._load_manage_module()
+
+                with manage_module.app.app_context():
+                    db.create_all()
+                    self.assertIsNone(User.query.filter_by(username="admin").first())
+
+                    with self.assertRaisesRegex(RuntimeError, "INITIAL_ADMIN_PASSWORD"):
+                        manage_module.ensure_default_admin()
+                    self.assertIsNone(User.query.filter_by(username="admin").first())
 
     def test_init_db_command_runs_initialize_database_explicitly(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
