@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import inspect, text
-from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.exc import NoSuchTableError, OperationalError
 from sqlalchemy.engine.reflection import Inspector
 
 from models import db
@@ -45,7 +45,8 @@ def ensure_schema_compatibility() -> None:
             db.session.execute(text("ALTER TABLE departments ADD COLUMN parent_id INTEGER"))
             try:
                 db.session.execute(text("CREATE INDEX ix_departments_parent_id ON departments(parent_id)"))
-            except Exception:
+            except OperationalError:
+                # 索引可能已存在（旧库迁移重复执行），幂等跳过
                 pass
             db.session.commit()
         if "is_locked" not in department_columns:

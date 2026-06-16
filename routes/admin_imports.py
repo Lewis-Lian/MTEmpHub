@@ -226,15 +226,17 @@ def import_raw_files():
         admin_module.db.session.add(import_record)
 
         try:
+            admin_module.db.session.commit()
             success += 1
             import_record.error_message = None
             results.append({"file": filename, "status": "ok", "message": "replaced" if replaced else "uploaded"})
         except Exception as exc:
+            admin_module.db.session.rollback()
             failed += 1
             import_record.status = "error"
             import_record.error_message = str(exc)
             results.append({"file": filename, "status": "error", "error": str(exc)})
-        admin_module.db.session.commit()
+            admin_module.db.session.commit()
 
     return jsonify(
         {
