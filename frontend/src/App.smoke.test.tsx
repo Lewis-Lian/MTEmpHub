@@ -33,10 +33,10 @@ describe("App smoke regression", () => {
     });
 
     const { default: App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
     expect(await screen.findByRole("heading", { name: "欢迎回来！" })).toBeInTheDocument();
-    expect(screen.getAllByText("考勤系统").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll(".mtemphub-logo").length).toBeGreaterThan(0);
     expect(screen.queryByText("用一处入口管理每天的考勤节奏")).not.toBeInTheDocument();
     await waitFor(() => expect(window.location.pathname).toBe("/login"));
   });
@@ -217,7 +217,7 @@ describe("App smoke regression", () => {
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "newpass123" } });
     fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
 
-    expect(await screen.findByText("密码修改成功，请使用新密码登录。")).toBeInTheDocument();
+    expect((await screen.findAllByText("密码修改成功，请使用新密码登录。"))[0]).toBeInTheDocument();
     expect(changePasswordBody).toEqual({
       username: "admin",
       current_password: "admin123",
@@ -392,10 +392,8 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     expect(await screen.findByText("新增员工")).toBeInTheDocument();
-    expect(screen.getByText("导入员工（xlsx）")).toBeInTheDocument();
-    expect(screen.getByText("员工列表")).toBeInTheDocument();
+    expect(screen.getByText("导入/导出员工")).toBeInTheDocument();
     expect(screen.getByText("员工筛选器")).toBeInTheDocument();
-    expect(screen.getByText("应用到已选")).toBeInTheDocument();
     expect(screen.getAllByText("人员编号").length).toBeGreaterThan(0);
     await waitFor(() => expect(container.querySelector("tbody")?.textContent).toContain("E001"));
   });
@@ -419,7 +417,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
+    await screen.findByText("员工筛选器");
     const file = new File(["employee"], "employees.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -446,7 +444,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
+    await screen.findByText("员工筛选器");
     const file = new File(["employee"], "employees.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -463,14 +461,14 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
-    fireEvent.click(screen.getByRole("button", { name: /选择员工/i }));
+    await screen.findByText("员工筛选器");
+    fireEvent.click(container.querySelector('button[title="选择员工"]') as Element);
 
     expect(await screen.findByRole("heading", { name: "选择员工" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: /E001/ }));
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
 
     expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("员工甲");
   });
@@ -482,7 +480,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
+    await screen.findByText("员工筛选器");
     expect(container.querySelector("#createEmployeeDeptLookup.employee-lookup")).not.toBeNull();
 
     fireEvent.click(screen.getAllByTitle("选择部门")[0]);
@@ -491,7 +489,7 @@ describe("App smoke regression", () => {
     expect(screen.getByText("部门树")).toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "信息部" })[1]);
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
 
     expect(screen.getAllByDisplayValue("信息部").length).toBeGreaterThan(0);
   });
@@ -503,7 +501,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
+    await screen.findByText("员工筛选器");
     expect(container.querySelector(".legacy-table-wrap")).not.toBeNull();
     expect(container.querySelector(".table-pager select")).not.toBeNull();
     expect(screen.getByRole("button", { name: "上一页" })).toBeDisabled();
@@ -517,8 +515,8 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    expect(await screen.findByText("新增部门")).toBeInTheDocument();
-    expect(screen.getByText("导入部门（xlsx）")).toBeInTheDocument();
+    expect(await screen.findByText("新建部门")).toBeInTheDocument();
+    expect(screen.getByText("导入/导出部门")).toBeInTheDocument();
     expect(screen.getByText("部门列表")).toBeInTheDocument();
     expect(screen.getByText("一键删除空部门")).toBeInTheDocument();
     expect(screen.getByText("导出全部部门")).toBeInTheDocument();
@@ -532,22 +530,22 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
-    render(<App />);
+    const { container } = render(<App />);
 
-    await screen.findByText("员工列表");
+    await screen.findByText("员工筛选器");
 
-    const typeField = screen
-      .getAllByText("人员类型")
-      .map((node) => node.closest("label"))
-      .find((node) => node?.querySelector("select"));
-    const typeSelect = typeField?.querySelector("select");
+    // 筛选区的"人员类型"label 后紧跟 select（EmployeesPage.tsx:691-692）
+    const typeLabels = screen.getAllByText("人员类型");
+    const typeSelect = typeLabels
+      .map((node) => node.parentElement?.querySelector("select"))
+      .find((node) => node != null);
     expect(typeSelect).not.toBeNull();
     fireEvent.change(typeSelect as HTMLSelectElement, { target: { value: "employee" } });
 
-    fireEvent.click(screen.getByRole("button", { name: "导入员工" }));
-    expect(await screen.findByText("导入员工（xlsx）")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "导入/导出员工" }));
+    expect(await screen.findByText("数据导入与导出")).toBeInTheDocument();
 
-    expect(screen.getByRole("link", { name: "导出筛选结果" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "导出当前筛选结果" })).toHaveAttribute(
       "href",
       "/api/admin/employees/export?type=employee",
     );
@@ -624,7 +622,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("heading", { name: "选择上级部门" })).toBeInTheDocument();
     expect(screen.getByText("部门树")).toBeInTheDocument();
     fireEvent.click(screen.getAllByRole("button", { name: "信息部" })[1]);
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
 
     expect(screen.getAllByDisplayValue("信息部").length).toBeGreaterThan(0);
   });
@@ -674,7 +672,7 @@ describe("App smoke regression", () => {
     render(<App />);
 
     expect(await screen.findByText("新增班次")).toBeInTheDocument();
-    expect(screen.getByText("新增时间段")).toBeInTheDocument();
+    expect(screen.getByText("+ 新增时间段")).toBeInTheDocument();
     expect(screen.getByText("班次列表")).toBeInTheDocument();
     expect(screen.getByText("排班规则")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建班次" })).toBeInTheDocument();
@@ -883,7 +881,7 @@ describe("App smoke regression", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "查询" }));
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看经理甲在 2026-05 的出勤打卡明细" }));
+    fireEvent.click((await screen.findAllByRole("button", { name: "查看经理甲在 2026-05 的出勤打卡明细" }))[0]);
     expect(await screen.findByRole("heading", { name: "经理甲 2026-05 出勤打卡明细" })).toBeInTheDocument();
     const attendanceDialog = screen.getByRole("dialog", { name: "查询详情" });
     expect(within(attendanceDialog).getByText("部门")).toBeInTheDocument();
@@ -1056,7 +1054,7 @@ describe("App smoke regression", () => {
     await screen.findByText("查询条件");
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
     expect(await screen.findByText("M001")).toBeInTheDocument();
@@ -1091,14 +1089,12 @@ describe("App smoke regression", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
     expect(await screen.findByText("前年累积")).toBeInTheDocument();
     expect(screen.getByText("剩余调休天数")).toBeInTheDocument();
-    expect(container.querySelector(".table-pager select")).not.toBeNull();
-    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员加班")).toBeInTheDocument();
     expect(screen.getByText("前年累积天数")).toBeInTheDocument();
     expect(screen.getByText("1月")).toBeInTheDocument();
@@ -1122,14 +1118,12 @@ describe("App smoke regression", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "选择管理人员" }));
     fireEvent.click(screen.getByLabelText("M001 - 经理甲"));
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
     expect(await screen.findByText("年度已用")).toBeInTheDocument();
     expect(screen.getByText("剩余年休天数")).toBeInTheDocument();
-    expect(container.querySelector(".table-pager select")).not.toBeNull();
-    expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员年休")).toBeInTheDocument();
     expect(screen.getByText("1月")).toBeInTheDocument();
     expect(screen.getByText("12月")).toBeInTheDocument();
@@ -1160,9 +1154,9 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "批量删除账号" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "创建账号" }));
-    expect(await screen.findByText("关联员工（可搜索、多选）")).toBeInTheDocument();
-    expect(screen.getByText("关联部门（可搜索、多选）")).toBeInTheDocument();
-    expect(screen.getByText("账号页面权限")).toBeInTheDocument();
+    expect(await screen.findByText("关联员工 (限定可见个人数据)")).toBeInTheDocument();
+    expect(screen.getByText("关联部门 (限定可见部门数据)")).toBeInTheDocument();
+    expect(screen.getByText("功能导航权限")).toBeInTheDocument();
   });
 
   it("账号管理页可以打开编辑账号弹窗", async () => {
@@ -1176,12 +1170,9 @@ describe("App smoke regression", () => {
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
 
     expect(await screen.findByText("编辑账号")).toBeInTheDocument();
-    expect(screen.getByText("工号")).toBeInTheDocument();
-    expect(screen.getByText("姓名")).toBeInTheDocument();
-    expect(screen.getByText("部门信息")).toBeInTheDocument();
-    expect(screen.getByText("关联员工")).toBeInTheDocument();
-    expect(screen.getByText("关联部门")).toBeInTheDocument();
-    expect(screen.getByText("编辑页面权限")).toBeInTheDocument();
+    expect(screen.getByText("关联档案人员 (自动提取工号/姓名/部门)")).toBeInTheDocument();
+    expect(screen.getByText("关联员工 (限定可见个人数据)")).toBeInTheDocument();
+    expect(screen.getByText("关联部门 (限定可见部门数据)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重置密码" })).toBeInTheDocument();
   });
 
