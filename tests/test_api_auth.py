@@ -8,6 +8,7 @@ from flask import Flask
 from models import db
 from models.user import User
 from routes import register_routes
+from tests.csrf_helper import attach_origin
 
 
 class ApiAuthTests(unittest.TestCase):
@@ -34,7 +35,7 @@ class ApiAuthTests(unittest.TestCase):
             user.set_password("admin123")
             db.session.add(user)
             db.session.commit()
-        self.client = self.app.test_client()
+        self.client = attach_origin(self.app.test_client())
 
     def tearDown(self) -> None:
         with self.app.app_context():
