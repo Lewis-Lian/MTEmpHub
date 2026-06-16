@@ -162,6 +162,32 @@ class ImportService:
         return employee, emp_no, name
 
     @staticmethod
+    def _bulk_lookup_managers(
+        emp_nos: list[str], names: list[str]
+    ) -> tuple[dict[str, Employee], dict[str, Employee]]:
+        """批量预查管理人员，返回 {emp_no: Employee} 和 {name: Employee}。
+
+        复用与单条查询相同的过滤逻辑（_can_receive_manager_source），
+        但用一次查询拉取所有候选，在内存中按优先级筛选。
+        """
+        unique_emp_nos = {n for n in emp_nos if n}
+        unique_names = {n for n in names if n}
+        query_filter = db.or_(Employee.emp_no.in_(unique_emp_nos), Employee.name.in_(unique_names))
+        candidates = Employee.query.filter(query_filter).order_by(
+            Employee.is_manager.desc(), Employee.emp_no.asc()
+        ).all()
+
+        emp_by_no: dict[str, Employee] = {}
+        emp_by_name: dict[str, Employee] = {}
+        for emp in candidates:
+            if ImportService._can_receive_manager_source(emp):
+                if emp.emp_no and emp.emp_no not in emp_by_no:
+                    emp_by_no[emp.emp_no] = emp
+                if emp.name and emp.name not in emp_by_name:
+                    emp_by_name[emp.name] = emp
+        return emp_by_no, emp_by_name
+
+    @staticmethod
     def _raw_dict_from_header_map(row: list[Any], header_map: dict[str, int]) -> dict[str, Any]:
         raw: dict[str, Any] = {}
         for header, idx in header_map.items():
@@ -324,21 +350,41 @@ class ImportService:
                 for r in OvertimeRecord.query.filter(OvertimeRecord.overtime_no.in_(overtime_nos)).all()
             }
 
+        # 批量预查 Employee（按工号 + 姓名）
+        emp_nos_in_rows: list[str] = []
+        names_in_rows: list[str] = []
+        emp_no_col = ImportService._find_col(header_map, "工号")
+        name_col = ImportService._find_col(header_map, "姓名")
+        for row in rows[header_idx + 1 :]:
+            en = clean_text(ImportService._get_row_value(row, emp_no_col)) if emp_no_col >= 0 else ""
+            nm = clean_text(ImportService._get_row_value(row, name_col)) if name_col >= 0 else ""
+            if en:
+                emp_nos_in_rows.append(en)
+            if nm:
+                names_in_rows.append(nm)
+        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos_in_rows, names_in_rows)
+        # 非管理人员也按工号查
+        non_manager_by_no: dict[str, Employee] = {}
+        unique_emp_nos = {n for n in emp_nos_in_rows if n}
+        if unique_emp_nos:
+            for e in Employee.query.filter(Employee.emp_no.in_(unique_emp_nos)).all():
+                non_manager_by_no.setdefault(e.emp_no, e)
+
         for row in rows[header_idx + 1 :]:
             overtime_no = clean_text(ImportService._get_row_value(row, overtime_col_idx))
             if not overtime_no:
                 skipped_no_key += 1
                 continue
             scanned += 1
-            emp_name = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "姓名")))
-            emp_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "工号")))
+            emp_name = clean_text(ImportService._get_row_value(row, name_col)) if name_col >= 0 else ""
+            emp_no = clean_text(ImportService._get_row_value(row, emp_no_col)) if emp_no_col >= 0 else ""
             if not emp_no and not emp_name:
                 skipped_no_key += 1
                 continue
 
-            emp = ImportService._find_existing_employee(emp_no) if emp_no else None
+            emp = non_manager_by_no.get(emp_no) if emp_no else None
             if not emp and emp_name:
-                emp = ImportService._find_manager_by_name(emp_name)
+                emp = emp_by_name.get(emp_name)
             if not emp:
                 skipped_unknown_employee += 1
                 continue
@@ -396,6 +442,25 @@ class ImportService:
                 for r in LeaveRecord.query.filter(LeaveRecord.leave_no.in_(leave_nos)).all()
             }
 
+        # 批量预查 Employee（按工号 + 姓名）
+        emp_nos_in_rows: list[str] = []
+        names_in_rows: list[str] = []
+        emp_no_col = ImportService._find_col(header_map, "工号")
+        name_col = ImportService._find_col(header_map, "请假人")
+        for row in rows[header_idx + 1 :]:
+            en = clean_text(ImportService._get_row_value(row, emp_no_col)) if emp_no_col >= 0 else ""
+            nm = clean_text(ImportService._get_row_value(row, name_col)) if name_col >= 0 else ""
+            if en:
+                emp_nos_in_rows.append(en)
+            if nm:
+                names_in_rows.append(nm)
+        emp_by_no_mgr, emp_by_name_mgr = ImportService._bulk_lookup_managers(emp_nos_in_rows, names_in_rows)
+        non_manager_by_no: dict[str, Employee] = {}
+        unique_emp_nos = {n for n in emp_nos_in_rows if n}
+        if unique_emp_nos:
+            for e in Employee.query.filter(Employee.emp_no.in_(unique_emp_nos)).all():
+                non_manager_by_no.setdefault(e.emp_no, e)
+
         for row in rows[header_idx + 1 :]:
             leave_no = clean_text(ImportService._get_row_value(row, leave_col_idx))
             if not leave_no:
@@ -403,15 +468,15 @@ class ImportService:
                 continue
             scanned += 1
 
-            emp_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "工号")))
-            emp_name = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "请假人")))
+            emp_no = clean_text(ImportService._get_row_value(row, emp_no_col)) if emp_no_col >= 0 else ""
+            emp_name = clean_text(ImportService._get_row_value(row, name_col)) if name_col >= 0 else ""
             if not emp_no and not emp_name:
                 skipped_no_key += 1
                 continue
 
-            emp = ImportService._find_existing_employee(emp_no) if emp_no else None
+            emp = non_manager_by_no.get(emp_no) if emp_no else None
             if not emp and emp_name:
-                emp = ImportService._find_manager_by_name(emp_name)
+                emp = emp_by_name_mgr.get(emp_name)
             if not emp:
                 skipped_unknown_employee += 1
                 continue
@@ -478,29 +543,75 @@ class ImportService:
         skipped_no_key = 0
         skipped_unknown_employee = 0
         header_row = rows[header_idx]
+
+        emp_no_idx = ImportService._find_col(header_map, "人员编号", "工号")
+        shift_no_idx = ImportService._find_col(header_map, "班次编号")
+        shift_name_idx = ImportService._find_col(header_map, "班次名称")
+        date_idx = ImportService._find_col(header_map, "考勤日期")
+
+        # ---- 批量预查：Employee / Shift / DailyRecord ----
+        emp_no_col = emp_no_idx if emp_no_idx >= 0 else -1
+        emp_nos: list[str] = []
         for row in rows[header_idx + 1 :]:
-            emp_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "人员编号", "工号")))
+            val = clean_text(ImportService._get_row_value(row, emp_no_col))
+            if val:
+                emp_nos.append(val)
+        emp_by_no: dict[str, Employee] = (
+            {e.emp_no: e for e in Employee.query.filter(Employee.emp_no.in_(emp_nos)).all()}
+            if emp_nos
+            else {}
+        )
+
+        shift_keys: set[str] = set()
+        for row in rows[header_idx + 1 :]:
+            no_val = clean_text(ImportService._get_row_value(row, shift_no_idx))
+            name_val = clean_text(ImportService._get_row_value(row, shift_name_idx))
+            if no_val:
+                shift_keys.add(no_val)
+            if name_val:
+                shift_keys.add(name_val)
+        all_shifts: dict[str, Shift] = {}
+        if shift_keys:
+            for s in Shift.query.filter(
+                db.or_(Shift.shift_no.in_(shift_keys), Shift.shift_name.in_(shift_keys))
+            ).all():
+                all_shifts[s.shift_no] = s
+                all_shifts[s.shift_name] = s
+
+        # 预查 DailyRecord：需先确定 emp_id + record_date 才能精确预查，
+        # 但 record_date 在循环内解析。改为按 emp_id 批量预查该批的所有记录。
+        resolved_emp_ids: set[int] = {
+            e.id for e in emp_by_no.values() if ImportService._can_receive_employee_source(e)
+        }
+        existing_records: dict[tuple[int, Any], DailyRecord] = {}
+        if resolved_emp_ids:
+            for r in DailyRecord.query.filter(DailyRecord.emp_id.in_(resolved_emp_ids)).all():
+                existing_records[(r.emp_id, r.record_date)] = r
+
+        for row in rows[header_idx + 1 :]:
+            emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx))
             if not emp_no:
                 skipped_no_key += 1
                 continue
             scanned += 1
-            emp = ImportService._find_existing_employee(emp_no)
+            emp = emp_by_no.get(emp_no)
             if not emp or not ImportService._can_receive_employee_source(emp):
                 skipped_unknown_employee += 1
                 continue
 
-            shift_no = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "班次编号")))
-            shift_name = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "班次名称")))
-            shift = ImportService._find_existing_shift(shift_no, shift_name)
+            shift_no = clean_text(ImportService._get_row_value(row, shift_no_idx))
+            shift_name = clean_text(ImportService._get_row_value(row, shift_name_idx))
+            shift = all_shifts.get(shift_no) or all_shifts.get(shift_name)
 
-            record_date = parse_date(ImportService._get_row_value(row, ImportService._find_col(header_map, "考勤日期")))
+            record_date = parse_date(ImportService._get_row_value(row, date_idx))
             if not record_date:
                 continue
 
-            record = DailyRecord.query.filter_by(emp_id=emp.id, record_date=record_date).first()
+            record = existing_records.get((emp.id, record_date))
             if not record:
                 record = DailyRecord(emp_id=emp.id, record_date=record_date)
                 db.session.add(record)
+                existing_records[(emp.id, record_date)] = record
 
             check_raw = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "刷卡时间数据")))
             times = split_time_cells(check_raw)
@@ -580,21 +691,45 @@ class ImportService:
                 "skipped_unknown_employee": 0,
             }
 
+        # ---- 批量预查：Employee（按工号+姓名）/ MonthlyReport ----
+        emp_nos: list[str] = []
+        names: list[str] = []
         for row in rows[header_idx + 2 :]:
-            emp, emp_no, name = ImportService._resolve_manager_employee(header_map, row)
+            en = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
+            nm = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
+            if en:
+                emp_nos.append(en)
+            if nm:
+                names.append(nm)
+        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
+        resolved_emp_ids: set[int] = set(emp_by_no.values()) | set(emp_by_name.values())
+        existing_reports: dict[int, MonthlyReport] = {}
+        if resolved_emp_ids:
+            for r in MonthlyReport.query.filter(
+                MonthlyReport.emp_id.in_(resolved_emp_ids), MonthlyReport.report_month == report_month
+            ).all():
+                existing_reports[r.emp_id] = r
+
+        for row in rows[header_idx + 2 :]:
+            emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
+            name = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
             if not emp_no and not name:
                 skipped_no_key += 1
                 continue
             scanned += 1
 
+            emp = emp_by_no.get(emp_no) if emp_no else None
+            if not emp and name:
+                emp = emp_by_name.get(name)
             if not emp:
                 skipped_unknown_employee += 1
                 continue
 
-            report = MonthlyReport.query.filter_by(emp_id=emp.id, report_month=report_month).first()
+            report = existing_reports.get(emp.id)
             if not report:
                 report = MonthlyReport(emp_id=emp.id, report_month=report_month)
                 db.session.add(report)
+                existing_reports[emp.id] = report
 
             raw_data = ImportService._raw_dict_from_header_map(row, header_map)
             existing_raw = report.manager_raw_data if isinstance(report.manager_raw_data, dict) else {}
@@ -635,22 +770,44 @@ class ImportService:
                 "skipped_unknown_employee": 0,
             }
 
+        # ---- 批量预查：Employee（按工号+姓名）/ DailyRecord ----
+        emp_nos: list[str] = []
+        names: list[str] = []
         for row in rows[header_idx + 2 :]:
-            emp, emp_no, name = ImportService._resolve_manager_employee(header_map, row)
+            en = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
+            nm = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
+            if en:
+                emp_nos.append(en)
+            if nm:
+                names.append(nm)
+        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
+        resolved_emp_ids: set[int] = set(emp_by_no.values()) | set(emp_by_name.values())
+        existing_records: dict[tuple[int, Any], DailyRecord] = {}
+        if resolved_emp_ids:
+            for r in DailyRecord.query.filter(DailyRecord.emp_id.in_(resolved_emp_ids)).all():
+                existing_records[(r.emp_id, r.record_date)] = r
+
+        for row in rows[header_idx + 2 :]:
+            emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
+            name = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
             record_date = ImportService._parse_manager_record_date(ImportService._get_row_value(row, date_idx))
             if (not emp_no and not name) or not record_date:
                 skipped_no_key += 1
                 continue
             scanned += 1
 
+            emp = emp_by_no.get(emp_no) if emp_no else None
+            if not emp and name:
+                emp = emp_by_name.get(name)
             if not emp:
                 skipped_unknown_employee += 1
                 continue
 
-            record = DailyRecord.query.filter_by(emp_id=emp.id, record_date=record_date).first()
+            record = existing_records.get((emp.id, record_date))
             if not record:
                 record = DailyRecord(emp_id=emp.id, record_date=record_date)
                 db.session.add(record)
+                existing_records[(emp.id, record_date)] = record
 
             raw_data = ImportService._raw_dict_from_header_map(row, header_map)
             existing_raw = record.manager_payload if isinstance(record.manager_payload, dict) else {}
@@ -716,6 +873,27 @@ class ImportService:
 
         base_idx = {i for i in [emp_no_idx, emp_name_idx, dept_no_idx, dept_name_idx] if i >= 0}
 
+        # ---- 批量预查：Employee / MonthlyReport ----
+        emp_nos: list[str] = []
+        for row in rows[header_idx + 1 :]:
+            val = clean_text(ImportService._get_row_value(row, emp_no_idx))
+            if val:
+                emp_nos.append(val)
+        emp_by_no: dict[str, Employee] = (
+            {e.emp_no: e for e in Employee.query.filter(Employee.emp_no.in_(emp_nos)).all()}
+            if emp_nos
+            else {}
+        )
+        resolved_emp_ids: set[int] = {
+            e.id for e in emp_by_no.values() if ImportService._can_receive_employee_source(e)
+        }
+        existing_reports: dict[int, MonthlyReport] = {}
+        if resolved_emp_ids:
+            for r in MonthlyReport.query.filter(
+                MonthlyReport.emp_id.in_(resolved_emp_ids), MonthlyReport.report_month == report_month
+            ).all():
+                existing_reports[r.emp_id] = r
+
         for row in rows[header_idx + 1 :]:
             emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx))
             if not emp_no:
@@ -723,7 +901,7 @@ class ImportService:
                 continue
             scanned += 1
 
-            emp = ImportService._find_existing_employee(emp_no)
+            emp = emp_by_no.get(emp_no)
             if not emp or not ImportService._can_receive_employee_source(emp):
                 skipped_unknown_employee += 1
                 continue
@@ -738,10 +916,11 @@ class ImportService:
             while len(metric_values) < 84:
                 metric_values.append(0.0)
 
-            report = MonthlyReport.query.filter_by(emp_id=emp.id, report_month=report_month).first()
+            report = existing_reports.get(emp.id)
             if not report:
                 report = MonthlyReport(emp_id=emp.id, report_month=report_month)
                 db.session.add(report)
+                existing_reports[emp.id] = report
 
             for i in range(84):
                 setattr(report, f"agg_{i+1:02d}", metric_values[i])
