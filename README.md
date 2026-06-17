@@ -152,7 +152,7 @@ python switch_sqlite.py
 ### 1. 准备环境与初始化
 ```bash
 sudo apt update && sudo apt install python3 python3-venv python3-pip nginx -y
-cd /var/www/attendance_system
+cd /var/www/mtemphub
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt gunicorn
 cp .env.example .env && nano .env
@@ -177,8 +177,8 @@ sudo systemctl restart nginx
 ```
 ### 5. 一键更新与重启
 在部署完成后，你可以使用提供的一键脚本来管理应用更新和重启：
-- **一键更新**：执行 `./scripts/ubuntu/update.sh` 会自动拉取代码、更新后端依赖、构建前端并重启服务。
-- **一键重启**：执行 `./scripts/ubuntu/restart.sh` 可快速重启后端进程并重载 Nginx 配置。
+- **一键更新**：执行 `./update.sh` 会自动拉取代码、更新后端依赖、执行数据库迁移、构建前端、重启服务并做健康检查（任意目录均可，脚本内部使用绝对路径）。
+- **一键重启**：执行 `./restart.sh` 可快速重启后端进程并重载 Nginx 配置。
 </details>
 
 ---
