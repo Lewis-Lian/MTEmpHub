@@ -1,0 +1,187 @@
+/* 滑块验证码组件样式。全部用企业主题 --ent-* 变量，与登录/改密页风格一致。 */
+
+.slider-captcha {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.slider-captcha-loading,
+.slider-captcha-error {
+  padding: 24px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ent-text-secondary, #64748b);
+  background: var(--ent-tertiary-bg, #f1f5f9);
+  border-radius: var(--ent-radius, 8px);
+  border: 1px dashed var(--ent-border, #e2e8f0);
+}
+
+.slider-captcha-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: var(--ent-radius, 8px);
+  overflow: hidden;
+  border: 1px solid var(--ent-border, #e2e8f0);
+  background: var(--ent-tertiary-bg, #f1f5f9);
+}
+
+.slider-captcha-bg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.slider-captcha-piece {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  /* transform: translateX 由组件内联控制，与手柄同步。 */
+  transition: none;
+}
+
+.slider-captcha-track {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  background: var(--ent-tertiary-bg, #f1f5f9);
+  border-radius: var(--ent-radius, 8px);
+  border: 1px solid var(--ent-border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.slider-captcha-hint {
+  font-size: 12px;
+  color: var(--ent-text-tertiary, #94a3b8);
+  pointer-events: none;
+}
+
+.slider-captcha-hint--success {
+  color: #16a34a;
+  font-weight: 500;
+}
+
+.slider-captcha-hint--error {
+  color: #dc2626;
+  font-weight: 500;
+}
+
+.slider-captcha-handle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--ent-blue, #2563eb);
+  border: none;
+  border-radius: var(--ent-radius-sm, 6px);
+  cursor: grab;
+  touch-action: none; /* 阻止触摸滚动，保证 pointer 拖动流畅 */
+  transition: none;
+  z-index: var(--z-sticky, 20);
+}
+
+.slider-captcha-handle:active {
+  cursor: grabbing;
+}
+
+.slider-captcha-handle--dragging {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+.slider-captcha-handle--success {
+  background: #16a34a;
+  cursor: default;
+}
+
+.slider-captcha-handle--error {
+  background: #dc2626;
+}
+
+.slider-captcha-handle--verifying {
+  background: var(--ent-text-tertiary, #94a3b8);
+  cursor: wait;
+}
+
+.slider-captcha-handle:disabled {
+  cursor: default;
+}
+
+.slider-captcha-refresh-btn {
+  align-self: flex-end;
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: var(--ent-text-tertiary, #94a3b8);
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.slider-captcha-refresh-btn:hover {
+  color: var(--ent-blue, #2563eb);
+}
+
+.slider-captcha-trigger-btn {
+  width: 100%;
+  height: 48px;
+  background: var(--ent-tertiary-bg, #f1f5f9);
+  border-radius: var(--ent-radius, 8px);
+  border: 1px solid var(--ent-border, #e2e8f0);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ent-text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.slider-captcha-trigger-btn:hover {
+  background: #e2e8f0;
+  color: var(--ent-text, #183153);
+  border-color: #cbd5e1;
+}
+
+.slider-captcha-trigger-icon {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  color: var(--ent-blue, #2563eb);
+}
+
+.slider-captcha-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  background: #ffffff;
+  padding: 12px;
+  border-radius: var(--ent-radius, 8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--ent-border, #e2e8f0);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+}

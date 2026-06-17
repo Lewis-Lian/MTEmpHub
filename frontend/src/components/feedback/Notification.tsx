@@ -171,13 +171,25 @@ function NotificationItemComponent({
   const [isHovered, setIsHovered] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 独立的退出动画定时器 ref，避免与自动关闭定时器互相干扰。
+  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duration = item.duration ?? 10000;
+
+  // 组件卸载时清理退出动画定时器，避免卸载后触发 onClose 调用父组件 setState。
+  useEffect(() => {
+    return () => {
+      if (leaveTimerRef.current) {
+        clearTimeout(leaveTimerRef.current);
+        leaveTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // 退出淡出函数：先播放 200ms 的 CSS 动画，然后销毁
   const handleClose = useCallback(() => {
     setIsLeaving(true);
-    setTimeout(() => {
+    leaveTimerRef.current = setTimeout(() => {
       onClose(item.id);
     }, 200); // 与 CSS 的渐隐过渡时间保持一致
   }, [item.id, onClose]);

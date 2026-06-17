@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { changePassword } from "../api/auth";
 import { ApiError } from "../api/client";
 import AnimatedCharacters from "../components/AnimatedCharacters";
+import SliderCaptcha from "../components/auth/SliderCaptcha";
 import Logo from "../components/common/Logo";
 import { useNotification } from "../components/feedback/Notification";
 
@@ -17,12 +18,19 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
 
   const notification = useNotification();
   const passwordLength = currentPassword.length + newPassword.length + confirmPassword.length;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!captchaToken) {
+      const msg = "请先完成滑块验证";
+      setError(msg);
+      notification.warning(msg);
+      return;
+    }
     setIsSubmitting(true);
     setError("");
     setSuccess("");
@@ -33,10 +41,12 @@ export default function ChangePasswordPage() {
         current_password: currentPassword,
         new_password: newPassword,
         confirm_password: confirmPassword,
+        captcha_token: captchaToken,
       });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setCaptchaToken("");
       const successMsg = "密码修改成功，请使用新密码登录。";
       setSuccess(successMsg);
       notification.success(successMsg);
@@ -208,6 +218,10 @@ export default function ChangePasswordPage() {
                     </button>
                   </span>
                 </label>
+                <div className="login-field">
+                  <span className="login-field-label">滑块验证</span>
+                  <SliderCaptcha onReset={() => setCaptchaToken("")} onVerified={setCaptchaToken} />
+                </div>
                 <div className="login-form-meta">
                   <Link className="login-link" to="/login">
                     返回登录

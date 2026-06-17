@@ -1,3 +1,4 @@
+import hmac
 import logging
 import os
 from urllib.parse import urlparse
@@ -99,8 +100,9 @@ def setup_required(f):
         if not required_password:
             return jsonify({"error": "为了安全起见，请先在 .env 中设置 SETUP_PASSWORD"}), 403
             
-        provided_password = request.headers.get("X-Setup-Password")
-        if not provided_password or provided_password != required_password:
+        provided_password = request.headers.get("X-Setup-Password") or ""
+        # 用常量时间比较防御时序侧信道；hmac.compare_digest 要求两侧同为 str 或同为 bytes。
+        if not hmac.compare_digest(provided_password, required_password):
             return jsonify({"error": "向导访问密码不正确"}), 401
             
         return f(*args, **kwargs)

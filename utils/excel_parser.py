@@ -22,11 +22,14 @@ class ExcelParser:
     @staticmethod
     def _read_xlsx(file_path: str) -> list[list[Any]]:
         wb = openpyxl.load_workbook(file_path, data_only=True)
-        ws = wb.active
-        rows = []
-        for row in ws.iter_rows(values_only=True):
-            rows.append(list(row))
-        return rows
+        try:
+            ws = wb.active
+            rows = []
+            for row in ws.iter_rows(values_only=True):
+                rows.append(list(row))
+            return rows
+        finally:
+            wb.close()
 
     @staticmethod
     def _read_xls(file_path: str) -> list[list[Any]]:

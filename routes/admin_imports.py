@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime
 from io import BytesIO
@@ -11,106 +12,7 @@ from werkzeug.utils import secure_filename
 
 from routes.auth_helpers import admin_required
 
-
-def register_admin_import_routes(admin_bp) -> None:
-    from routes import admin_core as admin_module
-
-    @admin_bp.route("/account-sets/<int:account_set_id>/imports", methods=["GET"])
-    @admin_required
-    def list_account_set_imports(account_set_id: int):
-        row = admin_module._require_model(admin_module.AccountSet, account_set_id)
-        records = (
-            admin_module.AccountSetImport.query.filter_by(account_set_id=row.id)
-            .order_by(admin_module.AccountSetImport.id.desc())
-            .all()
-        )
-        return jsonify(
-            [
-                {
-                    "id": record.id,
-                    "source_filename": record.source_filename,
-                    "stored_path": record.stored_path,
-                    "file_type": record.file_type,
-                    "status": record.status,
-                    "imported_count": record.imported_count,
-                    "error_message": record.error_message,
-                    "created_at": record.created_at.isoformat() if record.created_at else None,
-                }
-                for record in records
-            ]
-        )
-
-    @admin_bp.route("/upload", methods=["POST"])
-    @admin_required
-    def upload_excel():
-        if "file" not in request.files:
-            return jsonify({"error": "No file uploaded"}), 400
-
-        file = request.files["file"]
-        if not file.filename:
-            return jsonify({"error": "Invalid filename"}), 400
-
-        safe_name = secure_filename(file.filename)
-        if not safe_name:
-            return jsonify({"error": "Invalid filename"}), 400
-
-        save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], safe_name)
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        file.save(save_path)
-
-        result = admin_module.ImportService.import_file(save_path)
-        return jsonify(result)
-
-    admin_bp.add_url_rule("/import/raw-files", endpoint="import_raw_files", view_func=import_raw_files, methods=["POST"])
-
-    @admin_bp.route("/manager-overtime/template", methods=["GET"])
-    @admin_required
-    def download_manager_overtime_template():
-        return admin_module._download_manager_stat_template("overtime")
-
-    @admin_bp.route("/manager-overtime/import", methods=["POST"])
-    @admin_required
-    def import_manager_overtime():
-        year = request.form.get("year", type=int) or datetime.now().year
-        locked_error = admin_module._ensure_year_months_unlocked(
-            year, "导入管理人员加班统计", include_prev_dec=True
-        )
-        if locked_error:
-            return locked_error
-        return admin_module._import_manager_stat_file("overtime", year)
-
-    @admin_bp.route("/manager-overtime/export", methods=["GET"])
-    @admin_required
-    def export_manager_overtime():
-        year = request.args.get("year", type=int) or datetime.now().year
-        return admin_module._export_manager_overtime_workbook(year)
-
-    @admin_bp.route("/manager-annual-leave/template", methods=["GET"])
-    @admin_required
-    def download_manager_annual_leave_template():
-        return admin_module._download_manager_stat_template("annual_leave")
-
-    @admin_bp.route("/manager-annual-leave/import", methods=["POST"])
-    @admin_required
-    def import_manager_annual_leave():
-        year = request.form.get("year", type=int) or datetime.now().year
-        locked_error = admin_module._ensure_year_months_unlocked(year, "导入管理人员年休统计")
-        if locked_error:
-            return locked_error
-        return admin_module._import_manager_stat_file("annual_leave", year)
-
-    @admin_bp.route("/manager-annual-leave/export", methods=["GET"])
-    @admin_required
-    def export_manager_annual_leave():
-        year = request.args.get("year", type=int) or datetime.now().year
-        return admin_module._export_manager_annual_leave_workbook(year)
-
-    admin_bp.add_url_rule("/departments/import", endpoint="import_departments_xlsx", view_func=import_departments_xlsx, methods=["POST"])
-    admin_bp.add_url_rule("/departments/template", endpoint="download_departments_template", view_func=download_departments_template, methods=["GET"])
-    admin_bp.add_url_rule("/departments/export", endpoint="export_departments_xlsx", view_func=export_departments_xlsx, methods=["GET"])
-    admin_bp.add_url_rule("/employees/import", endpoint="import_employees_xlsx", view_func=import_employees_xlsx, methods=["POST"])
-    admin_bp.add_url_rule("/employees/template", endpoint="download_employees_template", view_func=download_employees_template, methods=["GET"])
-    admin_bp.add_url_rule("/employees/export", endpoint="export_employees_xlsx", view_func=export_employees_xlsx, methods=["GET"])
+logger = logging.getLogger(__name__)
 
 
 @admin_required
@@ -230,12 +132,13 @@ def import_raw_files():
             success += 1
             import_record.error_message = None
             results.append({"file": filename, "status": "ok", "message": "replaced" if replaced else "uploaded"})
-        except Exception as exc:
+        except Exception:
             admin_module.db.session.rollback()
             failed += 1
+            logger.exception("原始文件导入记录入库失败 file=%s", filename)
             import_record.status = "error"
-            import_record.error_message = str(exc)
-            results.append({"file": filename, "status": "error", "error": str(exc)})
+            import_record.error_message = "导入记录保存失败，请查看服务端日志"
+            results.append({"file": filename, "status": "error", "error": "导入记录保存失败，请查看服务端日志"})
             admin_module.db.session.commit()
 
     return jsonify(
@@ -266,27 +169,30 @@ def import_departments_xlsx():
     file.save(save_path)
 
     wb = openpyxl.load_workbook(save_path, data_only=True)
-    ws = wb[wb.sheetnames[0]]
-    raw_rows = [list(row) for row in ws.iter_rows(values_only=True)]
-    if not raw_rows:
-        return jsonify({"error": "empty file"}), 400
+    try:
+        ws = wb[wb.sheetnames[0]]
+        raw_rows = [list(row) for row in ws.iter_rows(values_only=True)]
+        if not raw_rows:
+            return jsonify({"error": "empty file"}), 400
 
-    header_idx, header_map = admin_module._parse_header_row(raw_rows, ["部门编号", "部门名称", "上级部门编号"])
-    dept_no_idx = header_map.get("部门编号", -1)
-    dept_name_idx = header_map.get("部门名称", -1)
-    parent_no_idx = header_map.get("上级部门编号", -1)
-    original_id_idx = header_map.get(admin_module._DEPARTMENT_ORIGINAL_ID_HEADER, -1)
-    if dept_no_idx < 0 or dept_name_idx < 0:
-        return jsonify({"error": "missing required headers: 部门编号, 部门名称"}), 400
+        header_idx, header_map = admin_module._parse_header_row(raw_rows, ["部门编号", "部门名称", "上级部门编号"])
+        dept_no_idx = header_map.get("部门编号", -1)
+        dept_name_idx = header_map.get("部门名称", -1)
+        parent_no_idx = header_map.get("上级部门编号", -1)
+        original_id_idx = header_map.get(admin_module._DEPARTMENT_ORIGINAL_ID_HEADER, -1)
+        if dept_no_idx < 0 or dept_name_idx < 0:
+            return jsonify({"error": "missing required headers: 部门编号, 部门名称"}), 400
 
-    imported = 0
-    pending_parent_links: list[tuple[admin_module.Department, str]] = []
-    existing_departments = admin_module.Department.query.order_by(admin_module.Department.id.asc()).all()
-    departments_by_id = {department.id: department for department in existing_departments}
-    departments_by_dept_no = {
-        department.dept_no: department for department in existing_departments if department.dept_no
-    }
-    original_identities_by_id = admin_module._load_department_identity_metadata(wb)
+        imported = 0
+        pending_parent_links: list[tuple[admin_module.Department, str]] = []
+        existing_departments = admin_module.Department.query.order_by(admin_module.Department.id.asc()).all()
+        departments_by_id = {department.id: department for department in existing_departments}
+        departments_by_dept_no = {
+            department.dept_no: department for department in existing_departments if department.dept_no
+        }
+        original_identities_by_id = admin_module._load_department_identity_metadata(wb)
+    finally:
+        wb.close()
     staged_rows: list[tuple[admin_module.Department, str, str, str]] = []
     staged_departments_by_dept_no = dict(departments_by_dept_no)
     used_temp_dept_nos = set(departments_by_dept_no)
@@ -442,8 +348,11 @@ def import_employees_xlsx():
     file.save(save_path)
 
     wb = openpyxl.load_workbook(save_path, data_only=True, read_only=True)
-    ws = wb[wb.sheetnames[0]]
-    raw_rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    try:
+        ws = wb[wb.sheetnames[0]]
+        raw_rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    finally:
+        wb.close()
     if not raw_rows:
         return jsonify({"error": "empty file"}), 400
 

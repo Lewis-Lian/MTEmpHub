@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { fetchAdminDepartments, fetchAdminEmployees } from "../../api/admin";
 import { apiRequest } from "../../api/client";
@@ -103,8 +103,13 @@ export default function AccountsPage() {
   const [resetTargetUser, setResetTargetUser] = useState<AccountUser | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState("");
 
+  const mountedRef = useRef(true);
   useEffect(() => {
+    mountedRef.current = true;
     void loadPage();
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   async function loadPage() {
@@ -116,13 +121,17 @@ export default function AccountsPage() {
         fetchAdminEmployees(),
         fetchAdminDepartments(),
       ]);
+      if (!mountedRef.current) return;
       setUsers(Array.isArray(userRows) ? userRows : []);
       setEmployees(employeeRows);
       setDepartments(departmentRows);
     } catch (error) {
+      if (!mountedRef.current) return;
       setLoadError(error instanceof Error ? error.message : "账号管理加载失败");
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
   }
 

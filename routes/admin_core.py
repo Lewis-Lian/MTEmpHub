@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from io import BytesIO
@@ -9,6 +10,8 @@ from typing import Any
 from flask import abort, jsonify, request, send_file, g
 import openpyxl
 from sqlalchemy.orm import joinedload, selectinload
+
+logger = logging.getLogger(__name__)
 
 from models import db
 from models.department import Department
@@ -1038,12 +1041,13 @@ def calculate_account_set(account_set_id: int):
                 rec.error_message = imported.get("message", "import failed")
                 rec.imported_count = 0
                 results.append({"file": filename, "status": "error", "error": rec.error_message, "result": imported})
-        except Exception as exc:
+        except Exception:
             failed += 1
+            logger.exception("账套文件导入失败 file=%s", filename)
             rec.status = "error"
-            rec.error_message = str(exc)
+            rec.error_message = "导入失败，请查看服务端日志"
             rec.imported_count = 0
-            results.append({"file": filename, "status": "error", "error": str(exc)})
+            results.append({"file": filename, "status": "error", "error": "导入失败，请查看服务端日志"})
         db.session.commit()
 
     manager_stats_sync = None
@@ -1059,15 +1063,16 @@ def calculate_account_set(account_set_id: int):
             if manager_stats_sync["error_count"]:
                 failed += manager_stats_sync["error_count"]
             db.session.commit()
-        except Exception as exc:
+        except Exception:
             db.session.rollback()
             failed += 1
+            logger.exception("管理人员考勤统计同步失败 month=%s", row.month)
             manager_stats_sync = {
                 "month": row.month,
                 "overtime_synced": 0,
                 "annual_leave_synced": 0,
                 "error_count": 1,
-                "errors": [str(exc)],
+                "errors": ["考勤统计同步失败，请查看服务端日志"],
             }
 
     return jsonify(
@@ -1755,55 +1760,58 @@ def _import_manager_stat_file(stat_type: str, year: int):
         return jsonify({"error": "请选择要导入的Excel文件"}), 400
 
     wb = openpyxl.load_workbook(file, data_only=True)
-    ws = wb.active
-    headers = _header_map(ws)
-    if "姓名" not in headers:
-        return jsonify({"error": "导入文件缺少姓名列"}), 400
+    try:
+        ws = wb.active
+        headers = _header_map(ws)
+        if "姓名" not in headers:
+            return jsonify({"error": "导入文件缺少姓名列"}), 400
 
-    imported = 0
-    errors: list[str] = []
-    skipped_locked_months: set[str] = set()
-    employees_by_name = {employee.name: employee for employee in _manager_scope_employees()}
-    for row_idx in range(2, ws.max_row + 1):
-        name = str(ws.cell(row_idx, headers["姓名"]).value or "").strip()
-        if not name:
-            continue
-        employee = employees_by_name.get(name)
-        if not employee:
-            errors.append(f"第{row_idx}行：未找到管理人员 {name}")
-            continue
-
-        existing_row = ManagerMonthStat.query.filter_by(emp_id=employee.id, year=year, stat_type=stat_type).first()
-        values = {
-            key: float(getattr(existing_row, key) or 0) if existing_row else 0.0
-            for key in _stat_value_keys(stat_type)
-        }
-        for key, label in _stat_col_keys(stat_type):
-            col_idx = headers.get(label)
-            month = _stat_key_month(year, key)
-            if _stat_key_lock_state(year, key) == "locked":
-                if month:
-                    skipped_locked_months.add(month)
+        imported = 0
+        errors: list[str] = []
+        skipped_locked_months: set[str] = set()
+        employees_by_name = {employee.name: employee for employee in _manager_scope_employees()}
+        for row_idx in range(2, ws.max_row + 1):
+            name = str(ws.cell(row_idx, headers["姓名"]).value or "").strip()
+            if not name:
                 continue
-            values[key] = float(_number_or_blank(ws.cell(row_idx, col_idx).value if col_idx else None) or 0)
-        remark_col = headers.get("备注")
-        remark = str(ws.cell(row_idx, remark_col).value or "").strip() if remark_col else ""
-        payload, status = _upsert_manager_month_stat(stat_type, employee.id, year, values, remark)
-        if status != 200:
-            errors.append(f"第{row_idx}行：{payload.get('error', '保存失败')}")
-            continue
-        imported += 1
+            employee = employees_by_name.get(name)
+            if not employee:
+                errors.append(f"第{row_idx}行：未找到管理人员 {name}")
+                continue
 
-    response = {
-        "status": "ok",
-        "imported": imported,
-        "errors": errors,
-        "error_count": len(errors),
-        "skipped_locked_months": sorted(skipped_locked_months),
-    }
-    if skipped_locked_months:
-        response["warning"] = f"已跳过锁定月份：{'、'.join(response['skipped_locked_months'])}"
-    return jsonify(response)
+            existing_row = ManagerMonthStat.query.filter_by(emp_id=employee.id, year=year, stat_type=stat_type).first()
+            values = {
+                key: float(getattr(existing_row, key) or 0) if existing_row else 0.0
+                for key in _stat_value_keys(stat_type)
+            }
+            for key, label in _stat_col_keys(stat_type):
+                col_idx = headers.get(label)
+                month = _stat_key_month(year, key)
+                if _stat_key_lock_state(year, key) == "locked":
+                    if month:
+                        skipped_locked_months.add(month)
+                    continue
+                values[key] = float(_number_or_blank(ws.cell(row_idx, col_idx).value if col_idx else None) or 0)
+            remark_col = headers.get("备注")
+            remark = str(ws.cell(row_idx, remark_col).value or "").strip() if remark_col else ""
+            payload, status = _upsert_manager_month_stat(stat_type, employee.id, year, values, remark)
+            if status != 200:
+                errors.append(f"第{row_idx}行：{payload.get('error', '保存失败')}")
+                continue
+            imported += 1
+
+        response = {
+            "status": "ok",
+            "imported": imported,
+            "errors": errors,
+            "error_count": len(errors),
+            "skipped_locked_months": sorted(skipped_locked_months),
+        }
+        if skipped_locked_months:
+            response["warning"] = f"已跳过锁定月份：{'、'.join(response['skipped_locked_months'])}"
+        return jsonify(response)
+    finally:
+        wb.close()
 
 
 def _manager_overtime_values(year: int, emp_ids: list[int] | None = None) -> dict[str, dict[str, object]]:
@@ -1887,7 +1895,10 @@ def _export_manager_overtime_workbook(year: int):
     _fill_named_month_template(ws, values_by_name, "remaining")
 
     output = BytesIO()
-    wb.save(output)
+    try:
+        wb.save(output)
+    finally:
+        wb.close()
     output.seek(0)
     return send_file(
         output,
@@ -1914,7 +1925,10 @@ def _export_manager_annual_leave_workbook(year: int):
     _fill_named_month_template(ws, values_by_name, "remaining", _annual_leave_value_keys())
 
     output = BytesIO()
-    wb.save(output)
+    try:
+        wb.save(output)
+    finally:
+        wb.close()
     output.seek(0)
     return send_file(
         output,

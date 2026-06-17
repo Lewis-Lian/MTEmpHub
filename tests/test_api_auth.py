@@ -135,6 +135,17 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("api_access_token=;", response.headers.get("Set-Cookie", ""))
 
+    def _get_valid_captcha_token(self) -> str:
+        """返回一个合法的 verified token，专供 change-password 测试使用。
+
+        改密测试关注的是改密逻辑本身（锁定、密码校验等），不是滑块轨迹；因此这里直接
+        签发 verified token 跳过轨迹校验。滑块自身的轨迹校验在 test_slider_* 系列测试。
+        """
+        from routes.auth_helpers import issue_slider_verified_token
+
+        with self.app.app_context():
+            return issue_slider_verified_token()
+
     def test_change_password_rejects_wrong_current_password(self) -> None:
         response = self.client.post(
             "/api/auth/change-password",
@@ -143,6 +154,7 @@ class ApiAuthTests(unittest.TestCase):
                 "current_password": "wrong-password",
                 "new_password": "newpass123",
                 "confirm_password": "newpass123",
+                "captcha_token": self._get_valid_captcha_token(),
             },
         )
 
@@ -180,6 +192,7 @@ class ApiAuthTests(unittest.TestCase):
                 "current_password": "admin123",
                 "new_password": "newpass123",
                 "confirm_password": "newpass123",
+                "captcha_token": self._get_valid_captcha_token(),
             },
         )
 
@@ -213,6 +226,7 @@ class ApiAuthTests(unittest.TestCase):
                     "current_password": "wrong-password",
                     "new_password": "newpass123",
                     "confirm_password": "newpass123",
+                    "captcha_token": self._get_valid_captcha_token(),
                 },
             )
             self.assertEqual(response.status_code, 401)
@@ -224,6 +238,7 @@ class ApiAuthTests(unittest.TestCase):
                 "current_password": "wrong-password",
                 "new_password": "newpass123",
                 "confirm_password": "newpass123",
+                "captcha_token": self._get_valid_captcha_token(),
             },
         )
 
@@ -242,6 +257,7 @@ class ApiAuthTests(unittest.TestCase):
                     "current_password": "wrong-password",
                     "new_password": "newpass123",
                     "confirm_password": "newpass123",
+                    "captcha_token": self._get_valid_captcha_token(),
                 },
             )
 
@@ -252,6 +268,7 @@ class ApiAuthTests(unittest.TestCase):
                 "current_password": "admin123",
                 "new_password": "newpass123",
                 "confirm_password": "newpass123",
+                "captcha_token": self._get_valid_captcha_token(),
             },
         )
 
@@ -260,6 +277,118 @@ class ApiAuthTests(unittest.TestCase):
             locked_response.get_json()["error"],
             "该账号已被临时禁用 10 分钟，请稍后再试",
         )
+
+    def _human_like_trace(self, target_x: int) -> list[dict]:
+        """构造一条「慢启动→加速→减速」的人手轨迹，终点命中 target_x。
+
+        时间跨度 > 400ms（满足最短耗时），速度有明显变化（满足方差阈值），采样点 >= 5。
+        """
+        points = []
+        # 分段：前 30% 缓慢、中 50% 快速、后 20% 减速对齐。
+        ratios = [0.05, 0.12, 0.25, 0.45, 0.65, 0.82, 0.92, 0.98, 1.0]
+        times_ms = [0, 60, 140, 230, 320, 410, 500, 560, 620]
+        for r, t in zip(ratios, times_ms):
+            points.append({"x": round(target_x * r, 1), "t": t})
+        return points
+
+    def test_slider_captcha_get_returns_image_and_token(self) -> None:
+        response = self.client.get("/api/auth/captcha/slider")
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertIn("token", data)
+        self.assertIn("challenge_id", data)
+        self.assertTrue(data["background"].startswith("data:image/png;base64,"))
+        self.assertTrue(data["slider"].startswith("data:image/png;base64,"))
+        self.assertEqual(data["slider_width"], 44)
+
+    def test_slider_captcha_verify_succeeds_with_valid_trace(self) -> None:
+        from routes.auth_helpers import generate_slider_challenge
+
+        with self.app.app_context():
+            _, token = generate_slider_challenge(150)
+        trace = self._human_like_trace(150)
+        response = self.client.post(
+            "/api/auth/captcha/slider/verify",
+            json={"token": token, "x_offset": 150, "trace": trace},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("verified_token", response.get_json())
+
+    def test_slider_captcha_verify_rejects_wrong_position(self) -> None:
+        from routes.auth_helpers import generate_slider_challenge
+
+        with self.app.app_context():
+            _, token = generate_slider_challenge(150)
+        # 终点偏离 target_x 超过容差 5px。
+        response = self.client.post(
+            "/api/auth/captcha/slider/verify",
+            json={"token": token, "x_offset": 180, "trace": self._human_like_trace(180)},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_slider_captcha_verify_rejects_instant_move(self) -> None:
+        from routes.auth_helpers import generate_slider_challenge
+
+        with self.app.app_context():
+            _, token = generate_slider_challenge(150)
+        # 耗时 < 400ms（瞬移）。
+        fast_trace = [
+            {"x": 0, "t": 0},
+            {"x": 30, "t": 50},
+            {"x": 80, "t": 100},
+            {"x": 130, "t": 150},
+            {"x": 150, "t": 200},
+        ]
+        response = self.client.post(
+            "/api/auth/captcha/slider/verify",
+            json={"token": token, "x_offset": 150, "trace": fast_trace},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_slider_captcha_verify_rejects_replay(self) -> None:
+        from routes.auth_helpers import generate_slider_challenge
+
+        with self.app.app_context():
+            _, token = generate_slider_challenge(150)
+        trace = self._human_like_trace(150)
+        first = self.client.post(
+            "/api/auth/captcha/slider/verify",
+            json={"token": token, "x_offset": 150, "trace": trace},
+        )
+        self.assertEqual(first.status_code, 200)
+        # 同一 token 二次消费应被拒。
+        second = self.client.post(
+            "/api/auth/captcha/slider/verify",
+            json={"token": token, "x_offset": 150, "trace": trace},
+        )
+        self.assertEqual(second.status_code, 400)
+
+    def test_change_password_requires_captcha_token(self) -> None:
+        # 不带 captcha_token → 403（在密码校验之前拦截）。
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "admin123",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.get_json()["error"], "请先完成滑块验证")
+
+    def test_change_password_rejects_invalid_captcha_token(self) -> None:
+        response = self.client.post(
+            "/api/auth/change-password",
+            json={
+                "username": "admin",
+                "current_password": "admin123",
+                "new_password": "newpass123",
+                "confirm_password": "newpass123",
+                "captcha_token": "fake-token",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
 
     def test_api_login_locks_account_for_ten_minutes_after_five_failed_attempts(self) -> None:
         for _ in range(5):
