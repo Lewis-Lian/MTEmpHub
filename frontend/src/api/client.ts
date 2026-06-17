@@ -45,14 +45,35 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
 
   if (!response.ok) {
-    const message =
-      typeof payload === "object" && payload !== null && "error" in payload
-        ? String(payload.error)
-        : response.statusText || "请求失败";
+    const message = (extractErrorMessage(payload) ?? response.statusText) || "请求失败";
     throw new ApiError(message, response.status, payload);
   }
 
   return payload as T;
+}
+
+// 从后端响应中提取可展示的错误信息：
+// - JSON 形如 { error: "..." } 或 { error: { message: "..." } } → 取对应文本
+// - error 为字符串则直接使用；为对象则降级 JSON.stringify，避免得到 "[object Object]"
+function extractErrorMessage(payload: unknown): string | undefined {
+  if (typeof payload !== "object" || payload === null || !("error" in payload)) {
+    return undefined;
+  }
+  const error = (payload as { error?: unknown }).error;
+  if (typeof error === "string") {
+    return error;
+  }
+  if (error && typeof error === "object" && "message" in error) {
+    const inner = (error as { message?: unknown }).message;
+    if (typeof inner === "string") {
+      return inner;
+    }
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return undefined;
+  }
 }
 
 export function buildApiUrl(path: string): string {

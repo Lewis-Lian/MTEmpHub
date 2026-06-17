@@ -326,8 +326,11 @@ def import_manager_attendance_overrides():
     if not file or not file.filename:
         return jsonify({"error": "请选择导入文件"}), 400
     wb = openpyxl.load_workbook(file, data_only=True, read_only=True)
-    ws = wb[wb.sheetnames[0]]
-    rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    try:
+        ws = wb[wb.sheetnames[0]]
+        rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    finally:
+        wb.close()
     if not rows:
         return jsonify({"error": "empty file"}), 400
     header_idx, header_map = admin_module._parse_header_row(rows, ["月份", "工号", "姓名", "出勤天数", "备注"])
@@ -448,8 +451,11 @@ def import_employee_attendance_overrides():
     if not file or not file.filename:
         return jsonify({"error": "请选择导入文件"}), 400
     wb = openpyxl.load_workbook(file, data_only=True, read_only=True)
-    ws = wb[wb.sheetnames[0]]
-    rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    try:
+        ws = wb[wb.sheetnames[0]]
+        rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    finally:
+        wb.close()
     if not rows:
         return jsonify({"error": "empty file"}), 400
     header_idx, header_map = admin_module._parse_header_row(rows, ["月份", "工号", "姓名", "考勤天数", "备注"])

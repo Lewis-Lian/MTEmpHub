@@ -8,7 +8,6 @@ from datetime import date, datetime, time, timedelta
 from models import db
 from models.account_set import AccountSet
 from models.employee import Employee
-from models.daily_record import DailyRecord
 from models.leave import LeaveRecord
 from models.manager_attendance_override import ManagerAttendanceOverride
 from models.monthly_report import MonthlyReport
@@ -287,11 +286,6 @@ def _factory_rest_days_from_periods(periods_by_date: dict[date, set[str]]) -> fl
     return _round2(sum(0.5 * len(periods) for periods in periods_by_date.values()))
 
 
-def _manager_month_stat(employee_id: int, month: str, stat_type: str) -> ManagerMonthStat | None:
-    year, _key = _stat_year_key(month)
-    return ManagerMonthStat.query.filter_by(emp_id=employee_id, year=year, stat_type=stat_type).first()
-
-
 def _manager_month_stats_by_employee(employee_ids: list[int], month: str) -> dict[tuple[int, str], ManagerMonthStat]:
     if not employee_ids:
         return {}
@@ -303,18 +297,6 @@ def _manager_month_stats_by_employee(employee_ids: list[int], month: str) -> dic
         .all()
     )
     return {(row.emp_id, row.stat_type): row for row in rows}
-
-
-def _stat_month_value(row: ManagerMonthStat | None, month: str) -> float | None:
-    if not row:
-        return None
-    _year, key = _stat_year_key(month)
-    return _round2(getattr(row, key) or 0)
-
-
-def _required_stat_month_value(row: ManagerMonthStat | None, month: str) -> float:
-    value = _stat_month_value(row, month)
-    return _round2(value or 0)
 
 
 def _stat_remaining_from_row(stat_type: str, row: ManagerMonthStat | None) -> float:

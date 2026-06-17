@@ -6,6 +6,7 @@ import { login, type AuthUser } from "../api/auth";
 import AnimatedCharacters from "../components/AnimatedCharacters";
 import Logo from "../components/common/Logo";
 import { triggerNotification } from "../components/feedback/Notification";
+import SliderCaptcha from "../components/auth/SliderCaptcha";
 
 interface LoginPageProps {
   onLogin: (user: AuthUser) => void;
@@ -21,12 +22,18 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [captchaToken, setCaptchaToken] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const redirectTo = typeof location.state?.from === "string" ? location.state.from : null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!captchaToken) {
+      setError("请先完成滑块验证");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
 
@@ -35,6 +42,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         username,
         password,
         remember_me: rememberMe,
+        captcha_token: captchaToken,
       });
       onLogin(user);
       navigate(redirectTo ?? defaultLandingPath(user), { replace: true });
@@ -147,6 +155,12 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                   <Link className="login-link" to="/change-password">
                     修改密码
                   </Link>
+                </div>
+                <div className="login-field" style={{ marginBottom: "16px" }}>
+                  <SliderCaptcha
+                    onReset={() => setCaptchaToken("")}
+                    onVerified={setCaptchaToken}
+                  />
                 </div>
                 {error ? <p className="login-error">{error}</p> : null}
                 <button

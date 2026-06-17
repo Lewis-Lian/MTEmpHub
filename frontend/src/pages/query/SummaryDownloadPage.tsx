@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchQueryBootstrap } from "../../api/query";
 import EmployeePicker from "../../components/query/EmployeePicker";
@@ -167,6 +167,22 @@ export default function SummaryDownloadPage() {
     };
   }, []);
 
+  // 下载进度条定时器：组件卸载时清理，避免卸载后 setState。
+  const downloadTimersRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const downloadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    return () => {
+      if (downloadIntervalRef.current) {
+        clearInterval(downloadIntervalRef.current);
+        downloadIntervalRef.current = null;
+      }
+      if (downloadTimersRef.current) {
+        clearTimeout(downloadTimersRef.current);
+        downloadTimersRef.current = null;
+      }
+    };
+  }, []);
+
   const applyPreset1 = () => {
     // 预设1：员工考勤汇总
     setIncludeFinal(true);
@@ -248,7 +264,7 @@ export default function SummaryDownloadPage() {
     setLoadingText("正在为您生成并下载汇总工作簿...");
 
     let current = 0;
-    const interval = setInterval(() => {
+    downloadIntervalRef.current = setInterval(() => {
       current += Math.floor(Math.random() * 15) + 5;
       if (current >= 99) {
         current = 99;
@@ -256,13 +272,16 @@ export default function SummaryDownloadPage() {
       setProgress(current);
     }, 150);
 
-    setTimeout(() => {
-      clearInterval(interval);
+    downloadTimersRef.current = setTimeout(() => {
+      if (downloadIntervalRef.current) {
+        clearInterval(downloadIntervalRef.current);
+        downloadIntervalRef.current = null;
+      }
       setProgress(100);
       setLoadingText("下载已准备就绪！");
       window.location.href = buildDownloadUrl("/api/query/summary-download/export", query);
 
-      setTimeout(() => {
+      downloadTimersRef.current = setTimeout(() => {
         setProgressVisible(false);
       }, 500);
     }, 1500);

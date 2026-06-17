@@ -201,6 +201,20 @@ describe("App smoke regression", () => {
       if (path === "/api/auth/me") {
         return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
       }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
+      }
       if (path === "/api/auth/change-password") {
         changePasswordBody = JSON.parse(String(init?.body));
         return Promise.resolve(jsonResponse({ ok: true }));
@@ -215,6 +229,16 @@ describe("App smoke regression", () => {
     fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "admin123" } });
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "newpass123" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "newpass123" } });
+
+    // 模拟滑块拖动：pointerDown → pointerMove（移动足够距离）→ pointerUp 触发验证。
+    await screen.findByAltText("验证码背景");
+    const sliderHandle = screen.getByRole("button", { name: "拖动滑块" });
+    fireEvent.pointerDown(sliderHandle, { clientX: 10, pointerId: 1 });
+    fireEvent.pointerMove(sliderHandle, { clientX: 160, pointerId: 1 });
+    fireEvent.pointerUp(sliderHandle, { clientX: 160, pointerId: 1 });
+    // 等待验证通过提示出现。
+    await screen.findByText("验证通过");
+
     fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
 
     expect((await screen.findAllByText("密码修改成功，请使用新密码登录。"))[0]).toBeInTheDocument();
@@ -223,6 +247,7 @@ describe("App smoke regression", () => {
       current_password: "admin123",
       new_password: "newpass123",
       confirm_password: "newpass123",
+      captcha_token: "test-verified-token",
     });
   });
 
@@ -232,6 +257,17 @@ describe("App smoke regression", () => {
       const path = normalizePath(input);
       if (path === "/api/auth/me") {
         return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test",
+            token: "t",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
       }
       throw new Error(`unexpected request: ${path}`);
     });
@@ -255,6 +291,17 @@ describe("App smoke regression", () => {
       const path = normalizePath(input);
       if (path === "/api/auth/me") {
         return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test",
+            token: "t",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
       }
       throw new Error(`unexpected request: ${path}`);
     });

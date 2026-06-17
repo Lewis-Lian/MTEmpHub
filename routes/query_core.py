@@ -125,22 +125,6 @@ def _filter_final_columns(headers: list[str], rows: list[list[object]]) -> tuple
     return filtered_headers, filtered_rows
 
 
-def _filter_punch_columns(headers: list[str], rows: list[list[object]]) -> tuple[list[str], list[list[object]]]:
-    requested = (request.args.get("punch_headers") or "").strip()
-    if not requested:
-        return headers, rows
-    wanted = [h.strip() for h in requested.split(",") if h.strip()]
-    wanted_set = set(wanted)
-    keep_indexes: list[int] = []
-    filtered_headers: list[str] = []
-    for idx, header in enumerate(headers):
-        if header in wanted_set:
-            keep_indexes.append(idx)
-            filtered_headers.append(header)
-    filtered_rows = [[row[idx] if idx < len(row) else "" for idx in keep_indexes] for row in rows]
-    return filtered_headers, filtered_rows
-
-
 def _filter_columns(headers: list[str], rows: list[list[object]], param_name: str) -> tuple[list[str], list[list[object]]]:
     requested = (request.args.get(param_name) or "").strip()
     if not requested:
@@ -1326,7 +1310,7 @@ def punch_records_export_api():
             ]
         )
 
-    headers, row_data = _filter_punch_columns(punch_headers, row_data)
+    headers, row_data = _filter_columns(punch_headers, row_data, "punch_headers")
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -1756,7 +1740,7 @@ def summary_download_export_api():
                 r.exception_reason or "",
             ])
 
-        punch_headers, punch_row_data = _filter_punch_columns(punch_headers, punch_row_data)
+        punch_headers, punch_row_data = _filter_columns(punch_headers, punch_row_data, "punch_headers")
 
         ws2 = wb.create_sheet("打卡数据查询")
         ws2.append(punch_headers)
@@ -2246,7 +2230,10 @@ def manager_attendance_template_export_api():
         header_footer_xml = None
 
     output = BytesIO()
-    wb.save(output)
+    try:
+        wb.save(output)
+    finally:
+        wb.close()
     output_bytes = _apply_sheet_header_footer_xml(output.getvalue(), header_footer_xml)
     return send_file(
         BytesIO(output_bytes),
