@@ -16,6 +16,10 @@ cd "$PROJECT_DIR"
 echo "=========================================="
 echo "1. 拉取最新代码..."
 echo "=========================================="
+# package-lock.json 是平台相关的：不同机器 npm install 会按本地平台补全/重写
+# （如 esbuild 平台子包），差异不应入 git。上一次 npm install 产生的本地改动
+# 会挡住本次 pull，这里先丢弃它（npm 会按 package.json 重新生成，无损失）。
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 # --ff-only：仅允许快进合并，遇到本地改动冲突时会失败而非自动合并
 if ! git pull --ff-only origin master; then
     echo "❌ git pull 失败，可能有本地改动冲突或网络问题"
@@ -57,6 +61,9 @@ cd frontend
 npm install
 npm run build
 cd "$PROJECT_DIR"
+# npm install 会按服务器平台重写 package-lock.json，丢弃其本地改动保持工作区干净
+# （下次 update.sh 第1步也会再清理一次，双保险）
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 
 echo ""
 echo "=========================================="
