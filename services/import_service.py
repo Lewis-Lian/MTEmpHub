@@ -461,6 +461,15 @@ class ImportService:
             for e in Employee.query.filter(Employee.emp_no.in_(unique_emp_nos)).all():
                 non_manager_by_no.setdefault(e.emp_no, e)
 
+        # 批量预查 AnnualLeave（调休余额，按 emp_id 拉取全部年份记录）
+        all_leave_emp_ids: set[int] = {e.id for e in non_manager_by_no.values()}
+        all_leave_emp_ids |= {e.id for e in emp_by_no_mgr.values()}
+        all_leave_emp_ids |= {e.id for e in emp_by_name_mgr.values()}
+        annual_leave_by_key: dict[tuple[int, int], AnnualLeave] = {}
+        if all_leave_emp_ids:
+            for bal in AnnualLeave.query.filter(AnnualLeave.emp_id.in_(all_leave_emp_ids)).all():
+                annual_leave_by_key[(bal.emp_id, bal.year)] = bal
+
         for row in rows[header_idx + 1 :]:
             leave_no = clean_text(ImportService._get_row_value(row, leave_col_idx))
             if not leave_no:
@@ -511,16 +520,17 @@ class ImportService:
 
             # 调休已用余额修正（数学差值）
             if not is_new and old_is_time_off and old_year is not None:
-                old_balance = AnnualLeave.query.filter_by(emp_id=emp.id, year=old_year).first()
+                old_balance = annual_leave_by_key.get((emp.id, old_year))
                 if old_balance:
                     old_balance.used_days = max((old_balance.used_days or 0) - old_duration / 8, 0.0)
                     old_balance.remaining_days = (old_balance.total_days or 0) - (old_balance.used_days or 0)
 
             if new_is_time_off and new_year is not None:
-                new_balance = AnnualLeave.query.filter_by(emp_id=emp.id, year=new_year).first()
+                new_balance = annual_leave_by_key.get((emp.id, new_year))
                 if not new_balance:
                     new_balance = AnnualLeave(emp_id=emp.id, year=new_year, total_days=0, used_days=0, remaining_days=0)
                     db.session.add(new_balance)
+                    annual_leave_by_key[(emp.id, new_year)] = new_balance
                 new_balance.used_days = (new_balance.used_days or 0) + (record.duration or 0) / 8
                 new_balance.remaining_days = (new_balance.total_days or 0) - (new_balance.used_days or 0)
 
