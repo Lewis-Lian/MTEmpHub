@@ -22,7 +22,13 @@ class Config:
     }
     JWT_EXPIRES_HOURS = int(os.getenv("JWT_EXPIRES_HOURS", "12"))
     JWT_EXPIRES_DELTA = timedelta(hours=JWT_EXPIRES_HOURS)
-    FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    # 允许的前端来源（CSRF/CORS 白名单）。
+    # 优先读 FRONTEND_ORIGINS（逗号分隔多个，如 "http://a.com,http://1.2.3.4"）；
+    # 未配置时回退到单值 FRONTEND_ORIGIN，最终回退到 localhost:5173。
+    _raw_origins = os.getenv("FRONTEND_ORIGINS") or os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+    FRONTEND_ORIGINS = [o.strip().rstrip("/") for o in _raw_origins.split(",") if o.strip()]
+    # 单值别名，保留向后兼容（取白名单首项）
+    FRONTEND_ORIGIN = FRONTEND_ORIGINS[0]
     FRONTEND_APP_URL = os.getenv("FRONTEND_APP_URL", FRONTEND_ORIGIN)
     SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "access_token")
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
