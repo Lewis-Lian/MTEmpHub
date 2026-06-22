@@ -67,11 +67,26 @@ describe("App smoke regression", () => {
       if (path === "/api/auth/me") {
         return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
       }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
+      }
       if (path === "/api/auth/login") {
         expect(JSON.parse(String(init?.body))).toEqual({
           username: "admin",
           password: "admin123",
           remember_me: false,
+          captcha_token: "test-verified-token",
         });
         return Promise.resolve(
           jsonResponse({
@@ -99,6 +114,7 @@ describe("App smoke regression", () => {
     expect(screen.queryByRole("slider", { name: "滑动完成验证" })).not.toBeInTheDocument();
     expect(loginButton).toBeEnabled();
 
+    await completeSliderCaptcha();
     fireEvent.click(loginButton);
 
     await waitFor(() => expect(window.location.pathname).toBe("/employee/home"));
@@ -111,6 +127,20 @@ describe("App smoke regression", () => {
       const path = normalizePath(input);
       if (path === "/api/auth/me") {
         return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
       }
       if (path === "/api/auth/login") {
         loginBody = JSON.parse(String(init?.body));
@@ -134,6 +164,7 @@ describe("App smoke regression", () => {
     fireEvent.change(await screen.findByLabelText("账号"), { target: { value: "admin" } });
     fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
     fireEvent.click(screen.getByRole("checkbox", { name: "30 天内记住我" }));
+    await completeSliderCaptcha();
     fireEvent.click(screen.getByRole("button", { name: "登录" }));
 
     await waitFor(() =>
@@ -141,6 +172,7 @@ describe("App smoke regression", () => {
         username: "admin",
         password: "admin123",
         remember_me: true,
+        captcha_token: "test-verified-token",
       }),
     );
   });
@@ -230,14 +262,8 @@ describe("App smoke regression", () => {
     fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "newpass123" } });
     fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "newpass123" } });
 
-    // 模拟滑块拖动：pointerDown → pointerMove（移动足够距离）→ pointerUp 触发验证。
-    await screen.findByAltText("验证码背景");
-    const sliderHandle = screen.getByRole("button", { name: "拖动滑块" });
-    fireEvent.pointerDown(sliderHandle, { clientX: 10, pointerId: 1 });
-    fireEvent.pointerMove(sliderHandle, { clientX: 160, pointerId: 1 });
-    fireEvent.pointerUp(sliderHandle, { clientX: 160, pointerId: 1 });
-    // 等待验证通过提示出现。
-    await screen.findByText("验证通过");
+    // 滑块组件默认折叠，需先点开再拖动完成验证。
+    await completeSliderCaptcha();
 
     fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
 
@@ -1215,7 +1241,7 @@ describe("App smoke regression", () => {
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
 
     expect(await screen.findByText("编辑账号")).toBeInTheDocument();
-    expect(screen.getByText("关联档案人员 (自动提取工号/姓名/部门)")).toBeInTheDocument();
+    expect(screen.getByText("绑定档案人员 (自动提取工号/姓名/部门)")).toBeInTheDocument();
     expect(screen.getByText("关联员工 (限定可见个人数据)")).toBeInTheDocument();
     expect(screen.getByText("关联部门 (限定可见部门数据)")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "重置密码" })).toBeInTheDocument();
@@ -1233,6 +1259,17 @@ function normalizePath(input: RequestInfo | URL): string {
     return input.pathname;
   }
   return new URL(input.url, "http://localhost").pathname;
+}
+
+// 滑块组件默认折叠，需先点击触发按钮展开，再拖动滑块完成验证。
+async function completeSliderCaptcha() {
+  fireEvent.click(await screen.findByRole("button", { name: "点击进行安全验证" }));
+  await screen.findByAltText("验证码背景");
+  const sliderHandle = screen.getByRole("button", { name: "拖动滑块" });
+  fireEvent.pointerDown(sliderHandle, { clientX: 10, pointerId: 1 });
+  fireEvent.pointerMove(sliderHandle, { clientX: 160, pointerId: 1 });
+  fireEvent.pointerUp(sliderHandle, { clientX: 160, pointerId: 1 });
+  await screen.findByText("验证通过");
 }
 
 function hasRequestedPath(pathname: string): boolean {
