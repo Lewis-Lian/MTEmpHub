@@ -164,19 +164,34 @@ export default function AccountsPage() {
     [departments],
   );
 
+  // 账号筛选按"档案人员"判定：选中某员工时，筛出档案人员为该员工的账号。
+  // 注意：这里用档案人员（profile_emp_no），而不是关联员工（emp_ids）——后者只是数据可见范围配置。
+  const profileEmpIdByEmpNo = useMemo(() => {
+    const map = new Map<string, number>();
+    employees.forEach((employee) => {
+      map.set(employee.emp_no, employee.id);
+    });
+    return map;
+  }, [employees]);
+
   const filteredUsers = users.filter((user) => {
     if (filterRole && user.role !== filterRole) {
       return false;
     }
     if (filterEmpIds.length) {
-      return filterEmpIds.some((id) => user.emp_ids.includes(id));
+      const profileEmpId = profileEmpIdByEmpNo.get(user.profile_emp_no);
+      return profileEmpId !== undefined && filterEmpIds.includes(profileEmpId);
     }
     return true;
   });
 
   const filteredPermissionRows = permissionCatalog.filter((row) => {
-    if (permissionGroup && row.group !== permissionGroup) {
-      return false;
+    if (permissionGroup) {
+      const inSelectedGroup = row.group === permissionGroup;
+      const isHome = row.key === "query_home";
+      if (!inSelectedGroup && !isHome) {
+        return false;
+      }
     }
     if (permissionKeyword.trim()) {
       return `${row.label}${row.group}`.includes(permissionKeyword.trim());
@@ -263,7 +278,7 @@ export default function AccountsPage() {
       return;
     }
     if (!createProfileEmpNo.trim() || !createProfileName.trim() || !createProfileDeptId) {
-      notification.warning("关联档案人员信息不能为空");
+      notification.warning("绑定档案人员信息不能为空");
       return;
     }
 
@@ -578,7 +593,7 @@ export default function AccountsPage() {
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
-                    <span className="account-field-label">关联档案人员 (自动提取工号/姓名/部门)</span>
+                    <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
                       employees={pickerEmployees}
@@ -718,7 +733,7 @@ export default function AccountsPage() {
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                   <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
-                    <span className="account-field-label">关联档案人员 (自动提取工号/姓名/部门)</span>
+                    <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
                       employees={pickerEmployees}
