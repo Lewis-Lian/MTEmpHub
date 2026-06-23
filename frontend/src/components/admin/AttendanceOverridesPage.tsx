@@ -257,7 +257,7 @@ export default function AttendanceOverridesPage({
         remark: String(nextRow.override?.remark ?? ""),
         values: Object.fromEntries(fields.map((field) => [field.key, normalizeEditValue(nextRow.override?.[field.key])])),
       });
-      window.alert(saveSuccessText);
+      notification.success(saveSuccessText);
     } catch (caughtError) {
       notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
     }
@@ -318,7 +318,9 @@ export default function AttendanceOverridesPage({
       if (Array.isArray(result.errors) && result.errors.length) {
         summary.push("", result.errors.join("\n"));
       }
-      window.alert(summary.join("\n"));
+      const hasFailures = result.failed_count > 0 || (Array.isArray(result.errors) && result.errors.length > 0);
+      // 导入结果含多行汇总与可能的错误明细，给更长的展示时间方便阅读
+      (hasFailures ? notification.warning : notification.success)(summary.join("\n"), 20000);
       if (selectedIds.length) {
         await handleQuery();
       }
