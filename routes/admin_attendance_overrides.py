@@ -100,6 +100,8 @@ def save_manager_attendance_override_record_api():
             "manager", emp_id, month, "manual_save", before_values, after_values
         )
         admin_module.db.session.commit()
+        # 考勤天数修正会影响加班天数，需同步加班查询页数据源（manager_month_stats）
+        admin_module._sync_manager_month_stats(month)
 
     payload, status = admin_module._manager_attendance_response(emp_id, month)
     return jsonify(payload), status
@@ -127,6 +129,8 @@ def delete_manager_attendance_override_record_api():
         admin_module._record_override_history("manager", emp_id, month, "clear", before_values, after_values)
         admin_module.db.session.delete(row)
         admin_module.db.session.commit()
+        # 删除修正后出勤天数恢复，需同步重算加班查询页数据源
+        admin_module._sync_manager_month_stats(month)
     payload, status = admin_module._manager_attendance_response(emp_id, month)
     return jsonify(payload), status
 
@@ -408,6 +412,9 @@ def import_manager_attendance_overrides():
         else:
             skipped_count += 1
     admin_module.db.session.commit()
+    if changed_count:
+        # 批量导入修正会改变考勤天数，需同步重算加班查询页数据源
+        admin_module._sync_manager_month_stats(month)
     return jsonify(
         admin_module._import_summary(
             success_count, skipped_count, failed_count, changed_count, errors
