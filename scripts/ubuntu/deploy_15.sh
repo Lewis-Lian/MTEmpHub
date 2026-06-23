@@ -58,6 +58,9 @@ server {
     listen 80;
     server_name _;
 
+    # 考勤原始表上传体积较大，放开 Nginx 默认 1MB 的请求体限制，避免 413
+    client_max_body_size 100m;
+
     root /var/www/mtemphub/frontend/dist;
     index index.html;
 
