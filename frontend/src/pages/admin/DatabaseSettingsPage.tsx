@@ -14,10 +14,12 @@ import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import QueryTable from "../../components/query/QueryTable";
 import { useNotification } from "../../components/feedback/Notification";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { Link } from "react-router-dom";
 
 export default function DatabaseSettingsPage() {
   const notification = useNotification();
+  const confirm = useConfirm();
   const [settings, setSettings] = useState<DatabaseSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -114,7 +116,11 @@ export default function DatabaseSettingsPage() {
   }
 
   async function handleMigrate() {
-    if (!confirm("确定要将 SQLite 数据迁移到 MySQL 吗？请确保 MySQL 数据库为空且暂存配置已保存。")) return;
+    const isConfirmed = await confirm({
+      message: "确定要将 SQLite 数据迁移到 MySQL 吗？请确保 MySQL 数据库为空且暂存配置已保存。",
+      type: "danger",
+    });
+    if (!isConfirmed) return;
     setMigrating(true);
     setMigrationResults(null);
     try {
@@ -133,7 +139,11 @@ export default function DatabaseSettingsPage() {
   }
 
   async function handleMigrateToSqlite() {
-    if (!confirm("确定要将 MySQL 数据全量迁移回 SQLite 吗？这将覆盖现有的 SQLite 数据库。请确保 MySQL 来源配置有效。")) return;
+    const isConfirmed = await confirm({
+      message: "确定要将 MySQL 数据全量迁移回 SQLite 吗？这将覆盖现有的 SQLite 数据库。请确保 MySQL 来源配置有效。",
+      type: "danger",
+    });
+    if (!isConfirmed) return;
     setMigrating(true);
     setMigrationResults(null);
     try {
@@ -280,7 +290,10 @@ export default function DatabaseSettingsPage() {
           </button>
           <button
             onClick={async () => {
-              if (!confirm("确定要切换到刚才暂存的 MySQL 配置吗？重启应用后生效。")) return;
+              if (!(await confirm({
+                message: "确定要切换到刚才暂存的 MySQL 配置吗？重启应用后生效。",
+                type: "warning",
+              }))) return;
               try {
                 const res = await switchToMysql(setupPassword);
                 notification.success(res.message || "已切换到 MySQL");
@@ -294,7 +307,10 @@ export default function DatabaseSettingsPage() {
           </button>
           <button
             onClick={async () => {
-              if (!confirm("确定要切回 SQLite 吗？系统连接将重置。重启应用后生效。")) return;
+              if (!(await confirm({
+                message: "确定要切回 SQLite 吗？系统连接将重置。重启应用后生效。",
+                type: "warning",
+              }))) return;
               try {
                 const res = await switchToSqlite(setupPassword);
                 notification.success(res.message || "已切换回 SQLite");
