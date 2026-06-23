@@ -1058,11 +1058,9 @@ def calculate_account_set(account_set_id: int):
                 factory_rest_days=_effective_factory_rest_days(row),
                 monthly_benefit_days=row.monthly_benefit_days or 0,
             )
-            manager_rows = build_manager_rows(manager_options, sync_month_stats=True)
-            manager_stats_sync = _sync_manager_stats_from_manager_rows(row.month, manager_rows)
+            manager_stats_sync = _sync_manager_month_stats(row.month, manager_options)
             if manager_stats_sync["error_count"]:
                 failed += manager_stats_sync["error_count"]
-            db.session.commit()
         except Exception:
             db.session.rollback()
             failed += 1
@@ -1680,6 +1678,28 @@ def _apply_manager_override_updates(
 def _stat_key_for_month(month: str) -> tuple[int, str]:
     year, month_no = [int(part) for part in month.split("-", 1)]
     return year, f"m{month_no}"
+
+
+def _sync_manager_month_stats(
+    month: str,
+    options: ManagerAttendanceOptions | None = None,
+) -> dict[str, object]:
+    """重算指定月份的管理人员考勤，并把加班/年休结果写回 manager_month_stats。
+
+    管理人员考勤修正（单条保存/删除、批量导入）会改变 attendance_days，
+    进而影响加班天数（出勤+厂休>当月天数 即产生加班）。加班查询页直接读取
+    manager_month_stats，因此修正后必须重算并同步，否则两边数据不一致。
+
+    本函数复用账套文件导入的同步路径：build_manager_rows(sync_month_stats=True)
+    会在计算时直接写回 stat 表，再由 _sync_manager_stats_from_manager_rows 校验。
+    options 缺省时按 _manager_attendance_options(month) 构造，与查询页保持一致。
+    """
+    if options is None:
+        options = _manager_attendance_options(month)
+    manager_rows = build_manager_rows(options, sync_month_stats=True)
+    result = _sync_manager_stats_from_manager_rows(month, manager_rows)
+    db.session.commit()
+    return result
 
 
 def _sync_manager_stats_from_manager_rows(month: str, manager_rows: list[dict[str, object]]) -> dict[str, object]:

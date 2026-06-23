@@ -69,7 +69,14 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.manager_id = manager.id
 
         self.client = attach_origin(self.app.test_client())
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        from routes.auth_helpers import issue_slider_verified_token
+
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin123", "captcha_token": captcha_token},
+        )
 
     def tearDown(self) -> None:
         with self.app.app_context():
@@ -420,6 +427,88 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
 
             refreshed = db.session.get(AccountSet, account_set.id)
             self.assertEqual(len(refreshed.factory_rest_entries), 1)
+
+    def test_manager_override_save_syncs_overtime_stats(self) -> None:
+        """保存管理人员考勤修正后，加班统计表（加班查询页数据源）应同步重算。
+
+        场景：2026-05 共 31 天，账套厂休 5 天。修正出勤天数为 27 天，
+        27 + 5 = 32 > 31，缺口 -1 天 → 本月加班 1 天。
+        保存修正前 stats.m5=0；保存后应变为 1.0（与考勤查询页一致）。
+        """
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            for rest_day in (date(2026, 5, 2), date(2026, 5, 9), date(2026, 5, 16),
+                             date(2026, 5, 23), date(2026, 5, 30)):
+                db.session.add(AccountSetFactoryRestDay(
+                    account_set_id=account_set.id,
+                    rest_date=rest_day,
+                    rest_period="full",
+                ))
+            db.session.commit()
+            self.manager_id_local = self.manager_id
+
+        # 保存前：加班 stats 应为空（m5=0 或无记录）
+        res = self.client.put(
+            "/api/admin/manager-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.manager_id,
+                "attendance_days": "27",
+                "remark": "产生加班的修正",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+
+        with self.app.app_context():
+            stat = (
+                db.session.query(ManagerMonthStat)
+                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
+                .first()
+            )
+            self.assertIsNotNone(stat, "保存修正后应存在加班统计记录")
+            self.assertEqual(stat.m5, 1.0, "加班查询页 m5 应同步为 1.0 天")
+
+    def test_manager_override_delete_syncs_overtime_stats(self) -> None:
+        """删除管理人员考勤修正后，加班统计表也应同步重算（加班归零）。"""
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            for rest_day in (date(2026, 5, 2), date(2026, 5, 9), date(2026, 5, 16),
+                             date(2026, 5, 23), date(2026, 5, 30)):
+                db.session.add(AccountSetFactoryRestDay(
+                    account_set_id=account_set.id,
+                    rest_date=rest_day,
+                    rest_period="full",
+                ))
+            db.session.commit()
+
+        # 先保存产生加班
+        self.client.put(
+            "/api/admin/manager-attendance-overrides/record",
+            json={"month": "2026-05", "emp_id": self.manager_id, "attendance_days": "27"},
+        )
+        with self.app.app_context():
+            stat = (
+                db.session.query(ManagerMonthStat)
+                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
+                .first()
+            )
+            self.assertEqual(stat.m5, 1.0)
+
+        # 删除修正 → 出勤天数恢复为月报值（无月报则按打卡兜底，本测试无数据→0），
+        # 缺口为正（缺勤），加班归零
+        res = self.client.delete(
+            f"/api/admin/manager-attendance-overrides/record?emp_id={self.manager_id}&month=2026-05"
+        )
+        self.assertEqual(res.status_code, 200)
+
+        with self.app.app_context():
+            stat = (
+                db.session.query(ManagerMonthStat)
+                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
+                .first()
+            )
+            self.assertIsNotNone(stat)
+            self.assertEqual(stat.m5, 0.0, "删除修正后加班应同步归零")
 
     def test_product_navigation_filters_readonly_permissions(self) -> None:
         readonly_user = SimpleNamespace(
