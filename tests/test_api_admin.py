@@ -16,6 +16,7 @@ from models.manager_attendance_override import ManagerAttendanceOverride
 from models.shift import Shift
 from models.user import User
 from routes import register_routes
+from routes.auth_helpers import issue_slider_verified_token
 from tests.csrf_helper import attach_origin
 
 
@@ -83,7 +84,12 @@ class ApiAdminTests(unittest.TestCase):
             db.drop_all()
 
     def _login(self) -> None:
-        self.client.post("/api/auth/login", json={"username": "admin", "password": "admin123"})
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "admin123", "captcha_token": captcha_token},
+        )
 
     def _xlsx_file(self, rows: list[list[object]], filename: str) -> BytesIO:
         wb = openpyxl.Workbook()

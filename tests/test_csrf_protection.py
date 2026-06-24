@@ -11,6 +11,7 @@ from flask import Flask
 from models import db
 import app  # noqa: F401 —— 触发全部模型注册到 metadata
 from routes import register_routes
+from routes.auth_helpers import issue_slider_verified_token
 
 
 class CsrfProtectionTests(unittest.TestCase):
@@ -37,11 +38,15 @@ class CsrfProtectionTests(unittest.TestCase):
             db.session.remove()
             db.drop_all()
 
+    def _captcha_token(self) -> str:
+        with self.app.app_context():
+            return issue_slider_verified_token()
+
     def test_write_with_matching_origin_is_allowed(self) -> None:
         """带匹配 Origin 的写请求不被拦截（可能因业务逻辑返回 400/401，但非 403 CSRF）。"""
         response = self.client.post(
             "/api/auth/login",
-            json={"username": "nobody", "password": "x"},
+            json={"username": "nobody", "password": "x", "captcha_token": self._captcha_token()},
             headers={"Origin": "http://localhost:5173"},
         )
         self.assertNotEqual(response.status_code, 403)
@@ -50,7 +55,7 @@ class CsrfProtectionTests(unittest.TestCase):
         """带匹配 Referer（含路径）的写请求不被拦截。"""
         response = self.client.post(
             "/api/auth/login",
-            json={"username": "nobody", "password": "x"},
+            json={"username": "nobody", "password": "x", "captcha_token": self._captcha_token()},
             headers={"Referer": "http://localhost:5173/login"},
         )
         self.assertNotEqual(response.status_code, 403)
