@@ -542,6 +542,28 @@ class ManagerInjuryDeductionTests(unittest.TestCase):
         )
         db.session.commit()
 
+    def test_injury_not_in_attendance_is_deducted_as_absence(self) -> None:
+        """工伤不进考勤天数 → 被当成缺勤扣薪。
+
+        固定月报出勤5天（无加班/年假余额，缺勤全额算事/病假）：
+        - 无工伤：缺勤 = 本月天数 - 出勤5 = 25 → 事/病假 25。
+        - 加工伤1天：工伤不进考勤天数，出勤仍为 5，缺勤仍为 25 → 事/病假 25，
+          同时 injury_days=1 被记录。
+
+        工伤通过「不进考勤天数」隐式算作缺勤并被扣薪。若有人误把工伤加进
+        attendance_days，出勤会变成 6、事/病假变成 24，本断言会失败。
+        """
+        with self.app.app_context():
+            baseline = self._build_rows()
+            self._add_injury_leave("GS-A1", day=15)
+            with_injury = self._build_rows()
+
+        # 工伤被记录，但不进考勤天数。
+        self.assertEqual(with_injury[0]["injury_days"], 1.0)
+        self.assertEqual(with_injury[0]["attendance_days"], 5.0)
+        # 工伤那天因「没上班也不算出勤」已隐含在缺勤里被扣薪：扣薪天数与无工伤时相同。
+        self.assertEqual(with_injury[0]["personal_sick_days"], baseline[0]["personal_sick_days"])
+
 
 if __name__ == "__main__":
     unittest.main()
