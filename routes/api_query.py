@@ -20,6 +20,7 @@ from routes.query_core import (
     leave_records_api,
     leave_records_export_api,
     manager_annual_leave_query_api,
+    manager_annual_leave_query_export_api,
     manager_attendance_api,
     manager_attendance_export_api,
     manager_leave_records_api,
@@ -27,6 +28,7 @@ from routes.query_core import (
     manager_department_hours_api,
     manager_department_hours_export_api,
     manager_overtime_query_api,
+    manager_overtime_query_export_api,
     manager_punch_records_api,
     punch_records_api,
     punch_records_export_api,
@@ -211,10 +213,22 @@ def manager_overtime():
     return manager_overtime_query_api()
 
 
+@api_query_bp.get("/manager-overtime/export")
+@page_permission_required("manager_overtime_query")
+def manager_overtime_export():
+    return manager_overtime_query_export_api()
+
+
 @api_query_bp.get("/manager-annual-leave")
 @page_permission_required("manager_annual_leave_query")
 def manager_annual_leave():
     return manager_annual_leave_query_api()
+
+
+@api_query_bp.get("/manager-annual-leave/export")
+@page_permission_required("manager_annual_leave_query")
+def manager_annual_leave_export():
+    return manager_annual_leave_query_export_api()
 
 
 @api_query_bp.get("/manager-department-hours")
