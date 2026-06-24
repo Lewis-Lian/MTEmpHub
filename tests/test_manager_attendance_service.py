@@ -481,5 +481,67 @@ class ManagerFactoryRestOverlapTests(unittest.TestCase):
         self.assertEqual(rows[0]["overtime_change"], 0.0)
 
 
+class ManagerInjuryDeductionTests(unittest.TestCase):
+    """守护「工伤要扣工资、等同普通缺勤」政策。
+
+    与 ManagerFactoryRestOverlapTests 解耦：本类不注入厂休明细，确保工伤天数不被
+    厂休重叠干扰，断言聚焦于扣薪缺口与扣减顺序。
+    """
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-injury-deduction.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D002", dept_name="安环部")
+            manager = Employee(emp_no="M002", name="石含巧", is_manager=True)
+            db.session.add_all([dept, manager])
+            db.session.flush()
+            manager.dept_id = dept.id
+            # 月报出勤 5 天，工厂不设厂休明细（factory_rest_days=0）。
+            db.session.add(
+                MonthlyReport(
+                    emp_id=manager.id,
+                    report_month="2026-06",
+                    manager_raw_data={"出勤天数": 5},
+                )
+            )
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def _build_rows(self) -> list[dict[str, object]]:
+        # factory_rest_days=0：本类不测厂休重叠，专注扣薪行为。
+        return build_manager_rows(ManagerAttendanceOptions(month="2026-06", factory_rest_days=0.0))
+
+    def _add_injury_leave(self, leave_no: str, day: int = 15) -> None:
+        """添加 1 整天工伤假（8:00-17:00），位于 2026-06 当月且不与任何厂休重叠。"""
+        db.session.add(
+            LeaveRecord(
+                emp_id=self.manager_id,
+                leave_no=leave_no,
+                leave_type="工伤假",
+                start_time=datetime(2026, 6, day, 8, 0, 0),
+                end_time=datetime(2026, 6, day, 17, 0, 0),
+            )
+        )
+        db.session.commit()
+
+
 if __name__ == "__main__":
     unittest.main()
