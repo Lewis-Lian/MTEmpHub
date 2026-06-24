@@ -481,5 +481,115 @@ class ManagerFactoryRestOverlapTests(unittest.TestCase):
         self.assertEqual(rows[0]["overtime_change"], 0.0)
 
 
+class ManagerInjuryDeductionTests(unittest.TestCase):
+    """守护「工伤要扣工资、等同普通缺勤」政策。
+
+    与 ManagerFactoryRestOverlapTests 解耦：本类不注入厂休明细，确保工伤天数不被
+    厂休重叠干扰，断言聚焦于扣薪缺口与扣减顺序。
+    """
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-injury-deduction.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D002", dept_name="安环部")
+            manager = Employee(emp_no="M002", name="石含巧", is_manager=True)
+            db.session.add_all([dept, manager])
+            db.session.flush()
+            manager.dept_id = dept.id
+            # 月报出勤 5 天，工厂不设厂休明细（factory_rest_days=0）。
+            db.session.add(
+                MonthlyReport(
+                    emp_id=manager.id,
+                    report_month="2026-06",
+                    manager_raw_data={"出勤天数": 5},
+                )
+            )
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def _build_rows(self) -> list[dict[str, object]]:
+        # factory_rest_days=0：本类不测厂休重叠，专注扣薪行为。
+        return build_manager_rows(ManagerAttendanceOptions(month="2026-06", factory_rest_days=0.0))
+
+    def _add_injury_leave(self, leave_no: str, day: int = 15) -> None:
+        """添加 1 整天工伤假（8:00-17:00），位于 2026-06 当月且不与任何厂休重叠。"""
+        db.session.add(
+            LeaveRecord(
+                emp_id=self.manager_id,
+                leave_no=leave_no,
+                leave_type="工伤假",
+                start_time=datetime(2026, 6, day, 8, 0, 0),
+                end_time=datetime(2026, 6, day, 17, 0, 0),
+            )
+        )
+        db.session.commit()
+
+    def test_injury_not_in_attendance_is_deducted_as_absence(self) -> None:
+        """工伤不进考勤天数 → 被当成缺勤扣薪。
+
+        固定月报出勤5天（无加班/年假余额，缺勤全额算事/病假）：
+        - 无工伤：缺勤 = 本月天数 - 出勤5 = 25 → 事/病假 25。
+        - 加工伤1天：工伤不进考勤天数，出勤仍为 5，缺勤仍为 25 → 事/病假 25，
+          同时 injury_days=1 被记录。
+
+        工伤通过「不进考勤天数」隐式算作缺勤并被扣薪。若有人误把工伤加进
+        attendance_days，出勤会变成 6、事/病假变成 24，本断言会失败。
+        """
+        with self.app.app_context():
+            baseline = self._build_rows()
+            self._add_injury_leave("GS-A1", day=15)
+            with_injury = self._build_rows()
+
+        # 工伤被记录，但不进考勤天数。
+        self.assertEqual(with_injury[0]["injury_days"], 1.0)
+        self.assertEqual(with_injury[0]["attendance_days"], 5.0)
+        # 工伤那天因「没上班也不算出勤」已隐含在缺勤里被扣薪：扣薪天数与无工伤时相同。
+        self.assertEqual(with_injury[0]["personal_sick_days"], baseline[0]["personal_sick_days"])
+
+    def test_injury_absence_consumed_by_annual_leave(self) -> None:
+        """有年假余额时，工伤所在的缺勤会被年休吃掉一部分，而非全扣事/病假。
+
+        月报出勤5天 + 工伤1天 → 缺勤25天。年假 remaining=12（可用额度受
+        min(remaining,3.0)=3 限制）→ 年休吃 3 天，剩下 22 天算事/病假扣薪。
+        工伤那天作为缺勤的一部分，随缺勤一起被年休吃掉 / 剩余扣薪。
+        """
+        from models.manager_month_stat import ManagerMonthStat
+        with self.app.app_context():
+            db.session.add(
+                ManagerMonthStat(
+                    emp_id=self.manager_id,
+                    year=2026,
+                    stat_type="annual_leave",
+                    remaining=12.0,
+                )
+            )
+            db.session.commit()
+            self._add_injury_leave("GS-B1", day=16)
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["injury_days"], 1.0)
+        # 年休吃掉 3 天缺勤，剩下 22 天扣薪。
+        self.assertEqual(rows[0]["benefit_days"], 3.0)
+        self.assertEqual(rows[0]["personal_sick_days"], 22.0)
+
+
 if __name__ == "__main__":
     unittest.main()
