@@ -17,6 +17,7 @@ from models.manager_month_stat import ManagerMonthStat
 from models.user import User
 from routes import register_routes
 from routes.admin_core import _factory_rest_unit, _manager_attendance_options
+from routes.auth_helpers import issue_slider_verified_token
 from routes.query_core import _manager_options
 from tests.csrf_helper import attach_origin
 from services.bootstrap_service import ensure_schema_compatibility
@@ -69,7 +70,6 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.manager_id = manager.id
 
         self.client = attach_origin(self.app.test_client())
-        from routes.auth_helpers import issue_slider_verified_token
 
         with self.app.app_context():
             captcha_token = issue_slider_verified_token()
@@ -355,7 +355,11 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             viewer.set_password("viewer123")
             db.session.add(viewer)
             db.session.commit()
-        viewer_client.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
+            captcha_token = issue_slider_verified_token()
+        viewer_client.post(
+            "/api/auth/login",
+            json={"username": "viewer", "password": "viewer123", "captcha_token": captcha_token},
+        )
         res = viewer_client.get("/api/query/home-summary")
         self.assertEqual(res.status_code, 200)
         payload = res.get_json()
@@ -376,7 +380,12 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             db.session.commit()
 
         viewer_client = attach_origin(self.app.test_client())
-        viewer_client.post("/api/auth/login", json={"username": "viewer", "password": "viewer123"})
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        viewer_client.post(
+            "/api/auth/login",
+            json={"username": "viewer", "password": "viewer123", "captcha_token": captcha_token},
+        )
         april_payload = viewer_client.get("/api/query/home-summary?month=2026-04").get_json()
         self.assertTrue(april_payload["has_data"])
         self.assertEqual(april_payload["month"], "2026-04")
