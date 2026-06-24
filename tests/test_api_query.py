@@ -256,6 +256,36 @@ class ApiQueryTests(unittest.TestCase):
         leave_names = [row[1] for row in leave_rows[1:]]
         self.assertIn("经理甲", leave_names)
 
+    def test_manager_overtime_export_returns_xlsx_with_expected_headers(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.get("/api/query/manager-overtime/export?year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        ws = wb.active
+        rows = list(ws.values)
+        self.assertEqual(
+            rows[0],
+            ("部门", "姓名", "前年累积天数", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余调休天数", "备注"),
+        )
+        self.assertIn("经理甲", [row[1] for row in rows[1:]])
+
+    def test_manager_annual_leave_export_returns_xlsx_with_expected_headers(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.get("/api/query/manager-annual-leave/export?year=2026")
+
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        ws = wb.active
+        rows = list(ws.values)
+        self.assertEqual(
+            rows[0],
+            ("部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"),
+        )
+        self.assertIn("经理甲", [row[1] for row in rows[1:]])
+
     def test_manager_profile_binding_can_query_overtime_and_annual_leave(self) -> None:
         self._login("manager-viewer", "manager123")
 
