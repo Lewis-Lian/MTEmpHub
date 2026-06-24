@@ -465,6 +465,14 @@ def build_manager_rows(
     include_overrides: bool = True,
     sync_month_stats: bool = False,
 ) -> list[dict[str, object]]:
+    """计算管理人员月度考勤及扣薪。
+
+    各类假期扣薪规则：
+    - 计入「出勤天数」（不扣薪）：出差、婚假、丧假。
+    - 不计入「出勤天数」（扣薪，等同普通缺勤）：工伤、事/病假、调休。
+      工伤不进考勤天数，因而被当作缺勤处理：缺勤天数 = 本月天数 − 出勤天数，
+      按「加班额度 → 年假额度 → 事/病假」顺序扣减（厂休重叠不减免工伤天数）。
+    """
     query = Employee.query.options(joinedload(Employee.department)).filter(Employee.is_manager.is_(True))
     if emp_ids is not None:
         if not emp_ids:
