@@ -1,9 +1,11 @@
+import io
 import tempfile
 import unittest
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
 
+import openpyxl
 from flask import Flask
 
 from models import db
@@ -15,6 +17,7 @@ from models.leave import LeaveRecord
 from models.manager_month_stat import ManagerMonthStat
 from models.user import User, UserEmployeeAssignment
 from routes import register_routes
+from routes.auth_helpers import issue_slider_verified_token
 from tests.csrf_helper import attach_origin
 
 
@@ -96,7 +99,12 @@ class ApiQueryTests(unittest.TestCase):
             db.drop_all()
 
     def _login(self, username: str, password: str):
-        return self.client.post("/api/auth/login", json={"username": username, "password": password})
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        return self.client.post(
+            "/api/auth/login",
+            json={"username": username, "password": password, "captcha_token": captcha_token},
+        )
 
     def test_query_routes_are_registered_under_api_prefix(self) -> None:
         rules = {rule.rule for rule in self.app.url_map.iter_rules()}
@@ -196,8 +204,6 @@ class ApiQueryTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
-        import io
-        import openpyxl
         wb = openpyxl.load_workbook(io.BytesIO(response.data))
         self.assertIn("员工部门工时查询", wb.sheetnames)
         self.assertIn("管理人员部门工时查询", wb.sheetnames)
@@ -215,6 +221,40 @@ class ApiQueryTests(unittest.TestCase):
         # 检查是否成功统计到人数。经理甲属于制造一部，所以在经理部门工时里制造一部人数应当是1
         d001_row = next(r for r in rows_mgr if r[0] == "制造一部")
         self.assertEqual(d001_row[2], 1)
+
+    def test_summary_download_export_manager_overtime_and_annual_leave(self) -> None:
+        # 复现：勾选"管理人员加班查询"和"管理人员年假查询"后下载会报错。
+        # 经理甲已存在 overtime/annual_leave 两份 ManagerMonthStat 数据。
+        self._login("admin", "admin123")
+
+        response = self.client.get(
+            "/api/query/summary-download/export?month=2026-05&sheets=mgr_overtime,mgr_annual_leave"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        self.assertIn("管理人员加班查询", wb.sheetnames)
+        self.assertIn("管理人员年假查询", wb.sheetnames)
+
+        # 加班表表头应按预期顺序落地，且应包含经理甲一行（部门=制造一部）
+        ws_overtime = wb["管理人员加班查询"]
+        overtime_rows = list(ws_overtime.values)
+        self.assertEqual(
+            overtime_rows[0],
+            ("部门", "姓名", "前年累积天数", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余调休天数", "备注"),
+        )
+        overtime_names = [row[1] for row in overtime_rows[1:]]
+        self.assertIn("经理甲", overtime_names)
+
+        # 年假表表头应按预期顺序落地（无"前年累积天数"列）
+        ws_leave = wb["管理人员年假查询"]
+        leave_rows = list(ws_leave.values)
+        self.assertEqual(
+            leave_rows[0],
+            ("部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"),
+        )
+        leave_names = [row[1] for row in leave_rows[1:]]
+        self.assertIn("经理甲", leave_names)
 
     def test_manager_profile_binding_can_query_overtime_and_annual_leave(self) -> None:
         self._login("manager-viewer", "manager123")
@@ -321,9 +361,6 @@ class ApiQueryTests(unittest.TestCase):
         response = self.client.get("/api/query/punch-records/modal-export?month=2026-05&emp_ids=1")
 
         self.assertEqual(response.status_code, 200)
-
-        import io
-        import openpyxl
 
         wb = openpyxl.load_workbook(io.BytesIO(response.data))
         ws = wb.active
@@ -474,9 +511,6 @@ class ApiQueryTests(unittest.TestCase):
         response = self.client.get("/api/query/leave-records/export?month=2026-05&emp_ids=1&leave_type=补休（调休）")
 
         self.assertEqual(response.status_code, 200)
-
-        import io
-        import openpyxl
 
         wb = openpyxl.load_workbook(io.BytesIO(response.data))
         ws = wb.active
