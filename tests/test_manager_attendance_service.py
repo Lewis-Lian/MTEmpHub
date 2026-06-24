@@ -564,6 +564,32 @@ class ManagerInjuryDeductionTests(unittest.TestCase):
         # 工伤那天因「没上班也不算出勤」已隐含在缺勤里被扣薪：扣薪天数与无工伤时相同。
         self.assertEqual(with_injury[0]["personal_sick_days"], baseline[0]["personal_sick_days"])
 
+    def test_injury_absence_consumed_by_annual_leave(self) -> None:
+        """有年假余额时，工伤所在的缺勤会被年休吃掉一部分，而非全扣事/病假。
+
+        月报出勤5天 + 工伤1天 → 缺勤25天。年假 remaining=12（可用额度受
+        min(remaining,3.0)=3 限制）→ 年休吃 3 天，剩下 22 天算事/病假扣薪。
+        工伤那天作为缺勤的一部分，随缺勤一起被年休吃掉 / 剩余扣薪。
+        """
+        from models.manager_month_stat import ManagerMonthStat
+        with self.app.app_context():
+            db.session.add(
+                ManagerMonthStat(
+                    emp_id=self.manager_id,
+                    year=2026,
+                    stat_type="annual_leave",
+                    remaining=12.0,
+                )
+            )
+            db.session.commit()
+            self._add_injury_leave("GS-B1", day=16)
+            rows = self._build_rows()
+
+        self.assertEqual(rows[0]["injury_days"], 1.0)
+        # 年休吃掉 3 天缺勤，剩下 22 天扣薪。
+        self.assertEqual(rows[0]["benefit_days"], 3.0)
+        self.assertEqual(rows[0]["personal_sick_days"], 22.0)
+
 
 if __name__ == "__main__":
     unittest.main()
