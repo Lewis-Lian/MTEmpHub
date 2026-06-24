@@ -141,6 +141,20 @@ def _filter_columns(headers: list[str], rows: list[list[object]], param_name: st
     return filtered_headers, filtered_rows
 
 
+def _manager_month_row_to_list(row: dict[str, object], month_keys: list[str]) -> list[object]:
+    """将 _manager_month_rows 产出的 dict 行按表头顺序展平为 list 行。
+
+    顺序与表头严格对齐：部门、姓名、各月数据、剩余天数、备注。
+    """
+    return [
+        row.get("dept_name", ""),
+        row.get("name", ""),
+        *[row.get(key, "") for key in month_keys],
+        row.get("remaining", ""),
+        row.get("remark", ""),
+    ]
+
+
 def _normalize_leave_type(value: str | None) -> str:
     text = (value or "").strip()
     if text in {"补休(调休)", "补休（调休）"}:
@@ -1798,12 +1812,14 @@ def summary_download_export_api():
 
     # 6. mgr_overtime：管理人员加班查询
     if "mgr_overtime" in sheets_list:
-        from routes.admin_core import _manager_month_rows, _manager_overtime_values
+        from routes.admin_core import _manager_month_rows, _manager_overtime_values, _month_value_keys
         values = _manager_overtime_values(year)
         mgr_ids = set(_manager_emp_ids(full_emp_ids))
         values = {name: r for name, r in values.items() if r.get("emp_id") in mgr_ids}
         headers = ["部门", "姓名", "前年累积天数", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余调休天数", "备注"]
-        row_data = _manager_month_rows(values, "剩余调休天数")
+        month_keys = _month_value_keys()
+        dict_rows = _manager_month_rows(values, "剩余调休天数")
+        row_data = [_manager_month_row_to_list(row, month_keys) for row in dict_rows]
         headers, row_data = _filter_columns(headers, row_data, "mgr_overtime_headers")
         ws6 = wb.create_sheet("管理人员加班查询")
         ws6.append(headers)
@@ -1817,7 +1833,9 @@ def summary_download_export_api():
         mgr_ids = set(_manager_emp_ids(full_emp_ids))
         values = {name: r for name, r in values.items() if r.get("emp_id") in mgr_ids}
         headers = ["部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"]
-        row_data = _manager_month_rows(values, "剩余年休天数", _annual_leave_value_keys())
+        month_keys = _annual_leave_value_keys()
+        dict_rows = _manager_month_rows(values, "剩余年休天数", month_keys)
+        row_data = [_manager_month_row_to_list(row, month_keys) for row in dict_rows]
         headers, row_data = _filter_columns(headers, row_data, "mgr_annual_leave_headers")
         ws7 = wb.create_sheet("管理人员年假查询")
         ws7.append(headers)
