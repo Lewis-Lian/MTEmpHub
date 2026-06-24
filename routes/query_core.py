@@ -1917,6 +1917,39 @@ def manager_overtime_query_api():
     )
 
 
+def manager_overtime_query_export_api():
+    from routes.admin_core import _manager_month_rows, _manager_overtime_values, _month_value_keys
+
+    year = request.args.get("year", type=int) or datetime.now().year
+    values = _manager_overtime_values(year)
+    allowed_ids = set(_accessible_manager_emp_ids())
+    values = {name: row for name, row in values.items() if row.get("emp_id") in allowed_ids}
+    requested_ids = set(_requested_emp_ids())
+    if requested_ids:
+        values = {name: row for name, row in values.items() if row.get("emp_id") in requested_ids}
+
+    month_keys = _month_value_keys()
+    dict_rows = _manager_month_rows(values, "剩余调休天数")
+    headers = ["部门", "姓名", "前年累积天数", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余调休天数", "备注"]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "管理人员加班查询"
+    ws.append(headers)
+    for row in dict_rows:
+        ws.append(_manager_month_row_to_list(row, month_keys))
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"管理人员加班查询_{year}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
+
 def manager_annual_leave_query_api():
     from routes.admin_core import _annual_leave_value_keys, _manager_annual_leave_values, _manager_month_rows
 
@@ -1933,6 +1966,39 @@ def manager_annual_leave_query_api():
             "headers": ["部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"],
             "rows": _manager_month_rows(values, "剩余年休天数", _annual_leave_value_keys()),
         }
+    )
+
+
+def manager_annual_leave_query_export_api():
+    from routes.admin_core import _annual_leave_value_keys, _manager_annual_leave_values, _manager_month_rows
+
+    year = request.args.get("year", type=int) or datetime.now().year
+    values = _manager_annual_leave_values(year)
+    allowed_ids = set(_accessible_manager_emp_ids())
+    values = {name: row for name, row in values.items() if row.get("emp_id") in allowed_ids}
+    requested_ids = set(_requested_emp_ids())
+    if requested_ids:
+        values = {name: row for name, row in values.items() if row.get("emp_id") in requested_ids}
+
+    month_keys = _annual_leave_value_keys()
+    dict_rows = _manager_month_rows(values, "剩余年休天数", month_keys)
+    headers = ["部门", "姓名", "1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "剩余年休天数", "备注"]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "管理人员年休查询"
+    ws.append(headers)
+    for row in dict_rows:
+        ws.append(_manager_month_row_to_list(row, month_keys))
+
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=f"管理人员年休查询_{year}.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
 
 

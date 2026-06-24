@@ -6,6 +6,7 @@ export default function ManagerAnnualLeavePage() {
       description="按年份查询管理人员月度年休统计。"
       employeeFilterMode="manager"
       endpoint="/api/query/manager-annual-leave"
+      exportPath="/api/query/manager-annual-leave/export"
       fields={["year", "employees"]}
       kind="headerRows"
       transformHeaderRows={(payload) => ({

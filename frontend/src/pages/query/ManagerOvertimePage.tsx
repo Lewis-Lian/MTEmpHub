@@ -6,6 +6,7 @@ export default function ManagerOvertimePage() {
       description="按年份查询管理人员月度加班统计。"
       employeeFilterMode="manager"
       endpoint="/api/query/manager-overtime"
+      exportPath="/api/query/manager-overtime/export"
       fields={["year", "employees"]}
       kind="headerRows"
       transformHeaderRows={(payload) => ({
