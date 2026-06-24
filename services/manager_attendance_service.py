@@ -470,8 +470,8 @@ def build_manager_rows(
     各类假期扣薪规则：
     - 计入「出勤天数」（不扣薪）：出差、婚假、丧假。
     - 不计入「出勤天数」（扣薪，等同普通缺勤）：工伤、事/病假、调休。
-      其中工伤不计入出勤天数，会扩大扣薪缺口，并按「加班额度 → 年假额度 → 事/病假」
-      顺序扣减；厂休重叠不减免工伤天数。
+      工伤不进考勤天数，因而被当作缺勤处理：缺勤天数 = 本月天数 − 出勤天数，
+      按「加班额度 → 年假额度 → 事/病假」顺序扣减（厂休重叠不减免工伤天数）。
     """
     query = Employee.query.options(joinedload(Employee.department)).filter(Employee.is_manager.is_(True))
     if emp_ids is not None:
