@@ -8,7 +8,6 @@ from io import BytesIO
 import openpyxl
 from flask import current_app, jsonify, request, send_file
 from sqlalchemy import func, or_
-from werkzeug.utils import secure_filename
 
 from routes.auth_helpers import admin_required
 
@@ -112,7 +111,15 @@ def import_raw_files():
 
         account_set_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "account_sets", account_set.month)
         os.makedirs(account_set_dir, exist_ok=True)
-        save_name = f"{int(datetime.now().timestamp())}_{secure_filename(filename)}"
+        # 注意：不能用 werkzeug 的 secure_filename，它会删除所有非 ASCII 字符（含全部中文），
+        # 导致「员工月报/员工日报/管理人员日报」等不同文件被归并成同名而互相覆盖，
+        # 且后续 _account_set_file_type 靠中文关键字判型、_extract_report_month 靠「月」字提取月份都会失效。
+        # 这里只清洗对文件系统不安全的字符，保留中文。
+        safe_name = filename
+        for ch in '<>:"/\\|?*\x00':
+            safe_name = safe_name.replace(ch, "_")
+        safe_name = safe_name.strip().strip(".") or f"file_{int(datetime.now().timestamp())}"
+        save_name = f"{int(datetime.now().timestamp())}_{safe_name}"
         save_path = os.path.join(account_set_dir, save_name)
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         file.save(save_path)
