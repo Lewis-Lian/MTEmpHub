@@ -712,7 +712,7 @@ class ImportService:
             if nm:
                 names.append(nm)
         emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
-        resolved_emp_ids: set[int] = set(emp_by_no.values()) | set(emp_by_name.values())
+        resolved_emp_ids: set[int] = {e.id for e in emp_by_no.values()} | {e.id for e in emp_by_name.values()}
         existing_reports: dict[int, MonthlyReport] = {}
         if resolved_emp_ids:
             for r in MonthlyReport.query.filter(
@@ -791,7 +791,7 @@ class ImportService:
             if nm:
                 names.append(nm)
         emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
-        resolved_emp_ids: set[int] = set(emp_by_no.values()) | set(emp_by_name.values())
+        resolved_emp_ids: set[int] = {e.id for e in emp_by_no.values()} | {e.id for e in emp_by_name.values()}
         existing_records: dict[tuple[int, Any], DailyRecord] = {}
         if resolved_emp_ids:
             for r in DailyRecord.query.filter(DailyRecord.emp_id.in_(resolved_emp_ids)).all():
