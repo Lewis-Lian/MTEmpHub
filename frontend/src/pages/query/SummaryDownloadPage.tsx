@@ -9,7 +9,7 @@ import type { QueryBootstrap } from "../../types/query";
 const FINAL_HEADERS = [
   "部门名称",
   "人员编号",
-  "人员姓名",
+  "人员名称",
   "考勤天数",
   "病假（次数）",
   "工伤（次数）",
