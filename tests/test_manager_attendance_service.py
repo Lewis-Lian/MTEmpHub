@@ -242,6 +242,40 @@ class ManagerAttendanceBatchingTests(unittest.TestCase):
         attendance_lookup.assert_called_once()
         self.assertEqual(len(rows), 2)
 
+    def test_manager_employee_source_rows_count_employee_punch_data_as_attendance_days(self) -> None:
+        with self.app.app_context():
+            manager = db.session.get(Employee, self.manager_ids[0])
+            manager.manager_stats_attendance_source = "employee"
+            db.session.add_all(
+                [
+                    DailyRecord(
+                        emp_id=manager.id,
+                        record_date=date(2026, 4, 1),
+                        actual_hours=8,
+                        raw_data={"刷卡时间数据": "07:25,11:15,11:33,17:12"},
+                        employee_payload={
+                            "actual_hours": 8,
+                            "raw_data": {"刷卡时间数据": "07:25,11:15,11:33,17:12"},
+                        },
+                    ),
+                    DailyRecord(
+                        emp_id=manager.id,
+                        record_date=date(2026, 4, 2),
+                        actual_hours=8,
+                        raw_data={"刷卡时间数据": "07:30,11:16,12:59,20:36"},
+                        employee_payload={
+                            "actual_hours": 8,
+                            "raw_data": {"刷卡时间数据": "07:30,11:16,12:59,20:36"},
+                        },
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-04"), [manager.id])
+
+        self.assertEqual(rows[0]["attendance_days"], 2.0)
+
 
 class ManagerFactoryRestOverlapTests(unittest.TestCase):
     def setUp(self) -> None:
