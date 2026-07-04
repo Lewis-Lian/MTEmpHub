@@ -427,8 +427,13 @@ _MANAGER_PUNCH_TIME_KEYS = (
 
 def _has_manager_punch_record(record) -> bool:
     raw = record.raw_data if isinstance(record.raw_data, dict) else {}
-    punch_data = str(raw.get("刷卡时间数据") or "").strip()
+    nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
+    punch_data = str(raw.get("刷卡时间数据") or nested_raw.get("刷卡时间数据") or "").strip()
     if punch_data:
+        return True
+    if getattr(record, "check_in_times", None) or getattr(record, "check_out_times", None):
+        return True
+    if any(str(nested_raw.get(key) or "").strip() for key in _MANAGER_PUNCH_TIME_KEYS):
         return True
     return any(str(raw.get(key) or "").strip() for key in _MANAGER_PUNCH_TIME_KEYS)
 
