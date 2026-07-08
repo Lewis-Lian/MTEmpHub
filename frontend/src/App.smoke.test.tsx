@@ -959,6 +959,8 @@ describe("App smoke regression", () => {
     expect(within(attendanceDialog).getByText("姓名")).toBeInTheDocument();
     expect(within(attendanceDialog).getByText("原始打卡数据")).toBeInTheDocument();
     expect(within(attendanceDialog).getByText("08:00,12:00,13:00")).toBeInTheDocument();
+    expect(within(attendanceDialog).getByText("日期")).toBeInTheDocument();
+    expect(within(attendanceDialog).getByText("2026-05-01")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));
 
     fireEvent.click((await screen.findAllByRole("button", { name: "查看经理甲在 2026-05 的请假明细" }))[0]);
