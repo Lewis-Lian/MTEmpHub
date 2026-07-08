@@ -67,6 +67,7 @@ const managerCellModal: QueryTableCellModalConfig = {
             <table className="legacy-table">
               <thead>
                 <tr>
+                  <th className="legacy-table-head-cell"><div className="master-static-head">日期</div></th>
                   <th className="legacy-table-head-cell"><div className="master-static-head">部门</div></th>
                   <th className="legacy-table-head-cell"><div className="master-static-head">姓名</div></th>
                   <th className="legacy-table-head-cell"><div className="master-static-head">原始打卡数据</div></th>
@@ -75,6 +76,7 @@ const managerCellModal: QueryTableCellModalConfig = {
               <tbody>
                 {validRows.map((row, index) => (
                   <tr key={`${row.date}-${index}`}>
+                    <td className="legacy-table-body-cell">{row.date || ""}</td>
                     <td className="legacy-table-body-cell">{row.dept_name || meta.deptName}</td>
                     <td className="legacy-table-body-cell">{row.name || meta.employeeName}</td>
                     <td className="legacy-table-body-cell">{row.raw_punch_data || "-"}</td>
