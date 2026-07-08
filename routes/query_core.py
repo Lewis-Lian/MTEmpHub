@@ -258,6 +258,9 @@ def _attendance_day_value(record) -> float:
         actual_hours, _ = _calc_record_work_hours(record)
     if actual_hours < 2:
         return 0.5
+    # 与半勤判定一致：真实刷卡 2 次且工时在 [2, 5.1) 视为半天考勤，计 0.5 天。
+    if _raw_punch_count(record) == 2 and 2 <= actual_hours < 5.1:
+        return 0.5
     return 1.0
 
 
@@ -855,10 +858,13 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
 
         day_work_stats = [_calc_record_work_hours(r) for r in daily_rows]
         attendance_days = round(sum(_attendance_day_value(r) for r in daily_rows), 2)
+        # 半勤判定用 _raw_punch_count（优先读 raw_data["刷卡时间数据"] 等真实刷卡源），
+        # 而非 _punch_count：后者直接读 check_in/out_times，该数组在导入时会被「段X实际上/下班时间」
+        # （考勤机常填成班次整点如 12:00，非真实刷卡）污染，导致真实 2 次刷卡被错算成 3 次，半天漏判。
         half_days = sum(
             1
             for idx, r in enumerate(daily_rows)
-            if _punch_count(r) == 2 and 2 <= (day_work_stats[idx][0]) < 5.1
+            if _raw_punch_count(r) == 2 and 2 <= (day_work_stats[idx][0]) < 5.1
         )
         work_hours = round(sum(x[0] for x in day_work_stats), 2)
         override = overrides.get(employee.id)
