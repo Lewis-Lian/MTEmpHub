@@ -549,6 +549,47 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(rows[0], ("部门", "姓名", "请假类型", "开始时间", "结束时间", "时长", "事由"))
         self.assertEqual(rows[1], ("制造一部", "员工甲", "补休（调休）", "2026-05-06 09:00", "2026-05-07 09:00", 1, "调休"))
 
+    def test_half_day_detected_when_check_arrays_contain_shift_slot_pollution(self) -> None:
+        # 复刻真实 bug：导入时「段2实际上班时间」(班次整点 12:00) 被塞进 check_in_times，
+        # 导致 _punch_count 把真实 2 次刷卡 (13:06/17:27, 工时 5h) 错算成 3 次，半天漏判。
+        # raw_data["刷卡时间数据"] 保留干净的真实刷卡源 "13:06,17:27"。
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=employee.id,
+                    record_date=date(2026, 5, 15),
+                    actual_hours=5,
+                    check_in_times=["13:06", "2026-05-15 12:00"],
+                    check_out_times=["17:27", "2026-05-15 17:27"],
+                    raw_data={
+                        "刷卡时间数据": "13:06,17:27",
+                        "段2实际上班时间": "2026-05-15 12:00",
+                        "段2实际下班时间": "2026-05-15 17:27",
+                    },
+                    employee_payload={
+                        "actual_hours": 5,
+                        "check_in_times": ["13:06", "2026-05-15 12:00"],
+                        "check_out_times": ["17:27", "2026-05-15 17:27"],
+                        "raw_data": {"刷卡时间数据": "13:06,17:27"},
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("viewer", "viewer123")
+        response = self.client.get("/api/query/employee-dashboard?month=2026-05")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        half_days_idx = payload["headers"].index("半勤天数")
+        attendance_days_idx = payload["headers"].index("考勤天数")
+        emp_row = next(row for row in payload["rows"] if row[1] == "E001")
+        # 半勤天数应识别出这 1 天
+        self.assertEqual(emp_row[half_days_idx], 1)
+        # 半天考勤应计入考勤天数 0.5 天（而非整天 1.0）
+        self.assertEqual(emp_row[attendance_days_idx], 0.5)
+
 
 if __name__ == "__main__":
     unittest.main()
