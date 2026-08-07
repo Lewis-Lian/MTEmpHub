@@ -536,6 +536,85 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         context = nav_context(readonly_user, "/employee/home")
         self.assertEqual([entry["href"] for entry in context["current_entries"]], ["/employee/dashboard"])
 
+    def test_employee_override_has_actual_attendance_days_field(self) -> None:
+        from models.employee_attendance_override import EmployeeAttendanceOverride
+
+        with self.app.app_context():
+            row = EmployeeAttendanceOverride(
+                emp_id=self.employee_id,
+                month="2026-05",
+                actual_attendance_days=18.5,
+            )
+            db.session.add(row)
+            db.session.commit()
+
+            fetched = EmployeeAttendanceOverride.query.filter_by(
+                emp_id=self.employee_id, month="2026-05"
+            ).first()
+            self.assertIsNotNone(fetched)
+            self.assertEqual(fetched.actual_attendance_days, 18.5)
+
+    def test_employee_override_actual_attendance_days_round_trip(self) -> None:
+        # 先建一条全勤打卡记录，使系统自动值非 0
+        with self.app.app_context():
+            db.session.add(DailyRecord(
+                emp_id=self.employee_id, record_date=date(2026, 5, 10),
+                check_in_times=["08:00"], check_out_times=["17:00"],
+                employee_payload={
+                    "check_in_times": ["08:00"],
+                    "check_out_times": ["17:00"],
+                    "raw_data": {"刷卡时间数据": "08:00,17:00"},
+                },
+            ))
+            db.session.commit()
+
+        # 保存修正
+        self.client.put(
+            "/api/admin/employee-attendance-overrides/record",
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "actual_attendance_days": "15",
+                "remark": "手工修正实际出勤",
+            },
+        )
+
+        # 查询修正记录：override 与 applied 应反映修正值，automatic 为系统计算值（当月至少 1 天全勤）
+        res = self.client.get(
+            f"/api/admin/employee-attendance-overrides/record?emp_id={self.employee_id}&month=2026-05"
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(payload["override"]["actual_attendance_days"], 15.0)
+        self.assertEqual(payload["applied"]["actual_attendance_days"], 15.0)
+        self.assertGreaterEqual(payload["automatic"]["actual_attendance_days"], 1)
+
+    def test_import_employee_override_with_actual_attendance_days(self) -> None:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["月份", "工号", "姓名", "考勤天数", "实际出勤天数", "工时", "半勤天数", "迟到早退", "备注"])
+        ws.append(["2026-05", "E001", "员工甲", "", "12", "", "", "", "导入实际出勤"])
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        res = self.client.post(
+            "/api/admin/employee-attendance-overrides/import",
+            data={"month": "2026-05", "file": (buf, "imp.xlsx")},
+            content_type="multipart/form-data",
+        )
+        self.assertEqual(res.status_code, 200)
+        body = res.get_json()
+        self.assertGreater(body.get("changed_count", 0), 0)
+
+        # 验证落库
+        record_res = self.client.get(
+            f"/api/admin/employee-attendance-overrides/record?emp_id={self.employee_id}&month=2026-05"
+        )
+        self.assertEqual(
+            record_res.get_json()["override"]["actual_attendance_days"], 12.0
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

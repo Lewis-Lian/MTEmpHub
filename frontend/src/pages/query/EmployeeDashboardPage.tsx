@@ -57,6 +57,7 @@ export default function EmployeeDashboardPage() {
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [showLeaveCounts, setShowLeaveCounts] = useState(false);
   const [showLeaveDurations, setShowLeaveDurations] = useState(false);
+  const [showActualAttendanceDays, setShowActualAttendanceDays] = useState(false);
   const [tableHeaders, setTableHeaders] = useState<string[]>(["暂无数据"]);
   const [tableRows, setTableRows] = useState<Array<Array<string | number | null>>>([]);
   const [tableRowMeta, setTableRowMeta] = useState<DashboardRowMeta[]>([]);
@@ -146,6 +147,9 @@ export default function EmployeeDashboardPage() {
     }
     if (showLeaveDurations) {
       query.set("show_leave_durations", "1");
+    }
+    if (showActualAttendanceDays) {
+      query.set("show_actual_attendance_days", "1");
     }
     return query;
   }
@@ -260,6 +264,15 @@ export default function EmployeeDashboardPage() {
                   type="checkbox"
                 />
                 <span>请假时长</span>
+              </label>
+              <label className="dashboard-check-option">
+                <input
+                  checked={showActualAttendanceDays}
+                  className="form-check-input m-0"
+                  onChange={(event) => setShowActualAttendanceDays(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>实际出勤天数</span>
               </label>
             </div>
           </div>

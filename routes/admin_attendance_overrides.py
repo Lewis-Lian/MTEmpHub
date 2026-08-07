@@ -182,7 +182,7 @@ def save_employee_attendance_override_record_api():
         return jsonify({"error": "员工不存在或是管理人员"}), 400
 
     values: dict[str, float | int | None] = {}
-    for key in ("attendance_days", "work_hours"):
+    for key in ("attendance_days", "actual_attendance_days", "work_hours"):
         value, error = admin_module._nullable_float(data, key)
         if error:
             return jsonify({"error": error}), 400
@@ -508,6 +508,19 @@ def import_employee_attendance_overrides():
                 break
             if value not in (None, ""):
                 updates[key] = parsed
+        if numeric_error:
+            continue
+        # 实际出勤天数为非必填列：旧导入文件可能不含该列，缺列时跳过不覆盖。
+        actual_label = admin_module._EMPLOYEE_OVERRIDE_LABELS["actual_attendance_days"]
+        if actual_label in header_map:
+            value = raw[header_map[actual_label]] if header_map[actual_label] < len(raw) else None
+            parsed, error = admin_module._nullable_float({"actual_attendance_days": value}, "actual_attendance_days")
+            if error:
+                failed_count += 1
+                errors.append(f"第 {row_index} 行：{error}")
+                numeric_error = True
+            elif value not in (None, ""):
+                updates["actual_attendance_days"] = parsed
         if numeric_error:
             continue
         for key in ("half_days", "late_early_minutes"):
