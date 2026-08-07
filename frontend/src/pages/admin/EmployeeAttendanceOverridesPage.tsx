@@ -2,6 +2,7 @@ import AttendanceOverridesPage from "../../components/admin/AttendanceOverridesP
 
 const EMPLOYEE_FIELDS = [
   { key: "attendance_days", label: "考勤天数", inputMode: "decimal" as const },
+  { key: "actual_attendance_days", label: "实际出勤天数", inputMode: "decimal" as const },
   { key: "work_hours", label: "工时", inputMode: "decimal" as const },
   { key: "half_days", label: "半勤天数", inputMode: "numeric" as const },
   { key: "late_early_minutes", label: "迟到\\早退", inputMode: "numeric" as const },
