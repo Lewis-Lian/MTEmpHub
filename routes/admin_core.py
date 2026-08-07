@@ -51,6 +51,7 @@ from utils.helpers import parse_bool_zh
 
 _EMPLOYEE_OVERRIDE_FIELDS = (
     "attendance_days",
+    "actual_attendance_days",
     "work_hours",
     "half_days",
     "late_early_minutes",
@@ -58,6 +59,7 @@ _EMPLOYEE_OVERRIDE_FIELDS = (
 
 _EMPLOYEE_OVERRIDE_LABELS = {
     "attendance_days": "考勤天数",
+    "actual_attendance_days": "实际出勤天数",
     "work_hours": "工时",
     "half_days": "半勤天数",
     "late_early_minutes": "迟到早退",
@@ -1516,10 +1518,12 @@ def _employee_override_export_headers() -> list[str]:
         "工号",
         "姓名",
         "系统考勤天数",
+        "系统实际出勤天数",
         "系统工时",
         "系统半勤天数",
         "系统迟到早退",
         "考勤天数",
+        "实际出勤天数",
         "工时",
         "半勤天数",
         "迟到早退",
@@ -1568,10 +1572,12 @@ def _build_employee_override_export_workbook(month: str, include_real_rows: bool
                     employee.emp_no,
                     employee.name,
                     automatic.get("attendance_days"),
+                    automatic.get("actual_attendance_days"),
                     automatic.get("work_hours"),
                     automatic.get("half_days"),
                     automatic.get("late_early_minutes"),
                     override.attendance_days if override else "",
+                    override.actual_attendance_days if override else "",
                     override.work_hours if override else "",
                     override.half_days if override else "",
                     override.late_early_minutes if override else "",
@@ -1579,7 +1585,7 @@ def _build_employee_override_export_workbook(month: str, include_real_rows: bool
                 ]
             )
     else:
-        ws.append(["2026-05", "1001001", "张三", 20, 160, 0, 5, "", "", "", "", "留空表示不覆盖"])
+        ws.append(["2026-05", "1001001", "张三", 20, 18, 160, 0, 5, "", "", "", "", "", "留空表示不覆盖"])
     return wb
 
 
@@ -2382,8 +2388,9 @@ def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None
     row = rows[0]
     return {
         "attendance_days": row[3],
-        "work_hours": row[16],
-        "half_days": row[17],
+        "actual_attendance_days": row[4],
+        "work_hours": row[17],
+        "half_days": row[18],
         "late_early_minutes": _employee_late_early_minutes(emp_id, month),
     }
 
