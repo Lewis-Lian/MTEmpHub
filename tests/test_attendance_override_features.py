@@ -536,6 +536,24 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         context = nav_context(readonly_user, "/employee/home")
         self.assertEqual([entry["href"] for entry in context["current_entries"]], ["/employee/dashboard"])
 
+    def test_employee_override_has_actual_attendance_days_field(self) -> None:
+        from models.employee_attendance_override import EmployeeAttendanceOverride
+
+        with self.app.app_context():
+            row = EmployeeAttendanceOverride(
+                emp_id=self.employee_id,
+                month="2026-05",
+                actual_attendance_days=18.5,
+            )
+            db.session.add(row)
+            db.session.commit()
+
+            fetched = EmployeeAttendanceOverride.query.filter_by(
+                emp_id=self.employee_id, month="2026-05"
+            ).first()
+            self.assertIsNotNone(fetched)
+            self.assertEqual(fetched.actual_attendance_days, 18.5)
+
 
 if __name__ == "__main__":
     unittest.main()
