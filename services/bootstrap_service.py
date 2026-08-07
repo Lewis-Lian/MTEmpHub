@@ -146,6 +146,14 @@ def ensure_schema_compatibility() -> None:
             db.session.execute(text("ALTER TABLE monthly_reports ADD COLUMN manager_raw_data JSON"))
             db.session.commit()
 
+    employee_override_columns = _get_column_names(inspector, "employee_attendance_overrides")
+    if employee_override_columns is not None:
+        if "actual_attendance_days" not in employee_override_columns:
+            db.session.execute(
+                text("ALTER TABLE employee_attendance_overrides ADD COLUMN actual_attendance_days FLOAT")
+            )
+            db.session.commit()
+
 
 def _get_column_names(inspector: Inspector, table_name: str) -> set[str] | None:
     try:

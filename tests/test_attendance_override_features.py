@@ -437,6 +437,48 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             refreshed = db.session.get(AccountSet, account_set.id)
             self.assertEqual(len(refreshed.factory_rest_entries), 1)
 
+    def test_ensure_schema_compatibility_adds_actual_attendance_days_column(self) -> None:
+        # 复现生产事故：生产部署走 update.sh → upgrade-legacy-schema（ensure_schema_compatibility），
+        # 不跑 alembic 迁移。若该函数未补 employee_attendance_overrides.actual_attendance_days 列，
+        # 生产库缺列 → 查询/保存 500。这里模拟"表已存在但缺列"的场景。
+        with self.app.app_context():
+            from sqlalchemy import inspect, text
+
+            # db.create_all() 已建好列，先 DROP 掉以模拟生产旧库缺列
+            inspector = inspect(db.engine)
+            cols = {c["name"] for c in inspector.get_columns("employee_attendance_overrides")}
+            self.assertIn("actual_attendance_days", cols, "夹具应已建该列")
+            db.session.execute(
+                text("ALTER TABLE employee_attendance_overrides DROP COLUMN actual_attendance_days")
+            )
+            db.session.commit()
+            # 丢弃当前 session 缓存的表结构，确保后续反射读到真实库
+            db.session.remove()
+            inspector = inspect(db.engine)
+            cols_after_drop = {c["name"] for c in inspector.get_columns("employee_attendance_overrides")}
+            self.assertNotIn("actual_attendance_days", cols_after_drop)
+
+            # 调用被测函数：应幂等补回该列
+            ensure_schema_compatibility()
+
+            inspector = inspect(db.engine)
+            cols_fixed = {c["name"] for c in inspector.get_columns("employee_attendance_overrides")}
+            self.assertIn("actual_attendance_days", cols_fixed)
+
+            # 补列后读写正常（修复前会因缺列抛错）
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
+            row = EmployeeAttendanceOverride(
+                emp_id=self.employee_id, month="2026-05", actual_attendance_days=12.0
+            )
+            db.session.add(row)
+            db.session.commit()
+            fetched = EmployeeAttendanceOverride.query.filter_by(
+                emp_id=self.employee_id, month="2026-05"
+            ).first()
+            self.assertIsNotNone(fetched)
+            self.assertEqual(fetched.actual_attendance_days, 12.0)
+
     def test_manager_override_save_syncs_overtime_stats(self) -> None:
         """保存管理人员考勤修正后，加班统计表（加班查询页数据源）应同步重算。
 
