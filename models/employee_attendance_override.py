@@ -12,6 +12,7 @@ class EmployeeAttendanceOverride(db.Model):
     attendance_days = db.Column(db.Float, nullable=True)
     work_hours = db.Column(db.Float, nullable=True)
     half_days = db.Column(db.Integer, nullable=True)
+    actual_attendance_days = db.Column(db.Float, nullable=True)
     late_early_minutes = db.Column(db.Integer, nullable=True)
     remark = db.Column(db.Text, nullable=True)
     updated_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
