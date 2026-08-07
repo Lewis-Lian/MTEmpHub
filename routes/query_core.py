@@ -58,6 +58,7 @@ FINAL_HEADERS = [
     "人员编号",
     "人员名称",
     "考勤天数",
+    "实际出勤天数",
     "病假（次数）",
     "工伤（次数）",
     "丧假（次数）",
@@ -93,6 +94,8 @@ LEAVE_DURATION_HEADERS = {
     "婚假（天）",
 }
 
+ACTUAL_ATTENDANCE_DAYS_HEADER = "实际出勤天数"
+
 
 def _filter_final_columns(headers: list[str], rows: list[list[object]]) -> tuple[list[str], list[list[object]]]:
     requested = (request.args.get("final_headers") or "").strip()
@@ -110,6 +113,7 @@ def _filter_final_columns(headers: list[str], rows: list[list[object]]) -> tuple
 
     show_leave_counts = request.args.get("show_leave_counts", "").strip() in {"1", "true", "True"}
     show_leave_durations = request.args.get("show_leave_durations", "").strip() in {"1", "true", "True"}
+    show_actual_attendance_days = request.args.get("show_actual_attendance_days", "").strip() in {"1", "true", "True"}
 
     keep_indexes: list[int] = []
     filtered_headers: list[str] = []
@@ -117,6 +121,8 @@ def _filter_final_columns(headers: list[str], rows: list[list[object]]) -> tuple
         if header in LEAVE_COUNT_HEADERS and not show_leave_counts:
             continue
         if header in LEAVE_DURATION_HEADERS and not show_leave_durations:
+            continue
+        if header == ACTUAL_ATTENDANCE_DAYS_HEADER and not show_actual_attendance_days:
             continue
         keep_indexes.append(idx)
         filtered_headers.append(header)
@@ -262,6 +268,11 @@ def _attendance_day_value(record) -> float:
     if _raw_punch_count(record) == 2 and 2 <= actual_hours < 5.1:
         return 0.5
     return 1.0
+
+
+def _actual_attendance_day_value(record) -> float:
+    # 实际出勤天数（刷卡口径）：当日真实刷卡 >= 2 次记 1 天，否则 0 天。
+    return 1.0 if _raw_punch_count(record) >= 2 else 0.0
 
 
 def _normalize_punch_token(value: object) -> str:
@@ -867,6 +878,9 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
             if _raw_punch_count(r) == 2 and 2 <= (day_work_stats[idx][0]) < 5.1
         )
         work_hours = round(sum(x[0] for x in day_work_stats), 2)
+        actual_attendance_days = round(
+            sum(_actual_attendance_day_value(r) for r in daily_rows), 2
+        )
         override = overrides.get(employee.id)
         if override:
             if override.attendance_days is not None:
@@ -875,12 +889,15 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
                 work_hours = round(float(override.work_hours or 0), 2)
             if override.half_days is not None:
                 half_days = int(override.half_days or 0)
+            if override.actual_attendance_days is not None:
+                actual_attendance_days = round(float(override.actual_attendance_days or 0), 2)
 
         row = [
             employee.department.dept_name if employee.department else "",
             employee.emp_no,
             employee.name,
             attendance_days,
+            actual_attendance_days,
             leave_count["病假"],
             leave_count["工伤"],
             leave_count["丧假"],

@@ -590,6 +590,46 @@ class ApiQueryTests(unittest.TestCase):
         # 半天考勤应计入考勤天数 0.5 天（而非整天 1.0）
         self.assertEqual(emp_row[attendance_days_idx], 0.5)
 
+    def test_employee_dashboard_actual_attendance_days_uses_punch_count(self) -> None:
+        # 实际出勤天数口径：当日真实刷卡 >= 2 记 1 天，仅 1 次记 0 天。
+        # setUp 未给 E001 建 5 月打卡记录，故本测试两天即全部聚合值。
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            # 全勤日：2 次真实刷卡 -> 1 天
+            db.session.add(DailyRecord(
+                emp_id=employee.id, record_date=date(2026, 5, 20),
+                check_in_times=["08:00"], check_out_times=["17:00"],
+                employee_payload={
+                    "check_in_times": ["08:00"],
+                    "check_out_times": ["17:00"],
+                    "raw_data": {"刷卡时间数据": "08:00,17:00"},
+                },
+            ))
+            # 仅 1 次真实刷卡 -> 0 天
+            db.session.add(DailyRecord(
+                emp_id=employee.id, record_date=date(2026, 5, 21),
+                check_in_times=["08:00"], check_out_times=[],
+                employee_payload={
+                    "check_in_times": ["08:00"],
+                    "check_out_times": [],
+                    "raw_data": {"刷卡时间数据": "08:00"},
+                },
+            ))
+            db.session.commit()
+
+        self._login("viewer", "viewer123")
+        # 带开关：实际出勤天数列存在，聚合 = 1（全勤）+ 0（单刷）
+        res = self.client.get("/api/query/employee-dashboard?month=2026-05&show_actual_attendance_days=1")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        actual_idx = payload["headers"].index("实际出勤天数")
+        emp_row = next(row for row in payload["rows"] if row[1] == "E001")
+        self.assertEqual(emp_row[actual_idx], 1.0)
+
+        # 不带开关：该列不存在
+        res2 = self.client.get("/api/query/employee-dashboard?month=2026-05")
+        self.assertNotIn("实际出勤天数", res2.get_json()["headers"])
+
 
 if __name__ == "__main__":
     unittest.main()
