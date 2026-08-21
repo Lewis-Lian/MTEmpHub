@@ -80,6 +80,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         <span className="cal-badge cal-badge-overtime is-bg-overtime">加班</span>
         <span className="cal-badge cal-badge-overtime is-bg-overtime">周末加</span>
         <span className="cal-badge cal-badge-holiday is-bg-overtime">节假日加</span>
+        <span className="cal-badge is-bg-exception">异常</span>
       </div>
 
       {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
