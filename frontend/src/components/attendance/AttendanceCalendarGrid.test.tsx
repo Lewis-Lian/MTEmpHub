@@ -49,6 +49,10 @@ const MULTI_LEAVE_DATA: AttendanceCalendarData = {
 
 afterEach(() => cleanup());
 
+function getCell(date: string) {
+  return screen.getByRole("button", { name: date });
+}
+
 describe("AttendanceCalendarGrid", () => {
   it("渲染周一首月历与前导空格（2026-07-01 是周三）", () => {
     render(<AttendanceCalendarGrid data={DATA} />);
@@ -91,5 +95,26 @@ describe("AttendanceCalendarGrid", () => {
     fireEvent.click(screen.getByRole("button", { name: /2026-07-03/ }));
     expect(screen.getByText("事假：0.5 天")).toBeInTheDocument();
     expect(screen.getByText("出差：0.5 天")).toBeInTheDocument();
+  });
+
+  it("格子按状态填充背景色类", () => {
+    render(<AttendanceCalendarGrid data={DATA} />);
+    expect(getCell("2026-07-01")).toHaveClass("is-bg-attendance");
+    expect(getCell("2026-07-02")).toHaveClass("is-bg-half");
+    expect(getCell("2026-07-03")).toHaveClass("is-bg-leave");
+    expect(getCell("2026-07-05")).toHaveClass("is-bg-overtime");
+  });
+
+  it("多状态时按优先级取第一个命中", () => {
+    // 07-02 同时有迟到(黄优先级低)与半勤(橙优先级高) → 取半勤；再构造请假+迟到取请假
+    const mixed: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-10", late_minutes: 20 },
+      ],
+      leaves: [{ date: "2026-07-10", leave_type: "事假", duration: 1 }],
+    };
+    render(<AttendanceCalendarGrid data={mixed} />);
+    expect(getCell("2026-07-10")).toHaveClass("is-bg-leave");
   });
 });
