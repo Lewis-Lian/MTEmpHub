@@ -28,6 +28,7 @@ MANAGER_PAGE_PERMISSION_KEYS = (
 
 EMPLOYEE_PAGE_PERMISSION_KEYS = (
     "employee_dashboard",
+    "attendance_calendar",
     "abnormal_query",
     "punch_records",
     "department_hours_query",

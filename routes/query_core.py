@@ -256,6 +256,13 @@ def _has_punch_record(record) -> bool:
     return any(str(raw.get(key) or "").strip() for key in manager_time_keys)
 
 
+def _is_half_day_record(record) -> bool:
+    actual_hours = record.actual_hours or 0
+    if actual_hours <= 0:
+        actual_hours, _ = _calc_record_work_hours(record)
+    return _raw_punch_count(record) == 2 and 2 <= actual_hours < 5.1
+
+
 def _attendance_day_value(record) -> float:
     if not _has_punch_record(record):
         return 0.0
@@ -265,7 +272,7 @@ def _attendance_day_value(record) -> float:
     if actual_hours < 2:
         return 0.5
     # 与半勤判定一致：真实刷卡 2 次且工时在 [2, 5.1) 视为半天考勤，计 0.5 天。
-    if _raw_punch_count(record) == 2 and 2 <= actual_hours < 5.1:
+    if _is_half_day_record(record):
         return 0.5
     return 1.0
 
@@ -1596,6 +1603,144 @@ def daily_records_api():
             }
             for r in rows
         ]
+    )
+
+
+def _format_punch_tokens(values: list[object] | None) -> list[str]:
+    return [t for t in (_normalize_punch_token(v) for v in (values or [])) if t]
+
+
+def _split_overtime_by_day(rows, month: str):
+    """加班条按天拆分：跨天条 effective_hours ÷ 覆盖日历天数（最后一天差额补偿），
+    条级晚间(start>=17:00)/周末/节假日属性继承。同日同属性累并。"""
+    bounds = _month_date_range(month)
+    if not bounds:
+        return []
+    month_start, month_end = bounds
+    merged: dict[tuple, dict] = {}
+    for record in rows:
+        if not record.start_time or not record.end_time:
+            continue
+        total = record.effective_hours or 0
+        span = (record.end_time.date() - record.start_time.date()).days + 1
+        per_day = round(total / span, 2)
+        for offset in range(span):
+            day = record.start_time.date() + timedelta(days=offset)
+            if not (month_start <= day < month_end):
+                continue
+            hours = per_day if offset < span - 1 else round(total - per_day * (span - 1), 2)
+            key = (day, bool(record.is_weekend), bool(record.is_holiday), record.start_time.time() >= time(17, 0))
+            bucket = merged.setdefault(key, {"hours": 0.0})
+            bucket["hours"] = round(bucket["hours"] + hours, 2)
+    return [
+        {
+            "date": day.isoformat(),
+            "is_weekend": is_weekend,
+            "is_holiday": is_holiday,
+            "is_evening": is_evening,
+            "hours": bucket["hours"],
+        }
+        for (day, is_weekend, is_holiday, is_evening), bucket in sorted(merged.items())
+    ]
+
+
+def attendance_calendar_api():
+    emp_id = request.args.get("emp_id", type=int)
+    allowed = _non_manager_emp_ids(_accessible_emp_ids())
+    if not emp_id or emp_id not in allowed:
+        return jsonify({"error": "无效的员工范围"}), 400
+    month = request.args.get("month") or ""
+    bounds = _month_date_range(month)
+    if not bounds:
+        return jsonify({"error": "无效的月份"}), 400
+    month_start, month_end = bounds
+
+    employee = db.session.get(Employee, emp_id)
+    views = attendance_views_by_employee(month, [employee], EMPLOYEE_STATS_CONTEXT).get(emp_id, [])
+    views = [r for r in views if r.record_date]
+
+    overtime_rows = (
+        OvertimeRecord.query
+        .filter(OvertimeRecord.emp_id == emp_id)
+        .filter(OvertimeRecord.start_time < datetime.combine(month_end, time.min))
+        .filter(OvertimeRecord.end_time >= datetime.combine(month_start, time.min))
+        .all()
+    )
+    overtime_rows = [r for r in overtime_rows if (r.approval_status or "") != "已拒绝"]
+    overtimes = _split_overtime_by_day(overtime_rows, month)
+
+    leave_rows = (
+        LeaveRecord.query
+        .filter(LeaveRecord.emp_id == emp_id)
+        .filter(LeaveRecord.start_time < datetime.combine(month_end, time.min))
+        .filter(LeaveRecord.end_time >= datetime.combine(month_start, time.min))
+        .all()
+    )
+    leave_by_date: dict[str, dict[str, float]] = {}
+    for record in leave_rows:
+        leave_type = (record.leave_type or "").strip() or "请假"
+        day = max(record.start_time.date(), month_start)
+        while day < month_end and day <= record.end_time.date():
+            day_start = datetime.combine(day, time.min)
+            day_next = datetime.combine(day + timedelta(days=1), time.min)
+            day_hours = overlap_duration_days(record.start_time, record.end_time, day_start, day_next)
+            if day_hours > 0:
+                slot = leave_by_date.setdefault(day.isoformat(), {})
+                slot[leave_type] = round(slot.get(leave_type, 0.0) + day_hours, 2)
+            day += timedelta(days=1)
+    leaves = [
+        {"date": d, "leave_type": t, "duration": hours}
+        for d, types in sorted(leave_by_date.items())
+        for t, hours in types.items()
+    ]
+
+    days = [
+        {
+            "date": r.record_date.isoformat(),
+            "check_in_times": _format_punch_tokens(r.check_in_times),
+            "check_out_times": _format_punch_tokens(r.check_out_times),
+            "punch_count": _raw_punch_count(r),
+            "actual_hours": _calc_record_work_hours(r)[0],
+            "late_minutes": r.late_minutes or 0,
+            "early_leave_minutes": r.early_leave_minutes or 0,
+            "is_half_day": _is_half_day_record(r),
+            "exception_reason": r.exception_reason or "",
+        }
+        for r in views
+    ]
+
+    leave_summary: dict[str, dict] = {}
+    for item in leaves:
+        slot = leave_summary.setdefault(item["leave_type"], {"count": 0, "days": 0.0})
+        slot["count"] += 1
+        slot["days"] = round(slot["days"] + item["duration"], 2)
+    summary = {
+        "attendance_days": round(sum(_attendance_day_value(r) for r in views), 2),
+        "half_days": sum(1 for r in views if _is_half_day_record(r)),
+        "leave_by_type": [
+            {"leave_type": t, "count": s["count"], "days": s["days"]}
+            for t, s in sorted(leave_summary.items())
+        ],
+        "evening_overtime_hours": round(sum(o["hours"] for o in overtimes if o["is_evening"]), 2),
+        "other_overtime_hours": round(sum(o["hours"] for o in overtimes if not o["is_evening"]), 2),
+        "late_minutes_total": sum(r.late_minutes or 0 for r in views),
+        "early_leave_minutes_total": sum(r.early_leave_minutes or 0 for r in views),
+    }
+
+    return jsonify(
+        {
+            "employee": {
+                "id": employee.id,
+                "emp_no": employee.emp_no,
+                "name": employee.name,
+                "dept_name": employee.department.dept_name if employee.department else "",
+            },
+            "month": month,
+            "days": days,
+            "overtimes": overtimes,
+            "leaves": leaves,
+            "summary": summary,
+        }
     )
 
 
