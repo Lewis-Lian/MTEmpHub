@@ -32,7 +32,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         <span className="cal-badge">半勤 {data.summary.half_days} 天</span>
         {data.summary.leave_by_type.map((item) => (
           <span className="cal-badge cal-badge-leave" key={item.leave_type}>
-            {item.leave_type} {item.days} 天
+            {item.leave_type} {item.count} 次 {item.days} 天
           </span>
         ))}
         <span className="cal-badge cal-badge-evening">晚加 {data.summary.evening_overtime_hours}h</span>

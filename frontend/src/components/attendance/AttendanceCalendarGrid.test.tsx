@@ -45,6 +45,7 @@ describe("AttendanceCalendarGrid", () => {
     render(<AttendanceCalendarGrid data={DATA} />);
     expect(screen.getByText("07:32-19:28")).toBeInTheDocument();
     expect(screen.getByText("晚加 2.5h")).toBeInTheDocument();
+    expect(screen.getByText("晚加 +2.5h")).toBeInTheDocument();
     expect(screen.getByText("迟 12′")).toBeInTheDocument();
     expect(screen.getByText("半勤")).toBeInTheDocument();
     expect(screen.getByText("出差")).toBeInTheDocument();
