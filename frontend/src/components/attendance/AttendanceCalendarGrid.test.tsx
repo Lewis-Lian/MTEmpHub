@@ -117,4 +117,14 @@ describe("AttendanceCalendarGrid", () => {
     render(<AttendanceCalendarGrid data={mixed} />);
     expect(getCell("2026-07-10")).toHaveClass("is-bg-leave");
   });
+
+  it("异常优先级高于请假", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [{ ...DATA.days[0], date: "2026-07-11", exception_reason: "忘打卡" }],
+      leaves: [{ date: "2026-07-11", leave_type: "事假", duration: 1 }],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(getCell("2026-07-11")).toHaveClass("is-bg-exception");
+  });
 });
