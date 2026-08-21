@@ -12,8 +12,8 @@ interface DayCell {
   date: string;
   dayOfMonth: number;
   day?: AttendanceCalendarDay;
-  overtime?: AttendanceCalendarOvertime;
-  leave?: AttendanceCalendarLeave;
+  overtimes: AttendanceCalendarOvertime[];
+  leaves: AttendanceCalendarLeave[];
 }
 
 export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalendarData }) {
@@ -55,7 +55,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         {cells.map((cell) => (
           <button
             aria-label={cell.date}
-            className={`attendance-calendar-cell${cell.day || cell.overtime || cell.leave ? " has-data" : ""}`}
+            className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}`}
             key={cell.date}
             onClick={() => setSelectedDate(cell.date)}
             type="button"
@@ -74,10 +74,11 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         <span className="cal-badge cal-badge-leave">请假</span>
         <span className="cal-badge cal-badge-evening">晚加</span>
         <span className="cal-badge cal-badge-overtime">加班</span>
+        <span className="cal-badge cal-badge-overtime">周末加</span>
         <span className="cal-badge cal-badge-holiday">节假日加</span>
       </div>
 
-      {selected && selected.day ? (
+      {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
         <div className="attendance-calendar-daydetail" role="dialog" aria-label={`考勤明细 ${selected.date}`}>
           <div className="daydetail-card">
             <div className="daydetail-header">
@@ -85,33 +86,39 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
               <button aria-label="关闭" onClick={() => setSelectedDate(null)} type="button">×</button>
             </div>
             <div className="daydetail-body">
-              <div className="daydetail-row">上班卡：{renderTimes(selected.day.check_in_times)}</div>
-              <div className="daydetail-row">下班卡：{renderTimes(selected.day.check_out_times)}</div>
-              <div className="daydetail-row">打卡次数：{selected.day.punch_count} 次</div>
-              <div className="daydetail-row">实出勤：{selected.day.actual_hours} 小时</div>
-              {selected.day.late_minutes > 0 && (
-                <div className="daydetail-row">迟到：{selected.day.late_minutes} 分钟</div>
-              )}
-              {selected.day.early_leave_minutes > 0 && (
-                <div className="daydetail-row">早退：{selected.day.early_leave_minutes} 分钟</div>
-              )}
-              {selected.day.is_half_day && <div className="daydetail-row">半勤：是</div>}
-              {selected.leave && (
-                <div className="daydetail-row">{selected.leave.leave_type}：{selected.leave.duration} 天</div>
-              )}
-              {selected.overtime && (
-                <div className="daydetail-row">
-                  {selected.overtime.is_evening
+              {selected.day ? (
+                <>
+                  <div className="daydetail-row">上班卡：{renderTimes(selected.day.check_in_times)}</div>
+                  <div className="daydetail-row">下班卡：{renderTimes(selected.day.check_out_times)}</div>
+                  <div className="daydetail-row">打卡次数：{selected.day.punch_count} 次</div>
+                  <div className="daydetail-row">实出勤：{selected.day.actual_hours} 小时</div>
+                  {selected.day.late_minutes > 0 && (
+                    <div className="daydetail-row">迟到：{selected.day.late_minutes} 分钟</div>
+                  )}
+                  {selected.day.early_leave_minutes > 0 && (
+                    <div className="daydetail-row">早退：{selected.day.early_leave_minutes} 分钟</div>
+                  )}
+                  {selected.day.is_half_day && <div className="daydetail-row">半勤：是</div>}
+                </>
+              ) : null}
+              {selected.leaves.map((leave, index) => (
+                <div className="daydetail-row" key={`leave-${index}`}>
+                  {leave.leave_type}：{leave.duration} 天
+                </div>
+              ))}
+              {selected.overtimes.map((overtime, index) => (
+                <div className="daydetail-row" key={`overtime-${index}`}>
+                  {overtime.is_evening
                     ? "晚上加班"
-                    : selected.overtime.is_holiday
+                    : overtime.is_holiday
                       ? "节假日加班"
-                      : selected.overtime.is_weekend
+                      : overtime.is_weekend
                         ? "周末加班"
                         : "加班"}
-                  ：{selected.overtime.hours} 小时
+                  ：{overtime.hours} 小时
                 </div>
-              )}
-              {selected.day.exception_reason && (
+              ))}
+              {selected.day?.exception_reason && (
                 <div className="daydetail-row">异常：{selected.day.exception_reason}</div>
               )}
             </div>
@@ -140,8 +147,8 @@ function buildCells(data: AttendanceCalendarData): DayCell[] {
   const monthIndex = Number(monthText) - 1;
   const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
   const dayMap = new Map(data.days.map((day) => [day.date, day]));
-  const overtimeMap = new Map(data.overtimes.map((overtime) => [overtime.date, overtime]));
-  const leaveMap = new Map(data.leaves.map((leave) => [leave.date, leave]));
+  const overtimesByDate = groupByDate(data.overtimes);
+  const leavesByDate = groupByDate(data.leaves);
 
   return Array.from({ length: lastDayOfMonth }, (_, index) => {
     const dayOfMonth = index + 1;
@@ -150,10 +157,22 @@ function buildCells(data: AttendanceCalendarData): DayCell[] {
       date: isoDate,
       dayOfMonth,
       day: dayMap.get(isoDate),
-      overtime: overtimeMap.get(isoDate),
-      leave: leaveMap.get(isoDate),
+      overtimes: overtimesByDate.get(isoDate) ?? [],
+      leaves: leavesByDate.get(isoDate) ?? [],
     };
   });
+}
+
+function groupByDate<T extends { date: string }>(items: T[]): Map<string, T[]> {
+  return items.reduce((map, item) => {
+    const list = map.get(item.date);
+    if (list) {
+      list.push(item);
+    } else {
+      map.set(item.date, [item]);
+    }
+    return map;
+  }, new Map<string, T[]>());
 }
 
 function renderPunchSummary(cell: DayCell) {
@@ -186,31 +205,30 @@ function renderBadges(cell: DayCell): ReactNode[] {
       badges.push(<span className="cal-badge" key="half">半勤</span>);
     }
   }
-  if (cell.leave) {
+  cell.leaves.forEach((leave, index) => {
     badges.push(
-      <span className="cal-badge cal-badge-leave" key="leave">{cell.leave.leave_type}</span>,
+      <span className="cal-badge cal-badge-leave" key={`leave-${index}`}>{leave.leave_type}</span>,
     );
-  }
-  if (cell.overtime) {
-    const overtime = cell.overtime;
+  });
+  cell.overtimes.forEach((overtime, index) => {
     if (overtime.is_evening) {
       badges.push(
-        <span className="cal-badge cal-badge-evening" key="overtime">晚加 +{overtime.hours}h</span>,
+        <span className="cal-badge cal-badge-evening" key={`overtime-${index}`}>晚加 +{overtime.hours}h</span>,
       );
     } else if (overtime.is_holiday) {
       badges.push(
-        <span className="cal-badge cal-badge-holiday" key="overtime">节假 +{overtime.hours}h</span>,
+        <span className="cal-badge cal-badge-holiday" key={`overtime-${index}`}>节假 +{overtime.hours}h</span>,
       );
     } else if (overtime.is_weekend) {
       badges.push(
-        <span className="cal-badge cal-badge-overtime" key="overtime">周 +{overtime.hours}h</span>,
+        <span className="cal-badge cal-badge-overtime" key={`overtime-${index}`}>周 +{overtime.hours}h</span>,
       );
     } else {
       badges.push(
-        <span className="cal-badge cal-badge-overtime" key="overtime">+{overtime.hours}h</span>,
+        <span className="cal-badge cal-badge-overtime" key={`overtime-${index}`}>+{overtime.hours}h</span>,
       );
     }
-  }
+  });
   if (day?.exception_reason) {
     badges.push(<span className="cal-badge cal-badge-exception" key="exception">⚠</span>);
   }

@@ -131,6 +131,7 @@ const entryIconMap: Record<string, React.FC<IconProps>> = {
   employee_dashboard: BarChartIcon,
   abnormal_query: AlertTriangleIcon,
   punch_records: ClockIcon,
+  attendance_calendar: CalendarIcon,
   department_hours_query: BuildingIcon,
   manager_query: BriefcaseIcon,
   manager_overtime_query: ClockPlusIcon,
