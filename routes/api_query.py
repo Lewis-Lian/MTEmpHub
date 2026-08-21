@@ -11,6 +11,7 @@ from routes.query_core import (
     account_sets_api,
     abnormal_attendance_api,
     abnormal_attendance_export_api,
+    attendance_calendar_api,
     departments_api,
     department_hours_api,
     department_hours_export_api,
@@ -151,6 +152,12 @@ def punch_records_export():
 @any_page_permission_required(("punch_records", "employee_dashboard"))
 def punch_records_modal_export():
     return punch_records_modal_export_api()
+
+
+@api_query_bp.get("/attendance-calendar")
+@any_page_permission_required(("attendance_calendar", "employee_dashboard"))
+def attendance_calendar():
+    return attendance_calendar_api()
 
 
 @api_query_bp.get("/leave-records")
