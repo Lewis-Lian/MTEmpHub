@@ -52,30 +52,34 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         {Array.from({ length: leadingSlots(data.month) }).map((_, index) => (
           <div className="attendance-calendar-cell is-empty" key={`empty-${index}`} />
         ))}
-        {cells.map((cell) => (
-          <button
-            aria-label={cell.date}
-            className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}`}
-            key={cell.date}
-            onClick={() => setSelectedDate(cell.date)}
-            type="button"
-          >
-            <div className="cal-day-number">{cell.dayOfMonth}</div>
-            {renderPunchSummary(cell)}
-            {renderBadges(cell)}
-          </button>
-        ))}
+        {cells.map((cell) => {
+          const bgKey = cellBackgroundKey(cell);
+          return (
+            <button
+              aria-label={cell.date}
+              className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}${bgKey !== "none" ? ` is-bg-${bgKey}` : ""}`}
+              key={cell.date}
+              onClick={() => setSelectedDate(cell.date)}
+              type="button"
+            >
+              <div className="cal-day-number">{cell.dayOfMonth}</div>
+              {renderPunchSummary(cell)}
+              {renderBadges(cell)}
+            </button>
+          );
+        })}
       </div>
 
       <div className="attendance-calendar-legend">
-        <span className="cal-badge cal-badge-late">迟到</span>
-        <span className="cal-badge cal-badge-early">早退</span>
-        <span className="cal-badge">半勤（半日）</span>
-        <span className="cal-badge cal-badge-leave">请假</span>
-        <span className="cal-badge cal-badge-evening">晚加</span>
-        <span className="cal-badge cal-badge-overtime">加班</span>
-        <span className="cal-badge cal-badge-overtime">周末加</span>
-        <span className="cal-badge cal-badge-holiday">节假日加</span>
+        <span className="cal-badge is-bg-attendance">出勤</span>
+        <span className="cal-badge cal-badge-late is-bg-late">迟到</span>
+        <span className="cal-badge cal-badge-early is-bg-late">早退</span>
+        <span className="cal-badge is-bg-half">半勤（半日）</span>
+        <span className="cal-badge cal-badge-leave is-bg-leave">请假</span>
+        <span className="cal-badge cal-badge-evening is-bg-overtime">晚加</span>
+        <span className="cal-badge cal-badge-overtime is-bg-overtime">加班</span>
+        <span className="cal-badge cal-badge-overtime is-bg-overtime">周末加</span>
+        <span className="cal-badge cal-badge-holiday is-bg-overtime">节假日加</span>
       </div>
 
       {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
@@ -135,6 +139,18 @@ function leadingSlots(month: string): number {
   }
   const [yearText, monthText] = month.split("-");
   return (new Date(Number(yearText), Number(monthText) - 1, 1).getDay() + 6) % 7;
+}
+
+type CellBackgroundKey = "exception" | "leave" | "half" | "late" | "attendance" | "overtime" | "none";
+
+function cellBackgroundKey(cell: DayCell): CellBackgroundKey {
+  if (cell.day?.exception_reason) return "exception";
+  if (cell.leaves.length > 0) return "leave";
+  if (cell.day?.is_half_day) return "half";
+  if ((cell.day?.late_minutes ?? 0) > 0 || (cell.day?.early_leave_minutes ?? 0) > 0) return "late";
+  if (cell.day) return "attendance";
+  if (cell.overtimes.length > 0) return "overtime";
+  return "none";
 }
 
 function buildCells(data: AttendanceCalendarData): DayCell[] {

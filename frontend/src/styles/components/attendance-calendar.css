@@ -28,12 +28,26 @@
 .attendance-calendar-cell.is-empty { background: transparent; border-color: transparent; cursor: default; }
 .attendance-calendar-cell.has-data { border-color: #b9c4d6; }
 .attendance-calendar-cell.has-data:hover { border-color: #8a97ad; }
+.attendance-calendar-cell.is-bg-exception { background: #f6effd; }
+.attendance-calendar-cell.is-bg-leave { background: #eef4ff; }
+.attendance-calendar-cell.is-bg-half { background: #fff4e6; }
+.attendance-calendar-cell.is-bg-late { background: #fdf6dc; }
+.attendance-calendar-cell.is-bg-attendance { background: #eaf7ee; }
+.attendance-calendar-cell.is-bg-overtime { background: #fdeeee; }
 .cal-day-number { font-weight: 600; color: #3c4658; }
 .cal-punch { color: #4a5568; font-variant-numeric: tabular-nums; }
 .attendance-calendar-cell .cal-badge { padding: 1px 6px; font-size: 11px; align-self: flex-start; }
 
 .attendance-calendar-legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .attendance-calendar-legend .cal-badge { cursor: default; }
+.attendance-calendar-legend .cal-badge.is-bg-exception { background: #f6effd; }
+.attendance-calendar-legend .cal-badge.is-bg-leave { background: #eef4ff; }
+.attendance-calendar-legend .cal-badge.is-bg-half { background: #fff4e6; }
+.attendance-calendar-legend .cal-badge.is-bg-late { background: #fdf6dc; }
+.attendance-calendar-legend .cal-badge.is-bg-attendance { background: #eaf7ee; }
+.attendance-calendar-legend .cal-badge.is-bg-overtime { background: #fdeeee; }
+.attendance-calendar-cell.is-bg-attendance:hover,
+.attendance-calendar-cell.is-bg-leave:hover { filter: brightness(0.97); }
 
 .attendance-calendar-daydetail {
   position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
