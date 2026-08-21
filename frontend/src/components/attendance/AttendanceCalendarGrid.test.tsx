@@ -31,6 +31,22 @@ const DATA: AttendanceCalendarData = {
   },
 };
 
+const MULTI_OVERTIME_DATA: AttendanceCalendarData = {
+  ...DATA,
+  overtimes: [
+    { date: "2026-07-05", is_evening: true, is_weekend: false, is_holiday: false, hours: 2.5 },
+    { date: "2026-07-05", is_evening: false, is_weekend: true, is_holiday: false, hours: 3 },
+  ],
+};
+
+const MULTI_LEAVE_DATA: AttendanceCalendarData = {
+  ...DATA,
+  leaves: [
+    { date: "2026-07-03", leave_type: "事假", duration: 0.5 },
+    { date: "2026-07-03", leave_type: "出差", duration: 0.5 },
+  ],
+};
+
 afterEach(() => cleanup());
 
 describe("AttendanceCalendarGrid", () => {
@@ -57,5 +73,23 @@ describe("AttendanceCalendarGrid", () => {
     fireEvent.click(screen.getByRole("button", { name: /2026-07-01/ }));
     expect(screen.getByText("11:39")).toBeInTheDocument();
     expect(screen.getByText(/4 次/)).toBeInTheDocument();
+  });
+
+  it("同日两条加班（晚间 + 周末白天）在格子与弹层都完整展示", () => {
+    render(<AttendanceCalendarGrid data={MULTI_OVERTIME_DATA} />);
+    expect(screen.getByText("晚加 +2.5h")).toBeInTheDocument();
+    expect(screen.getByText("周 +3h")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /2026-07-05/ }));
+    expect(screen.getByText("晚上加班：2.5 小时")).toBeInTheDocument();
+    expect(screen.getByText("周末加班：3 小时")).toBeInTheDocument();
+  });
+
+  it("同日两个假种（事假 + 出差）在格子与弹层都完整展示", () => {
+    render(<AttendanceCalendarGrid data={MULTI_LEAVE_DATA} />);
+    expect(screen.getByText("事假")).toBeInTheDocument();
+    expect(screen.getByText("出差")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /2026-07-03/ }));
+    expect(screen.getByText("事假：0.5 天")).toBeInTheDocument();
+    expect(screen.getByText("出差：0.5 天")).toBeInTheDocument();
   });
 });

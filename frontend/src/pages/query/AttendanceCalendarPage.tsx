@@ -7,10 +7,13 @@ import EmployeePicker from "../../components/query/EmployeePicker";
 import type { AttendanceCalendarData, QueryBootstrap } from "../../types/query";
 import "./EmployeeDashboardPage.css";
 
+const now = new Date();
+const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
 export default function AttendanceCalendarPage() {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [month, setMonth] = useState<string>(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState<string>(currentMonth);
   const [data, setData] = useState<AttendanceCalendarData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
