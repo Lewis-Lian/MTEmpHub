@@ -1,5 +1,6 @@
 import { apiRequest, buildApiUrl } from "./client";
 import type {
+  AttendanceCalendarData,
   HeaderRowsResponse,
   HomeSummaryResponse,
   QueryBootstrap,
@@ -46,4 +47,9 @@ export function fetchObjectRows<T>(path: string, query: URLSearchParams): Promis
 export function buildDownloadUrl(path: string, query: URLSearchParams): string {
   const suffix = query.toString() ? `?${query.toString()}` : "";
   return buildApiUrl(`${path}${suffix}`);
+}
+
+export function fetchAttendanceCalendar(empId: number, month: string): Promise<AttendanceCalendarData> {
+  const query = new URLSearchParams({ emp_id: String(empId), month });
+  return apiRequest<AttendanceCalendarData>(`/api/query/attendance-calendar?${query.toString()}`);
 }
