@@ -2,6 +2,7 @@ import { useDeferredValue, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { DepartmentOption as QueryDepartment, QueryEmployee } from "../../types/query";
+import { useConfirm } from "../../components/feedback/ConfirmDialog";
 
 
 interface EmployeePickerProps {
@@ -41,6 +42,8 @@ export default function EmployeePicker({
   const [isInputEditing, setIsInputEditing] = useState(false);
   const [activeDeptId, setActiveDeptId] = useState<DepartmentFilter>("all");
   const [expandedDeptIds, setExpandedDeptIds] = useState<Set<number>>(new Set());
+  const confirm = useConfirm();
+  const [deptScopeMode, setDeptScopeMode] = useState<"include-sub" | "dept-only">("include-sub");
   const deferredKeyword = useDeferredValue(keyword);
 
   const eligibleEmployees = useMemo(
@@ -58,7 +61,11 @@ export default function EmployeePicker({
   const filteredEmployees = useMemo(() => {
     const normalizedKeyword = deferredKeyword.trim().toLowerCase();
     const activeDeptScope =
-      activeDeptId === "all" ? null : collectDepartmentScope(deptHierarchy, activeDeptId);
+      activeDeptId === "all"
+        ? null
+        : deptScopeMode === "dept-only"
+          ? new Set([activeDeptId])
+          : collectDepartmentScope(deptHierarchy, activeDeptId);
     return eligibleEmployees.filter((employee) => {
       if (activeDeptScope && !activeDeptScope.has(employee.dept_id ?? -1)) {
         return false;
@@ -72,7 +79,7 @@ export default function EmployeePicker({
         .toLowerCase()
         .includes(normalizedKeyword);
     });
-  }, [activeDeptId, deferredKeyword, deptHierarchy, eligibleEmployees]);
+  }, [activeDeptId, deptScopeMode, deferredKeyword, deptHierarchy, eligibleEmployees]);
   const draftSelectedEmployees = useMemo(() => {
     const selectedIdSet = new Set(draftSelectedIds);
     return eligibleEmployees.filter((employee) => selectedIdSet.has(employee.id));
@@ -218,6 +225,21 @@ export default function EmployeePicker({
     });
   }
 
+  async function handleDeptNodeClick(node: DepartmentNode) {
+    const childIds = deptHierarchy.children.get(node.id) ?? [];
+    let includeSub = true;
+    if (childIds.length > 0) {
+      includeSub = await confirm({
+        message: `是否包含「${node.label}」子部门的员工？`,
+        confirmText: "包含子部门",
+        cancelText: "仅本部门",
+        type: "info",
+      });
+    }
+    setActiveDeptId(node.id);
+    setDeptScopeMode(includeSub ? "include-sub" : "dept-only");
+  }
+
   const isTestEnv =
     (typeof window !== "undefined" && (window as any).process?.env?.NODE_ENV === "test") ||
     ((globalThis as any).process?.env?.NODE_ENV === "test");
@@ -278,7 +300,7 @@ export default function EmployeePicker({
                           </button>
                           <button
                             className="dept-tree-label"
-                            onClick={() => setActiveDeptId(node.id)}
+                            onClick={() => handleDeptNodeClick(node)}
                             type="button"
                           >
                             {node.label}

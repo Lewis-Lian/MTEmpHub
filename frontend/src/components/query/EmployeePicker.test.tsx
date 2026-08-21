@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConfirmProvider } from "../feedback/ConfirmDialog";
+import type { ReactElement } from "react";
 import EmployeePicker from "./EmployeePicker";
 
 const EMPLOYEES = [
@@ -14,6 +16,10 @@ const DEPARTMENTS = [
   { id: 20, dept_no: "D20", dept_name: "信息部", parent_id: null },
 ];
 
+function renderPicker(ui: ReactElement) {
+  return render(<ConfirmProvider>{ui}</ConfirmProvider>);
+}
+
 afterEach(() => {
   cleanup();
 });
@@ -22,7 +28,7 @@ describe("EmployeePicker", () => {
   it("点击确定前不会提交，点击确定后才会回写选中结果", () => {
     const onChange = vi.fn();
 
-    render(
+    renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -36,7 +42,8 @@ describe("EmployeePicker", () => {
 
     expect(onChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "确定" }));
+    const dialog = screen.getByRole("dialog", { name: "选择员工" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "确定" }));
 
     expect(onChange).toHaveBeenCalledWith([1, 2]);
   });
@@ -44,7 +51,7 @@ describe("EmployeePicker", () => {
   it("入口为输入框加右侧选择按钮，并按旧版摘要显示已选员工", () => {
     const onChange = vi.fn();
 
-    render(
+    renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -70,7 +77,7 @@ describe("EmployeePicker", () => {
   it("取消会丢弃草稿选择", () => {
     const onChange = vi.fn();
 
-    render(
+    renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -81,7 +88,9 @@ describe("EmployeePicker", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "选择员工" }));
     fireEvent.click(screen.getByLabelText("E001 - 员工甲"));
-    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    fireEvent.click(
+      within(screen.getByRole("dialog", { name: "选择员工" })).getByRole("button", { name: "取消" }),
+    );
 
     expect(onChange).not.toHaveBeenCalled();
   });
@@ -89,7 +98,7 @@ describe("EmployeePicker", () => {
   it("支持按部门过滤、搜索、全选当前可见项和清空", () => {
     const onChange = vi.fn();
 
-    render(
+    renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -118,7 +127,7 @@ describe("EmployeePicker", () => {
   it("弹窗布局为左侧上下分区、右侧已选员工", () => {
     const onChange = vi.fn();
 
-    const { container } = render(
+    const { container } = renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -142,7 +151,7 @@ describe("EmployeePicker", () => {
   it("候选、已选和快速列表按旧版结构渲染", () => {
     const onChange = vi.fn();
 
-    const { container } = render(
+    const { container } = renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -176,7 +185,7 @@ describe("EmployeePicker", () => {
   it("部门树支持父子层级和展开收起", () => {
     const onChange = vi.fn();
 
-    render(
+    renderPicker(
       <EmployeePicker
         departments={DEPARTMENTS}
         employees={EMPLOYEES}
@@ -193,5 +202,81 @@ describe("EmployeePicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开 制造中心" }));
 
     expect(screen.getByRole("button", { name: "制造一部" })).toBeInTheDocument();
+  });
+
+  it("点击有子部门的节点时弹确认框，选『仅本部门』只显示直属员工", async () => {
+    const localEmployees = [
+      { id: 1, emp_no: "E001", name: "员工甲", dept_id: 11, dept_name: "制造一部", is_manager: false },
+      { id: 2, emp_no: "E002", name: "员工乙", dept_id: 11, dept_name: "制造一部", is_manager: false },
+      { id: 3, emp_no: "E003", name: "员工丙", dept_id: 10, dept_name: "制造中心", is_manager: false },
+      { id: 4, emp_no: "M001", name: "经理甲", dept_id: 20, dept_name: "信息部", is_manager: true },
+    ];
+
+    renderPicker(
+      <EmployeePicker
+        departments={DEPARTMENTS}
+        employees={localEmployees}
+        onChange={vi.fn()}
+        selectedIds={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/i }));
+    fireEvent.click(screen.getByRole("button", { name: "制造中心" }));
+
+    expect(await screen.findByText("是否包含「制造中心」子部门的员工？")).toBeInTheDocument();
+    expect(screen.getAllByLabelText(/E00\d - 员工/)).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("button", { name: "仅本部门" }));
+
+    expect(await screen.findByLabelText("E003 - 员工丙")).toBeInTheDocument();
+    expect(screen.queryByLabelText("E001 - 员工甲")).toBeNull();
+    expect(screen.queryByLabelText("M001 - 经理甲")).toBeNull();
+  });
+
+  it("弹确认框选『包含子部门』时候选含子部门员工", async () => {
+    const localEmployees = [
+      { id: 1, emp_no: "E001", name: "员工甲", dept_id: 11, dept_name: "制造一部", is_manager: false },
+      { id: 2, emp_no: "E002", name: "员工乙", dept_id: 11, dept_name: "制造一部", is_manager: false },
+      { id: 3, emp_no: "E003", name: "员工丙", dept_id: 10, dept_name: "制造中心", is_manager: false },
+      { id: 4, emp_no: "M001", name: "经理甲", dept_id: 20, dept_name: "信息部", is_manager: true },
+    ];
+
+    renderPicker(
+      <EmployeePicker
+        departments={DEPARTMENTS}
+        employees={localEmployees}
+        onChange={vi.fn()}
+        selectedIds={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/i }));
+    fireEvent.click(screen.getByRole("button", { name: "制造中心" }));
+    fireEvent.click(await screen.findByRole("button", { name: "包含子部门" }));
+
+    expect(await screen.findByLabelText("E001 - 员工甲")).toBeInTheDocument();
+    expect(screen.getByLabelText("E002 - 员工乙")).toBeInTheDocument();
+    expect(screen.getByLabelText("E003 - 员工丙")).toBeInTheDocument();
+    expect(screen.queryByLabelText("M001 - 经理甲")).toBeNull();
+  });
+
+  it("点击叶子部门不弹确认框直接过滤", () => {
+    renderPicker(
+      <EmployeePicker
+        departments={DEPARTMENTS}
+        employees={EMPLOYEES}
+        onChange={vi.fn()}
+        selectedIds={[]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/i }));
+    fireEvent.click(screen.getByRole("button", { name: "展开 制造中心" }));
+    fireEvent.click(screen.getByRole("button", { name: "制造一部" }));
+
+    expect(screen.getByLabelText("E001 - 员工甲")).toBeInTheDocument();
+    expect(screen.getByLabelText("E002 - 员工乙")).toBeInTheDocument();
+    expect(screen.queryByText(/是否包含/)).toBeNull();
   });
 });
