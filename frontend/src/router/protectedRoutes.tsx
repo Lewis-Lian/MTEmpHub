@@ -10,6 +10,7 @@ import ManagerAttendanceOverridesPage from "../pages/admin/ManagerAttendanceOver
 import ManagerOvertimeAdminPage from "../pages/admin/ManagerOvertimeAdminPage";
 import ShiftsPage from "../pages/admin/ShiftsPage";
 import AbnormalQueryPage from "../pages/query/AbnormalQueryPage";
+import AttendanceCalendarPage from "../pages/query/AttendanceCalendarPage";
 import DepartmentHoursPage from "../pages/query/DepartmentHoursPage";
 import EmployeeDashboardPage from "../pages/query/EmployeeDashboardPage";
 import ManagerAnnualLeavePage from "../pages/query/ManagerAnnualLeavePage";
@@ -36,6 +37,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: <ManagerAnnualLeavePage />, path: "/employee/manager-annual-leave-query" },
   { element: <ManagerDepartmentHoursPage />, path: "/employee/manager-department-hours-query" },
   { element: <SummaryDownloadPage />, path: "/employee/summary-download" },
+  { element: <AttendanceCalendarPage />, path: "/employee/attendance-calendar" },
   { element: <AdminDashboardPage />, path: "/admin/dashboard" },
   { element: <AccountsPage />, path: "/admin/accounts" },
   { element: <DisabledUsersPage />, path: "/admin/disabled-users" },

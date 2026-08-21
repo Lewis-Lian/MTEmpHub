@@ -59,6 +59,13 @@ MODULES: list[dict[str, Any]] = [
                 "description": "查询原始打卡记录和明细。",
             },
             {
+                "key": "attendance_calendar",
+                "label": "考勤日历",
+                "href": "/employee/attendance-calendar",
+                "permission_key": "attendance_calendar",
+                "description": "按月份日历查看员工逐日考勤明细。",
+            },
+            {
                 "key": "department_hours_query",
                 "label": "员工部门工时",
                 "href": "/employee/department-hours-query",

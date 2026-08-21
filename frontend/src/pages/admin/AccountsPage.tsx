@@ -40,6 +40,7 @@ const permissionCatalog = [
   { key: "employee_dashboard", label: "员工考勤数据查询", group: "员工" },
   { key: "abnormal_query", label: "员工异常查询", group: "员工" },
   { key: "punch_records", label: "员工打卡数据查询", group: "员工" },
+  { key: "attendance_calendar", label: "考勤日历", group: "员工" },
   { key: "department_hours_query", label: "员工部门工时查询", group: "员工" },
   { key: "summary_download", label: "汇总下载", group: "员工" },
 ] as const;
