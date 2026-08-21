@@ -72,3 +72,55 @@ export interface HomeSummaryResponse {
   summary?: Record<string, number | string>;
   factory_rest_entries?: FactoryRestEntry[];
 }
+
+export interface AttendanceCalendarEmployee {
+  id: number;
+  emp_no: string;
+  name: string;
+  dept_name: string;
+}
+
+export interface AttendanceCalendarDay {
+  date: string;
+  check_in_times: string[];
+  check_out_times: string[];
+  punch_count: number;
+  actual_hours: number;
+  late_minutes: number;
+  early_leave_minutes: number;
+  is_half_day: boolean;
+  exception_reason: string;
+}
+
+export interface AttendanceCalendarOvertime {
+  date: string;
+  is_evening: boolean;
+  is_weekend: boolean;
+  is_holiday: boolean;
+  hours: number;
+}
+
+export interface AttendanceCalendarLeave {
+  date: string;
+  leave_type: string;
+  duration: number;
+}
+
+export interface AttendanceCalendarSummary {
+  attendance_days: number;
+  half_days: number;
+  leave_by_type: Array<{ leave_type: string; count: number; days: number }>;
+  evening_overtime_hours: number;
+  other_overtime_hours: number;
+  late_minutes_total: number;
+  early_leave_minutes_total: number;
+}
+
+export interface AttendanceCalendarData {
+  employee: AttendanceCalendarEmployee;
+  month: string;
+  days: AttendanceCalendarDay[];
+  overtimes: AttendanceCalendarOvertime[];
+  leaves: AttendanceCalendarLeave[];
+  summary: AttendanceCalendarSummary;
+}
