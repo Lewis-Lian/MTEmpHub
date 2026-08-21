@@ -226,12 +226,17 @@ describe("EmployeePicker", () => {
 
     expect(await screen.findByText("是否包含「制造中心」子部门的员工？")).toBeInTheDocument();
     expect(screen.getAllByLabelText(/E00\d - 员工/)).toHaveLength(3);
+    expect(screen.getByLabelText("M001 - 经理甲")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "仅本部门" }));
 
     expect(await screen.findByLabelText("E003 - 员工丙")).toBeInTheDocument();
     expect(screen.queryByLabelText("E001 - 员工甲")).toBeNull();
     expect(screen.queryByLabelText("M001 - 经理甲")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "制造中心" }));
+
+    expect(await screen.findByText("是否包含「制造中心」子部门的员工？")).toBeInTheDocument();
   });
 
   it("弹确认框选『包含子部门』时候选含子部门员工", async () => {
@@ -277,6 +282,10 @@ describe("EmployeePicker", () => {
 
     expect(screen.getByLabelText("E001 - 员工甲")).toBeInTheDocument();
     expect(screen.getByLabelText("E002 - 员工乙")).toBeInTheDocument();
+    expect(screen.queryByText(/是否包含/)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "全部部门" }));
+
     expect(screen.queryByText(/是否包含/)).toBeNull();
   });
 });
