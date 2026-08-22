@@ -116,7 +116,9 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.queryByText("迟 12′")).not.toBeInTheDocument();
     expect(screen.queryByText(/早退 \d+′/)).not.toBeInTheDocument();
     fireEvent.click(getCell("2026-07-02"));
-    expect(screen.getByText(/迟到：12 分钟/)).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("迟到")).toBeInTheDocument();
+    expect(within(dialog).getByText("12 分钟")).toBeInTheDocument();
   });
 
   it("点击日格弹出当天完整明细", () => {
@@ -126,13 +128,28 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText(/4 次/)).toBeInTheDocument();
   });
 
+  it("弹层头部显示星期，点击遮罩关闭、点击卡片不关闭", () => {
+    render(<AttendanceCalendarGrid data={DATA} />);
+    fireEvent.click(getCell("2026-07-01"));
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("2026-07-01")).toBeInTheDocument();
+    expect(within(dialog).getByText("周三")).toBeInTheDocument(); // 2026-07-01 是周三
+    fireEvent.click(within(dialog).getByText("上班卡")); // 点卡片内容不关闭
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    fireEvent.click(dialog); // 点遮罩关闭
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
   it("同日两条加班（晚间 + 周末白天）在格子与弹层都完整展示", () => {
     render(<AttendanceCalendarGrid data={MULTI_OVERTIME_DATA} />);
     expect(screen.getByText("晚加 +2.5h")).toBeInTheDocument();
     expect(screen.getByText("周 +3h")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /2026-07-05/ }));
-    expect(screen.getByText("晚上加班：2.5 小时")).toBeInTheDocument();
-    expect(screen.getByText("周末加班：3 小时")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("晚上加班")).toBeInTheDocument();
+    expect(within(dialog).getByText("2.5 小时")).toBeInTheDocument();
+    expect(within(dialog).getByText("周末加班")).toBeInTheDocument();
+    expect(within(dialog).getByText("3 小时")).toBeInTheDocument();
   });
 
   it("同日两个假种（事假 + 出差）在格子与弹层都完整展示", () => {
@@ -140,8 +157,10 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("事假")).toBeInTheDocument();
     expect(screen.getAllByText("出差").length).toBeGreaterThan(0); // 假种徽章 + 图例
     fireEvent.click(screen.getByRole("button", { name: /2026-07-03/ }));
-    expect(screen.getByText("事假：0.5 天")).toBeInTheDocument();
-    expect(screen.getByText("出差：0.5 天")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("事假")).toBeInTheDocument();
+    expect(within(dialog).getByText("出差")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("0.5 天").length).toBe(2);
   });
 
   it("同日两张事假单：格子徽章去重，弹层展示 OA 单明细", () => {
