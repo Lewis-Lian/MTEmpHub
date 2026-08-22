@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "../../api/client";
-import { fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
+import { fetchAttendanceCalendar, fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
 import { fetchMe } from "../../api/auth";
+import AttendanceCalendarGrid from "../../components/attendance/AttendanceCalendarGrid";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
-import type { QueryBootstrap } from "../../types/query";
+import type { AttendanceCalendarData, QueryBootstrap } from "../../types/query";
 import "./QueryHome.css";
 
 export default function QueryHomePage() {
@@ -18,6 +19,10 @@ export default function QueryHomePage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [isAdmin, setIsAdmin] = useState(false);
+
+  const [calendarData, setCalendarData] = useState<AttendanceCalendarData | null>(null);
+  const [calendarError, setCalendarError] = useState("");
+  const [calendarForbidden, setCalendarForbidden] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -85,6 +90,44 @@ export default function QueryHomePage() {
       mounted = false;
     };
   }, [month]);
+
+  // 首页日历展示绑定管理人员本人的考勤，员工 id 通过工号在可见员工列表中匹配
+  const managerEmployeeId = useMemo(
+    () => bootstrap?.employees.find((employee) => employee.emp_no === managerInfo?.emp_no)?.id ?? null,
+    [bootstrap, managerInfo],
+  );
+
+  useEffect(() => {
+    if (!managerEmployeeId || !month) {
+      return;
+    }
+
+    let mounted = true;
+    setCalendarData(null);
+    setCalendarError("");
+
+    fetchAttendanceCalendar(managerEmployeeId, month)
+      .then((payload) => {
+        if (mounted) {
+          setCalendarData(payload);
+        }
+      })
+      .catch((caughtError) => {
+        if (!mounted) {
+          return;
+        }
+        // 无日历接口权限的账号（如纯首页权限用户）直接隐藏面板
+        if (caughtError instanceof ApiError && caughtError.status === 403) {
+          setCalendarForbidden(true);
+          return;
+        }
+        setCalendarError(caughtError instanceof ApiError ? caughtError.message : "考勤日历加载失败");
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [managerEmployeeId, month]);
 
   if (error && !bootstrap) {
     return <ErrorState description={error} title="查询首页初始化失败" />;
@@ -321,8 +364,33 @@ export default function QueryHomePage() {
               </div>
             </section>
 
-            {/* 右栏：占比堆叠条和系统广播 Notice Banner */}
+            {/* 右栏：考勤日历、占比堆叠条和系统广播 Notice Banner */}
             <div className="qh-right-box">
+              {/* 考勤日历面板：位于“请假与外勤类型占比”上方，展示绑定管理人员本人当月考勤 */}
+              {managerEmployeeId && !calendarForbidden ? (
+                <section className="qh-dashboard-panel">
+                  <h3 className="qh-panel-title">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--qh-primary)" }}>
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <span>考勤日历</span>
+                  </h3>
+
+                  {calendarError ? (
+                    <p className="legacy-inline-error" style={{ marginTop: "24px" }}>{calendarError}</p>
+                  ) : calendarData ? (
+                    <div style={{ marginTop: "24px" }}>
+                      <AttendanceCalendarGrid data={calendarData} />
+                    </div>
+                  ) : (
+                    <p className="text-muted" style={{ marginTop: "24px" }}>正在加载考勤日历...</p>
+                  )}
+                </section>
+              ) : null}
+
               {/* 请假假勤占比分析 */}
               <section className="qh-dashboard-panel">
                 <h3 className="qh-panel-title">

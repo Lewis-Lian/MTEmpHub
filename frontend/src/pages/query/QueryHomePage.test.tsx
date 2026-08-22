@@ -1,19 +1,39 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "../../api/client";
 
 const mockBootstrap = vi.hoisted(() => vi.fn());
 const mockFetchMe = vi.hoisted(() => vi.fn());
 const mockHomeSummary = vi.hoisted(() => vi.fn());
+const mockCalendar = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/query", () => ({
   fetchQueryBootstrap: mockBootstrap,
   fetchHomeSummary: mockHomeSummary,
+  fetchAttendanceCalendar: mockCalendar,
 }));
 vi.mock("../../api/auth", () => ({
   fetchMe: mockFetchMe,
 }));
 
 import QueryHomePage from "./QueryHomePage";
+
+const calendarPayload = {
+  employee: { id: 7, emp_no: "100701010", name: "余兆中", dept_name: "制造一部" },
+  month: "2026-05",
+  days: [],
+  overtimes: [],
+  leaves: [],
+  summary: {
+    attendance_days: 0,
+    half_days: 0,
+    leave_by_type: [],
+    evening_overtime_hours: 0,
+    other_overtime_hours: 0,
+    late_minutes_total: 0,
+    early_leave_minutes_total: 0,
+  },
+};
 
 afterEach(() => {
   cleanup();
@@ -39,6 +59,7 @@ describe("QueryHomePage 纯首页权限用户", () => {
       manager: { emp_no: "100701010", name: "余兆中", dept_name: "制造一部" },
       summary: { attendance_days: 20 },
     });
+    mockCalendar.mockResolvedValue(calendarPayload);
   });
 
   it("能拿到账套并加载出绑定的管理人员摘要", async () => {
@@ -56,5 +77,82 @@ describe("QueryHomePage 纯首页权限用户", () => {
     await waitFor(() => {
       expect(screen.queryByText("正在加载首页摘要...")).toBeNull();
     });
+  });
+
+  it("无法匹配到员工时不出考勤日历面板", async () => {
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(screen.queryByText("正在加载首页摘要...")).toBeNull();
+    });
+
+    expect(mockCalendar).not.toHaveBeenCalled();
+    expect(screen.queryByText("考勤日历")).toBeNull();
+  });
+});
+
+describe("QueryHomePage 首页考勤日历", () => {
+  beforeEach(() => {
+    mockFetchMe.mockResolvedValue({ username: "100701010", role: "readonly" });
+    mockBootstrap.mockResolvedValue({
+      employees: [
+        { id: 7, emp_no: "100701010", name: "余兆中", dept_id: null, dept_name: "制造一部", is_manager: true },
+      ],
+      account_sets: [
+        { id: 1, month: "2026-05", name: "2026年5月", is_active: true },
+      ],
+      departments: [],
+    });
+    mockHomeSummary.mockResolvedValue({
+      has_data: true,
+      month: "2026-05",
+      account_set_name: "2026年5月",
+      support_message: "已加载首页摘要",
+      manager: { emp_no: "100701010", name: "余兆中", dept_name: "制造一部" },
+      summary: { attendance_days: 20 },
+    });
+  });
+
+  it("按绑定管理人员与账套月份加载日历，且位于请假与外勤类型占比上方", async () => {
+    mockCalendar.mockResolvedValue(calendarPayload);
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(mockCalendar).toHaveBeenCalledWith(7, "2026-05");
+    });
+    await waitFor(() => {
+      expect(screen.getByText("周一")).toBeInTheDocument();
+    });
+
+    const calendarTitle = screen.getByText("考勤日历");
+    const ratioTitle = screen.getByText("请假与外勤类型占比");
+    expect(
+      calendarTitle.compareDocumentPosition(ratioTitle) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    // 日历面板应位于右栏 qh-right-box 内，紧贴占比面板上方
+    expect(calendarTitle.closest(".qh-right-box")).not.toBeNull();
+  });
+
+  it("日历接口失败时在面板内提示错误，不影响首页摘要", async () => {
+    mockCalendar.mockRejectedValue(new ApiError("服务器错误", 500, null));
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("服务器错误")).toBeInTheDocument();
+    });
+    expect(screen.getByText("请假与外勤类型占比")).toBeInTheDocument();
+  });
+
+  it("日历接口返回 403 时隐藏面板（无日历权限用户）", async () => {
+    mockCalendar.mockRejectedValue(new ApiError("无权限访问", 403, null));
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(mockCalendar).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("考勤日历")).toBeNull();
+    });
+    expect(screen.getByText("请假与外勤类型占比")).toBeInTheDocument();
   });
 });
