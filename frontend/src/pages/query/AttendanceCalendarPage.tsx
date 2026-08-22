@@ -20,7 +20,14 @@ export default function AttendanceCalendarPage() {
 
   useEffect(() => {
     fetchQueryBootstrap()
-      .then(setBootstrap)
+      .then((payload) => {
+        setBootstrap(payload);
+        // 考勤数据按账套归集，月份默认跟随当前激活账套
+        const activeMonth = payload.account_sets.find((item) => item.is_active)?.month;
+        if (activeMonth) {
+          setMonth(activeMonth);
+        }
+      })
       .catch(() => setError("基础数据加载失败"));
   }, []);
 
