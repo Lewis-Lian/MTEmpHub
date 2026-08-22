@@ -104,6 +104,11 @@ export interface AttendanceCalendarLeave {
   date: string;
   leave_type: string;
   duration: number;
+  leave_no?: string;
+  start_time?: string;
+  end_time?: string;
+  reason?: string;
+  approval_status?: string;
 }
 
 export interface AttendanceCalendarSummary {

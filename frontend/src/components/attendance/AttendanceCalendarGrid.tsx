@@ -106,8 +106,14 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
                 </>
               ) : null}
               {selected.leaves.map((leave, index) => (
-                <div className="daydetail-row" key={`leave-${index}`}>
-                  {leave.leave_type}：{leave.duration} 天
+                <div className="daydetail-leave" key={`leave-${index}`}>
+                  <div className="daydetail-row">
+                    {leave.leave_type}：{leave.duration} 天{leave.approval_status ? `（${leave.approval_status}）` : ""}
+                  </div>
+                  {leave.start_time && leave.end_time ? (
+                    <div className="daydetail-row daydetail-sub">{leave.start_time} ~ {leave.end_time}</div>
+                  ) : null}
+                  {leave.reason ? <div className="daydetail-row daydetail-sub">{leave.reason}</div> : null}
                 </div>
               ))}
               {selected.overtimes.map((overtime, index) => (
@@ -221,9 +227,10 @@ function renderBadges(cell: DayCell): ReactNode[] {
       badges.push(<span className="cal-badge" key="half">半勤</span>);
     }
   }
-  cell.leaves.forEach((leave, index) => {
+  // 同日同假种可能有多张 OA 单，格子徽章按假种去重展示
+  Array.from(new Set(cell.leaves.map((leave) => leave.leave_type))).forEach((leaveType) => {
     badges.push(
-      <span className="cal-badge cal-badge-leave" key={`leave-${index}`}>{leave.leave_type}</span>,
+      <span className="cal-badge cal-badge-leave" key={`leave-${leaveType}`}>{leaveType}</span>,
     );
   });
   cell.overtimes.forEach((overtime, index) => {

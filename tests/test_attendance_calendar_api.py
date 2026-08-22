@@ -157,6 +157,30 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertIn("出差", by_type)
         self.assertEqual(by_type["出差"]["days"], 1.0)
 
+    def test_leave_entries_carry_oa_fields_and_merge_in_summary(self):
+        """leaves 为单据级明细（附 OA 字段）；同日同假种多单时汇总仍按天数与时长合计。"""
+        with self.app.app_context():
+            db.session.add_all([
+                LeaveRecord(leave_no="L101", emp_id=self.emp_id, leave_type="事假",
+                            start_time=datetime(2026, 7, 10, 8, 0), end_time=datetime(2026, 7, 10, 12, 0),
+                            duration=0.5, reason="家中有事", approval_status="已审批"),
+                LeaveRecord(leave_no="L102", emp_id=self.emp_id, leave_type="事假",
+                            start_time=datetime(2026, 7, 10, 13, 0), end_time=datetime(2026, 7, 10, 17, 0),
+                            duration=0.5, reason="下午外出", approval_status="已审批"),
+            ])
+            db.session.commit()
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
+        day_entries = [l for l in data["leaves"] if l["date"] == "2026-07-10"]
+        self.assertEqual(len(day_entries), 2)  # 每张 OA 单一条明细
+        by_no = {l["leave_no"]: l for l in day_entries}
+        self.assertEqual(by_no["L101"]["reason"], "家中有事")
+        self.assertEqual(by_no["L101"]["approval_status"], "已审批")
+        self.assertEqual(by_no["L101"]["start_time"], "2026-07-10 08:00")
+        self.assertEqual(by_no["L102"]["end_time"], "2026-07-10 17:00")
+        sick = [x for x in data["summary"]["leave_by_type"] if x["leave_type"] == "事假"][0]
+        self.assertEqual(sick["count"], 1)      # 汇总次数 = 覆盖天数（1 天）
+        self.assertAlmostEqual(sick["days"], 0.34, places=2)  # 时长 = 两单 overlap 折算合计（0.17+0.17，逐日两位舍入）
+
     def test_half_day_and_attendance_summary(self):
         """半勤（2 次刷卡 + 工时∈[2,5.1)）与出勤天数口径。"""
         self._add_daily(record_date=date(2026, 7, 1), check_in_times=["07:30"],
