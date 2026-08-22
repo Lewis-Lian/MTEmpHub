@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import AttendanceCalendarGrid from "./AttendanceCalendarGrid";
 import type { AttendanceCalendarData } from "../../types/query";
 
+// 2026-07 为过去月份（当前时间 2026-08+），其中无数据日按缺勤口径染红
 const DATA: AttendanceCalendarData = {
   employee: { id: 1, emp_no: "E001", name: "员工甲", dept_name: "制造一部" },
   month: "2026-07",
@@ -47,6 +48,45 @@ const MULTI_LEAVE_DATA: AttendanceCalendarData = {
   ],
 };
 
+// 优先级链：出差 > 婚假 > 丧假 > 半勤 > 晚加班 > 出勤
+const PRIORITY_DATA: AttendanceCalendarData = {
+  ...DATA,
+  days: [
+    { ...DATA.days[0], date: "2026-07-12", is_half_day: true, late_minutes: 0 },
+    { ...DATA.days[0], date: "2026-07-13", is_half_day: false },
+    { ...DATA.days[0], date: "2026-07-14", is_half_day: false },
+  ],
+  overtimes: [
+    { date: "2026-07-12", is_evening: true, is_weekend: false, is_holiday: false, hours: 2 },
+    { date: "2026-07-13", is_evening: true, is_weekend: false, is_holiday: false, hours: 2 },
+  ],
+  leaves: [
+    { date: "2026-07-10", leave_type: "出差", duration: 1 },
+    { date: "2026-07-10", leave_type: "婚假", duration: 1 },
+    { date: "2026-07-10", leave_type: "丧假", duration: 1 },
+    { date: "2026-07-11", leave_type: "婚假", duration: 1 },
+    { date: "2026-07-11", leave_type: "丧假", duration: 1 },
+    { date: "2026-07-14", leave_type: "丧假", duration: 1 },
+  ],
+};
+
+// 未来月份：无数据日不标记缺勤
+const FUTURE_DATA: AttendanceCalendarData = {
+  ...DATA,
+  month: "2099-01",
+  days: [{ ...DATA.days[0], date: "2099-01-04" }],
+  overtimes: [],
+  leaves: [],
+};
+
+// 整月无任何数据：不渲染缺勤红
+const EMPTY_DATA: AttendanceCalendarData = {
+  ...DATA,
+  days: [],
+  overtimes: [],
+  leaves: [],
+};
+
 afterEach(() => cleanup());
 
 function getCell(date: string) {
@@ -66,10 +106,17 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("07:32-19:28")).toBeInTheDocument();
     expect(screen.getByText("晚加 2.5h")).toBeInTheDocument();
     expect(screen.getByText("晚加 +2.5h")).toBeInTheDocument();
-    expect(screen.getByText("迟 12′")).toBeInTheDocument();
-    expect(screen.getByText("半勤")).toBeInTheDocument();
-    expect(screen.getByText("出差")).toBeInTheDocument();
+    expect(screen.getAllByText("半勤").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("出差").length).toBeGreaterThan(0);
     expect(screen.getByText(/出勤 1\.5 天/)).toBeInTheDocument();
+  });
+
+  it("迟到/早退不再渲染格子徽章，弹层明细行保留", () => {
+    render(<AttendanceCalendarGrid data={DATA} />);
+    expect(screen.queryByText("迟 12′")).not.toBeInTheDocument();
+    expect(screen.queryByText(/早退 \d+′/)).not.toBeInTheDocument();
+    fireEvent.click(getCell("2026-07-02"));
+    expect(screen.getByText(/迟到：12 分钟/)).toBeInTheDocument();
   });
 
   it("点击日格弹出当天完整明细", () => {
@@ -91,7 +138,7 @@ describe("AttendanceCalendarGrid", () => {
   it("同日两个假种（事假 + 出差）在格子与弹层都完整展示", () => {
     render(<AttendanceCalendarGrid data={MULTI_LEAVE_DATA} />);
     expect(screen.getByText("事假")).toBeInTheDocument();
-    expect(screen.getByText("出差")).toBeInTheDocument();
+    expect(screen.getAllByText("出差").length).toBeGreaterThan(0); // 假种徽章 + 图例
     fireEvent.click(screen.getByRole("button", { name: /2026-07-03/ }));
     expect(screen.getByText("事假：0.5 天")).toBeInTheDocument();
     expect(screen.getByText("出差：0.5 天")).toBeInTheDocument();
@@ -99,32 +146,57 @@ describe("AttendanceCalendarGrid", () => {
 
   it("格子按状态填充背景色类", () => {
     render(<AttendanceCalendarGrid data={DATA} />);
-    expect(getCell("2026-07-01")).toHaveClass("is-bg-attendance");
+    expect(getCell("2026-07-01")).toHaveClass("is-bg-evening"); // 出勤 + 晚加班 → 晚加班优先
     expect(getCell("2026-07-02")).toHaveClass("is-bg-half");
-    expect(getCell("2026-07-03")).toHaveClass("is-bg-leave");
-    expect(getCell("2026-07-05")).toHaveClass("is-bg-overtime");
+    expect(getCell("2026-07-03")).toHaveClass("is-bg-trip");
+    expect(getCell("2026-07-04")).toHaveClass("is-bg-absent"); // 过去无数据日
+    expect(getCell("2026-07-05")).toHaveClass("is-bg-attendance"); // 周末加班视同出勤
   });
 
   it("多状态时按优先级取第一个命中", () => {
-    // 07-02 同时有迟到(黄优先级低)与半勤(橙优先级高) → 取半勤；再构造请假+迟到取请假
-    const mixed: AttendanceCalendarData = {
-      ...DATA,
-      days: [
-        { ...DATA.days[0], date: "2026-07-10", late_minutes: 20 },
-      ],
-      leaves: [{ date: "2026-07-10", leave_type: "事假", duration: 1 }],
-    };
-    render(<AttendanceCalendarGrid data={mixed} />);
-    expect(getCell("2026-07-10")).toHaveClass("is-bg-leave");
+    render(<AttendanceCalendarGrid data={PRIORITY_DATA} />);
+    expect(getCell("2026-07-10")).toHaveClass("is-bg-trip"); // 出差 > 婚假 > 丧假
+    expect(getCell("2026-07-11")).toHaveClass("is-bg-marriage"); // 婚假 > 丧假
+    expect(getCell("2026-07-12")).toHaveClass("is-bg-half"); // 半勤 > 晚加班
+    expect(getCell("2026-07-13")).toHaveClass("is-bg-evening"); // 晚加班 > 出勤
+    expect(getCell("2026-07-14")).toHaveClass("is-bg-funeral"); // 丧假 > 出勤
   });
 
-  it("异常优先级高于请假", () => {
+  it("异常不参与底色、角标与弹层展示", () => {
     const data: AttendanceCalendarData = {
       ...DATA,
       days: [{ ...DATA.days[0], date: "2026-07-11", exception_reason: "忘打卡" }],
-      leaves: [{ date: "2026-07-11", leave_type: "事假", duration: 1 }],
     };
     render(<AttendanceCalendarGrid data={data} />);
-    expect(getCell("2026-07-11")).toHaveClass("is-bg-exception");
+    expect(getCell("2026-07-11")).toHaveClass("is-bg-attendance"); // 有 day 即出勤，异常无底色
+    expect(screen.queryByText("⚠")).not.toBeInTheDocument();
+    fireEvent.click(getCell("2026-07-11"));
+    expect(screen.queryByText(/异常/)).not.toBeInTheDocument();
+  });
+
+  it("缺勤仅标记过去无数据日：未来日期与整月空数据不标记", () => {
+    const { container } = render(
+      <>
+        <AttendanceCalendarGrid data={FUTURE_DATA} />
+        <AttendanceCalendarGrid data={EMPTY_DATA} />
+      </>,
+    );
+    expect(screen.getByRole("button", { name: "2099-01-04" })).toHaveClass("is-bg-attendance");
+    expect(screen.getByRole("button", { name: "2099-01-05" }).className).not.toMatch(/is-bg-/);
+    expect(getCell("2026-07-04").className).not.toMatch(/is-bg-/);
+    expect(container.querySelectorAll(".attendance-calendar-cell.is-bg-absent")).toHaveLength(0);
+  });
+
+  it("图例渲染七色修订版七项", () => {
+    const { container } = render(<AttendanceCalendarGrid data={DATA} />);
+    const legend = container.querySelector(".attendance-calendar-legend");
+    expect(legend).toBeTruthy();
+    for (const key of ["trip", "marriage", "funeral", "half", "evening", "attendance", "absent"]) {
+      expect(legend?.querySelector(`.is-bg-${key}`)).toBeTruthy();
+    }
+    expect(screen.getByText("婚假")).toBeInTheDocument();
+    expect(screen.getByText("丧假")).toBeInTheDocument();
+    expect(screen.getByText("晚加班")).toBeInTheDocument();
+    expect(screen.getByText("缺勤")).toBeInTheDocument();
   });
 });

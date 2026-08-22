@@ -20,6 +20,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const cells = useMemo(() => buildCells(data), [data]);
   const selected = cells.find((cell) => cell.date === selectedDate) ?? null;
+  const hasMonthData = data.days.length > 0 || data.overtimes.length > 0 || data.leaves.length > 0;
 
   if (cells.length === 0) {
     return <div className="attendance-calendar attendance-calendar-empty">无效月份</div>;
@@ -53,7 +54,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
           <div className="attendance-calendar-cell is-empty" key={`empty-${index}`} />
         ))}
         {cells.map((cell) => {
-          const bgKey = cellBackgroundKey(cell);
+          const bgKey = cellBackgroundKey(cell, hasMonthData);
           return (
             <button
               aria-label={cell.date}
@@ -71,16 +72,13 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
       </div>
 
       <div className="attendance-calendar-legend">
+        <span className="cal-badge is-bg-trip">出差</span>
+        <span className="cal-badge is-bg-marriage">婚假</span>
+        <span className="cal-badge is-bg-funeral">丧假</span>
+        <span className="cal-badge is-bg-half">半勤</span>
+        <span className="cal-badge is-bg-evening">晚加班</span>
         <span className="cal-badge is-bg-attendance">出勤</span>
-        <span className="cal-badge cal-badge-late is-bg-late">迟到</span>
-        <span className="cal-badge cal-badge-early is-bg-late">早退</span>
-        <span className="cal-badge is-bg-half">半勤（半日）</span>
-        <span className="cal-badge cal-badge-leave is-bg-leave">请假</span>
-        <span className="cal-badge cal-badge-evening is-bg-overtime">晚加</span>
-        <span className="cal-badge cal-badge-overtime is-bg-overtime">加班</span>
-        <span className="cal-badge cal-badge-overtime is-bg-overtime">周末加</span>
-        <span className="cal-badge cal-badge-holiday is-bg-overtime">节假日加</span>
-        <span className="cal-badge is-bg-exception">异常</span>
+        <span className="cal-badge is-bg-absent">缺勤</span>
       </div>
 
       {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
@@ -123,9 +121,6 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
                   ：{overtime.hours} 小时
                 </div>
               ))}
-              {selected.day?.exception_reason && (
-                <div className="daydetail-row">异常：{selected.day.exception_reason}</div>
-              )}
             </div>
           </div>
         </div>
@@ -142,16 +137,24 @@ function leadingSlots(month: string): number {
   return (new Date(Number(yearText), Number(monthText) - 1, 1).getDay() + 6) % 7;
 }
 
-type CellBackgroundKey = "exception" | "leave" | "half" | "late" | "attendance" | "overtime" | "none";
+// 七色修订版背景色口径（设计文档 2.9）：出差 > 婚假 > 丧假 > 半勤 > 晚加班 > 出勤 > 缺勤 > 无
+type CellBackgroundKey = "trip" | "marriage" | "funeral" | "half" | "evening" | "attendance" | "absent" | "none";
 
-function cellBackgroundKey(cell: DayCell): CellBackgroundKey {
-  if (cell.day?.exception_reason) return "exception";
-  if (cell.leaves.length > 0) return "leave";
+function cellBackgroundKey(cell: DayCell, hasMonthData: boolean): CellBackgroundKey {
+  const leaveTypes = cell.leaves.map((leave) => leave.leave_type);
+  if (leaveTypes.includes("出差")) return "trip";
+  if (leaveTypes.includes("婚假")) return "marriage";
+  if (leaveTypes.includes("丧假")) return "funeral";
   if (cell.day?.is_half_day) return "half";
-  if ((cell.day?.late_minutes ?? 0) > 0 || (cell.day?.early_leave_minutes ?? 0) > 0) return "late";
-  if (cell.day) return "attendance";
-  if (cell.overtimes.length > 0) return "overtime";
+  if (cell.overtimes.some((overtime) => overtime.is_evening)) return "evening";
+  if (cell.day || cell.overtimes.length > 0) return "attendance";
+  if (hasMonthData && cell.date < todayString()) return "absent";
   return "none";
+}
+
+function todayString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 function buildCells(data: AttendanceCalendarData): DayCell[] {
@@ -208,16 +211,6 @@ function renderBadges(cell: DayCell): ReactNode[] {
   const day = cell.day;
 
   if (day) {
-    if (day.late_minutes > 0) {
-      badges.push(
-        <span className="cal-badge cal-badge-late" key="late">迟 {day.late_minutes}′</span>,
-      );
-    }
-    if (day.early_leave_minutes > 0) {
-      badges.push(
-        <span className="cal-badge cal-badge-early" key="early">早退 {day.early_leave_minutes}′</span>,
-      );
-    }
     if (day.is_half_day) {
       badges.push(<span className="cal-badge" key="half">半勤</span>);
     }
@@ -246,9 +239,6 @@ function renderBadges(cell: DayCell): ReactNode[] {
       );
     }
   });
-  if (day?.exception_reason) {
-    badges.push(<span className="cal-badge cal-badge-exception" key="exception">⚠</span>);
-  }
   return badges;
 }
 
