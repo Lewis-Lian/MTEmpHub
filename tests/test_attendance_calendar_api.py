@@ -184,6 +184,24 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertEqual(day["exception_reason"], "忘打卡")
         self.assertEqual(data["summary"]["late_minutes_total"], 15)
 
+    def test_manager_punch_times_from_raw_data(self):
+        """管理人员的结构化刷卡为空时，从 raw_data 的钉钉原始键提取上/下班时间。"""
+        with self.app.app_context():
+            db.session.add(DailyRecord(
+                emp_id=self.emp_id,
+                record_date=date(2026, 7, 3),
+                check_in_times=[],
+                check_out_times=[],
+                actual_hours=0.0,
+                raw_data={"上班1打卡时间": "08:03", "下班1打卡时间": "17:32"},
+            ))
+            db.session.commit()
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
+        day = data["days"][0]
+        self.assertEqual(day["check_in_times"], ["08:03"])
+        self.assertEqual(day["check_out_times"], ["17:32"])
+        self.assertEqual(day["punch_count"], 2)
+
     def test_invalid_params(self):
         """缺 emp_id / 非法 month 返回 4xx。"""
         self.assertEqual(self._get("?month=2026-07").status_code, 400)

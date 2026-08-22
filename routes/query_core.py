@@ -1610,6 +1610,31 @@ def _format_punch_tokens(values: list[object] | None) -> list[str]:
     return [t for t in (_normalize_punch_token(v) for v in (values or [])) if t]
 
 
+def _calendar_punch_times(record) -> dict[str, list[str]]:
+    """日历的每日刷卡时间：优先结构化字段；管理人员的结构化字段常为空（导入管道未填充
+    employee_payload/manager_payload 的 check_in_times），回退到 raw_data 的钉钉原始键提取。"""
+    check_in_times = _format_punch_tokens(record.check_in_times)
+    check_out_times = _format_punch_tokens(record.check_out_times)
+    if check_in_times or check_out_times:
+        return {"check_in_times": check_in_times, "check_out_times": check_out_times}
+
+    raw = record.raw_data or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    if isinstance(raw.get("raw_data"), dict):
+        raw = raw.get("raw_data") or {}
+    raw_check_in: list[str] = []
+    raw_check_out: list[str] = []
+    for slot in range(1, 5):
+        in_token = _normalize_punch_token(raw.get(f"上班{slot}打卡时间"))
+        if in_token:
+            raw_check_in.append(in_token)
+        out_token = _normalize_punch_token(raw.get(f"下班{slot}打卡时间"))
+        if out_token:
+            raw_check_out.append(out_token)
+    return {"check_in_times": raw_check_in, "check_out_times": raw_check_out}
+
+
 def _split_overtime_by_day(rows, month: str):
     """加班条按天拆分：跨天条 effective_hours ÷ 覆盖日历天数（最后一天差额补偿），
     条级晚间(start>=17:00)/周末/节假日属性继承。同日同属性累并。"""
@@ -1698,8 +1723,7 @@ def attendance_calendar_api():
     days = [
         {
             "date": r.record_date.isoformat(),
-            "check_in_times": _format_punch_tokens(r.check_in_times),
-            "check_out_times": _format_punch_tokens(r.check_out_times),
+            **_calendar_punch_times(r),
             "punch_count": _raw_punch_count(r),
             "actual_hours": _calc_record_work_hours(r)[0],
             "late_minutes": r.late_minutes or 0,
