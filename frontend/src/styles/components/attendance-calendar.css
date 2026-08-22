@@ -6,6 +6,7 @@
   font-size: 12px; background: #eef1f6; color: #3c4658; border: 1px solid #d8dee9;
 }
 .cal-badge-attendance { background: #e6f4ea; color: #1c7c3c; border-color: #bfe3cc; }
+.cal-badge-absent { background: #ffffff; color: #b02a2a; border-color: #e6b0aa; }
 .cal-badge-leave { background: #e8f0fe; color: #1a56b0; border-color: #c6dafc; }
 .cal-badge-evening { background: #fff3e0; color: #b25e00; border-color: #ffd9a8; }
 .cal-badge-overtime { background: #fdeeee; color: #b02a2a; border-color: #f6cfcf; }
