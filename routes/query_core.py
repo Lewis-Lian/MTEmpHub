@@ -1703,6 +1703,7 @@ def attendance_calendar_api():
         .all()
     )
     leave_by_date: dict[str, dict[str, float]] = {}
+    leave_entries: list[dict] = []
     for record in leave_rows:
         leave_type = (record.leave_type or "").strip() or "请假"
         day = max(record.start_time.date(), month_start)
@@ -1713,12 +1714,22 @@ def attendance_calendar_api():
             if day_hours > 0:
                 slot = leave_by_date.setdefault(day.isoformat(), {})
                 slot[leave_type] = round(slot.get(leave_type, 0.0) + day_hours, 2)
+                # leaves 为单据级明细（每张 OA 单每天一条），弹层据此展示单据信息
+                leave_entries.append(
+                    {
+                        "date": day.isoformat(),
+                        "leave_type": leave_type,
+                        "duration": round(day_hours, 2),
+                        "leave_no": record.leave_no or "",
+                        "start_time": record.start_time.strftime("%Y-%m-%d %H:%M"),
+                        "end_time": record.end_time.strftime("%Y-%m-%d %H:%M"),
+                        "reason": (record.reason or "").strip(),
+                        "approval_status": record.approval_status or "",
+                    }
+                )
             day += timedelta(days=1)
-    leaves = [
-        {"date": d, "leave_type": t, "duration": hours}
-        for d, types in sorted(leave_by_date.items())
-        for t, hours in types.items()
-    ]
+    leave_entries.sort(key=lambda item: (item["date"], item["leave_type"], item["start_time"]))
+    leaves = leave_entries
 
     days = [
         {
@@ -1735,10 +1746,11 @@ def attendance_calendar_api():
     ]
 
     leave_summary: dict[str, dict] = {}
-    for item in leaves:
-        slot = leave_summary.setdefault(item["leave_type"], {"count": 0, "days": 0.0})
-        slot["count"] += 1
-        slot["days"] = round(slot["days"] + item["duration"], 2)
+    for types in leave_by_date.values():
+        for leave_type, hours in types.items():
+            slot = leave_summary.setdefault(leave_type, {"count": 0, "days": 0.0})
+            slot["count"] += 1  # 次数 = 覆盖的日历天数
+            slot["days"] = round(slot["days"] + hours, 2)
     summary = {
         "attendance_days": round(sum(_attendance_day_value(r) for r in views), 2),
         "half_days": sum(1 for r in views if _is_half_day_record(r)),

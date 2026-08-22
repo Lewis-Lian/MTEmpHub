@@ -144,6 +144,24 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("出差：0.5 天")).toBeInTheDocument();
   });
 
+  it("同日两张事假单：格子徽章去重，弹层展示 OA 单明细", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      leaves: [
+        { date: "2026-07-03", leave_type: "事假", duration: 0.17, leave_no: "L101", start_time: "2026-07-03 08:00", end_time: "2026-07-03 12:00", reason: "家中有事", approval_status: "已审批" },
+        { date: "2026-07-03", leave_type: "事假", duration: 0.17, leave_no: "L102", start_time: "2026-07-03 13:00", end_time: "2026-07-03 17:00", reason: "下午外出", approval_status: "已审批" },
+      ],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    const cell = getCell("2026-07-03");
+    expect(within(cell).getAllByText("事假")).toHaveLength(1); // 同假种多单只显示一个徽章
+    fireEvent.click(cell);
+    expect(screen.getByText("家中有事")).toBeInTheDocument();
+    expect(screen.getByText("下午外出")).toBeInTheDocument();
+    expect(screen.getByText("2026-07-03 08:00 ~ 2026-07-03 12:00")).toBeInTheDocument();
+    expect(screen.getAllByText(/已审批/)).toHaveLength(2);
+  });
+
   it("格子按状态填充背景色类", () => {
     render(<AttendanceCalendarGrid data={DATA} />);
     expect(getCell("2026-07-01")).toHaveClass("is-bg-evening"); // 出勤 + 晚加班 → 晚加班优先
