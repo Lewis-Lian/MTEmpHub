@@ -514,6 +514,16 @@
   gap: 28px;
 }
 
+/* 右栏较窄：日历格子压成正方形小月历，打卡时间与徽章放不下，明细走点击弹层 */
+.qh-right-box .attendance-calendar-cell {
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+}
+.qh-right-box .attendance-calendar-cell .cal-punch,
+.qh-right-box .attendance-calendar-cell .cal-badge {
+  display: none;
+}
+
 .qh-stack-bar-box {
   display: flex;
   flex-direction: column;
