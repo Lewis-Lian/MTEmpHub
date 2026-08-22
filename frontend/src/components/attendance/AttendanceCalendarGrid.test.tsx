@@ -153,6 +153,26 @@ describe("AttendanceCalendarGrid", () => {
     expect(getCell("2026-07-05")).toHaveClass("is-bg-attendance"); // 周末加班视同出勤
   });
 
+  it("无刷卡的旷工记录日显示缺勤红而非出勤绿", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-14" },
+        {
+          ...DATA.days[0],
+          date: "2026-07-15",
+          check_in_times: [],
+          check_out_times: [],
+          punch_count: 0,
+          actual_hours: 0,
+        },
+      ],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(getCell("2026-07-14")).toHaveClass("is-bg-attendance"); // 有刷卡记录 → 出勤
+    expect(getCell("2026-07-15")).toHaveClass("is-bg-absent"); // 旷工日（有记录无刷卡）→ 缺勤
+  });
+
   it("多状态时按优先级取第一个命中", () => {
     render(<AttendanceCalendarGrid data={PRIORITY_DATA} />);
     expect(getCell("2026-07-10")).toHaveClass("is-bg-trip"); // 出差 > 婚假 > 丧假
