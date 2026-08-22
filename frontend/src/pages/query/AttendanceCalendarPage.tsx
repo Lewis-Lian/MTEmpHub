@@ -60,7 +60,7 @@ export default function AttendanceCalendarPage() {
             <EmployeePicker
               departments={departments}
               employees={employees}
-              filterMode="employee"
+              filterMode="all"
               onChange={setSelectedIds}
               selectedIds={selectedIds}
               showFieldChrome={false}

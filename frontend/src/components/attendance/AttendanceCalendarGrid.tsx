@@ -65,6 +65,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
             >
               <div className="cal-day-number">{cell.dayOfMonth}</div>
               {renderPunchSummary(cell)}
+              {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
               {renderBadges(cell)}
             </button>
           );

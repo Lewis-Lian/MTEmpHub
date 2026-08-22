@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import AttendanceCalendarGrid from "./AttendanceCalendarGrid";
 import type { AttendanceCalendarData } from "../../types/query";
@@ -171,6 +171,7 @@ describe("AttendanceCalendarGrid", () => {
     render(<AttendanceCalendarGrid data={data} />);
     expect(getCell("2026-07-14")).toHaveClass("is-bg-attendance"); // 有刷卡记录 → 出勤
     expect(getCell("2026-07-15")).toHaveClass("is-bg-absent"); // 旷工日（有记录无刷卡）→ 缺勤
+    expect(within(getCell("2026-07-15")).getByText("缺勤")).toBeInTheDocument(); // 缺勤格子带文字徽标
   });
 
   it("多状态时按优先级取第一个命中", () => {
@@ -217,6 +218,6 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("婚假")).toBeInTheDocument();
     expect(screen.getByText("丧假")).toBeInTheDocument();
     expect(screen.getByText("晚加班")).toBeInTheDocument();
-    expect(screen.getByText("缺勤")).toBeInTheDocument();
+    expect(within(legend as HTMLElement).getByText("缺勤")).toBeInTheDocument(); // 图例的"缺勤"与格内徽章同名，限定图例容器
   });
 });

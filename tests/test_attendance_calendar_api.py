@@ -190,6 +190,22 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertEqual(self._get(f"?emp_id={self.emp_id}&month=bad").status_code, 400)
         self.assertEqual(self._get(f"?emp_id=99999&month=2026-07").status_code, 400)
 
+    def test_manager_employee_allowed(self):
+        """考勤日历可查询管理人员（可见范围内不再被非管理人员过滤拦截）。"""
+        with self.app.app_context():
+            dept = Department.query.first()
+            mgr = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            db.session.add(mgr)
+            db.session.flush()
+            viewer = User.query.filter_by(username="viewer").first()
+            db.session.add(UserEmployeeAssignment(user_id=viewer.id, emp_id=mgr.id))
+            db.session.commit()
+            mgr_id = mgr.id
+
+        resp = self._get(f"?emp_id={mgr_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
+
 
 if __name__ == "__main__":
     unittest.main()

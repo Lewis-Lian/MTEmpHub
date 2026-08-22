@@ -1646,7 +1646,8 @@ def _split_overtime_by_day(rows, month: str):
 
 def attendance_calendar_api():
     emp_id = request.args.get("emp_id", type=int)
-    allowed = _non_manager_emp_ids(_accessible_emp_ids())
+    # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
+    allowed = _accessible_emp_ids()
     if not emp_id or emp_id not in allowed:
         return jsonify({"error": "无效的员工范围"}), 400
     month = request.args.get("month") or ""
