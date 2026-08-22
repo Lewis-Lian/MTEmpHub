@@ -351,8 +351,7 @@ export default function EmployeePicker({
                                 className="form-check-input employee-picker-item"
                                 data-id={employee.id}
                                 onChange={() => toggleDraftEmployee(employee.id)}
-                                type={singleSelect ? "radio" : "checkbox"}
-                                name={singleSelect ? "employee-picker-radio" : undefined}
+                                type="checkbox"
                                 value={employee.id}
                               />
                               <span className="employee-picker-main">{candidateLabel}</span>
@@ -500,8 +499,7 @@ export default function EmployeePicker({
                       disabled
                       readOnly
                       tabIndex={-1}
-                      type={singleSelect ? "radio" : "checkbox"}
-                      name={singleSelect ? "quick-employee-picker-radio" : undefined}
+                      type="checkbox"
                     />
                     <span className="quick-option-label">
                       {employee.emp_no} - {employee.name}
