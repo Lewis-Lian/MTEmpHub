@@ -83,26 +83,28 @@ class AttendanceCalendarApiTests(unittest.TestCase):
             db.session.commit()
 
     def test_evening_overtime_threshold(self):
-        """17:00 边界：16:59 非晚间，17:00 晚间。"""
+        """17:00 边界：16:59 非晚间，17:00 晚间；hours 为小时（effective_hours 天 ×24）。"""
         with self.app.app_context():
             db.session.add_all([
                 OvertimeRecord(overtime_no="OT001", emp_id=self.emp_id,
                                start_time=datetime(2026, 7, 1, 16, 59),
-                               end_time=datetime(2026, 7, 1, 18, 0), effective_hours=1.0),
+                               end_time=datetime(2026, 7, 1, 18, 0), effective_hours=0.125),
                 OvertimeRecord(overtime_no="OT002", emp_id=self.emp_id,
                                start_time=datetime(2026, 7, 2, 17, 0),
-                               end_time=datetime(2026, 7, 2, 19, 30), effective_hours=2.5),
+                               end_time=datetime(2026, 7, 2, 19, 30), effective_hours=0.25),
             ])
             db.session.commit()
         data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
         ot = {o["date"]: o for o in data["overtimes"]}
         self.assertFalse(ot["2026-07-01"]["is_evening"])
         self.assertTrue(ot["2026-07-02"]["is_evening"])
-        self.assertEqual(data["summary"]["evening_overtime_hours"], 2.5)
-        self.assertEqual(data["summary"]["other_overtime_hours"], 1.0)
+        self.assertAlmostEqual(ot["2026-07-01"]["hours"], 3.0)   # 0.125 天 × 24
+        self.assertAlmostEqual(ot["2026-07-02"]["hours"], 6.0)   # 0.25 天 × 24
+        self.assertAlmostEqual(data["summary"]["evening_overtime_hours"], 6.0)
+        self.assertAlmostEqual(data["summary"]["other_overtime_hours"], 3.0)
 
     def test_cross_day_overtime_split(self):
-        """4/1 08:00 → 4/4 17:00 共 3.4h：每天 0.85h，合计守恒。"""
+        """4/1 08:00 → 4/4 17:00 共 3.4 天：每天 20.4h（0.85 天），合计 81.6h 守恒。"""
         with self.app.app_context():
             db.session.add(OvertimeRecord(overtime_no="OT001", emp_id=self.emp_id,
                                           start_time=datetime(2026, 4, 1, 8, 0),
@@ -111,8 +113,8 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         data = self._get(f"?emp_id={self.emp_id}&month=2026-04").get_json()
         ot = {o["date"]: o["hours"] for o in data["overtimes"]}
         self.assertEqual(len(ot), 4)
-        self.assertTrue(all(abs(h - 0.85) < 0.001 for h in ot.values()))
-        self.assertAlmostEqual(sum(ot.values()), 3.4, places=2)
+        self.assertTrue(all(abs(h - 20.4) < 0.01 for h in ot.values()))
+        self.assertAlmostEqual(sum(ot.values()), 3.4 * 24, places=1)
 
     def test_same_day_overtime_merged_and_rejected_excluded(self):
         """同日同属性两条累并；已拒绝的不计入。"""
@@ -133,8 +135,8 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
         ot = [o for o in data["overtimes"] if o["date"] == "2026-07-03"]
         self.assertEqual(len(ot), 1)
-        self.assertAlmostEqual(ot[0]["hours"], 2.5)
-        self.assertEqual(data["summary"]["evening_overtime_hours"], 2.5)
+        self.assertAlmostEqual(ot[0]["hours"], 60.0)  # (1.0 + 1.5) 天 × 24
+        self.assertAlmostEqual(data["summary"]["evening_overtime_hours"], 60.0)
 
     def test_leave_split_and_summary_keeps_raw_type(self):
         """跨天请假按天拆分；出差等假种在汇总中原样保留。"""

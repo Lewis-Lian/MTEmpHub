@@ -1637,7 +1637,9 @@ def _calendar_punch_times(record) -> dict[str, list[str]]:
 
 def _split_overtime_by_day(rows, month: str):
     """加班条按天拆分：跨天条 effective_hours ÷ 覆盖日历天数（最后一天差额补偿），
-    条级晚间(start>=17:00)/周末/节假日属性继承。同日同属性累并。"""
+    条级晚间(start>=17:00)/周末/节假日属性继承。同日同属性累并。
+    effective_hours 单位为天（管理端调休口径，如 0.27083 天 = 6.5 小时），
+    输出的 hours 换算为小时（天 × 24）。"""
     bounds = _month_date_range(month)
     if not bounds:
         return []
@@ -1646,14 +1648,15 @@ def _split_overtime_by_day(rows, month: str):
     for record in rows:
         if not record.start_time or not record.end_time:
             continue
-        total = record.effective_hours or 0
+        total_days = record.effective_hours or 0
         span = (record.end_time.date() - record.start_time.date()).days + 1
-        per_day = round(total / span, 2)
+        per_day = total_days / span
         for offset in range(span):
             day = record.start_time.date() + timedelta(days=offset)
             if not (month_start <= day < month_end):
                 continue
-            hours = per_day if offset < span - 1 else round(total - per_day * (span - 1), 2)
+            day_value = per_day if offset < span - 1 else total_days - per_day * (span - 1)
+            hours = round(day_value * 24, 2)
             key = (day, bool(record.is_weekend), bool(record.is_holiday), record.start_time.time() >= time(17, 0))
             bucket = merged.setdefault(key, {"hours": 0.0})
             bucket["hours"] = round(bucket["hours"] + hours, 2)
