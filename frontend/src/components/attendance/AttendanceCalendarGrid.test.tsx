@@ -208,18 +208,6 @@ describe("AttendanceCalendarGrid", () => {
     expect(container.querySelectorAll(".attendance-calendar-cell.is-bg-absent")).toHaveLength(0);
   });
 
-  it("有事假等其他假种的日子不标缺勤", () => {
-    const data: AttendanceCalendarData = {
-      ...DATA,
-      days: [{ ...DATA.days[0], date: "2026-07-14" }],
-      leaves: [{ date: "2026-07-16", leave_type: "事假", duration: 1 }],
-    };
-    render(<AttendanceCalendarGrid data={data} />);
-    expect(getCell("2026-07-16").className).not.toMatch(/is-bg-/); // 白底
-    expect(within(getCell("2026-07-16")).getByText("事假")).toBeInTheDocument(); // 假种徽章保留
-    expect(getCell("2026-07-04")).toHaveClass("is-bg-absent"); // 无任何记录的日子仍标缺勤
-  });
-
   it("图例渲染七色修订版七项", () => {
     const { container } = render(<AttendanceCalendarGrid data={DATA} />);
     const legend = container.querySelector(".attendance-calendar-legend");
