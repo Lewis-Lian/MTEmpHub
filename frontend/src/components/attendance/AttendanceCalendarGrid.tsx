@@ -83,49 +83,77 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
       </div>
 
       {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
-        <div className="attendance-calendar-daydetail" role="dialog" aria-label={`考勤明细 ${selected.date}`}>
-          <div className="daydetail-card">
+        <div
+          className="attendance-calendar-daydetail"
+          onClick={() => setSelectedDate(null)}
+          role="dialog"
+          aria-label={`考勤明细 ${selected.date}`}
+        >
+          <div className="daydetail-card" onClick={(event) => event.stopPropagation()}>
             <div className="daydetail-header">
-              <span>{selected.date}</span>
+              <div className="daydetail-date">
+                <span>{selected.date}</span>
+                <span className="daydetail-date-week">{weekdayLabel(selected.date)}</span>
+              </div>
               <button aria-label="关闭" onClick={() => setSelectedDate(null)} type="button">×</button>
             </div>
             <div className="daydetail-body">
               {selected.day ? (
                 <>
-                  <div className="daydetail-row">上班卡：{renderTimes(selected.day.check_in_times)}</div>
-                  <div className="daydetail-row">下班卡：{renderTimes(selected.day.check_out_times)}</div>
-                  <div className="daydetail-row">打卡次数：{selected.day.punch_count} 次</div>
-                  <div className="daydetail-row">实出勤：{selected.day.actual_hours} 小时</div>
+                  <div className="daydetail-row">
+                    <span className="daydetail-label">上班卡</span>
+                    <span className="daydetail-value">{renderTimes(selected.day.check_in_times)}</span>
+                  </div>
+                  <div className="daydetail-row">
+                    <span className="daydetail-label">下班卡</span>
+                    <span className="daydetail-value">{renderTimes(selected.day.check_out_times)}</span>
+                  </div>
+                  <div className="daydetail-row">
+                    <span className="daydetail-label">打卡次数</span>
+                    <span className="daydetail-value">{selected.day.punch_count} 次</span>
+                  </div>
+                  <div className="daydetail-row">
+                    <span className="daydetail-label">实出勤</span>
+                    <span className="daydetail-value">{selected.day.actual_hours} 小时</span>
+                  </div>
                   {selected.day.late_minutes > 0 && (
-                    <div className="daydetail-row">迟到：{selected.day.late_minutes} 分钟</div>
+                    <div className="daydetail-row">
+                      <span className="daydetail-label">迟到</span>
+                      <span className="daydetail-value daydetail-warn">{selected.day.late_minutes} 分钟</span>
+                    </div>
                   )}
                   {selected.day.early_leave_minutes > 0 && (
-                    <div className="daydetail-row">早退：{selected.day.early_leave_minutes} 分钟</div>
+                    <div className="daydetail-row">
+                      <span className="daydetail-label">早退</span>
+                      <span className="daydetail-value daydetail-warn">{selected.day.early_leave_minutes} 分钟</span>
+                    </div>
                   )}
-                  {selected.day.is_half_day && <div className="daydetail-row">半勤：是</div>}
+                  {selected.day.is_half_day && (
+                    <div className="daydetail-row">
+                      <span className="daydetail-label">半勤</span>
+                      <span className="daydetail-value">是</span>
+                    </div>
+                  )}
                 </>
               ) : null}
               {selected.leaves.map((leave, index) => (
                 <div className="daydetail-leave" key={`leave-${index}`}>
                   <div className="daydetail-row">
-                    {leave.leave_type}：{leave.duration} 天{leave.approval_status ? `（${leave.approval_status}）` : ""}
+                    <span className="daydetail-label">{leave.leave_type}</span>
+                    <span className="daydetail-value">
+                      {leave.duration} 天{leave.approval_status ? `（${leave.approval_status}）` : ""}
+                    </span>
                   </div>
                   {leave.start_time && leave.end_time ? (
-                    <div className="daydetail-row daydetail-sub">{leave.start_time} ~ {leave.end_time}</div>
+                    <div className="daydetail-sub">{leave.start_time} ~ {leave.end_time}</div>
                   ) : null}
-                  {leave.reason ? <div className="daydetail-row daydetail-sub">{leave.reason}</div> : null}
+                  {leave.reason ? <div className="daydetail-sub">{leave.reason}</div> : null}
                 </div>
               ))}
               {selected.overtimes.map((overtime, index) => (
                 <div className="daydetail-row" key={`overtime-${index}`}>
-                  {overtime.is_evening
-                    ? "晚上加班"
-                    : overtime.is_holiday
-                      ? "节假日加班"
-                      : overtime.is_weekend
-                        ? "周末加班"
-                        : "加班"}
-                  ：{overtime.hours} 小时
+                  <span className="daydetail-label">{overtimeLabel(overtime)}</span>
+                  <span className="daydetail-value">{overtime.hours} 小时</span>
                 </div>
               ))}
             </div>
@@ -142,6 +170,21 @@ function leadingSlots(month: string): number {
   }
   const [yearText, monthText] = month.split("-");
   return (new Date(Number(yearText), Number(monthText) - 1, 1).getDay() + 6) % 7;
+}
+
+function weekdayLabel(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return "";
+  }
+  return WEEKDAYS[(new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay() + 6) % 7];
+}
+
+function overtimeLabel(overtime: AttendanceCalendarOvertime): string {
+  if (overtime.is_evening) return "晚上加班";
+  if (overtime.is_holiday) return "节假日加班";
+  if (overtime.is_weekend) return "周末加班";
+  return "加班";
 }
 
 // 七色修订版背景色口径（设计文档 2.9）：出差 > 婚假 > 丧假 > 半勤 > 晚加班 > 出勤 > 缺勤 > 无
