@@ -150,6 +150,8 @@ function cellBackgroundKey(cell: DayCell, hasMonthData: boolean): CellBackground
   if (cell.overtimes.some((overtime) => overtime.is_evening)) return "evening";
   // 考勤机对旷工日也会生成无刷卡的 DailyRecord（如 exception_reason=旷工），出勤须以真实刷卡判定
   if ((cell.day && hasPunch(cell.day)) || cell.overtimes.length > 0) return "attendance";
+  // 事假等其他假种（无专属色）不标缺勤，白底 + 假种徽章展示
+  if (cell.leaves.length > 0) return "none";
   if (hasMonthData && cell.date < todayString()) return "absent";
   return "none";
 }
