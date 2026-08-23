@@ -30,6 +30,14 @@ export const MANAGER_DAILY_STATUSES = ["全勤", "上午出勤", "下午出勤",
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
+// 点击格子的出勤状态循环顺序（""=跟随系统）
+const ATTENDANCE_CYCLE = ["", "全勤", "上午出勤", "下午出勤", "缺勤"];
+
+function nextCycleStatus(current: string | null | undefined): string {
+  const index = ATTENDANCE_CYCLE.indexOf(current ?? "");
+  return ATTENDANCE_CYCLE[(index + 1) % ATTENDANCE_CYCLE.length] ?? "";
+}
+
 interface OverrideCalendarEmployee {
   id: number;
   emp_no: string;
@@ -144,8 +152,32 @@ export default function AttendanceOverrideCalendarModal({
     };
   }
 
+  // 点击格子直接循环切换出勤状态（""=跟随系统）；假种与详细信息在下方面板设置
+  function handleCellClick(date: string) {
+    setSelectedDate(date);
+    if (isLocked || isSaving || !calendar) {
+      return;
+    }
+    const dayOverride = calendar.days.find((day) => day.date === date)?.override ?? null;
+    const nextStatus = nextCycleStatus(dayOverride?.status);
+    void persist(
+      {
+        month,
+        emp_id: employee.id,
+        date,
+        status: nextStatus,
+        is_evening_overtime: dayOverride?.is_evening_overtime ?? undefined,
+        work_hours: dayOverride?.work_hours ?? "",
+        late_minutes: dayOverride?.late_minutes ?? "",
+        early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
+        remark: dayOverride?.remark ?? "",
+      },
+      nextStatus ? `已标记 ${nextStatus}` : "已恢复跟随系统",
+    );
+  }
+
   async function persist(payload: DailyOverrideSavePayload, successText: string) {
-    if (!selectedDate || isSaving) {
+    if (!payload.date || isSaving) {
       return;
     }
     setIsSaving(true);
@@ -210,11 +242,13 @@ export default function AttendanceOverrideCalendarModal({
               <>
                 <AttendanceCalendarGrid
                   data={calendar}
-                  onCellSelect={setSelectedDate}
+                  onCellSelect={handleCellClick}
                   selectedDate={selectedDate}
                 />
                 {selectedDay ? renderDayPanel() : (
-                  <div className="attendance-override-daypanel-hint">点击日历中的日期修正当天考勤</div>
+                  <div className="attendance-override-daypanel-hint">
+                    点击格子循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤 → 跟随系统）；假种与工时等可在选中日期后于下方设置
+                  </div>
                 )}
               </>
             ) : null}
@@ -278,7 +312,7 @@ export default function AttendanceOverrideCalendarModal({
         </div>
 
         <div className="daypanel-section daypanel-status">
-          <div className="daypanel-title">考勤状态（点击即保存）</div>
+          <div className="daypanel-title">考勤状态（假种在此选择；出勤状态点格子循环切换）</div>
           <div className="daypanel-status-group">
             {statuses.map((status) => (
               <button
