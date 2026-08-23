@@ -24,6 +24,7 @@ from utils.helpers import (
     parse_int,
     split_time_cells,
 )
+from services.manager_attendance_service import manager_raw_score
 
 
 class ImportService:
@@ -184,16 +185,6 @@ class ImportService:
                 continue
             raw[header] = row[idx] if idx < len(row) else None
         return raw
-
-    @staticmethod
-    def _manager_raw_score(raw: dict[str, Any]) -> int:
-        score = 0
-        for key in ("出勤天数", "工作时长", "迟到时长", "早退时长"):
-            value = raw.get(key)
-            if value not in (None, ""):
-                score += 10
-        score += sum(1 for value in raw.values() if value not in (None, ""))
-        return score
 
     @staticmethod
     def _is_manager_daily_raw(raw: dict[str, Any]) -> bool:
@@ -663,7 +654,7 @@ class ImportService:
 
             raw_data = ImportService._raw_dict_from_header_map(row, header_map)
             existing_raw = report.manager_raw_data if isinstance(report.manager_raw_data, dict) else {}
-            if ImportService._manager_raw_score(existing_raw) > ImportService._manager_raw_score(raw_data):
+            if manager_raw_score(existing_raw) > manager_raw_score(raw_data):
                 continue
             report.raw_data = raw_data
             report.manager_raw_data = raw_data
@@ -747,7 +738,7 @@ class ImportService:
                 continue
             if (
                 not (is_manager_raw and not existing_is_manager_raw)
-                and ImportService._manager_raw_score(existing_raw) > ImportService._manager_raw_score(raw_data)
+                and manager_raw_score(existing_raw) > manager_raw_score(raw_data)
             ):
                 continue
             manager_payload = {

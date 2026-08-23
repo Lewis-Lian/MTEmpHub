@@ -140,5 +140,18 @@ class ManagerImportBulkLookupTests(unittest.TestCase):
         self.assertEqual(result["imported"], 1, result)
 
 
+class ManagerRawScoreSharedTests(unittest.TestCase):
+    def test_import_service_uses_shared_score_implementation(self) -> None:
+        """import_service 不再有私有打分实现，统一使用 manager_attendance_service 的 13-key 版本。"""
+        from services.import_service import ImportService
+        from services.manager_attendance_service import manager_raw_score
+
+        self.assertFalse(hasattr(ImportService, "_manager_raw_score"))
+        raw = {"出勤天数": 20, "严重迟到时长": 30, "出差时长": 2}
+        # 13-key 语义：出勤天数/严重迟到时长/出差时长 三个加权 key 各 +10，
+        # 再加全部非空值计数 +3，共 33
+        self.assertEqual(manager_raw_score(raw), 33)
+
+
 if __name__ == "__main__":
     unittest.main()
