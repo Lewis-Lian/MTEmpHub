@@ -1104,6 +1104,50 @@ describe("App smoke regression", () => {
     expect(screen.getByText("请先查询员工和月份")).toBeInTheDocument();
   });
 
+  it("员工无月度修正时日历弹窗不显示月度修正优先提示", async () => {
+    window.history.replaceState({}, "", "/admin/employee-attendance-overrides");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/employee-attendance-overrides") {
+        // 后端无月度修正时 override 为全空字段对象（非 null）
+        return Promise.resolve(
+          jsonResponse({
+            month: "2026-05",
+            rows: [
+              {
+                employee: { id: 12, emp_no: "E001", name: "员工甲", dept_id: 10, dept_name: "信息部", is_manager: false },
+                automatic: { attendance_days: 21, work_hours: 168, half_days: 0, late_early_minutes: 0 },
+                override: {
+                  attendance_days: null,
+                  actual_attendance_days: null,
+                  work_hours: null,
+                  half_days: null,
+                  late_early_minutes: null,
+                  remark: "",
+                  updated_at: null,
+                  updated_by_name: "",
+                },
+                applied: { attendance_days: 21, work_hours: 168, half_days: 0, late_early_minutes: 0 },
+              },
+            ],
+          }),
+        );
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByText("查询条件");
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+    expect(await screen.findByText("员工甲")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(await screen.findByText("编辑员工考勤修正")).toBeInTheDocument();
+    expect(await screen.findByText(/出勤 1 天/)).toBeInTheDocument();
+    expect(screen.queryByText(/最终应用值以月度修正为准/)).not.toBeInTheDocument();
+  });
+
   it("考勤修正页会挂载专用查询卡和员工选择器样式类", async () => {
     window.history.replaceState({}, "", "/admin/employee-attendance-overrides");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
