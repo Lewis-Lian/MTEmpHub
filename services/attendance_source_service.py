@@ -162,6 +162,25 @@ def build_attendance_record_view(record: DailyRecord, employee: Employee, contex
 def attendance_views_by_employee(month: str, employees: list[Employee], context: str) -> dict[int, list[AttendanceRecordView]]:
     if not employees:
         return {}
+    # 请求级缓存：同一请求内相同 (month, emp_ids, context) 的重复调用直接复用结果。
+    # 汇总导出等接口会对同一批员工反复取视图（final rows/异常行/部门工时等），
+    # 该查询是全字段 DailyRecord joinedload 大查询，重复执行代价高。
+    # 调用方均只读视图对象（不 mutate），共享引用安全；无 app context 时跳过缓存。
+    cache: dict | None = None
+    cache_key: tuple | None = None
+    try:
+        from flask import g, has_app_context
+
+        if has_app_context():
+            cache = getattr(g, "_attendance_views_cache", None)
+            if cache is None:
+                cache = {}
+                g._attendance_views_cache = cache  # type: ignore[attr-defined]
+            cache_key = (month, context, tuple(sorted(employee.id for employee in employees)))
+            if cache_key in cache:
+                return cache[cache_key]
+    except RuntimeError:
+        cache = None
     date_range = _month_date_range(month)
     if not date_range:
         return {}
@@ -184,6 +203,8 @@ def attendance_views_by_employee(month: str, employees: list[Employee], context:
         if view is None:
             continue
         result.setdefault(row.emp_id, []).append(view)
+    if cache is not None and cache_key is not None:
+        cache[cache_key] = result
     return result
 
 
