@@ -5820,3 +5820,4 @@ input[type="checkbox"] {
 .daypanel-field input:disabled, .daypanel-field textarea:disabled { background: #eef1f6; }
 .daypanel-actions { display: flex; gap: 8px; grid-column: span 2; }
 .attendance-override-daypanel-meta { color: #6b7686; font-size: 12px; }
+.daypanel-current-status { font-weight: 400; font-size: 12px; color: #1a56b0; margin-left: auto; }

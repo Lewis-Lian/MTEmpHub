@@ -125,9 +125,9 @@ describe("AttendanceOverrideCalendarModal", () => {
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-15", status: "全勤" }));
     });
-    // 等日历刷新为全勤后（面板当前状态高亮），再点 → 上午出勤
+    // 等日历刷新为全勤后（面板显示当前状态），再点 → 上午出勤
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "标记 全勤" })).toHaveClass("is-active");
+      expect(screen.getByText("当前：全勤")).toBeInTheDocument();
     });
     fireEvent.click(cell);
     await waitFor(() => {
@@ -218,8 +218,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     });
   });
 
-  it("已有修正的日期显示当前状态、修正人与清除按钮", async () => {
-    const existing = { status: "全勤", remark: "补卡", updated_by_name: "admin", updated_at: "2026-08-01T10:00:00" };
+  it("已有假种修正的日期显示当前状态、修正人与清除按钮", async () => {
+    const existing = { status: "事假", remark: "补卡", updated_by_name: "admin", updated_at: "2026-08-01T10:00:00" };
     mockFetchCalendar.mockResolvedValue(calendarData({ "2026-07-15": existing }));
     // 点击格子会触发循环切换保存，mock 返回保持原状的数据避免状态漂移
     mockSave.mockResolvedValue({ calendar: calendarData({ "2026-07-15": existing }), row: {} });
@@ -230,14 +230,27 @@ describe("AttendanceOverrideCalendarModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
     const panel = await screen.findByTestId("daily-override-panel");
     await waitFor(() => {
-      expect(within(panel).getByRole("button", { name: "标记 全勤" })).toHaveClass("is-active");
+      expect(within(panel).getByText("当前：事假")).toBeInTheDocument();
     });
+    expect(within(panel).getByRole("button", { name: "标记 事假" })).toHaveClass("is-active");
     expect(within(panel).getByText(/admin/)).toBeInTheDocument();
     fireEvent.click(within(panel).getByRole("button", { name: "清除修正" }));
 
     await waitFor(() => {
       expect(mockClear).toHaveBeenCalledWith(EMPLOYEE.id, "2026-07-15");
     });
+  });
+
+  it("面板不显示可循环切换的出勤状态按钮，仅显示假种", async () => {
+    mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
+    renderModal();
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
+    for (const status of ["全勤", "上午出勤", "下午出勤", "缺勤"]) {
+      expect(screen.queryByRole("button", { name: `标记 ${status}` })).toBeNull();
+    }
+    expect(screen.getByRole("button", { name: "标记 事假" })).toBeInTheDocument();
+    expect(screen.getByText("当前：跟随系统")).toBeInTheDocument();
   });
 
   it("账套锁定时禁用全部编辑控件，点击格子只选中不保存", async () => {
@@ -247,7 +260,7 @@ describe("AttendanceOverrideCalendarModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
     expect(screen.getByTestId("daily-override-panel")).toBeInTheDocument();
     expect(mockSave).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "标记 全勤" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "标记 事假" })).toBeDisabled();
   });
 
   it("存在月度修正时提示最终应用以月度修正为准", async () => {
