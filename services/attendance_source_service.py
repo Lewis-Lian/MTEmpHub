@@ -88,13 +88,6 @@ def attendance_source_for_context(employee: Employee, context: str) -> str:
     return employee.employee_stats_attendance_source or ATTENDANCE_SOURCE_EMPLOYEE
 
 
-def manager_stats_included(employee: Employee) -> bool:
-    return bool(employee.is_manager)
-
-
-def employee_stats_included(employee: Employee) -> bool:
-    return not bool(employee.is_manager)
-
 
 def build_attendance_record_view(record: DailyRecord, employee: Employee, context: str) -> AttendanceRecordView | None:
     configured_source = attendance_source_for_context(employee, context)

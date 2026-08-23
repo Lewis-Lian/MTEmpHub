@@ -393,65 +393,6 @@ def delete_daily_attendance_override_record_api():
     return _daily_record_response(employee, month)
 
 
-def register_admin_attendance_override_routes(admin_bp) -> None:
-    @admin_bp.route("/manager-attendance-overrides/record", methods=["GET"])
-    @admin_required
-    def manager_attendance_override_record():
-        return manager_attendance_override_record_api()
-
-    @admin_bp.route("/manager-attendance-overrides/list", methods=["GET"])
-    @admin_required
-    def manager_attendance_override_list():
-        return manager_attendance_override_list_api()
-
-    @admin_bp.route("/manager-attendance-overrides/record", methods=["PUT"])
-    @admin_required
-    def save_manager_attendance_override_record():
-        return save_manager_attendance_override_record_api()
-
-    @admin_bp.route("/manager-attendance-overrides/record", methods=["DELETE"])
-    @admin_required
-    def delete_manager_attendance_override_record():
-        return delete_manager_attendance_override_record_api()
-
-    @admin_bp.route("/manager-attendance-overrides/history", methods=["GET"])
-    @admin_required
-    def manager_attendance_override_history():
-        return manager_attendance_override_history_api()
-
-    admin_bp.add_url_rule("/manager-attendance-overrides/template", endpoint="download_manager_attendance_override_template", view_func=download_manager_attendance_override_template, methods=["GET"])
-    admin_bp.add_url_rule("/manager-attendance-overrides/export", endpoint="export_manager_attendance_overrides", view_func=export_manager_attendance_overrides, methods=["GET"])
-    admin_bp.add_url_rule("/manager-attendance-overrides/import", endpoint="import_manager_attendance_overrides", view_func=import_manager_attendance_overrides, methods=["POST"])
-
-    @admin_bp.route("/employee-attendance-overrides/record", methods=["GET"])
-    @admin_required
-    def employee_attendance_override_record():
-        return employee_attendance_override_record_api()
-
-    @admin_bp.route("/employee-attendance-overrides/list", methods=["GET"])
-    @admin_required
-    def employee_attendance_override_list():
-        return employee_attendance_override_list_api()
-
-    @admin_bp.route("/employee-attendance-overrides/record", methods=["PUT"])
-    @admin_required
-    def save_employee_attendance_override_record():
-        return save_employee_attendance_override_record_api()
-
-    @admin_bp.route("/employee-attendance-overrides/record", methods=["DELETE"])
-    @admin_required
-    def delete_employee_attendance_override_record():
-        return delete_employee_attendance_override_record_api()
-
-    @admin_bp.route("/employee-attendance-overrides/history", methods=["GET"])
-    @admin_required
-    def employee_attendance_override_history():
-        return employee_attendance_override_history_api()
-
-    admin_bp.add_url_rule("/employee-attendance-overrides/template", endpoint="download_employee_attendance_override_template", view_func=download_employee_attendance_override_template, methods=["GET"])
-    admin_bp.add_url_rule("/employee-attendance-overrides/export", endpoint="export_employee_attendance_overrides", view_func=export_employee_attendance_overrides, methods=["GET"])
-    admin_bp.add_url_rule("/employee-attendance-overrides/import", endpoint="import_employee_attendance_overrides", view_func=import_employee_attendance_overrides, methods=["POST"])
-
 
 @admin_required
 def download_manager_attendance_override_template():

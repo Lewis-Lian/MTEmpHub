@@ -213,28 +213,6 @@ def _accessible_emp_ids_set() -> set[int]:
     return ids
 
 
-def _convert_uploaded_xls_to_xlsx(xls_path: str) -> str | None:
-    xlsx_path = f"{os.path.splitext(xls_path)[0]}.xlsx"
-    try:
-        subprocess.run(
-            [
-                "libreoffice",
-                "--headless",
-                "--convert-to",
-                "xlsx",
-                "--outdir",
-                os.path.dirname(xls_path),
-                xls_path,
-            ],
-            check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-    except Exception:
-        return None
-    return xlsx_path if os.path.exists(xlsx_path) else None
-
 
 def _serialize_user(user: User, profile_departments_by_id: dict[int, Department] | None = None) -> dict:
     profile_department = None
@@ -662,9 +640,6 @@ def _override_field_labels(override_type: str) -> dict[str, str]:
     return _MANAGER_OVERRIDE_LABELS
 
 
-def _override_field_names(override_type: str) -> tuple[str, ...]:
-    return _EMPLOYEE_OVERRIDE_FIELDS if override_type == "employee" else _MANAGER_ATTENDANCE_OVERRIDE_FIELDS
-
 
 def _override_state_from_row(row: object | None, fields: tuple[str, ...]) -> dict[str, object]:
     state = {field: getattr(row, field) if row else None for field in fields}
@@ -735,14 +710,6 @@ def _serialize_override_history(row: AttendanceOverrideHistory) -> dict[str, obj
         "changes": changes,
     }
 
-
-def _history_rows(override_type: str, emp_id: int, month: str) -> list[dict[str, object]]:
-    rows = (
-        AttendanceOverrideHistory.query.filter_by(override_type=override_type, emp_id=emp_id, month=month)
-        .order_by(AttendanceOverrideHistory.created_at.desc(), AttendanceOverrideHistory.id.desc())
-        .all()
-    )
-    return [_serialize_override_history(row) for row in rows]
 
 
 def _history_rows_for_month(override_type: str, month: str) -> list[dict[str, object]]:
@@ -1223,25 +1190,6 @@ def update_manager_overtime_summary():
     payload, status = _save_manager_month_stat("overtime")
     return jsonify(payload), status
 
-
-def update_manager_overtime_record(record_id: int):
-    row = _require_model(OvertimeRecord, record_id)
-    if not row.employee or not row.employee.is_manager:
-        return jsonify({"error": "record is not a manager overtime record"}), 400
-    month = row.date.strftime("%Y-%m") if row.date else None
-    account_set = _account_set_for_month(month)
-    locked_error = _ensure_account_set_unlocked(account_set, "修改管理人员加班记录")
-    if locked_error:
-        return locked_error
-    data = request.json or {}
-    row.effective_hours = float(data.get("effective_hours") or 0)
-    row.salary_option = (data.get("salary_option") or "").strip()
-    row.is_weekend = bool(data.get("is_weekend"))
-    row.is_holiday = bool(data.get("is_holiday"))
-    row.approval_status = (data.get("approval_status") or "").strip()
-    row.reason = (data.get("reason") or "").strip()
-    db.session.commit()
-    return jsonify({"status": "ok"})
 
 
 def _manager_export_months(year: int) -> list[tuple[str, str]]:
@@ -2379,14 +2327,6 @@ def batch_operate_employees():
 
     return jsonify({"error": "unsupported action"}), 400
 
-
-def annotate_record(record_id: int):
-    data = request.json or {}
-    reason = (data.get("exception_reason") or "").strip()
-    record = _require_model(DailyRecord, record_id)
-    record.exception_reason = reason
-    db.session.commit()
-    return jsonify({"status": "ok"})
 
 
 def _employee_override_values(override: EmployeeAttendanceOverride | None) -> dict[str, float | int | None]:
