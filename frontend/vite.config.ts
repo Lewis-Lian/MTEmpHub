@@ -6,6 +6,20 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: "vendor-react",
+                test: /node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/,
+              },
+            ],
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       proxy: {
