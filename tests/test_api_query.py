@@ -138,6 +138,8 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
         self.assertEqual(payload["account_sets"][0]["month"], "2026-05")
+        # is_locked 供修正页/弹窗禁用编辑，缺失会导致锁定账套仍可提交
+        self.assertIs(payload["account_sets"][0]["is_locked"], False)
         self.assertEqual([row["emp_no"] for row in payload["employees"]], ["E001"])
         self.assertEqual([row["dept_no"] for row in payload["departments"]], ["D001"])
 
