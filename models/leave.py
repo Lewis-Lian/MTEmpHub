@@ -3,6 +3,10 @@ from . import db
 
 class LeaveRecord(db.Model):
     __tablename__ = "leave_records"
+    __table_args__ = (
+        db.Index("ix_leave_records_emp_id_start_time", "emp_id", "start_time"),
+    )
+
 
     id = db.Column(db.Integer, primary_key=True)
     emp_id = db.Column(db.Integer, db.ForeignKey("employees.id"), nullable=False, index=True)
