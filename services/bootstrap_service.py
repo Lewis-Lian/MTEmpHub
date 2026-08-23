@@ -39,6 +39,11 @@ def ensure_schema_compatibility() -> None:
 
         AccountSetFactoryRestDay.__table__.create(bind=db.engine, checkfirst=True)
 
+    if "daily_attendance_overrides" not in table_names:
+        from models.daily_attendance_override import DailyAttendanceOverride
+
+        DailyAttendanceOverride.__table__.create(bind=db.engine, checkfirst=True)
+
     department_columns = _get_column_names(inspector, "departments")
     if department_columns is not None:
         if "parent_id" not in department_columns:

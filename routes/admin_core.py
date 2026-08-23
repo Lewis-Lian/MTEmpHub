@@ -85,6 +85,16 @@ _MANAGER_OVERRIDE_LABELS = {
     "remark": "备注",
 }
 
+_DAILY_OVERRIDE_LABELS = {
+    "record_date": "日期",
+    "status": "考勤状态",
+    "is_evening_overtime": "晚上加班",
+    "work_hours": "工时",
+    "late_minutes": "迟到分钟",
+    "early_leave_minutes": "早退分钟",
+    "remark": "备注",
+}
+
 _DEPARTMENT_ORIGINAL_ID_HEADER = "原始部门ID"
 _DEPARTMENT_ORIGINAL_DEPT_NO_HEADER = "原始部门编号"
 _DEPARTMENT_ORIGINAL_DEPT_NAME_HEADER = "原始部门名称"
@@ -645,7 +655,11 @@ def _user_display_name(user: User | None) -> str:
 
 
 def _override_field_labels(override_type: str) -> dict[str, str]:
-    return _EMPLOYEE_OVERRIDE_LABELS if override_type == "employee" else _MANAGER_OVERRIDE_LABELS
+    if override_type == "employee":
+        return _EMPLOYEE_OVERRIDE_LABELS
+    if override_type == "daily":
+        return _DAILY_OVERRIDE_LABELS
+    return _MANAGER_OVERRIDE_LABELS
 
 
 def _override_field_names(override_type: str) -> tuple[str, ...]:
@@ -2382,7 +2396,8 @@ def _employee_override_values(override: EmployeeAttendanceOverride | None) -> di
 def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None:
     from routes.query_core import _build_final_rows
 
-    rows = _build_final_rows(month, [emp_id])
+    # include_overrides=False：automatic 为「系统原始 + 逐日修正」，不含月度修正（月度优先级最高，applied 单独体现）
+    rows = _build_final_rows(month, [emp_id], include_overrides=False)
     if not rows:
         return None
     row = rows[0]
@@ -2397,6 +2412,11 @@ def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None
 
 def _employee_late_early_minutes(emp_id: int, month: str) -> int:
     from routes.query_core import _month_date_range
+    from services.daily_override_service import (
+        daily_override_maps,
+        effective_early_leave_minutes,
+        effective_late_minutes,
+    )
 
     date_range = _month_date_range(month)
     if not date_range:
@@ -2407,7 +2427,19 @@ def _employee_late_early_minutes(emp_id: int, month: str) -> int:
         .filter(DailyRecord.record_date >= start_date, DailyRecord.record_date < end_date)
         .all()
     )
-    return sum((r.late_minutes or 0) + (r.early_leave_minutes or 0) for r in records)
+    overrides = daily_override_maps(month, [emp_id]).get(emp_id, {})
+    total = 0
+    seen_dates = set()
+    for record in records:
+        override = overrides.get(record.record_date)
+        total += effective_late_minutes(record.late_minutes, override)
+        total += effective_early_leave_minutes(record.early_leave_minutes, override)
+        seen_dates.add(record.record_date)
+    # 修正表有记录但无 DailyRecord 的日期（缺勤日补修正）也计入
+    for day, override in overrides.items():
+        if day not in seen_dates:
+            total += int(override.late_minutes or 0) + int(override.early_leave_minutes or 0)
+    return total
 
 
 def _employee_override_payload(row: EmployeeAttendanceOverride | None) -> dict[str, object]:

@@ -18,6 +18,11 @@ from services.attendance_source_service import (
     attendance_views_by_employee,
     selected_monthly_report_raw,
 )
+from services.daily_override_service import (
+    daily_override_maps,
+    evening_overtime_dates_by_emp,
+    status_attendance_days,
+)
 from sqlalchemy.orm import joinedload
 from utils.helpers import overlap_duration_days
 
@@ -438,29 +443,76 @@ def _has_manager_punch_record(record) -> bool:
     return any(str(raw.get(key) or "").strip() for key in _MANAGER_PUNCH_TIME_KEYS)
 
 
-def _manager_attendance_days_from_views(rows: list[object]) -> float:
-    return _round2(sum(1 for row in rows if _has_manager_punch_record(row)))
+def _manager_attendance_days_from_views(
+    rows: list[object],
+    daily_overrides: dict | None = None,
+    evening_dates: set | None = None,
+) -> float:
+    """刷卡兜底出勤天数（effective 口径，与员工侧一致）：
+    勾选晚加 → 0.5；状态修正 → 按状态映射；当日有晚加班条 → 0.5；否则有刷卡记 1 天。
+    修正表有记录但无 DailyRecord 的日期也计入。
+    """
+    daily_overrides = daily_overrides or {}
+    evening_dates = evening_dates or set()
+
+    def day_value(day, override, has_punch: bool) -> float:
+        if override is not None:
+            if override.is_evening_overtime:
+                return 0.5
+            if override.status:
+                return status_attendance_days(override.status)
+        if day in evening_dates:
+            return 0.5
+        return 1.0 if has_punch else 0.0
+
+    total = 0.0
+    seen: set = set()
+    for row in rows:
+        day = getattr(row, "record_date", None)
+        total += day_value(day, daily_overrides.get(day) if day else None, _has_manager_punch_record(row))
+        if day:
+            seen.add(day)
+    for day, override in daily_overrides.items():
+        if day not in seen:
+            total += day_value(day, override, False)
+    return _round2(total)
 
 
-def _manager_schedule_late_minutes_from_views(employee: Employee, rows: list[object]) -> int:
+def _manager_schedule_late_minutes_from_views(
+    employee: Employee,
+    rows: list[object],
+    daily_overrides: dict | None = None,
+) -> int:
     if employee.is_nursing:
         return 0
+    daily_overrides = daily_overrides or {}
 
     total = 0
+    seen: set = set()
     for row in rows:
-        raw = row.raw_data if isinstance(row.raw_data, dict) else {}
-        nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
-        result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
-        if "迟到" not in result:
-            continue
-        day_minutes = (
-            _raw_minutes(raw, "迟到时长", "严重迟到时长")
-            or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
-            or int(row.late_minutes or 0)
-        )
-        if day_minutes >= 30:
-            continue
-        total += day_minutes
+        day = getattr(row, "record_date", None)
+        override = daily_overrides.get(day) if day else None
+        if override is not None and override.late_minutes is not None:
+            # 逐日修正的迟到分钟直接生效（不适用 ≥30 分钟排除规则）
+            total += int(override.late_minutes)
+        else:
+            raw = row.raw_data if isinstance(row.raw_data, dict) else {}
+            nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
+            result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
+            if "迟到" in result:
+                day_minutes = (
+                    _raw_minutes(raw, "迟到时长", "严重迟到时长")
+                    or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
+                    or int(row.late_minutes or 0)
+                )
+                if day_minutes < 30:
+                    total += day_minutes
+        if day:
+            seen.add(day)
+    # 修正表有记录但无 DailyRecord 的日期
+    for day, override in daily_overrides.items():
+        if day not in seen and override.late_minutes is not None:
+            total += int(override.late_minutes)
     return total
 
 
@@ -492,6 +544,8 @@ def build_manager_rows(
     overtime_rows_by_employee = _overtime_rows_by_employee(employee_ids, options.month)
     override_rows_by_employee = _override_rows_by_employee(employee_ids, options.month) if include_overrides else {}
     month_stats_by_employee = _manager_month_stats_by_employee(employee_ids, options.month)
+    daily_override_by_emp = daily_override_maps(options.month, employee_ids)
+    evening_dates_by_emp = evening_overtime_dates_by_emp(options.month, employee_ids)
     factory_rest_periods_by_date = _factory_rest_periods_by_date(options.month)
     factory_rest_days = _factory_rest_days_from_periods(factory_rest_periods_by_date)
     # 日期级厂休重叠只能以账套厂休明细为准。
@@ -502,8 +556,9 @@ def build_manager_rows(
         raw = _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
         attendance_rows = attendance_rows_by_employee.get(employee.id, [])
+        daily_overrides = daily_override_by_emp.get(employee.id, {})
 
-        late_early_minutes = _manager_schedule_late_minutes_from_views(employee, attendance_rows)
+        late_early_minutes = _manager_schedule_late_minutes_from_views(employee, attendance_rows, daily_overrides)
 
         # Accumulate leave record days by category
         half_leave_days = 0.0
@@ -536,11 +591,26 @@ def build_manager_rows(
             days = normalize_days(overtime.effective_hours)
             if _has_half_day_component(days):
                 half_overtime_days += 0.5
+        # 逐日修正的假种状态并入对应字段（每天按 1 天计）
+        for override in daily_overrides.values():
+            status = override.status or ""
+            if status == "工伤":
+                injury_days += 1.0
+            elif status == "出差":
+                business_trip_days += 1.0
+            elif status == "婚假":
+                marriage_days += 1.0
+            elif status == "丧假":
+                funeral_days += 1.0
 
         base_attendance_days = (
             raw_attendance_days
             if raw_attendance_days is not None
-            else _manager_attendance_days_from_views(attendance_rows)
+            else _manager_attendance_days_from_views(
+                attendance_rows,
+                daily_overrides,
+                evening_dates_by_emp.get(employee.id, set()),
+            )
         )
 
         # 实际出勤天数 = 月报出勤天数(失败时按刷卡天数兜底) - 请假半天的天数 - 调休半天的天数 - 加班半天的天数
