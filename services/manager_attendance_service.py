@@ -109,7 +109,7 @@ def _raw_minutes(raw: dict, *keys: str) -> int:
     return sum(_int_value(raw.get(key)) for key in keys)
 
 
-def _manager_raw_score(raw: dict) -> int:
+def manager_raw_score(raw: dict) -> int:
     score = 0
     for key in (
         "出勤天数",
@@ -200,7 +200,7 @@ def _monthly_report_raw(employee: Employee, month: str) -> dict:
         if isinstance(row.manager_raw_data, dict) and "出勤天数" in row.manager_raw_data
     ]
     if fallback_candidates:
-        return max(fallback_candidates, key=_manager_raw_score)
+        return max(fallback_candidates, key=manager_raw_score)
     return {}
 
 
