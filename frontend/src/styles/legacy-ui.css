@@ -5838,18 +5838,18 @@ input[type="checkbox"] {
 .attendance-override-daypanel {
   border: 1px solid #dbe4ef;
   border-radius: 14px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   background: #f8fafd;
 }
 .daypanel-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 .daypanel-detail { background: #f0f6ff; border: 1px solid #dbeafe; }
 .daypanel-status { background: #f6f3fd; border: 1px solid #e6dffa; }
@@ -5865,7 +5865,7 @@ input[type="checkbox"] {
 }
 .daypanel-status > .daypanel-title::before { background: #7c4dbe; }
 .daypanel-title-hint { font-weight: 400; font-size: 12px; color: #6b7686; }
-.daypanel-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; }
+.daypanel-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 3px 14px; }
 .daypanel-rows .daydetail-row { display: flex; gap: 8px; font-size: 13px; }
 
 /* 当前状态徽章 */
@@ -5904,15 +5904,24 @@ input[type="checkbox"] {
 
 /* 更多信息表单：输入框 focus 光环 */
 .daypanel-extra-form {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px 14px; padding: 12px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 10px; padding: 10px;
   border: 1px solid #e3e9f2; border-radius: 10px; background: #fbfcfe;
 }
-.daypanel-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-.daypanel-field-wide { grid-column: span 2; }
+.daypanel-field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.daypanel-field-wide { grid-column: 1 / -1; }
 .daypanel-field-label { color: #4a5568; }
+/* 晚上加行内开关 */
+.daypanel-field--check { flex-direction: row; align-items: center; gap: 6px; padding-top: 18px; }
+.daypanel-field--check input[type="checkbox"] {
+  width: 16px; height: 16px; margin: 0; accent-color: #1a56b0; cursor: pointer;
+}
+.daypanel-field-sub {
+  font-size: 11px; color: #7c4dbe; background: #f1ebfb;
+  border-radius: 8px; padding: 1px 6px; white-space: nowrap;
+}
 .daypanel-field input, .daypanel-field textarea {
-  border: 1px solid #c6d0e0; border-radius: 8px; padding: 6px 9px; font-size: 13px;
+  border: 1px solid #c6d0e0; border-radius: 8px; padding: 5px 8px; font-size: 13px;
   transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .daypanel-field input:focus, .daypanel-field textarea:focus {
@@ -5920,7 +5929,8 @@ input[type="checkbox"] {
   box-shadow: 0 0 0 3px rgba(26, 86, 176, 0.12);
 }
 .daypanel-field input:disabled, .daypanel-field textarea:disabled { background: #eef1f6; }
-.daypanel-actions { display: flex; gap: 8px; grid-column: span 2; }
+.daypanel-actions { display: flex; gap: 8px; grid-column: 1 / -1; justify-content: flex-end; }
+.daypanel-actions .account-action-button { padding: 4px 16px; font-size: 13px; }
 .attendance-override-daypanel-meta { color: #8a97ad; font-size: 12px; }
 
 /* 弹窗内容细滚动条 */

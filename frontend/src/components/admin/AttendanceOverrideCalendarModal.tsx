@@ -80,7 +80,7 @@ export default function AttendanceOverrideCalendarModal({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [detailExpanded, setDetailExpanded] = useState(false);
+  const [detailExpanded, setDetailExpanded] = useState(true);
   const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -97,7 +97,7 @@ export default function AttendanceOverrideCalendarModal({
     setLoadError(null);
     setCalendar(null);
     setSelectedDate(null);
-    setDetailExpanded(false);
+    setDetailExpanded(true);
     fetchAdminDailyOverrideCalendar(employee.id, month)
       .then((payload) => {
         if (mounted) {
@@ -128,7 +128,7 @@ export default function AttendanceOverrideCalendarModal({
       eveningOvertime: Boolean(currentOverride?.is_evening_overtime),
       remark: currentOverride?.remark ?? "",
     });
-    setDetailExpanded(false);
+    setDetailExpanded(true);
   }, [selectedDate, currentOverride]);
 
   function buildPayload(overrides: Partial<DailyOverrideSavePayload>): DailyOverrideSavePayload {
@@ -413,14 +413,15 @@ export default function AttendanceOverrideCalendarModal({
           </div>
           {detailExpanded ? (
             <div className="daypanel-extra-form">
-              <label className="daypanel-field daypanel-field-wide">
-                <span className="daypanel-field-label">晚上加班（按 0.5 出勤计）</span>
+              <label className="daypanel-field daypanel-field--check" title="确认晚上加班后按 0.5 天出勤计">
                 <input
                   checked={form.eveningOvertime}
                   disabled={isLocked || isSaving}
                   onChange={(event) => setForm((current) => ({ ...current, eveningOvertime: event.target.checked }))}
                   type="checkbox"
                 />
+                <span className="daypanel-field-label">晚上加班</span>
+                <span className="daypanel-field-sub">0.5 出勤</span>
               </label>
               <label className="daypanel-field">
                 <span className="daypanel-field-label">工时（小时）</span>
