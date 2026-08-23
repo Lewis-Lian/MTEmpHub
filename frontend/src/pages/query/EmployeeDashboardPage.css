@@ -15,6 +15,9 @@
   position: relative;
   display: flex;
   flex-direction: column;
+  /* 覆盖 .query-page-shell 残留的 align-items: start：flex 列布局下它会让
+     查询条件栏与结果面板收缩为内容宽，页面右侧留出大片空白 */
+  align-items: stretch;
   gap: 16px;
   height: calc(100vh - 64px);
   overflow: hidden;
