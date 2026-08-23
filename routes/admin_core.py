@@ -1422,6 +1422,10 @@ def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[d
         ).all()
     }
     rows: list[dict[str, object]] = []
+    options = _manager_attendance_options(month)
+    valid_ids = list(employees.keys())
+    automatic_by_emp = {row["emp_id"]: row for row in build_manager_rows(options, valid_ids, include_overrides=False)}
+    applied_by_emp = {row["emp_id"]: row for row in build_manager_rows(options, valid_ids, include_overrides=True)}
     for emp_id in emp_ids:
         employee = employees.get(emp_id)
         if not employee:
@@ -1429,9 +1433,9 @@ def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[d
         rows.append(
             {
                 "employee": _serialize_employee(employee),
-                "automatic": _manager_attendance_row(emp_id, month, include_overrides=False),
+                "automatic": automatic_by_emp.get(emp_id),
                 "override": _manager_attendance_override_payload(overrides.get(emp_id)),
-                "applied": _manager_attendance_row(emp_id, month, include_overrides=True),
+                "applied": applied_by_emp.get(emp_id),
             }
         )
     return {"rows": rows, "month": month}, 200
@@ -1565,9 +1569,21 @@ def _build_manager_override_export_workbook(month: str, include_real_rows: bool)
     ws.title = "管理人员考勤修正"
     ws.append(_manager_override_export_headers())
     if include_real_rows:
-        for employee in _manager_scope_employees():
-            automatic = _manager_attendance_row(employee.id, month, include_overrides=False) or {}
-            override = ManagerAttendanceOverride.query.filter_by(emp_id=employee.id, month=month).first()
+        employees = _manager_scope_employees()
+        options = _manager_attendance_options(month)
+        automatic_by_emp = {
+            row["emp_id"]: row
+            for row in build_manager_rows(options, [e.id for e in employees], include_overrides=False)
+        }
+        overrides_by_emp = {
+            row.emp_id: row
+            for row in ManagerAttendanceOverride.query.filter(
+                ManagerAttendanceOverride.month == month
+            ).all()
+        }
+        for employee in employees:
+            automatic = automatic_by_emp.get(employee.id) or {}
+            override = overrides_by_emp.get(employee.id)
             ws.append(
                 [
                     month,

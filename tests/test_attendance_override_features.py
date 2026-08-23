@@ -227,6 +227,47 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(rows[0]["override"]["injury_days"], 1.0)
         self.assertEqual(rows[0]["override"]["remark"], "经理修正")
 
+    def test_manager_override_list_rows_match_single_record_api(self) -> None:
+        """管理人员列表接口的 automatic/applied 必须与单员工接口一致（防批量结果错位）。"""
+        with self.app.app_context():
+            from models.employee import Employee as EmployeeModel
+            from models.monthly_report import MonthlyReport
+
+            manager_b = EmployeeModel(emp_no="M002", name="经理乙", dept_id=db.session.get(EmployeeModel, self.manager_id).dept_id, is_manager=True)
+            db.session.add(manager_b)
+            db.session.flush()
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-05",
+                        manager_raw_data={"出勤天数": 20, "工作时长": 160, "迟到时长": 30},
+                    ),
+                    MonthlyReport(
+                        emp_id=manager_b.id,
+                        report_month="2026-05",
+                        manager_raw_data={"出勤天数": 15, "工作时长": 120, "早退时长": 45},
+                    ),
+                ]
+            )
+            db.session.commit()
+            manager_b_id = manager_b.id
+
+        list_res = self.client.get(
+            f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id},{manager_b_id}"
+        )
+        self.assertEqual(list_res.status_code, 200)
+        rows = list_res.get_json()["rows"]
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            single = self.client.get(
+                f"/api/admin/manager-attendance-overrides/record?emp_id={row['employee']['id']}&month=2026-05"
+            )
+            self.assertEqual(single.status_code, 200)
+            payload = single.get_json()
+            self.assertEqual(row["automatic"], payload["automatic"])
+            self.assertEqual(row["applied"], payload["applied"])
+
     def test_employee_dashboard_api_uses_override_attendance_days(self) -> None:
         with self.app.app_context():
             db.session.add(
