@@ -6,6 +6,7 @@ import openpyxl
 from flask import jsonify, request
 
 from routes.auth_helpers import admin_required
+from models.daily_attendance_override import DailyAttendanceOverride
 
 
 def _requested_emp_ids() -> list[int]:
@@ -232,6 +233,164 @@ def employee_attendance_override_history_api():
     if not month:
         return jsonify({"error": "请选择有效月份"}), 400
     return jsonify({"rows": admin_module._history_rows_for_month("employee", month)})
+
+
+# ---------------------------------------------------------------- 逐日考勤修正
+
+
+def _daily_record_response(employee, month: str):
+    """逐日修正保存/清除后的统一响应：{calendar, row}——前端据此同时刷新日历弹窗与外层列表行。"""
+    from routes import admin_core as admin_module
+    from routes.query_core import _build_attendance_calendar_payload
+
+    if employee.is_manager:
+        row_payload, _ = admin_module._manager_attendance_response(employee.id, month)
+    else:
+        row_payload, _ = admin_module._employee_override_response(employee.id, month)
+    return jsonify(
+        {
+            "calendar": _build_attendance_calendar_payload(employee, month),
+            "row": row_payload,
+        }
+    )
+
+
+def _parse_daily_override_payload(data: dict, employee) -> tuple[dict, tuple | None]:
+    """校验并解析逐日修正字段。返回 (values, error_response)。"""
+    from routes import admin_core as admin_module
+    from services.daily_override_service import daily_statuses_for
+
+    values: dict[str, object] = {}
+
+    status = str(data.get("status") or "").strip()
+    if status and status not in daily_statuses_for(employee):
+        return values, (jsonify({"error": f"无效的考勤状态：{status}"}), 400)
+    values["status"] = status or None
+
+    for key, parser in (("work_hours", admin_module._nullable_float), ("late_minutes", admin_module._nullable_int), ("early_leave_minutes", admin_module._nullable_int)):
+        parsed, error = parser(data, key)
+        if error:
+            return values, (jsonify({"error": error}), 400)
+        values[key] = parsed
+
+    flag = data.get("is_evening_overtime")
+    if flag in (None, ""):
+        values["is_evening_overtime"] = None
+    elif isinstance(flag, bool):
+        values["is_evening_overtime"] = flag
+    else:
+        values["is_evening_overtime"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
+
+    values["remark"] = (data.get("remark") or "").strip()
+    return values, None
+
+
+def daily_attendance_override_calendar_api():
+    from routes import admin_core as admin_module
+    from routes.query_core import _build_attendance_calendar_payload
+
+    emp_id = request.args.get("emp_id", type=int) or 0
+    month = admin_module._validate_month(request.args.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择员工和有效月份"}), 400
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
+    return jsonify(_build_attendance_calendar_payload(employee, month))
+
+
+def save_daily_attendance_override_record_api():
+    from routes import admin_core as admin_module
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+
+    data = request.json or {}
+    emp_id = int(data.get("emp_id") or 0)
+    month = admin_module._validate_month(data.get("month"))
+    date_text = str(data.get("date") or "").strip()
+    if not emp_id or not month or not date_text:
+        return jsonify({"error": "请选择员工、月份和日期"}), 400
+    try:
+        record_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "无效的日期"}), 400
+    if record_date.strftime("%Y-%m") != month:
+        return jsonify({"error": "日期与月份不一致"}), 400
+
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存逐日考勤修正")
+    if locked_error:
+        return locked_error
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
+
+    values, error_response = _parse_daily_override_payload(data, employee)
+    if error_response:
+        return error_response
+
+    row = DailyAttendanceOverride.query.filter_by(emp_id=emp_id, record_date=record_date).first()
+    before_values = {"record_date": date_text}
+    for field in DAILY_OVERRIDE_FIELDS:
+        before_values[field] = getattr(row, field) if row else None
+    if row:
+        before_values["remark"] = row.remark or ""
+    after_values = dict(before_values)
+    after_values.update(values)
+    if admin_module._has_override_state_changes(before_values, after_values):
+        if not row:
+            row = DailyAttendanceOverride(emp_id=emp_id, record_date=record_date)
+            admin_module.db.session.add(row)
+        for key, value in values.items():
+            setattr(row, key, value)
+        row.updated_by = admin_module.g.current_user.id
+        admin_module._record_override_history("daily", emp_id, month, "manual_save", before_values, after_values)
+        admin_module.db.session.commit()
+        if employee.is_manager:
+            # 逐日修正影响出勤/假种天数，需同步重算加班查询页数据源
+            admin_module._sync_manager_month_stats(month)
+
+    return _daily_record_response(employee, month)
+
+
+def delete_daily_attendance_override_record_api():
+    from routes import admin_core as admin_module
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+
+    emp_id = request.args.get("emp_id", type=int) or 0
+    date_text = str(request.args.get("date") or "").strip()
+    if not emp_id or not date_text:
+        return jsonify({"error": "请选择员工和日期"}), 400
+    try:
+        record_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "无效的日期"}), 400
+    month = record_date.strftime("%Y-%m")
+
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "清除逐日考勤修正")
+    if locked_error:
+        return locked_error
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
+
+    row = DailyAttendanceOverride.query.filter_by(emp_id=emp_id, record_date=record_date).first()
+    if row:
+        before_values = {"record_date": date_text}
+        for field in DAILY_OVERRIDE_FIELDS:
+            before_values[field] = getattr(row, field)
+        before_values["remark"] = row.remark or ""
+        after_values = dict(before_values)
+        for field in DAILY_OVERRIDE_FIELDS:
+            after_values[field] = None
+        after_values["remark"] = ""
+        admin_module._record_override_history("daily", emp_id, month, "clear", before_values, after_values)
+        admin_module.db.session.delete(row)
+        admin_module.db.session.commit()
+        if employee.is_manager:
+            admin_module._sync_manager_month_stats(month)
+
+    return _daily_record_response(employee, month)
 
 
 def register_admin_attendance_override_routes(admin_bp) -> None:

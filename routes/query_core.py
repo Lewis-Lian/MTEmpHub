@@ -26,6 +26,16 @@ from models.manager_month_stat import ManagerMonthStat
 from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, UserEmployeeAssignment, UserDepartmentAssignment
 from services.attendance_service import AttendanceService
+from services.daily_override_service import (
+    EMPLOYEE_LEAVE_BUCKETS,
+    HALF_DAY_STATUSES,
+    daily_override_maps,
+    effective_early_leave_minutes,
+    effective_late_minutes,
+    evening_overtime_dates_by_emp,
+    serialize_daily_override,
+    status_attendance_days,
+)
 from services.attendance_source_service import (
     EMPLOYEE_STATS_CONTEXT,
     MANAGER_STATS_CONTEXT,
@@ -280,6 +290,70 @@ def _attendance_day_value(record) -> float:
 def _actual_attendance_day_value(record) -> float:
     # 实际出勤天数（刷卡口径）：当日真实刷卡 >= 2 次记 1 天，否则 0 天。
     return 1.0 if _raw_punch_count(record) >= 2 else 0.0
+
+
+def _effective_attendance_day_value(record, override, is_evening_overtime: bool) -> float:
+    """当日考勤天数（含逐日修正与晚加班条口径）：
+    勾选晚上加班 → 固定 0.5；状态修正 → 按状态映射；当日有晚加班条 → 固定 0.5；
+    其余按系统原始口径（刷卡推断）。
+    """
+    if override is not None:
+        if override.is_evening_overtime:
+            return 0.5
+        if override.status:
+            return status_attendance_days(override.status)
+    if is_evening_overtime:
+        return 0.5
+    if record is None:
+        return 0.0
+    return _attendance_day_value(record)
+
+
+def _effective_work_hours(record, override) -> float:
+    """当日工时：逐日修正值优先，否则按刷卡推断；无记录日取 0。"""
+    if override is not None and override.work_hours is not None:
+        return float(override.work_hours)
+    if record is None:
+        return 0.0
+    return _calc_record_work_hours(record)[0]
+
+
+def _effective_is_half_day(record, override, work_hours: float) -> bool:
+    """当日半勤判定：状态为上午/下午出勤 → 是；其他状态修正 → 否；无状态修正按原刷卡口径。
+
+    半勤判定用 _raw_punch_count（优先读 raw_data["刷卡时间数据"] 等真实刷卡源），
+    而非 _punch_count：后者直接读 check_in/out_times，该数组在导入时会被「段X实际上/下班时间」
+    （考勤机常填成班次整点如 12:00，非真实刷卡）污染，导致真实 2 次刷卡被错算成 3 次，半天漏判。
+    """
+    if override is not None and override.status:
+        return override.status in HALF_DAY_STATUSES
+    if record is None:
+        return False
+    return _raw_punch_count(record) == 2 and 2 <= work_hours < 5.1
+
+
+def _effective_daily_aggregate(
+    daily_rows: list,
+    employee_overrides: dict,
+    evening_dates: set,
+) -> tuple[float, int, float]:
+    """按日聚合（effective 口径）：返回 (考勤天数, 半勤天数, 工时)。
+    覆盖「有 DailyRecord 的日期」∪「逐日修正表有记录的日期」（无记录的缺勤日也可修正）。
+    """
+    records_by_date = {r.record_date: r for r in daily_rows if r.record_date}
+    all_dates = set(records_by_date) | set(employee_overrides)
+    attendance_days = 0.0
+    half_days = 0
+    work_hours_total = 0.0
+    for day in all_dates:
+        record = records_by_date.get(day)
+        override = employee_overrides.get(day)
+        attendance_days += _effective_attendance_day_value(record, override, day in evening_dates)
+        day_hours = _effective_work_hours(record, override)
+        work_hours_total += day_hours
+        if _effective_is_half_day(record, override, day_hours):
+            half_days += 1
+    return round(attendance_days, 2), half_days, round(work_hours_total, 2)
 
 
 def _normalize_punch_token(value: object) -> str:
@@ -830,7 +904,7 @@ def _resolve_query_month() -> str:
     return request.args.get("month") or (active_set.month if active_set else datetime.now().strftime("%Y-%m"))
 
 
-def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
+def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = True) -> list[list[object]]:
     employees = (
         Employee.query.options(joinedload(Employee.department))
         .filter(Employee.id.in_(emp_ids))
@@ -840,15 +914,21 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
     rows: list[list[object]] = []
     date_range = _month_date_range(month)
     datetime_range = _month_datetime_range(month)
-    overrides = {
-        row.emp_id: row
-        for row in EmployeeAttendanceOverride.query.filter(
-            EmployeeAttendanceOverride.month == month,
-            EmployeeAttendanceOverride.emp_id.in_(emp_ids),
-        ).all()
-    }
+    overrides = (
+        {
+            row.emp_id: row
+            for row in EmployeeAttendanceOverride.query.filter(
+                EmployeeAttendanceOverride.month == month,
+                EmployeeAttendanceOverride.emp_id.in_(emp_ids),
+            ).all()
+        }
+        if include_overrides
+        else {}
+    )
 
     daily_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT) if date_range else {}
+    daily_override_by_emp = daily_override_maps(month, emp_ids)
+    evening_dates_by_emp = evening_overtime_dates_by_emp(month, emp_ids)
 
     leave_by_emp: dict[int, list[LeaveRecord]] = defaultdict(list)
     if datetime_range:
@@ -873,18 +953,16 @@ def _build_final_rows(month: str, emp_ids: list[int]) -> list[list[object]]:
                 continue
             leave_count[leave_type] += 1
             leave_days[leave_type] += _normalized_leave_days(_leave_days_in_month(row, month))
+        # 逐日修正的假种状态并入请假天数列（次数不并入）
+        for override in daily_override_by_emp.get(employee.id, {}).values():
+            if override.status in EMPLOYEE_LEAVE_BUCKETS:
+                leave_days[override.status] += 1.0
 
-        day_work_stats = [_calc_record_work_hours(r) for r in daily_rows]
-        attendance_days = round(sum(_attendance_day_value(r) for r in daily_rows), 2)
-        # 半勤判定用 _raw_punch_count（优先读 raw_data["刷卡时间数据"] 等真实刷卡源），
-        # 而非 _punch_count：后者直接读 check_in/out_times，该数组在导入时会被「段X实际上/下班时间」
-        # （考勤机常填成班次整点如 12:00，非真实刷卡）污染，导致真实 2 次刷卡被错算成 3 次，半天漏判。
-        half_days = sum(
-            1
-            for idx, r in enumerate(daily_rows)
-            if _raw_punch_count(r) == 2 and 2 <= (day_work_stats[idx][0]) < 5.1
+        attendance_days, half_days, work_hours = _effective_daily_aggregate(
+            daily_rows,
+            daily_override_by_emp.get(employee.id, {}),
+            evening_dates_by_emp.get(employee.id, set()),
         )
-        work_hours = round(sum(x[0] for x in day_work_stats), 2)
         actual_attendance_days = round(
             sum(_actual_attendance_day_value(r) for r in daily_rows), 2
         )
@@ -1022,9 +1100,15 @@ def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[st
     if not employees:
         return []
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
+    daily_override_by_emp = daily_override_maps(month, emp_ids)
     for employee in employees:
         dept_name = employee.department.dept_name if employee.department else "未分配部门"
-        work_hours = round(sum(_calc_record_work_hours(row)[0] for row in rows_by_emp.get(employee.id, [])), 2)
+        # 只取工时口径；晚加班条仅影响考勤天数，不影响工时，故不查加班条
+        _, _, work_hours = _effective_daily_aggregate(
+            rows_by_emp.get(employee.id, []),
+            daily_override_by_emp.get(employee.id, {}),
+            set(),
+        )
         override = overrides.get(employee.id)
         if override and override.work_hours is not None:
             work_hours = round(float(override.work_hours or 0), 2)
@@ -1672,21 +1756,23 @@ def _split_overtime_by_day(rows, month: str):
     ]
 
 
-def attendance_calendar_api():
-    emp_id = request.args.get("emp_id", type=int)
-    # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
-    allowed = _accessible_emp_ids()
-    if not emp_id or emp_id not in allowed:
-        return jsonify({"error": "无效的员工范围"}), 400
-    month = request.args.get("month") or ""
+def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
+    """组装单员工单月考勤日历数据（打卡/加班/请假/逐日修正/汇总）。
+
+    员工日历页与考勤修正页的日历弹窗共用：summary 采用逐日修正后口径，
+    days 每天附 override（含无 DailyRecord 但有修正的缺勤日合成条目）。
+    """
     bounds = _month_date_range(month)
     if not bounds:
-        return jsonify({"error": "无效的月份"}), 400
+        return {}
     month_start, month_end = bounds
+    emp_id = employee.id
 
-    employee = db.session.get(Employee, emp_id)
     views = attendance_views_by_employee(month, [employee], EMPLOYEE_STATS_CONTEXT).get(emp_id, [])
     views = [r for r in views if r.record_date]
+
+    daily_overrides = daily_override_maps(month, [emp_id]).get(emp_id, {})
+    evening_dates = evening_overtime_dates_by_emp(month, [emp_id]).get(emp_id, set())
 
     overtime_rows = (
         OvertimeRecord.query
@@ -1744,9 +1830,30 @@ def attendance_calendar_api():
             "early_leave_minutes": r.early_leave_minutes or 0,
             "is_half_day": _is_half_day_record(r),
             "exception_reason": r.exception_reason or "",
+            "override": serialize_daily_override(daily_overrides.get(r.record_date)),
         }
         for r in views
     ]
+    # 修正表有记录但无 DailyRecord 的缺勤日：合成空打卡条目，让日历能展示修正标记
+    existing_dates = {r.record_date for r in views}
+    for day, override in sorted(daily_overrides.items()):
+        if day in existing_dates:
+            continue
+        days.append(
+            {
+                "date": day.isoformat(),
+                "check_in_times": [],
+                "check_out_times": [],
+                "punch_count": 0,
+                "actual_hours": 0.0,
+                "late_minutes": 0,
+                "early_leave_minutes": 0,
+                "is_half_day": False,
+                "exception_reason": "",
+                "override": serialize_daily_override(override),
+            }
+        )
+    days.sort(key=lambda item: item["date"])
 
     leave_summary: dict[str, dict] = {}
     for types in leave_by_date.values():
@@ -1754,34 +1861,68 @@ def attendance_calendar_api():
             slot = leave_summary.setdefault(leave_type, {"count": 0, "days": 0.0})
             slot["count"] += 1  # 次数 = 覆盖的日历天数
             slot["days"] = round(slot["days"] + hours, 2)
+    # 逐日修正的假种状态并入日历汇总（每天按 1 天计）
+    for override in daily_overrides.values():
+        if override.status and override.status not in ("全勤", "上午出勤", "下午出勤", "缺勤"):
+            slot = leave_summary.setdefault(override.status, {"count": 0, "days": 0.0})
+            slot["count"] += 1
+            slot["days"] = round(slot["days"] + 1.0, 2)
+
+    attendance_days, half_days, _ = _effective_daily_aggregate(views, daily_overrides, evening_dates)
+    late_total = sum(
+        effective_late_minutes(r.late_minutes, daily_overrides.get(r.record_date)) for r in views
+    ) + sum(
+        int(override.late_minutes or 0)
+        for day, override in daily_overrides.items()
+        if day not in existing_dates and override.late_minutes is not None
+    )
+    early_total = sum(
+        effective_early_leave_minutes(r.early_leave_minutes, daily_overrides.get(r.record_date)) for r in views
+    ) + sum(
+        int(override.early_leave_minutes or 0)
+        for day, override in daily_overrides.items()
+        if day not in existing_dates and override.early_leave_minutes is not None
+    )
     summary = {
-        "attendance_days": round(sum(_attendance_day_value(r) for r in views), 2),
-        "half_days": sum(1 for r in views if _is_half_day_record(r)),
+        "attendance_days": attendance_days,
+        "half_days": half_days,
         "leave_by_type": [
             {"leave_type": t, "count": s["count"], "days": s["days"]}
             for t, s in sorted(leave_summary.items())
         ],
         "evening_overtime_hours": round(sum(o["hours"] for o in overtimes if o["is_evening"]), 2),
         "other_overtime_hours": round(sum(o["hours"] for o in overtimes if not o["is_evening"]), 2),
-        "late_minutes_total": sum(r.late_minutes or 0 for r in views),
-        "early_leave_minutes_total": sum(r.early_leave_minutes or 0 for r in views),
+        "late_minutes_total": late_total,
+        "early_leave_minutes_total": early_total,
     }
 
-    return jsonify(
-        {
-            "employee": {
-                "id": employee.id,
-                "emp_no": employee.emp_no,
-                "name": employee.name,
-                "dept_name": employee.department.dept_name if employee.department else "",
-            },
-            "month": month,
-            "days": days,
-            "overtimes": overtimes,
-            "leaves": leaves,
-            "summary": summary,
-        }
-    )
+    return {
+        "employee": {
+            "id": employee.id,
+            "emp_no": employee.emp_no,
+            "name": employee.name,
+            "dept_name": employee.department.dept_name if employee.department else "",
+        },
+        "month": month,
+        "days": days,
+        "overtimes": overtimes,
+        "leaves": leaves,
+        "summary": summary,
+    }
+
+
+def attendance_calendar_api():
+    emp_id = request.args.get("emp_id", type=int)
+    # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
+    allowed = _accessible_emp_ids()
+    if not emp_id or emp_id not in allowed:
+        return jsonify({"error": "无效的员工范围"}), 400
+    month = request.args.get("month") or ""
+    if not _month_date_range(month):
+        return jsonify({"error": "无效的月份"}), 400
+
+    employee = db.session.get(Employee, emp_id)
+    return jsonify(_build_attendance_calendar_payload(employee, month))
 
 
 def overtime_api():
