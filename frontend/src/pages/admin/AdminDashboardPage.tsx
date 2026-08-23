@@ -387,12 +387,12 @@ export default function AdminDashboardPage() {
         }}>
           {activeAccountSet ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="admin-row">
                 <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>当前激活账套：</span>
                 <strong style={{ fontSize: "14.5px", color: "var(--ent-primary, #0f172a)" }}>{activeAccountSet.name}</strong>
               </div>
               <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="admin-row">
                 <span style={{ color: "var(--ent-text-secondary)" }}>账套状态：</span>
                 <span className={`badge ${activeAccountSet.is_locked ? "badge-danger" : "badge-success"}`} style={{
                   padding: "2px 8px",
@@ -407,12 +407,12 @@ export default function AdminDashboardPage() {
                 </span>
               </div>
               <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="admin-row">
                 <span style={{ color: "var(--ent-text-secondary)" }}>厂休天数：</span>
                 <strong style={{ color: "var(--ent-primary)" }}>{activeAccountSet.factory_rest_entries?.reduce((sum, entry) => sum + Number(entry.unit || 0), 0) ?? 0} 天</strong>
               </div>
               <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div className="admin-row">
                 <span style={{ color: "var(--ent-text-secondary)" }}>福利天数：</span>
                 <strong style={{ color: "var(--ent-primary)" }}>{activeAccountSet.monthly_benefit_days ?? 0} 天</strong>
               </div>
@@ -799,7 +799,7 @@ export default function AdminDashboardPage() {
                   {/* 参数配置卡片 */}
                   <div className="settings-card-module">
                     <div className="settings-card-title">参数设置</div>
-                    <div className="account-params-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div className="account-params-grid admin-form-grid">
                       <label className="settings-field" style={{ marginBottom: 0 }}>
                         <span className="settings-field-label">本月厂休天数</span>
                         <input className="settings-input" readOnly type="number" value={factoryRestSummary} />

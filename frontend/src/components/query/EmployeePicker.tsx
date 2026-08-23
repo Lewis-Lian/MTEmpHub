@@ -4,6 +4,8 @@ import { createPortal } from "react-dom";
 import type { DepartmentOption as QueryDepartment, QueryEmployee } from "../../types/query";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 
+import "../../styles/components/employee-picker.css";
+
 
 interface EmployeePickerProps {
   departments?: QueryDepartment[];

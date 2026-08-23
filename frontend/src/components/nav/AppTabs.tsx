@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
 
+import "../../styles/components/app-tabs.css";
+
 export interface AppTabItem {
   href: string;
   label: string;

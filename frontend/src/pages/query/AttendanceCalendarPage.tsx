@@ -5,7 +5,7 @@ import MonthPicker from "../../components/common/MonthPicker";
 import LoadingState from "../../components/feedback/LoadingState";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import type { AttendanceCalendarData, QueryBootstrap } from "../../types/query";
-import "./EmployeeDashboardPage.css";
+import "./dashboard-shared.css";
 
 const now = new Date();
 const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

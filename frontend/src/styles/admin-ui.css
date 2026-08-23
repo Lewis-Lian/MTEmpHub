@@ -1,0 +1,91 @@
+/* admin 页面公共布局与控件样式：从各管理页重复的内联样式抽取。
+   值与 --ent-* token 相等的颜色/边框直接引用变量（main.tsx 全局导入，晚于 legacy-ui.css）。 */
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-row-gap12 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-stack-lg {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.admin-stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-fill {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.admin-form-grid-wide {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.admin-modal-title {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ent-border-strong);
+  color: #1e293b;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.admin-text {
+  color: #334155;
+  font-size: 14px;
+}
+
+.admin-text-sm {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.admin-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: none;
+  background: transparent;
+  color: var(--ent-text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.admin-icon-btn {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ent-text-secondary);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}

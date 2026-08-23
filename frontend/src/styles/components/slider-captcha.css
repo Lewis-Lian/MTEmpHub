@@ -13,10 +13,10 @@
   padding: 24px 12px;
   text-align: center;
   font-size: 13px;
-  color: var(--ent-text-secondary, #64748b);
-  background: var(--ent-tertiary-bg, #f1f5f9);
+  color: var(--ent-text-secondary, var(--ent-text-secondary));
+  background: var(--ent-tertiary-bg, var(--ent-tertiary-bg));
   border-radius: var(--ent-radius, 8px);
-  border: 1px dashed var(--ent-border, #e2e8f0);
+  border: 1px dashed var(--ent-border, var(--ent-border-strong));
 }
 
 .slider-captcha-image-wrap {
@@ -25,8 +25,8 @@
   aspect-ratio: 2 / 1;
   border-radius: var(--ent-radius, 8px);
   overflow: hidden;
-  border: 1px solid var(--ent-border, #e2e8f0);
-  background: var(--ent-tertiary-bg, #f1f5f9);
+  border: 1px solid var(--ent-border, var(--ent-border-strong));
+  background: var(--ent-tertiary-bg, var(--ent-tertiary-bg));
 }
 
 .slider-captcha-bg {
@@ -54,9 +54,9 @@
   position: relative;
   width: 100%;
   height: 48px;
-  background: var(--ent-tertiary-bg, #f1f5f9);
+  background: var(--ent-tertiary-bg, var(--ent-tertiary-bg));
   border-radius: var(--ent-radius, 8px);
-  border: 1px solid var(--ent-border, #e2e8f0);
+  border: 1px solid var(--ent-border, var(--ent-border-strong));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -65,7 +65,7 @@
 
 .slider-captcha-hint {
   font-size: 12px;
-  color: var(--ent-text-tertiary, #94a3b8);
+  color: var(--ent-text-tertiary, var(--ent-text-tertiary));
   pointer-events: none;
 }
 
@@ -131,27 +131,27 @@
   background: none;
   border: none;
   font-size: 12px;
-  color: var(--ent-text-tertiary, #94a3b8);
+  color: var(--ent-text-tertiary, var(--ent-text-tertiary));
   cursor: pointer;
   padding: 2px 6px;
 }
 
 .slider-captcha-refresh-btn:hover {
-  color: var(--ent-blue, #2563eb);
+  color: var(--ent-blue, var(--ent-blue));
 }
 
 .slider-captcha-trigger-btn {
   width: 100%;
   height: 48px;
-  background: var(--ent-tertiary-bg, #f1f5f9);
+  background: var(--ent-tertiary-bg, var(--ent-tertiary-bg));
   border-radius: var(--ent-radius, 8px);
-  border: 1px solid var(--ent-border, #e2e8f0);
+  border: 1px solid var(--ent-border, var(--ent-border-strong));
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--ent-text-secondary, #64748b);
+  color: var(--ent-text-secondary, var(--ent-text-secondary));
   cursor: pointer;
   transition: all 0.2s ease;
 }
@@ -166,7 +166,7 @@
   width: 16px;
   height: 16px;
   display: inline-flex;
-  color: var(--ent-blue, #2563eb);
+  color: var(--ent-blue, var(--ent-blue));
 }
 
 .slider-captcha-popover {
@@ -174,12 +174,12 @@
   bottom: calc(100% + 8px);
   left: 0;
   width: 100%;
-  background: #ffffff;
+  background: var(--ent-bg);
   padding: 12px;
   border-radius: var(--ent-radius, 8px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
-  border: 1px solid var(--ent-border, #e2e8f0);
-  z-index: 100;
+  border: 1px solid var(--ent-border, var(--ent-border-strong));
+  z-index: var(--z-popover);
   display: flex;
   flex-direction: column;
   gap: 12px;

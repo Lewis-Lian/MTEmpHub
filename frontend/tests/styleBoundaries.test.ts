@@ -3,12 +3,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const sourceRoot = resolve(__dirname, "../src");
-const mainTsx = readSource("main.tsx");
 const legacyCss = readCss("styles/legacy-ui.css");
 const appTabsCss = readCss("styles/components/app-tabs.css");
 const employeePickerCss = readCss("styles/components/employee-picker.css");
 const queryTableCss = readCss("styles/components/query-table.css");
-const employeeDashboardCss = readCss("pages/query/EmployeeDashboardPage.css");
+const dashboardSharedCss = readCss("pages/query/dashboard-shared.css");
 const queryHomeCss = readCss("pages/query/QueryHome.css");
 
 function readCss(relativePath: string) {
@@ -30,7 +29,7 @@ function countExactRule(css: string, selector: string) {
 
 describe("style boundaries", () => {
   it("员工查询页样式不会裸覆盖通用查询页面和全局弹窗", () => {
-    const css = stripComments(employeeDashboardCss);
+    const css = stripComments(dashboardSharedCss);
 
     expect(css).not.toMatch(/(^|\})\s*\.query-page-shell\s*\{/);
     expect(css).not.toMatch(/(^|\})\s*\.query-filter-rail\s*\{/);
@@ -78,9 +77,9 @@ describe("style boundaries", () => {
   it("页签、员工选择弹窗、查询表格分页器样式从 legacy-ui 拆出", () => {
     const legacy = stripComments(legacyCss);
 
-    expect(mainTsx).toContain("./styles/components/app-tabs.css");
-    expect(mainTsx).toContain("./styles/components/employee-picker.css");
-    expect(mainTsx).toContain("./styles/components/query-table.css");
+    expect(readSource("components/nav/AppTabs.tsx")).toContain("./styles/components/app-tabs.css");
+    expect(readSource("components/query/EmployeePicker.tsx")).toContain("./styles/components/employee-picker.css");
+    expect(readSource("components/query/QueryTable.tsx")).toContain("./styles/components/query-table.css");
     expect(appTabsCss).toContain(".app-tab-bar");
     expect(employeePickerCss).toContain(".employee-picker-modal");
     expect(queryTableCss).toContain(".table-pager");

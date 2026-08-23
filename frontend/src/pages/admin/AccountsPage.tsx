@@ -497,17 +497,17 @@ export default function AccountsPage() {
           </div>
 
           <div className="active-account-set-summary-bar" style={{ display: "inline-flex", alignItems: "center", flexWrap: "wrap", gap: "14px", minHeight: "36px", boxSizing: "border-box", padding: "0 14px", marginLeft: "auto", maxWidth: "100%", width: "auto", flex: "0 1 auto", background: "var(--ent-secondary-bg, #f8fafc)", border: "1px solid var(--ent-border-strong)", borderRadius: "var(--ent-radius-lg, 8px)", fontSize: "13px", color: "var(--ent-text)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="admin-row">
               <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>账号总数：</span>
               <strong style={{ color: "var(--ent-primary)" }}>{users.length} 个</strong>
             </div>
             <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="admin-row">
               <span style={{ color: "var(--ent-text-secondary)" }}>管理员：</span>
               <strong style={{ color: "var(--ent-primary)" }}>{users.filter((user) => user.role === "admin").length} 个</strong>
             </div>
             <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="admin-row">
               <span style={{ color: "var(--ent-text-secondary)" }}>只读账号：</span>
               <strong style={{ color: "var(--ent-primary)" }}>{users.filter((user) => user.role === "readonly").length} 个</strong>
             </div>
@@ -581,7 +581,7 @@ export default function AccountsPage() {
         }}>
           <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div className="admin-row-gap12">
                 <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>创建账号</span>
                 <span className="page-tag">系统管理</span>
               </div>
@@ -590,10 +590,10 @@ export default function AccountsPage() {
             
             <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
               {/* 基础信息 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">基础信息</h4>
+                <div className="admin-form-grid">
+                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -612,7 +612,7 @@ export default function AccountsPage() {
                     <span className="account-field-label">初始密码</span>
                     <input className="account-input" type="password" onChange={(event) => setCreatePassword(event.target.value)} value={createPassword} placeholder="请输入初始密码" />
                   </label>
-                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">账号角色</span>
                     <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
                       <option value="readonly">只读权限</option>
@@ -623,10 +623,10 @@ export default function AccountsPage() {
               </div>
 
               {/* 数据与权限范围 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">数据与权限范围</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -636,7 +636,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -645,7 +645,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">功能导航权限</span>
                     <PickerSummaryField
                       buttonLabel="配置导航可见性"
@@ -722,7 +722,7 @@ export default function AccountsPage() {
         }}>
           <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div className="admin-row-gap12">
                 <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>编辑账号</span>
                 <span className="page-tag">系统管理</span>
               </div>
@@ -730,10 +730,10 @@ export default function AccountsPage() {
             </div>
             <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
               {/* 基础信息 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">基础信息</h4>
+                <div className="admin-form-grid">
+                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -752,7 +752,7 @@ export default function AccountsPage() {
                     <span className="account-field-label">密码 (留空则不修改)</span>
                     <input className="account-input" type="password" onChange={(event) => setEditPassword(event.target.value)} value={editPassword} placeholder="留空则不修改" />
                   </label>
-                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">角色</span>
                     <select className="account-select" onChange={(event) => setEditRole(event.target.value as "readonly" | "admin")} value={editRole}>
                       <option value="readonly">只读权限</option>
@@ -763,10 +763,10 @@ export default function AccountsPage() {
               </div>
 
               {/* 数据与权限范围 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>数据与权限范围</h4>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">数据与权限范围</h4>
                 <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -777,7 +777,7 @@ export default function AccountsPage() {
                     />
                   </label>
 
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -787,7 +787,7 @@ export default function AccountsPage() {
                     />
                   </label>
 
-                  <label className="account-field" style={{ margin: 0, width: "100%", minWidth: 0, display: "flex", flexDirection: "column" }}>
+                  <label className="account-field admin-fill">
                     <span className="account-field-label">功能导航权限</span>
                     <PickerSummaryField
                       buttonLabel="配置导航可见性"
@@ -836,7 +836,7 @@ export default function AccountsPage() {
         }}>
           <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div className="admin-row-gap12">
                 <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>
                   {permissionContext === "create" ? "创建账号页面权限" : permissionContext === "edit" ? "编辑页面权限" : "批量修改页面权限"}
                 </span>

@@ -3,7 +3,7 @@
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 9999;
+  z-index: var(--z-picker-modal);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -28,7 +28,7 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 16px;
   overflow: hidden;
-  background: #ffffff;
+  background: var(--ent-bg);
   box-shadow: 0 24px 60px rgba(24, 49, 83, 0.18);
 }
 
@@ -64,7 +64,7 @@
 .employee-picker-modal .btn,
 .employee-picker-modal .btn-close {
   border: 1px solid #bfcbd7;
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #183153;
   cursor: pointer;
 }
@@ -106,7 +106,7 @@
   padding: 6px 8px;
   box-sizing: border-box;
   border: 1px solid #c7d2de;
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #183153;
   font-size: 13px;
 }
@@ -167,7 +167,7 @@
   min-height: 24px;
   padding: 3px 8px;
   border: 1px solid #d9e4ef;
-  background: #f8fafc;
+  background: var(--ent-secondary-bg);
   color: #31475f;
   font-size: 12px;
 }
@@ -175,7 +175,7 @@
 .employee-picker-panel {
   border: 1px solid #d9e4ef;
   border-radius: 10px;
-  background: #fff;
+  background: var(--ent-bg);
   padding: 10px;
 }
 

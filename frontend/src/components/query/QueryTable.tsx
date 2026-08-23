@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import "../../styles/components/query-table.css";
+
 export interface QueryTableHeader {
   label: ReactNode;
   sortable?: boolean;

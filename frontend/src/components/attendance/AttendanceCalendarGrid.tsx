@@ -7,6 +7,8 @@ import type {
   DailyAttendanceOverrideValues,
 } from "../../types/query";
 
+import "../../styles/components/attendance-calendar.css";
+
 const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 interface DayCell {
