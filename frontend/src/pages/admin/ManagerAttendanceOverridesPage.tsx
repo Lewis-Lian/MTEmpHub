@@ -12,7 +12,6 @@ const MANAGER_FIELDS = [
 export default function ManagerAttendanceOverridesPage() {
   return (
     <AttendanceOverridesPage
-      editMetaEmpty="请选择列表中的管理人员进行编辑"
       editTitle="编辑管理人员考勤修正"
       endpointBase="/api/admin/manager-attendance-overrides"
       fields={MANAGER_FIELDS}
@@ -20,7 +19,6 @@ export default function ManagerAttendanceOverridesPage() {
       listEmptyHint="当前条件下暂无管理人员修正数据"
       pickerButtonLabel="管理人员范围"
       pickerLabel="管理人员"
-      saveSuccessText="修正已保存"
       title="管理人员考勤修正"
     />
   );

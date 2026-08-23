@@ -90,6 +90,18 @@ export interface AttendanceCalendarDay {
   early_leave_minutes: number;
   is_half_day: boolean;
   exception_reason: string;
+  override?: DailyAttendanceOverrideValues | null;
+}
+
+export interface DailyAttendanceOverrideValues {
+  status?: string | null;
+  is_evening_overtime?: boolean | null;
+  work_hours?: number | null;
+  late_minutes?: number | null;
+  early_leave_minutes?: number | null;
+  remark?: string;
+  updated_at?: string | null;
+  updated_by_name?: string;
 }
 
 export interface AttendanceCalendarOvertime {

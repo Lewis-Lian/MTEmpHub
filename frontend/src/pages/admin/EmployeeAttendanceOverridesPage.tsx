@@ -11,7 +11,6 @@ const EMPLOYEE_FIELDS = [
 export default function EmployeeAttendanceOverridesPage() {
   return (
     <AttendanceOverridesPage
-      editMetaEmpty="请选择列表中的员工进行编辑"
       editTitle="编辑员工考勤修正"
       endpointBase="/api/admin/employee-attendance-overrides"
       fields={EMPLOYEE_FIELDS}
@@ -19,7 +18,6 @@ export default function EmployeeAttendanceOverridesPage() {
       listEmptyHint="当前条件下暂无员工修正数据"
       pickerButtonLabel="员工范围"
       pickerLabel="员工"
-      saveSuccessText="修正已保存"
       title="员工考勤修正"
     />
   );

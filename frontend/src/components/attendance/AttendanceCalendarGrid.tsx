@@ -4,6 +4,7 @@ import type {
   AttendanceCalendarDay,
   AttendanceCalendarLeave,
   AttendanceCalendarOvertime,
+  DailyAttendanceOverrideValues,
 } from "../../types/query";
 
 const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -16,14 +17,32 @@ interface DayCell {
   leaves: AttendanceCalendarLeave[];
 }
 
-export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalendarData }) {
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+interface AttendanceCalendarGridProps {
+  data: AttendanceCalendarData;
+  /** 外部选中日期（修正模式高亮），不传时组件内部自管理（明细弹层） */
+  selectedDate?: string | null;
+  /** 提供时点击格子走外部回调，不弹内部明细弹层 */
+  onCellSelect?: (date: string) => void;
+}
+
+export default function AttendanceCalendarGrid({ data, selectedDate, onCellSelect }: AttendanceCalendarGridProps) {
+  const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
   const cells = useMemo(() => buildCells(data), [data]);
-  const selected = cells.find((cell) => cell.date === selectedDate) ?? null;
+  // selectedDate 传入（含 null）即由外部控制高亮；未传时组件内部自管理
+  const activeSelectedDate = selectedDate !== undefined ? selectedDate : internalSelectedDate;
+  const selected = cells.find((cell) => cell.date === activeSelectedDate) ?? null;
   const hasMonthData = data.days.length > 0 || data.overtimes.length > 0 || data.leaves.length > 0;
 
   if (cells.length === 0) {
     return <div className="attendance-calendar attendance-calendar-empty">无效月份</div>;
+  }
+
+  function handleCellClick(date: string) {
+    if (onCellSelect) {
+      onCellSelect(date);
+      return;
+    }
+    setInternalSelectedDate(date);
   }
 
   return (
@@ -55,17 +74,25 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         ))}
         {cells.map((cell) => {
           const bgKey = cellBackgroundKey(cell, hasMonthData);
+          const override = hasOverrideContent(cell.day?.override) ? cell.day?.override : null;
           return (
             <button
               aria-label={cell.date}
-              className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}${bgKey !== "none" ? ` is-bg-${bgKey}` : ""}`}
+              className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}${bgKey !== "none" ? ` is-bg-${bgKey}` : ""}${activeSelectedDate === cell.date ? " is-selected" : ""}`}
               key={cell.date}
-              onClick={() => setSelectedDate(cell.date)}
+              onClick={() => handleCellClick(cell.date)}
               type="button"
             >
               <div className="cal-day-number">{cell.dayOfMonth}</div>
               {renderPunchSummary(cell)}
               {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
+              {override && <span className="cal-badge cal-badge-override">修正</span>}
+              {override?.is_evening_overtime && <span className="cal-badge cal-badge-evening">晚加</span>}
+              {override?.status && !override.is_evening_overtime && (
+                <span className={`cal-badge${LEAVE_STATUS_BG[override.status] ? " cal-badge-leave" : ""}`}>
+                  {override.status}
+                </span>
+              )}
               {renderBadges(cell)}
             </button>
           );
@@ -82,10 +109,10 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
         <span className="cal-badge is-bg-absent">缺勤</span>
       </div>
 
-      {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) ? (
+      {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) && !onCellSelect ? (
         <div
           className="attendance-calendar-daydetail"
-          onClick={() => setSelectedDate(null)}
+          onClick={() => setInternalSelectedDate(null)}
           role="dialog"
           aria-label={`考勤明细 ${selected.date}`}
         >
@@ -95,7 +122,7 @@ export default function AttendanceCalendarGrid({ data }: { data: AttendanceCalen
                 <span>{selected.date}</span>
                 <span className="daydetail-date-week">{weekdayLabel(selected.date)}</span>
               </div>
-              <button aria-label="关闭" onClick={() => setSelectedDate(null)} type="button">×</button>
+              <button aria-label="关闭" onClick={() => setInternalSelectedDate(null)} type="button">×</button>
             </div>
             <div className="daydetail-body">
               {selected.day ? (
@@ -188,9 +215,48 @@ function overtimeLabel(overtime: AttendanceCalendarOvertime): string {
 }
 
 // 七色修订版背景色口径（设计文档 2.9）：出差 > 婚假 > 丧假 > 半勤 > 晚加班 > 出勤 > 缺勤 > 无
-type CellBackgroundKey = "trip" | "marriage" | "funeral" | "half" | "evening" | "attendance" | "absent" | "none";
+type CellBackgroundKey = "trip" | "marriage" | "funeral" | "half" | "evening" | "attendance" | "absent" | "leave" | "none";
+
+// 有专属背景色的假种；其余假种统一用请假蓝
+const LEAVE_STATUS_BG: Record<string, CellBackgroundKey> = {
+  出差: "trip",
+  婚假: "marriage",
+  丧假: "funeral",
+};
+
+function hasOverrideContent(override: DailyAttendanceOverrideValues | null | undefined): boolean {
+  if (!override) {
+    return false;
+  }
+  return Boolean(
+    override.status ||
+      override.is_evening_overtime != null ||
+      override.work_hours != null ||
+      override.late_minutes != null ||
+      override.early_leave_minutes != null ||
+      (override.remark ?? "").trim(),
+  );
+}
+
+// 逐日修正状态的背景映射：晚加 > 状态（出勤/半勤/缺勤/假种）> 无
+function overrideBackgroundKey(override: DailyAttendanceOverrideValues): CellBackgroundKey {
+  if (override.is_evening_overtime) return "evening";
+  const status = override.status || "";
+  if (status === "全勤") return "attendance";
+  if (status === "上午出勤" || status === "下午出勤") return "half";
+  if (status === "缺勤") return "absent";
+  if (status) return LEAVE_STATUS_BG[status] ?? "leave";
+  return "none";
+}
 
 function cellBackgroundKey(cell: DayCell, hasMonthData: boolean): CellBackgroundKey {
+  const override = cell.day?.override;
+  if (hasOverrideContent(override) && override) {
+    const overrideKey = overrideBackgroundKey(override);
+    if (overrideKey !== "none") {
+      return overrideKey;
+    }
+  }
   const leaveTypes = cell.leaves.map((leave) => leave.leave_type);
   if (leaveTypes.includes("出差")) return "trip";
   if (leaveTypes.includes("婚假")) return "marriage";

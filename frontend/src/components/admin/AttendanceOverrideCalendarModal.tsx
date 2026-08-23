@@ -1,0 +1,404 @@
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+
+import {
+  clearAdminDailyOverride,
+  fetchAdminDailyOverrideCalendar,
+  saveAdminDailyOverride,
+  type DailyOverrideSavePayload,
+} from "../../api/admin";
+import AttendanceCalendarGrid from "../attendance/AttendanceCalendarGrid";
+import ErrorState from "../feedback/ErrorState";
+import LoadingState from "../feedback/LoadingState";
+import { useNotification } from "../feedback/Notification";
+import type { AttendanceCalendarData } from "../../types/query";
+
+// 状态枚举与后端 services/daily_override_service.py 保持一致
+export const EMPLOYEE_DAILY_STATUSES = [
+  "全勤",
+  "上午出勤",
+  "下午出勤",
+  "缺勤",
+  "病假",
+  "工伤",
+  "丧假",
+  "事假",
+  "补休（调休）",
+  "婚假",
+];
+export const MANAGER_DAILY_STATUSES = ["全勤", "上午出勤", "下午出勤", "缺勤", "工伤", "出差", "婚假", "丧假"];
+
+const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+interface OverrideCalendarEmployee {
+  id: number;
+  emp_no: string;
+  name: string;
+}
+
+interface AttendanceOverrideCalendarModalProps {
+  editTitle: string;
+  employee: OverrideCalendarEmployee;
+  month: string;
+  isManager: boolean;
+  isLocked: boolean;
+  /** 外层列表行存在月度修正时提示：最终应用值以月度修正为准 */
+  hasMonthlyOverride: boolean;
+  onClose: () => void;
+  onRowRefresh: (row: unknown) => void;
+}
+
+interface DetailFormState {
+  workHours: string;
+  lateMinutes: string;
+  earlyLeaveMinutes: string;
+  eveningOvertime: boolean;
+  remark: string;
+}
+
+const EMPTY_FORM: DetailFormState = {
+  workHours: "",
+  lateMinutes: "",
+  earlyLeaveMinutes: "",
+  eveningOvertime: false,
+  remark: "",
+};
+
+export default function AttendanceOverrideCalendarModal({
+  editTitle,
+  employee,
+  month,
+  isManager,
+  isLocked,
+  hasMonthlyOverride,
+  onClose,
+  onRowRefresh,
+}: AttendanceOverrideCalendarModalProps) {
+  const notification = useNotification();
+  const [calendar, setCalendar] = useState<AttendanceCalendarData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [detailExpanded, setDetailExpanded] = useState(false);
+  const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const statuses = isManager ? MANAGER_DAILY_STATUSES : EMPLOYEE_DAILY_STATUSES;
+  const selectedDay = useMemo(
+    () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
+    [calendar, selectedDate],
+  );
+  const currentOverride = selectedDay?.override ?? null;
+
+  useEffect(() => {
+    let mounted = true;
+    setIsLoading(true);
+    setLoadError(null);
+    setCalendar(null);
+    setSelectedDate(null);
+    setDetailExpanded(false);
+    fetchAdminDailyOverrideCalendar(employee.id, month)
+      .then((payload) => {
+        if (mounted) {
+          setCalendar(payload);
+        }
+      })
+      .catch((caughtError: unknown) => {
+        if (mounted) {
+          setLoadError(caughtError instanceof Error ? caughtError.message : "日历数据加载失败");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoading(false);
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [employee.id, month]);
+
+  // 选中日变化（或保存成功后数据刷新）时，用该日修正值重置表单
+  useEffect(() => {
+    setForm({
+      workHours: currentOverride?.work_hours == null ? "" : String(currentOverride.work_hours),
+      lateMinutes: currentOverride?.late_minutes == null ? "" : String(currentOverride.late_minutes),
+      earlyLeaveMinutes: currentOverride?.early_leave_minutes == null ? "" : String(currentOverride.early_leave_minutes),
+      eveningOvertime: Boolean(currentOverride?.is_evening_overtime),
+      remark: currentOverride?.remark ?? "",
+    });
+    setDetailExpanded(false);
+  }, [selectedDate, currentOverride]);
+
+  function buildPayload(overrides: Partial<DailyOverrideSavePayload>): DailyOverrideSavePayload {
+    return {
+      month,
+      emp_id: employee.id,
+      date: selectedDate ?? "",
+      work_hours: form.workHours,
+      late_minutes: form.lateMinutes,
+      early_leave_minutes: form.earlyLeaveMinutes,
+      is_evening_overtime: form.eveningOvertime,
+      remark: form.remark,
+      ...overrides,
+    };
+  }
+
+  async function persist(payload: DailyOverrideSavePayload, successText: string) {
+    if (!selectedDate || isSaving) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const response = await saveAdminDailyOverride<unknown>(payload);
+      setCalendar(response.calendar);
+      onRowRefresh(response.row);
+      notification.success(successText);
+    } catch (caughtError: unknown) {
+      notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleClear() {
+    if (!selectedDate || isSaving) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const response = await clearAdminDailyOverride<unknown>(employee.id, selectedDate);
+      setCalendar(response.calendar);
+      onRowRefresh(response.row);
+      notification.success("已恢复系统口径");
+    } catch (caughtError: unknown) {
+      notification.error(caughtError instanceof Error ? caughtError.message : "清除失败");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function renderModal() {
+    return (
+      <div aria-label={editTitle} aria-modal="true" className="master-modal-backdrop attendance-override-edit-backdrop" role="dialog">
+        <div className="master-modal attendance-override-calendar-modal">
+          <div className="master-modal-header">
+            <div>
+              <h2>{editTitle}</h2>
+              <div className="attendance-override-edit-meta">
+                {`${employee.emp_no} - ${employee.name} / ${month || "-"}`}
+              </div>
+            </div>
+            <button aria-label="关闭" className="master-modal-close" onClick={onClose} type="button">
+              ×
+            </button>
+          </div>
+          <div className="master-modal-body attendance-override-calendar-body">
+            {hasMonthlyOverride ? (
+              <div className="attendance-override-calendar-notice">
+                该月存在月度手工修正（Excel 导入），最终应用值以月度修正为准
+              </div>
+            ) : null}
+            {isLocked ? (
+              <div className="account-lock-notice is-locked">{month || "-"} 账套已锁定，仅可查看</div>
+            ) : null}
+            {isLoading ? (
+              <LoadingState message="正在加载考勤日历..." />
+            ) : loadError ? (
+              <ErrorState description={loadError} title="日历数据加载失败" />
+            ) : calendar ? (
+              <>
+                <AttendanceCalendarGrid
+                  data={calendar}
+                  onCellSelect={setSelectedDate}
+                  selectedDate={selectedDate}
+                />
+                {selectedDay ? renderDayPanel() : (
+                  <div className="attendance-override-daypanel-hint">点击日历中的日期修正当天考勤</div>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderDayPanel() {
+    if (!selectedDay) {
+      return null;
+    }
+    const hasOverrideContent = Boolean(
+      currentOverride &&
+        (currentOverride.status ||
+          currentOverride.is_evening_overtime != null ||
+          currentOverride.work_hours != null ||
+          currentOverride.late_minutes != null ||
+          currentOverride.early_leave_minutes != null ||
+          (currentOverride.remark ?? "").trim()),
+    );
+    return (
+      <div className="attendance-override-daypanel" data-testid="daily-override-panel">
+        <div className="daypanel-section daypanel-detail">
+          <div className="daypanel-title">
+            <span>{selectedDate}</span>
+            <span className="daydetail-date-week">{weekdayLabel(selectedDate ?? "")}</span>
+            <span className="daypanel-title-hint">原始考勤</span>
+          </div>
+          <div className="daypanel-rows">
+            <div className="daydetail-row">
+              <span className="daydetail-label">上班卡</span>
+              <span className="daydetail-value">{selectedDay.check_in_times.join(" / ") || "无"}</span>
+            </div>
+            <div className="daydetail-row">
+              <span className="daydetail-label">下班卡</span>
+              <span className="daydetail-value">{selectedDay.check_out_times.join(" / ") || "无"}</span>
+            </div>
+            <div className="daydetail-row">
+              <span className="daydetail-label">打卡次数</span>
+              <span className="daydetail-value">{selectedDay.punch_count} 次</span>
+            </div>
+            <div className="daydetail-row">
+              <span className="daydetail-label">实出勤</span>
+              <span className="daydetail-value">{selectedDay.actual_hours} 小时</span>
+            </div>
+            {selectedDay.late_minutes > 0 && (
+              <div className="daydetail-row">
+                <span className="daydetail-label">迟到</span>
+                <span className="daydetail-value daydetail-warn">{selectedDay.late_minutes} 分钟</span>
+              </div>
+            )}
+            {selectedDay.early_leave_minutes > 0 && (
+              <div className="daydetail-row">
+                <span className="daydetail-label">早退</span>
+                <span className="daydetail-value daydetail-warn">{selectedDay.early_leave_minutes} 分钟</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="daypanel-section daypanel-status">
+          <div className="daypanel-title">考勤状态（点击即保存）</div>
+          <div className="daypanel-status-group">
+            {statuses.map((status) => (
+              <button
+                aria-label={`标记 ${status}`}
+                className={`daypanel-status-button${currentOverride?.status === status ? " is-active" : ""}`}
+                disabled={isLocked || isSaving}
+                key={status}
+                onClick={() => void persist(buildPayload({ status }), `已标记 ${status}`)}
+                type="button"
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="daypanel-section daypanel-extra">
+          <div className="daypanel-extra-header">
+            <button
+              className="daypanel-toggle"
+              onClick={() => setDetailExpanded((current) => !current)}
+              type="button"
+            >
+              更多信息{detailExpanded ? "▲" : "▼"}
+            </button>
+            {hasOverrideContent ? (
+              <button
+                className="account-action-button"
+                disabled={isLocked || isSaving}
+                onClick={() => void handleClear()}
+                type="button"
+              >
+                清除修正
+              </button>
+            ) : null}
+          </div>
+          {detailExpanded ? (
+            <div className="daypanel-extra-form">
+              <label className="daypanel-field daypanel-field-wide">
+                <span className="daypanel-field-label">晚上加班（按 0.5 出勤计）</span>
+                <input
+                  checked={form.eveningOvertime}
+                  disabled={isLocked || isSaving}
+                  onChange={(event) => setForm((current) => ({ ...current, eveningOvertime: event.target.checked }))}
+                  type="checkbox"
+                />
+              </label>
+              <label className="daypanel-field">
+                <span className="daypanel-field-label">工时（小时）</span>
+                <input
+                  disabled={isLocked || isSaving}
+                  inputMode="decimal"
+                  onChange={(event) => setForm((current) => ({ ...current, workHours: event.target.value }))}
+                  placeholder="自动"
+                  value={form.workHours}
+                />
+              </label>
+              <label className="daypanel-field">
+                <span className="daypanel-field-label">迟到分钟</span>
+                <input
+                  disabled={isLocked || isSaving}
+                  inputMode="numeric"
+                  onChange={(event) => setForm((current) => ({ ...current, lateMinutes: event.target.value }))}
+                  placeholder="自动"
+                  value={form.lateMinutes}
+                />
+              </label>
+              <label className="daypanel-field">
+                <span className="daypanel-field-label">早退分钟</span>
+                <input
+                  disabled={isLocked || isSaving}
+                  inputMode="numeric"
+                  onChange={(event) => setForm((current) => ({ ...current, earlyLeaveMinutes: event.target.value }))}
+                  placeholder="自动"
+                  value={form.earlyLeaveMinutes}
+                />
+              </label>
+              <label className="daypanel-field daypanel-field-wide">
+                <span className="daypanel-field-label">备注</span>
+                <textarea
+                  disabled={isLocked || isSaving}
+                  onChange={(event) => setForm((current) => ({ ...current, remark: event.target.value }))}
+                  placeholder="可填写修正原因"
+                  rows={2}
+                  value={form.remark}
+                />
+              </label>
+              <div className="daypanel-actions">
+                <button
+                  className="account-action-button account-action-button--primary"
+                  disabled={isLocked || isSaving}
+                  onClick={() => void persist(buildPayload({ status: currentOverride?.status ?? "" }), "已保存修正")}
+                  type="button"
+                >
+                  保存修正
+                </button>
+              </div>
+            </div>
+          ) : null}
+          {currentOverride?.updated_at ? (
+            <div className="attendance-override-daypanel-meta">
+              {`最近修正 ${(currentOverride.updated_by_name || "").trim()} ${formatDateTime(currentOverride.updated_at)}`.trim()}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return createPortal(renderModal(), document.body);
+}
+
+function weekdayLabel(date: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) {
+    return "";
+  }
+  return WEEKDAYS[new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getDay()];
+}
+
+function formatDateTime(value: string): string {
+  return value ? value.replace("T", " ").slice(0, 19) : "";
+}
