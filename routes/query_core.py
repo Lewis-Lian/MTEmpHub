@@ -900,7 +900,12 @@ def _pick_emp_ids() -> list[int]:
 
 
 def _resolve_query_month() -> str:
-    active_set = AccountSet.query.filter_by(is_active=True).first()
+    # 请求级缓存：激活账套在同一请求内不变，避免每个查询接口重复查询
+    active_set = getattr(g, "_active_account_set", None)
+    if active_set is None and not getattr(g, "_active_account_set_loaded", False):
+        active_set = AccountSet.query.filter_by(is_active=True).first()
+        g._active_account_set = active_set
+        g._active_account_set_loaded = True
     return request.args.get("month") or (active_set.month if active_set else datetime.now().strftime("%Y-%m"))
 
 

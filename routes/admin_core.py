@@ -616,7 +616,17 @@ def _account_set_for_month(month: str | None) -> AccountSet | None:
     key = (month or "").strip()
     if not key:
         return None
-    return AccountSet.query.filter_by(month=key).first()
+    # 请求级缓存：同请求内同月账套重复查询（修正列表曾放大到 2N 次）直接复用；
+    # 写账套的接口均为写完即返回，无写后再读路径
+    cache = getattr(g, "_account_set_by_month", None)
+    if cache is None:
+        cache = {}
+        g._account_set_by_month = cache
+    if key in cache:
+        return cache[key]
+    result = AccountSet.query.filter_by(month=key).first()
+    cache[key] = result
+    return result
 
 
 def _locked_account_set_error(account_set: AccountSet, action_label: str):
@@ -726,12 +736,9 @@ def _locked_months_for_year(year: int, include_prev_dec: bool = False) -> list[s
     months = [f"{year}-{month:02d}" for month in range(1, 13)]
     if include_prev_dec:
         months.insert(0, f"{year - 1}-12")
-    locked = []
-    for month in months:
-        account_set = _account_set_for_month(month)
-        if account_set and account_set.is_locked:
-            locked.append(month)
-    return locked
+    account_sets = AccountSet.query.filter(AccountSet.month.in_(months)).all()
+    locked_months = {row.month for row in account_sets if row.is_locked}
+    return [month for month in months if month in locked_months]
 
 
 def _ensure_year_months_unlocked(year: int, action_label: str, include_prev_dec: bool = False):
@@ -1363,12 +1370,21 @@ def _validate_month(value: str | None) -> str | None:
 
 
 def _manager_attendance_options(month: str) -> ManagerAttendanceOptions:
+    # 请求级缓存：options 为纯只读派生值，同请求内重复构建无意义
+    cache = getattr(g, "_manager_attendance_options_cache", None)
+    if cache is None:
+        cache = {}
+        g._manager_attendance_options_cache = cache
+    if month in cache:
+        return cache[month]
     account = AccountSet.query.filter_by(month=month).first()
-    return ManagerAttendanceOptions(
+    options = ManagerAttendanceOptions(
         month=month,
         factory_rest_days=_manager_factory_rest_days(account),
         monthly_benefit_days=(account.monthly_benefit_days if account else 0) or 0,
     )
+    cache[month] = options
+    return options
 
 
 def _manager_attendance_override_payload(row: ManagerAttendanceOverride | None) -> dict[str, object]:
