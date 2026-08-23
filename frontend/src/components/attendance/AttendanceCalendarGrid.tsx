@@ -88,7 +88,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, onCellSelec
               {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
               {override && <span className="cal-badge cal-badge-override">修正</span>}
               {override?.is_evening_overtime && <span className="cal-badge cal-badge-evening">晚加</span>}
-              {override?.status && !override.is_evening_overtime && (
+              {override?.status && !ATTENDANCE_STATUS_KEYS.has(override.status) && !override.is_evening_overtime && (
                 <span className={`cal-badge${LEAVE_STATUS_BG[override.status] ? " cal-badge-leave" : ""}`}>
                   {override.status}
                 </span>
@@ -223,6 +223,9 @@ const LEAVE_STATUS_BG: Record<string, CellBackgroundKey> = {
   婚假: "marriage",
   丧假: "funeral",
 };
+
+// 出勤类状态由背景色表达（缺勤另有红底徽标），不渲染状态文字徽标
+const ATTENDANCE_STATUS_KEYS = new Set(["全勤", "上午出勤", "下午出勤", "缺勤"]);
 
 function hasOverrideContent(override: DailyAttendanceOverrideValues | null | undefined): boolean {
   if (!override) {

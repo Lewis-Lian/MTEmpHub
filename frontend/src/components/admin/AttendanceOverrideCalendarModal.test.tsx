@@ -109,10 +109,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(screen.getByText("08:00")).toBeInTheDocument();
   });
 
-  it("点击格子直接循环切换考勤状态：无修正→全勤→上午出勤→…→跟随系统", async () => {
-    const savedStatuses: Array<string | undefined> = [];
+  it("点击格子乐观切换并保存：无修正→全勤→上午出勤", async () => {
     mockSave.mockImplementation(async (payload: { status?: string }) => {
-      savedStatuses.push(payload.status);
       const status = payload.status ?? "";
       return { calendar: calendarData(status ? { "2026-07-15": { status } } : {}), row: {} };
     });
@@ -121,31 +119,49 @@ describe("AttendanceOverrideCalendarModal", () => {
     await screen.findByText(/出勤 1 天/);
     const cell = screen.getByRole("button", { name: "2026-07-15" });
 
-    fireEvent.click(cell); // 无修正 → 全勤
+    fireEvent.click(cell); // 无修正 → 全勤（乐观立即显示）
+    expect(screen.getByText("当前：全勤")).toBeInTheDocument();
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-15", status: "全勤" }));
     });
-    // 等日历刷新为全勤后（面板显示当前状态），再点 → 上午出勤
+    // 等保存响应刷新后再点 → 上午出勤
     await waitFor(() => {
-      expect(screen.getByText("当前：全勤")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "2026-07-15" })).toBeInTheDocument();
     });
     fireEvent.click(cell);
+    expect(screen.getByText("当前：上午出勤")).toBeInTheDocument();
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledTimes(2);
     });
     expect(mockSave.mock.calls[1][0]).toMatchObject({ date: "2026-07-15", status: "上午出勤" });
-    expect(savedStatuses).toEqual(["全勤", "上午出勤"]);
   });
 
-  it("缺勤后再点格子恢复跟随系统（status 置空）", async () => {
+  it("快速连点格子只保存最终状态（防抖合并）", async () => {
+    mockSave.mockResolvedValue({ calendar: calendarData({ "2026-07-15": { status: "上午出勤" } }), row: {} });
+    renderModal();
+
+    await screen.findByText(/出勤 1 天/);
+    const cell = screen.getByRole("button", { name: "2026-07-15" });
+    fireEvent.click(cell); // 乐观：→ 全勤
+    fireEvent.click(cell); // 乐观：→ 上午出勤
+    fireEvent.click(cell); // 乐观：→ 下午出勤
+
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledTimes(1);
+    });
+    expect(mockSave.mock.calls[0][0]).toMatchObject({ status: "下午出勤" });
+  }, 5000);
+
+  it("缺勤后再点格子直接切到全勤（不再经过跟随系统）", async () => {
     mockFetchCalendar.mockResolvedValue(calendarData({ "2026-07-15": { status: "缺勤" } }));
-    mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
+    mockSave.mockResolvedValue({ calendar: calendarData({ "2026-07-15": { status: "全勤" } }), row: {} });
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    expect(screen.getByText("当前：全勤")).toBeInTheDocument();
     await waitFor(() => {
-      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-15", status: "" }));
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-15", status: "全勤" }));
     });
   });
 
@@ -250,7 +266,7 @@ describe("AttendanceOverrideCalendarModal", () => {
       expect(screen.queryByRole("button", { name: `标记 ${status}` })).toBeNull();
     }
     expect(screen.getByRole("button", { name: "标记 事假" })).toBeInTheDocument();
-    expect(screen.getByText("当前：跟随系统")).toBeInTheDocument();
+    expect(screen.getByText("当前：全勤")).toBeInTheDocument(); // 点击后乐观更新立即显示
   });
 
   it("账套锁定时禁用全部编辑控件，点击格子只选中不保存", async () => {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import {
@@ -11,21 +11,24 @@ import AttendanceCalendarGrid from "../attendance/AttendanceCalendarGrid";
 import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
 import { useNotification } from "../feedback/Notification";
-import type { AttendanceCalendarData } from "../../types/query";
+import type { AttendanceCalendarData, DailyAttendanceOverrideValues } from "../../types/query";
 
 // 状态枚举与后端 services/daily_override_service.py 保持一致
 // 出勤类状态通过点击格子循环切换（ATTENDANCE_CYCLE），假种在下方面板选择
 export const EMPLOYEE_LEAVE_STATUSES = ["病假", "工伤", "丧假", "事假", "补休（调休）", "婚假"];
 export const MANAGER_LEAVE_STATUSES = ["工伤", "出差", "婚假", "丧假"];
 
+// 快速连点合并为一次保存请求的等待窗口
+const SAVE_DEBOUNCE_MS = 350;
+
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
-// 点击格子的出勤状态循环顺序（""=跟随系统）
-const ATTENDANCE_CYCLE = ["", "全勤", "上午出勤", "下午出勤", "缺勤"];
+// 点击格子的出勤状态循环顺序：缺勤/无修正 → 全勤（回绕，不经过"跟随系统"；恢复跟随系统走清除修正）
+const ATTENDANCE_CYCLE = ["全勤", "上午出勤", "下午出勤", "缺勤"];
 
 function nextCycleStatus(current: string | null | undefined): string {
   const index = ATTENDANCE_CYCLE.indexOf(current ?? "");
-  return ATTENDANCE_CYCLE[(index + 1) % ATTENDANCE_CYCLE.length] ?? "";
+  return ATTENDANCE_CYCLE[(index + 1) % ATTENDANCE_CYCLE.length];
 }
 
 interface OverrideCalendarEmployee {
@@ -142,15 +145,88 @@ export default function AttendanceOverrideCalendarModal({
     };
   }
 
+  // 乐观更新本地日历的某天修正值（不等保存响应，点击立即生效）
+  function patchDayOverride(date: string, patch: Partial<DailyAttendanceOverrideValues>) {
+    setCalendar((current) => {
+      if (!current) {
+        return current;
+      }
+      const days = current.days.map((day) =>
+        day.date === date ? { ...day, override: { ...(day.override ?? {}), ...patch } } : day,
+      );
+      return { ...current, days };
+    });
+  }
+
+  // 防抖保存：快速连点只发最后一次；保存成功用后端数据对齐，失败则重拉日历回滚
+  const saveTimerRef = useRef<number | null>(null);
+  const pendingSaveRef = useRef<{ payload: DailyOverrideSavePayload; successText: string } | null>(null);
+
+  function scheduleSave(payload: DailyOverrideSavePayload, successText: string) {
+    pendingSaveRef.current = { payload, successText };
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null;
+      void flushSave();
+    }, SAVE_DEBOUNCE_MS);
+  }
+
+  async function flushSave() {
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pending = pendingSaveRef.current;
+    if (!pending) {
+      return;
+    }
+    pendingSaveRef.current = null;
+    setIsSaving(true);
+    try {
+      const response = await saveAdminDailyOverride<unknown>(pending.payload);
+      setCalendar(response.calendar);
+      onRowRefresh(response.row);
+      notification.success(pending.successText);
+    } catch (caughtError: unknown) {
+      notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
+      try {
+        setCalendar(await fetchAdminDailyOverrideCalendar(employee.id, month));
+      } catch {
+        // 重拉失败时保留本地状态，用户可手动刷新
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  // 弹窗关闭/卸载前把未落盘的防抖修正发出（fire-and-forget）
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const pending = pendingSaveRef.current;
+      if (pending) {
+        pendingSaveRef.current = null;
+        void saveAdminDailyOverride<unknown>(pending.payload).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 点击格子直接循环切换出勤状态（""=跟随系统）；假种与详细信息在下方面板设置
   function handleCellClick(date: string) {
     setSelectedDate(date);
-    if (isLocked || isSaving || !calendar) {
+    if (isLocked || !calendar) {
       return;
     }
     const dayOverride = calendar.days.find((day) => day.date === date)?.override ?? null;
     const nextStatus = nextCycleStatus(dayOverride?.status);
-    void persist(
+    patchDayOverride(date, { status: nextStatus });
+    scheduleSave(
       {
         month,
         emp_id: employee.id,
@@ -162,31 +238,20 @@ export default function AttendanceOverrideCalendarModal({
         early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
         remark: dayOverride?.remark ?? "",
       },
-      nextStatus ? `已标记 ${nextStatus}` : "已恢复跟随系统",
+      `已标记 ${nextStatus}`,
     );
-  }
-
-  async function persist(payload: DailyOverrideSavePayload, successText: string) {
-    if (!payload.date || isSaving) {
-      return;
-    }
-    setIsSaving(true);
-    try {
-      const response = await saveAdminDailyOverride<unknown>(payload);
-      setCalendar(response.calendar);
-      onRowRefresh(response.row);
-      notification.success(successText);
-    } catch (caughtError: unknown) {
-      notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
-    } finally {
-      setIsSaving(false);
-    }
   }
 
   async function handleClear() {
     if (!selectedDate || isSaving) {
       return;
     }
+    // 丢弃未落盘的防抖保存，避免清除后又落下一条写回修正
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    pendingSaveRef.current = null;
     setIsSaving(true);
     try {
       const response = await clearAdminDailyOverride<unknown>(employee.id, selectedDate);
@@ -237,7 +302,7 @@ export default function AttendanceOverrideCalendarModal({
                 />
                 {selectedDay ? renderDayPanel() : (
                   <div className="attendance-override-daypanel-hint">
-                    点击格子循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤 → 跟随系统）；假种与工时等可在选中日期后于下方设置
+                    点击格子循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤，缺勤再点回到全勤）；假种与工时等可在选中日期后于下方设置，恢复系统口径用"清除修正"
                   </div>
                 )}
               </>
@@ -313,7 +378,10 @@ export default function AttendanceOverrideCalendarModal({
                 className={`daypanel-status-button${currentOverride?.status === status ? " is-active" : ""}`}
                 disabled={isLocked || isSaving}
                 key={status}
-                onClick={() => void persist(buildPayload({ status }), `已标记 ${status}`)}
+                onClick={() => {
+                  patchDayOverride(selectedDate ?? "", { status });
+                  scheduleSave(buildPayload({ status }), `已标记 ${status}`);
+                }}
                 type="button"
               >
                 {status}
@@ -397,7 +465,18 @@ export default function AttendanceOverrideCalendarModal({
                 <button
                   className="account-action-button account-action-button--primary"
                   disabled={isLocked || isSaving}
-                  onClick={() => void persist(buildPayload({ status: currentOverride?.status ?? "" }), "已保存修正")}
+                  onClick={() => {
+                    if (selectedDate) {
+                      patchDayOverride(selectedDate, {
+                        work_hours: form.workHours === "" ? null : Number(form.workHours),
+                        late_minutes: form.lateMinutes === "" ? null : Number(form.lateMinutes),
+                        early_leave_minutes: form.earlyLeaveMinutes === "" ? null : Number(form.earlyLeaveMinutes),
+                        is_evening_overtime: form.eveningOvertime,
+                        remark: form.remark,
+                      });
+                    }
+                    scheduleSave(buildPayload({ status: currentOverride?.status ?? "" }), "已保存修正");
+                  }}
                   type="button"
                 >
                   保存修正

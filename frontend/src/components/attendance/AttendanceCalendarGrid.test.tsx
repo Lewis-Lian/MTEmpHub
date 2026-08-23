@@ -320,6 +320,26 @@ describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
     expect(getCell("2026-07-13")).toHaveClass("is-bg-leave");
   });
 
+  it("修正状态为缺勤时不渲染重复的缺勤徽标", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-10", override: { status: "缺勤" } },
+        { ...DATA.days[0], date: "2026-07-11", override: { status: "全勤" } },
+        { ...DATA.days[0], date: "2026-07-12", override: { status: "上午出勤" } },
+      ],
+      overtimes: [],
+      leaves: [],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    // 出勤类状态由背景色表达（缺勤另有红底徽标），不再重复渲染状态文字徽标
+    expect(within(getCell("2026-07-10")).getAllByText("缺勤")).toHaveLength(1);
+    expect(within(getCell("2026-07-11")).queryByText("全勤")).toBeNull();
+    expect(within(getCell("2026-07-12")).queryByText("上午出勤")).toBeNull();
+    // 假种修正仍显示文字徽标
+    expect(within(getCell("2026-07-10")).getByText("修正")).toBeInTheDocument();
+  });
+
   it("无记录的修正日（合成空打卡条目）也渲染格子与修正徽章", () => {
     const data: AttendanceCalendarData = {
       ...DATA,
