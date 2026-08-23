@@ -14,19 +14,9 @@ import { useNotification } from "../feedback/Notification";
 import type { AttendanceCalendarData } from "../../types/query";
 
 // 状态枚举与后端 services/daily_override_service.py 保持一致
-export const EMPLOYEE_DAILY_STATUSES = [
-  "全勤",
-  "上午出勤",
-  "下午出勤",
-  "缺勤",
-  "病假",
-  "工伤",
-  "丧假",
-  "事假",
-  "补休（调休）",
-  "婚假",
-];
-export const MANAGER_DAILY_STATUSES = ["全勤", "上午出勤", "下午出勤", "缺勤", "工伤", "出差", "婚假", "丧假"];
+// 出勤类状态通过点击格子循环切换（ATTENDANCE_CYCLE），假种在下方面板选择
+export const EMPLOYEE_LEAVE_STATUSES = ["病假", "工伤", "丧假", "事假", "补休（调休）", "婚假"];
+export const MANAGER_LEAVE_STATUSES = ["工伤", "出差", "婚假", "丧假"];
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
@@ -91,7 +81,7 @@ export default function AttendanceOverrideCalendarModal({
   const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
 
-  const statuses = isManager ? MANAGER_DAILY_STATUSES : EMPLOYEE_DAILY_STATUSES;
+  const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const selectedDay = useMemo(
     () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
     [calendar, selectedDate],
@@ -312,9 +302,12 @@ export default function AttendanceOverrideCalendarModal({
         </div>
 
         <div className="daypanel-section daypanel-status">
-          <div className="daypanel-title">考勤状态（假种在此选择；出勤状态点格子循环切换）</div>
+          <div className="daypanel-title">
+            <span>假种（点击即保存；出勤状态点格子循环切换）</span>
+            <span className="daypanel-current-status">{`当前：${currentOverride?.status || "跟随系统"}`}</span>
+          </div>
           <div className="daypanel-status-group">
-            {statuses.map((status) => (
+            {leaveStatuses.map((status) => (
               <button
                 aria-label={`标记 ${status}`}
                 className={`daypanel-status-button${currentOverride?.status === status ? " is-active" : ""}`}
