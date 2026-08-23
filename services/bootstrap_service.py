@@ -159,6 +159,30 @@ def ensure_schema_compatibility() -> None:
             )
             db.session.commit()
 
+    # 性能复合索引（模型层与 Alembic 迁移 b2c3d4e5f6a7 同名同列）：
+    # 旧库升级路径（upgrade-legacy-schema）不跑 Alembic，这里幂等补建
+    _performance_indexes = (
+        ("leave_records", "ix_leave_records_emp_id_start_time", "emp_id, start_time"),
+        ("overtime_records", "ix_overtime_records_emp_id_start_time", "emp_id, start_time"),
+        (
+            "attendance_override_histories",
+            "ix_attendance_override_history_type_month_created",
+            "override_type, month, created_at",
+        ),
+    )
+    for table_name, index_name, index_columns in _performance_indexes:
+        if table_name not in table_names:
+            continue
+        existing_index_names = {index["name"] for index in inspector.get_indexes(table_name)}
+        if index_name in existing_index_names:
+            continue
+        try:
+            db.session.execute(text(f"CREATE INDEX {index_name} ON {table_name}({index_columns})"))
+            db.session.commit()
+        except OperationalError:
+            # 索引可能已存在（重复执行），幂等跳过
+            db.session.rollback()
+
 
 def _get_column_names(inspector: Inspector, table_name: str) -> set[str] | None:
     try:
