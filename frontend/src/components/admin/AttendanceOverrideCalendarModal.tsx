@@ -305,8 +305,22 @@ export default function AttendanceOverrideCalendarModal({
                 </div>
                 <aside className="attendance-override-calendar-side">
                   {selectedDay ? renderDayPanel() : (
-                    <div className="attendance-override-daypanel-hint">
-                      首次点击格子选中并查看当天信息；再次点击同一格循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤）。假种与工时等在选中后于此处设置，恢复系统口径用"清除修正"
+                    <div aria-hidden="true" className="daypanel-skeleton">
+                      <span className="daypanel-skeleton-title" />
+                      <span className="daypanel-skeleton-row" />
+                      <span className="daypanel-skeleton-row daypanel-skeleton-row--short" />
+                      <span className="daypanel-skeleton-row" />
+                      <div className="daypanel-skeleton-block">
+                        <span className="daypanel-skeleton-chip" />
+                        <span className="daypanel-skeleton-chip" />
+                        <span className="daypanel-skeleton-chip" />
+                        <span className="daypanel-skeleton-chip" />
+                      </div>
+                      <div className="daypanel-skeleton-block">
+                        <span className="daypanel-skeleton-field" />
+                        <span className="daypanel-skeleton-field" />
+                        <span className="daypanel-skeleton-field daypanel-skeleton-field--wide" />
+                      </div>
                     </div>
                   )}
                 </aside>

@@ -5848,17 +5848,42 @@ input[type="checkbox"] {
   grid-template-columns: 1fr;
 }
 .attendance-override-calendar-side .daypanel-field--check { padding-top: 0; }
-.attendance-override-daypanel-hint {
-  color: #6b7686;
-  font-size: 13px;
-  text-align: center;
-  border: 1px dashed #ccd6e4;
+/* 右栏未选中时的骨架占位（模拟当天面板结构，微光扫过） */
+.daypanel-skeleton {
+  border: 1px solid #e3e9f2;
   border-radius: 14px;
+  padding: 12px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 160px;
-  padding: 16px;
+  flex-direction: column;
+  gap: 10px;
+  background: #fff;
+}
+.daypanel-skeleton-title,
+.daypanel-skeleton-row,
+.daypanel-skeleton-chip,
+.daypanel-skeleton-field {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #edf1f7 25%, #f8fafd 37%, #edf1f7 63%);
+  background-size: 400% 100%;
+  animation: daypanel-skeleton-shimmer 1.3s ease infinite;
+}
+.daypanel-skeleton-title { height: 16px; width: 45%; border-radius: 5px; }
+.daypanel-skeleton-row { height: 13px; width: 88%; }
+.daypanel-skeleton-row--short { width: 62%; }
+.daypanel-skeleton-block { display: flex; flex-wrap: wrap; gap: 7px; }
+.daypanel-skeleton-chip { height: 26px; width: 64px; border-radius: 13px; }
+.daypanel-skeleton-field { height: 34px; flex: 1 1 70px; }
+.daypanel-skeleton-field--wide { flex-basis: 100%; }
+@keyframes daypanel-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .daypanel-skeleton-title,
+  .daypanel-skeleton-row,
+  .daypanel-skeleton-chip,
+  .daypanel-skeleton-field { animation: none; }
 }
 @media (max-width: 1024px) {
   .attendance-override-calendar-layout { grid-template-columns: 1fr; }
@@ -5871,7 +5896,6 @@ input[type="checkbox"] {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
   .attendance-override-calendar-side .daypanel-field--check { padding-top: 18px; }
-  .attendance-override-daypanel-hint { min-height: 0; }
 }
 
 /* 当天面板：三段分区卡片化（原始考勤浅蓝 / 假种浅紫 / 更多信息白） */
