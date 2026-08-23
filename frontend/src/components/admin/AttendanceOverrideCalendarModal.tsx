@@ -295,18 +295,22 @@ export default function AttendanceOverrideCalendarModal({
             ) : loadError ? (
               <ErrorState description={loadError} title="日历数据加载失败" />
             ) : calendar ? (
-              <>
-                <AttendanceCalendarGrid
-                  data={calendar}
-                  onCellSelect={handleCellClick}
-                  selectedDate={selectedDate}
-                />
-                {selectedDay ? renderDayPanel() : (
-                  <div className="attendance-override-daypanel-hint">
-                    首次点击格子选中并查看当天信息；再次点击同一格循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤）。假种与工时等在选中后于下方设置，恢复系统口径用"清除修正"
-                  </div>
-                )}
-              </>
+              <div className="attendance-override-calendar-layout">
+                <div className="attendance-override-calendar-main">
+                  <AttendanceCalendarGrid
+                    data={calendar}
+                    onCellSelect={handleCellClick}
+                    selectedDate={selectedDate}
+                  />
+                </div>
+                <aside className="attendance-override-calendar-side">
+                  {selectedDay ? renderDayPanel() : (
+                    <div className="attendance-override-daypanel-hint">
+                      首次点击格子选中并查看当天信息；再次点击同一格循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤）。假种与工时等在选中后于此处设置，恢复系统口径用"清除修正"
+                    </div>
+                  )}
+                </aside>
+              </div>
             ) : null}
           </div>
         </div>
