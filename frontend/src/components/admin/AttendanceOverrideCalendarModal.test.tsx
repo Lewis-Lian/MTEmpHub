@@ -227,13 +227,13 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(onRowRefresh).toHaveBeenCalledWith(row);
   });
 
-  it("更多信息展开后可编辑工时/晚加并保存", async () => {
+  it("更多信息默认展开，可直接编辑工时/晚加并保存", async () => {
     mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 首次点击仅选中
-    fireEvent.click(screen.getByRole("button", { name: /更多信息/ }));
+    expect(screen.getByLabelText("工时（小时）")).toBeVisible(); // 无需点开，默认展开
 
     fireEvent.change(screen.getByLabelText("工时（小时）"), { target: { value: "8" } });
     fireEvent.click(screen.getByLabelText(/晚上加班/));
