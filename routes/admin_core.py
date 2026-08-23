@@ -180,38 +180,12 @@ def _accessible_dept_ids_set() -> set[int]:
 
 
 def _accessible_emp_ids_set() -> set[int]:
-    if getattr(g, "current_user", None) is None:
-        return set()
-        
-    if g.current_user.role == "admin":
-        return {e.id for e in Employee.query.with_entities(Employee.id).all()}
-        
-    emp_rows = UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id).all()
-    dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
-    
-    ids = {r.emp_id for r in emp_rows}
-    assigned_dept_ids = {r.dept_id for r in dept_rows}
-    
-    if assigned_dept_ids:
-        # Find all descendant departments
-        all_departments = Department.query.with_entities(Department.id, Department.parent_id).all()
-        children_map = {}
-        for d in all_departments:
-            children_map.setdefault(d.parent_id, []).append(d.id)
-            
-        expanded_dept_ids = set(assigned_dept_ids)
-        queue = list(assigned_dept_ids)
-        while queue:
-            curr = queue.pop(0)
-            for child_id in children_map.get(curr, []):
-                if child_id not in expanded_dept_ids:
-                    expanded_dept_ids.add(child_id)
-                    queue.append(child_id)
-                    
-        dept_emp_ids = Employee.query.with_entities(Employee.id).filter(Employee.dept_id.in_(expanded_dept_ids)).all()
-        ids.update(row.id for row in dept_emp_ids)
-        
-    return ids
+    # 可见范围计算的唯一实现在 query_core._accessible_emp_ids（含部门树展开），
+    # 双份实现易漂移导致越权/漏数据；此处仅按 set 口径薄包装。
+    # 函数内 import 以维持两路由模块间零模块级依赖（避免循环导入）。
+    from routes.query_core import _accessible_emp_ids
+
+    return set(_accessible_emp_ids())
 
 
 
