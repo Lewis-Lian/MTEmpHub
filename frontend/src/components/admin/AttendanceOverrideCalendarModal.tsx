@@ -217,10 +217,11 @@ export default function AttendanceOverrideCalendarModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 点击格子直接循环切换出勤状态（""=跟随系统）；假种与详细信息在下方面板设置
+  // 首次点击格子仅选中（展开当天信息），再次点击同一格才循环切换出勤状态；假种在下方面板设置
   function handleCellClick(date: string) {
+    const isFirstClick = selectedDate !== date;
     setSelectedDate(date);
-    if (isLocked || !calendar) {
+    if (isFirstClick || isLocked || !calendar) {
       return;
     }
     const dayOverride = calendar.days.find((day) => day.date === date)?.override ?? null;
@@ -302,7 +303,7 @@ export default function AttendanceOverrideCalendarModal({
                 />
                 {selectedDay ? renderDayPanel() : (
                   <div className="attendance-override-daypanel-hint">
-                    点击格子循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤，缺勤再点回到全勤）；假种与工时等可在选中日期后于下方设置，恢复系统口径用"清除修正"
+                    首次点击格子选中并查看当天信息；再次点击同一格循环切换考勤状态（全勤 → 上午出勤 → 下午出勤 → 缺勤）。假种与工时等在选中后于下方设置，恢复系统口径用"清除修正"
                   </div>
                 )}
               </>
