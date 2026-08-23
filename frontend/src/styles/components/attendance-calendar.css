@@ -55,7 +55,7 @@
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
-  z-index: 1050;
+  z-index: var(--z-calendar-modal);
   animation: daydetail-overlay-in 160ms ease-out;
 }
 .daydetail-card {

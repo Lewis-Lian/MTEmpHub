@@ -7,7 +7,7 @@ import QueryTable from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
-import "./EmployeeDashboardPage.css";
+import "./dashboard-shared.css";
 
 interface AbnormalQueryRow {
   dept_name: string;

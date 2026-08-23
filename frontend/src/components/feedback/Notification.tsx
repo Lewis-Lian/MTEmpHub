@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 
+import "../../styles/components/notification.css";
+
 // 定义支持的提示框类型
 export type NotificationType = "success" | "error" | "warning" | "info";
 

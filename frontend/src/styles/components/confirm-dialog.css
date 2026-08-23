@@ -5,7 +5,7 @@
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 99999 !important;
+  z-index: var(--z-confirm) !important;
   background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -25,12 +25,12 @@
 
 /* 弹窗卡片 */
 .confirm-card {
-  background: #ffffff;
+  background: var(--ent-bg);
   border-radius: 12px;
   width: 100%;
   max-width: 400px;
   box-shadow: 0 20px 25px -5px rgba(24, 49, 83, 0.15), 0 10px 10px -5px rgba(24, 49, 83, 0.08);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--ent-border-strong);
   overflow: hidden;
   transform: scale(0.95) translate3d(0, 10px, 0);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -57,8 +57,8 @@
 /* 弹窗底部操作栏 */
 .confirm-footer {
   padding: 12px 20px;
-  background: #f8fafc;
-  border-top: 1px solid #f1f5f9;
+  background: var(--ent-secondary-bg);
+  border-top: 1px solid var(--ent-border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
@@ -86,12 +86,12 @@
 
 /* 取消按钮 */
 .confirm-btn-cancel {
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #475569;
 }
 
 .confirm-btn-cancel:hover {
-  background: #f1f5f9;
+  background: var(--ent-tertiary-bg);
   color: #1e293b;
   border-color: #cbd5e1;
 }

@@ -184,7 +184,7 @@ export default function ShiftsPage() {
     return (
       <div className="master-slot-list" style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
         {state.time_slots.map((slot, index) => (
-          <div className="master-slot-row" key={index} style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div className="master-slot-row admin-row-gap12" key={index} >
             <TimePicker
               value={slot[0]}
               onChange={(val) => updateSlot(target, index, 0, val)}
@@ -282,12 +282,12 @@ export default function ShiftsPage() {
           color: "var(--ent-text)",
           boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>班次总数：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.length} 个</strong>
           </div>
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)" }}>跨天班次：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_cross_day).length} 个</strong>
           </div>
@@ -305,7 +305,7 @@ export default function ShiftsPage() {
         gap: "12px"
       }}>
         <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>班次列表</span>
-        <div className="toolbar" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+        <div className="toolbar admin-row">
           <button className="account-action-button" onClick={loadRows} type="button">
             刷新
           </button>
@@ -355,17 +355,17 @@ export default function ShiftsPage() {
       }}>
         <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div className="admin-row-gap12">
               <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增班次</span>
               <span className="page-tag">排班规则</span>
             </div>
-            <button className="master-modal-close" onClick={handleCloseModal} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
+            <button className="master-modal-close admin-icon-btn" onClick={handleCloseModal} type="button">×</button>
           </div>
-          <form className="account-create-form" onSubmit={submitCreate} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <form className="account-create-form admin-stack-lg" onSubmit={submitCreate} >
             {/* 基础信息 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div className="admin-stack">
+              <h4 className="admin-modal-title">基础信息</h4>
+              <div className="admin-form-grid">
                 <label className="account-field" style={{ margin: 0 }}>
                   <span className="account-field-label">班次编号</span>
                   <input className="account-input" onChange={(event) => setForm({ ...form, shift_no: event.target.value })} required value={form.shift_no} placeholder="例如: A0001" />
@@ -378,7 +378,7 @@ export default function ShiftsPage() {
             </div>
 
             {/* 时间规则 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            <div className="admin-stack">
               <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>时间规则</span>
                 <button className="account-action-button" onClick={() => addSlot("create")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
@@ -387,7 +387,7 @@ export default function ShiftsPage() {
               <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
                 <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: form.time_slots.length > 0 ? "16px" : "0" }}>
                   <input checked={form.is_cross_day} onChange={(event) => setForm({ ...form, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                  <span style={{ fontSize: "14px", color: "#334155" }}>允许跨天班次 (下班时间在次日)</span>
+                  <span className="admin-text">允许跨天班次 (下班时间在次日)</span>
                 </label>
                 {renderSlotEditor("create", form)}
               </div>
@@ -411,9 +411,9 @@ export default function ShiftsPage() {
             </div>
             <div className="master-modal-body" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
               {/* 基础信息 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">基础信息</h4>
+                <div className="admin-form-grid">
                   <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">班次编号</span>
                     <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_no: event.target.value })} required value={editForm.shift_no} placeholder="例如: A0001" />
@@ -426,7 +426,7 @@ export default function ShiftsPage() {
               </div>
 
               {/* 时间规则 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div className="admin-stack">
                 <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span>时间规则</span>
                   <button className="account-action-button" onClick={() => addSlot("edit")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
@@ -435,7 +435,7 @@ export default function ShiftsPage() {
                 <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
                   <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: editForm.time_slots.length > 0 ? "16px" : "0" }}>
                     <input checked={editForm.is_cross_day} onChange={(event) => setEditForm({ ...editForm, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                    <span style={{ fontSize: "14px", color: "#334155" }}>允许跨天班次 (下班时间在次日)</span>
+                    <span className="admin-text">允许跨天班次 (下班时间在次日)</span>
                   </label>
                   {renderSlotEditor("edit", editForm)}
                 </div>

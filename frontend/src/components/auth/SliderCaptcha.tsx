@@ -7,6 +7,8 @@ import {
   type SliderTracePoint,
 } from "../../api/auth";
 
+import "../../styles/components/slider-captcha.css";
+
 type SliderStatus = "loading" | "idle" | "dragging" | "verifying" | "success" | "error";
 
 interface SliderCaptchaProps {

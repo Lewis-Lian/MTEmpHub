@@ -854,7 +854,7 @@ export default function SummaryDownloadPage() {
             <span className="step-desc">过滤并定制导出的列名</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div className="admin-stack">
             {includeFinal && (
               <HeaderChecklist
                 headers={FINAL_HEADERS}

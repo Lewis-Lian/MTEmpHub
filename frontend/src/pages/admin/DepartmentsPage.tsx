@@ -354,12 +354,12 @@ export default function DepartmentsPage() {
           color: "var(--ent-text)",
           boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>部门总数：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.length} 个</strong>
           </div>
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)" }}>锁定部门：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_locked).length} 个</strong>
           </div>
@@ -424,9 +424,9 @@ export default function DepartmentsPage() {
             </div>
             <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
               {/* 基础信息 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">基础信息</h4>
+                <div className="admin-form-grid">
                   <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">部门编号</span>
                     <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_no: event.target.value })} required value={editForm.dept_no} placeholder="请输入部门编号" />
@@ -435,7 +435,7 @@ export default function DepartmentsPage() {
                     <span className="account-field-label">部门名称</span>
                     <input className="account-input" onChange={(event) => setEditForm({ ...editForm, dept_name: event.target.value })} required value={editForm.dept_name} placeholder="请输入部门名称" />
                   </label>
-                  <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">上级部门</span>
                     <DepartmentPicker
                       departments={rows}
@@ -456,12 +456,12 @@ export default function DepartmentsPage() {
               </div>
 
               {/* 附加状态 */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>附加状态</h4>
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">附加状态</h4>
                 <div style={{ display: "flex", gap: "32px", padding: "12px 16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                   <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
                     <input checked={editForm.is_locked} onChange={(event) => setEditForm({ ...editForm, is_locked: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                    <span style={{ fontSize: "14px", color: "#334155" }}>锁定部门</span>
+                    <span className="admin-text">锁定部门</span>
                   </label>
                 </div>
               </div>
@@ -525,15 +525,15 @@ export default function DepartmentsPage() {
         transition: "opacity 0.15s ease"
       }}>
         <div className="master-modal-container department-parent-modal" style={{ width: "100%", maxWidth: "550px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-          <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
+          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增部门</span>
           </div>
-          <form className="account-create-form" onSubmit={submitCreate} style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <form className="account-create-form admin-stack-lg" onSubmit={submitCreate} >
             {/* 基础信息 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+            <div className="admin-stack">
+              <h4 className="admin-modal-title">基础信息</h4>
+              <div className="admin-form-grid">
                 <label className="account-field" style={{ margin: 0 }}>
                   <span className="account-field-label">部门编号</span>
                   <input className="account-input" onChange={(event) => setForm({ ...form, dept_no: event.target.value })} required value={form.dept_no} placeholder="请输入部门编号" />
@@ -542,7 +542,7 @@ export default function DepartmentsPage() {
                   <span className="account-field-label">部门名称</span>
                   <input className="account-input" onChange={(event) => setForm({ ...form, dept_name: event.target.value })} required value={form.dept_name} placeholder="请输入部门名称" />
                 </label>
-                <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+                <label className="account-field admin-form-grid-wide">
                   <span className="account-field-label">上级部门</span>
                   <DepartmentPicker
                     departments={rows}
@@ -562,12 +562,12 @@ export default function DepartmentsPage() {
             </div>
 
             {/* 附加状态 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>附加状态</h4>
+            <div className="admin-stack">
+              <h4 className="admin-modal-title">附加状态</h4>
               <div style={{ display: "flex", gap: "32px", padding: "12px 16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
                 <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
                   <input checked={form.is_locked} onChange={(event) => setForm({ ...form, is_locked: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                  <span style={{ fontSize: "14px", color: "#334155" }}>锁定部门</span>
+                  <span className="admin-text">锁定部门</span>
                 </label>
               </div>
             </div>
@@ -599,12 +599,12 @@ export default function DepartmentsPage() {
         transition: "opacity 0.15s ease"
       }}>
         <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-          <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
+          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>数据导入与导出</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div className="admin-stack-lg">
             {/* 批量导入专区 */}
             <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
               <div

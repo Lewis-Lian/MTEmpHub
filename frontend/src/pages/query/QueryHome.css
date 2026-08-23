@@ -3,15 +3,15 @@
    ========================================================================== */
 
 :root {
-  /* 现代明亮极简 SaaS 风格色板 */
-  --qh-bg-page: #f8fafc;          /* 极浅灰白底色 */
+  /* 现代明亮极简 SaaS 风格色板（与 --ent-* 重合的基础值统一引用真源，定义在 legacy-ui.css） */
+  --qh-bg-page: var(--ent-secondary-bg); /* 极浅灰白底色 */
   --qh-bg-card: rgba(255, 255, 255, 0.75); /* 高透亮色玻璃卡片底色 */
   --qh-border: rgba(226, 232, 240, 0.8); /* 极细柔和灰色描边 */
   --qh-border-hover: rgba(56, 189, 248, 0.6); /* 极光蓝高亮描边 */
-  
+
   /* 前景与字色 */
-  --qh-text-main: #0f172a;        /* 深灰黑主字（Slate-900） */
-  --qh-text-muted: #64748b;       /* 蓝灰辅助字（Slate-500） */
+  --qh-text-main: var(--ent-text);        /* 深灰黑主字（Slate-900） */
+  --qh-text-muted: var(--ent-text-secondary); /* 蓝灰辅助字（Slate-500） */
   
   /* 精致亮色系渐变 */
   --qh-primary: #0284c7;          /* 科技蓝 */
@@ -141,7 +141,7 @@
 .qh-header-kicker {
   font-size: 11px;
   font-weight: 700;
-  color: #0284c7;
+  color: var(--qh-primary);
   text-transform: uppercase;
   letter-spacing: 2px;
   margin: 0;
@@ -175,7 +175,7 @@
   width: 48px;
   height: 48px;
   border-radius: 12px;
-  background: linear-gradient(135deg, #0284c7 0%, #7c3aed 100%);
+  background: linear-gradient(135deg, var(--qh-primary) 0%, var(--qh-purple) 100%);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -272,7 +272,7 @@
 
 .qh-flat-select-input:hover {
   border-color: var(--qh-primary);
-  background-color: #f8fafc;
+  background-color: var(--qh-bg-page);
   box-shadow: 0 0 8px rgba(56, 189, 248, 0.2);
 }
 
@@ -286,7 +286,7 @@
   font-size: 12px;
   font-weight: 600;
   background: rgba(2, 132, 199, 0.06);
-  color: #0284c7;
+  color: var(--qh-primary);
   border: 1px solid rgba(2, 132, 199, 0.15);
   justify-content: center;
 }
@@ -337,8 +337,6 @@
   position: relative;
   overflow: hidden;
 }
-
-
 
 .qh-kpi-card-hero:hover {
   transform: translateY(-4px);
@@ -482,8 +480,6 @@
   overflow: hidden;
 }
 
-
-
 .qh-indicator-item-card:hover {
   transform: translateY(-2px);
   background: rgba(255, 255, 255, 0.85);
@@ -610,18 +606,6 @@
   box-shadow: inset 0 0 10px rgba(59, 130, 246, 0.03);
   position: relative;
   overflow: hidden;
-}
-
-.qh-notice-icon {
-  font-size: 18px;
-  color: #2563eb;
-  line-height: 1;
-  animation: iconPulse 2s infinite alternate ease-in-out;
-}
-
-@keyframes iconPulse {
-  0% { transform: scale(1); opacity: 0.8; }
-  100% { transform: scale(1.15); opacity: 1; }
 }
 
 .qh-notice-content {

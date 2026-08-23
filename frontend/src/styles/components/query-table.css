@@ -40,7 +40,7 @@
   padding: 0 16px 0 6px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #1e293b;
   font-size: 12.5px;
   appearance: none;
@@ -64,7 +64,7 @@
   padding: 0 8px;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #1e293b;
   font-size: 12.5px;
   cursor: pointer;
@@ -102,7 +102,7 @@
   padding: 0;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #1e293b;
   font-size: 12.5px;
   text-align: center;
@@ -114,5 +114,5 @@
 .table-pager select:hover,
 .table-pager input:focus {
   border-color: #0284c7;
-  background-color: #f8fafc;
+  background-color: var(--ent-secondary-bg);
 }

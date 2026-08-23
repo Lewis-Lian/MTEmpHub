@@ -249,20 +249,20 @@ export default function DatabaseSettingsPage() {
           </div>
         </div>
         <div style={{ padding: "16px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>主机地址</span>
+          <label className="admin-stack-sm">
+            <span className="admin-text-sm">主机地址</span>
             <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="localhost" style={inputStyle} />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>端口</span>
+          <label className="admin-stack-sm">
+            <span className="admin-text-sm">端口</span>
             <input value={port} onChange={(e) => setPort(e.target.value)} placeholder="3306" style={inputStyle} />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>用户名</span>
+          <label className="admin-stack-sm">
+            <span className="admin-text-sm">用户名</span>
             <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="root" style={inputStyle} />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>密码</span>
+          <label className="admin-stack-sm">
+            <span className="admin-text-sm">密码</span>
             <input
               type="password"
               value={password}
@@ -272,7 +272,7 @@ export default function DatabaseSettingsPage() {
             />
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 4, gridColumn: "1 / -1" }}>
-            <span style={{ fontSize: 13, fontWeight: 500 }}>数据库名</span>
+            <span className="admin-text-sm">数据库名</span>
             <input
               value={database}
               onChange={(e) => setDatabase(e.target.value)}

@@ -9,7 +9,7 @@
   min-width: 0;
   min-height: calc(100vh - 86px);
   box-sizing: border-box;
-  background-color: #f8fafc;
+  background-color: var(--qh-bg-page);
   background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1.5px, transparent 0);
   background-size: 28px 28px;
   position: relative;
@@ -42,7 +42,7 @@
 /* 保证内容在上层，并使筛选栏的层级高于结果表格以解决下拉框遮挡问题 */
 .employee-dashboard-page .query-filter-rail {
   position: relative;
-  z-index: 30;
+  z-index: var(--z-sticky-raised);
 }
 .employee-dashboard-page .query-workspace {
   background: transparent;
@@ -131,7 +131,7 @@
 }
 
 .employee-dashboard-page .query-filter-kicker {
-  color: #0284c7;
+  color: var(--qh-primary);
   font-weight: 700;
   letter-spacing: 1.8px;
 }
@@ -139,13 +139,13 @@
 .employee-dashboard-page .query-filter-heading h2 {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--qh-text-main);
   margin: 0;
 }
 
 .employee-dashboard-page .query-filter-heading p {
   font-size: 12px;
-  color: #64748b;
+  color: var(--qh-text-muted);
 }
 
 .employee-dashboard-page .query-filter-body {
@@ -159,13 +159,12 @@
   margin-bottom: 8px;
 }
 
-
 .employee-dashboard-page .form-select {
   height: 38px;
   min-height: 38px;
   border: 1px solid #cbd5e1;
   background-color: #ffffff;
-  color: #0f172a;
+  color: var(--qh-text-main);
   border-radius: 8px;
   font-size: 13.5px;
   padding: 8px 36px 8px 12px;
@@ -179,7 +178,7 @@
 
 .employee-dashboard-page .form-select:hover {
   border-color: #94a3b8;
-  background-color: #f8fafc;
+  background-color: var(--qh-bg-page);
 }
 
 /* ==========================================================================
@@ -210,13 +209,13 @@
 
 .employee-dashboard-page .dashboard-check-option:hover {
   border-color: #94a3b8;
-  background: #f8fafc;
+  background: var(--qh-bg-page);
 }
 
 .employee-dashboard-page .dashboard-check-option:has(input:checked) {
-  border-color: #0284c7;
+  border-color: var(--qh-primary);
   background: rgba(56, 189, 248, 0.08);
-  color: #0284c7;
+  color: var(--qh-primary);
   box-shadow: 0 2px 8px rgba(56, 189, 248, 0.12);
 }
 
@@ -247,7 +246,7 @@
 }
 
 .employee-dashboard-page .query-filter-actions .btn-primary {
-  background: linear-gradient(135deg, #38bdf8 0%, #0284c7 50%, #0369a1 100%);
+  background: linear-gradient(135deg, #38bdf8 0%, var(--qh-primary) 50%, #0369a1 100%);
   background-size: 200% 100%;
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
@@ -265,7 +264,7 @@
 }
 
 .employee-dashboard-page .query-filter-actions .btn-outline-success {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background: linear-gradient(135deg, #34d399 0%, var(--qh-success) 50%, #10b981 100%);
   background-size: 200% 100%;
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
@@ -273,7 +272,7 @@
 }
 
 .employee-dashboard-page .query-filter-actions .btn-outline-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background: linear-gradient(135deg, #34d399 0%, var(--qh-success) 50%, #10b981 100%);
   background-size: 200% 100%;
   background-position: right center;
   color: #ffffff;
@@ -302,7 +301,7 @@
 }
 
 .dashboard-modal-actions .btn-outline-success {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background: linear-gradient(135deg, #34d399 0%, var(--qh-success) 50%, #10b981 100%);
   background-size: 200% 100%;
   color: #ffffff;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.18);
@@ -310,7 +309,7 @@
 }
 
 .dashboard-modal-actions .btn-outline-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #34d399 0%, #059669 50%, #10b981 100%);
+  background: linear-gradient(135deg, #34d399 0%, var(--qh-success) 50%, #10b981 100%);
   background-size: 200% 100%;
   background-position: right center;
   color: #ffffff;
@@ -345,8 +344,6 @@
   box-shadow: none;
   border-color: transparent;
 }
-
-
 
 /* 让表格内容区在超出时在内部产生滚动条，刚好占满 */
 .employee-dashboard-page .query-workspace .legacy-table-wrap {
@@ -412,7 +409,7 @@
 
 .employee-dashboard-page .query-progress-bar-inner {
   height: 100%;
-  background: linear-gradient(90deg, #38bdf8 0%, #0284c7 50%, #818cf8 100%);
+  background: linear-gradient(90deg, #38bdf8 0%, var(--qh-primary) 50%, #818cf8 100%);
   background-size: 200% 100%;
   animation: barShimmer 1.5s infinite linear;
   transition: width 0.3s cubic-bezier(0.1, 0.8, 0.25, 1);
@@ -426,7 +423,6 @@
     background-position: -200% 0;
   }
 }
-
 
 /* 统一解决包含 legacy-table-panel 时的自适应高度问题 */
 .employee-dashboard-page .query-result-panel,

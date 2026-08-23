@@ -519,9 +519,9 @@ export default function EmployeesPage() {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "24px", width: "100%" }}>
         {/* 基础信息 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>基础信息</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+        <div className="admin-stack">
+          <h4 className="admin-modal-title">基础信息</h4>
+          <div className="admin-form-grid">
             <label className="account-field" style={{ margin: 0 }}>
               <span className="account-field-label">人员编号</span>
               <input className="account-input" onChange={(event) => onChange({ ...state, emp_no: event.target.value })} required value={state.emp_no} placeholder="请输入人员编号" />
@@ -530,7 +530,7 @@ export default function EmployeesPage() {
               <span className="account-field-label">人员姓名</span>
               <input className="account-input" onChange={(event) => onChange({ ...state, name: event.target.value })} required value={state.name} placeholder="请输入人员姓名" />
             </label>
-            <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+            <label className="account-field admin-form-grid-wide">
               <span className="account-field-label">部门名称</span>
               {renderDepartmentSelect(state.dept_name, (value) => onChange({ ...state, dept_name: value }), departmentTarget)}
             </label>
@@ -538,10 +538,10 @@ export default function EmployeesPage() {
         </div>
 
         {/* 考勤设置 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>考勤规则设置</h4>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-            <label className="account-field" style={{ margin: 0, gridColumn: "1 / -1" }}>
+        <div className="admin-stack">
+          <h4 className="admin-modal-title">考勤规则设置</h4>
+          <div className="admin-form-grid">
+            <label className="account-field admin-form-grid-wide">
               <span className="account-field-label">班次编号</span>
               {renderShiftSelect(state.shift_no, (value) => onChange({ ...state, shift_no: value }))}
             </label>
@@ -559,16 +559,16 @@ export default function EmployeesPage() {
         </div>
 
         {/* 附加状态 */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px" }}>附加状态</h4>
+        <div className="admin-stack">
+          <h4 className="admin-modal-title">附加状态</h4>
           <div style={{ display: "flex", gap: "32px", padding: "12px 16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
             <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
               <input checked={state.is_manager} onChange={(event) => onChange({ ...state, is_manager: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-              <span style={{ fontSize: "14px", color: "#334155" }}>设为管理人员</span>
+              <span className="admin-text">设为管理人员</span>
             </label>
             <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
               <input checked={state.is_nursing} onChange={(event) => onChange({ ...state, is_nursing: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-              <span style={{ fontSize: "14px", color: "#334155" }}>享受哺乳假</span>
+              <span className="admin-text">享受哺乳假</span>
             </label>
           </div>
         </div>
@@ -653,22 +653,22 @@ export default function EmployeesPage() {
           color: "var(--ent-text)",
           boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>员工总数：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.length} 人</strong>
           </div>
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)" }}>普通员工：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => !r.is_manager).length} 人</strong>
           </div>
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)" }}>管理人员：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_manager).length} 人</strong>
           </div>
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div className="admin-row">
             <span style={{ color: "var(--ent-text-secondary)" }}>哺乳假：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_nursing).length} 人</strong>
           </div>
@@ -806,7 +806,7 @@ export default function EmployeesPage() {
 
             <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong, #cbd5e1)" }} />
 
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div className="admin-row">
               <button
                 className="account-action-button account-action-button--danger btn btn-danger"
                 onClick={applyBatchDelete}
@@ -917,7 +917,7 @@ export default function EmployeesPage() {
         transition: "opacity 0.15s ease"
       }}>
         <div className="master-modal-container" style={{ width: "100%", maxWidth: "650px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
-          <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
+          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增员工</span>
           </div>
@@ -946,12 +946,12 @@ export default function EmployeesPage() {
         transition: "opacity 0.15s ease"
       }}>
         <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-          <button className="master-modal-close" onClick={handleCloseModal} style={{ position: "absolute", top: "16px", right: "16px", border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b" }} type="button">×</button>
+          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
             <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>数据导入与导出</span>
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+          <div className="admin-stack-lg">
             {/* 批量导入专区 */}
             <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
               <div

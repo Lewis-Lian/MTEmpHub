@@ -12,7 +12,7 @@
   box-sizing: border-box;
   overflow: hidden;
   border-bottom: 1px solid #cbd5e1;
-  background: #f8fafc;
+  background: var(--ent-secondary-bg);
 }
 
 .app-tab-list {
@@ -45,8 +45,8 @@
   padding: 6px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 6px 6px 0 0;
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text-secondary);
   font-size: 12.5px;
   position: relative;
   z-index: 1;
@@ -72,7 +72,7 @@
 }
 
 .app-tab-button.is-active {
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #0284c7;
   border-color: #cbd5e1;
   border-bottom-color: #ffffff;
@@ -84,12 +84,12 @@
 
 .app-tab-button:hover:not(.is-active) {
   background: #e2e8f0;
-  color: #0f172a;
+  color: var(--ent-text);
   border-bottom-color: #cbd5e1;
 }
 
 .app-tab-button.is-active:hover {
-  background: #ffffff;
+  background: var(--ent-bg);
   color: #0284c7;
 }
 
