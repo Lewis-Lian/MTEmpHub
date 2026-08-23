@@ -359,7 +359,7 @@ export default function AttendanceOverridesPage({
         <AttendanceOverrideCalendarModal
           editTitle={editTitle}
           employee={editingRow.employee}
-          hasMonthlyOverride={Boolean(editingRow.override)}
+          hasMonthlyOverride={Boolean(editingRow.override?.updated_at)}
           isLocked={isLocked}
           isManager={filterMode === "manager"}
           month={selectedMonth}
