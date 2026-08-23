@@ -10,6 +10,7 @@ import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
 import type { AccountSet, QueryBootstrap } from "../../types/query";
 import MonthPicker from "../common/MonthPicker";
+import AttendanceOverrideCalendarModal from "./AttendanceOverrideCalendarModal";
 
 interface OverrideEmployee {
   id: number;
@@ -49,16 +50,9 @@ interface AttendanceOverridesPageProps {
   pickerButtonLabel: string;
   listEmptyHint: string;
   editTitle: string;
-  editMetaEmpty: string;
-  saveSuccessText: string;
   endpointBase: "/api/admin/employee-attendance-overrides" | "/api/admin/manager-attendance-overrides";
   filterMode: "employee" | "manager";
   fields: FieldConfig[];
-}
-
-interface EditDraftState {
-  values: Record<string, string>;
-  remark: string;
 }
 
 export default function AttendanceOverridesPage({
@@ -67,8 +61,6 @@ export default function AttendanceOverridesPage({
   pickerButtonLabel,
   listEmptyHint,
   editTitle,
-  editMetaEmpty,
-  saveSuccessText,
   endpointBase,
   filterMode,
   fields,
@@ -83,7 +75,6 @@ export default function AttendanceOverridesPage({
   const [rows, setRows] = useState<AttendanceOverrideRow[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
   const [editingRow, setEditingRow] = useState<AttendanceOverrideRow | null>(null);
-  const [editDraft, setEditDraft] = useState<EditDraftState>({ remark: "", values: {} });
   const [showActionsModal, setShowActionsModal] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -211,56 +202,14 @@ export default function AttendanceOverridesPage({
 
   function openEdit(row: AttendanceOverrideRow) {
     setEditingRow(row);
-    setEditDraft({
-      remark: String(row.override?.remark ?? ""),
-      values: Object.fromEntries(fields.map((field) => [field.key, normalizeEditValue(row.override?.[field.key])])),
-    });
   }
 
-  function closeEdit() {
-    setEditingRow(null);
-  }
-
-  function updateEditValue(key: string, value: string) {
-    setEditDraft((current) => ({
-      ...current,
-      values: {
-        ...current.values,
-        [key]: value,
-      },
-    }));
-  }
-
-  async function saveEdit() {
-    if (!editingRow || !selectedMonth) {
-      return;
-    }
-    const payload: Record<string, unknown> = {
-      month: selectedMonth,
-      emp_id: editingRow.employee.id,
-      remark: editDraft.remark,
-    };
-    fields.forEach((field) => {
-      payload[field.key] = editDraft.values[field.key] ?? "";
-    });
-
-    try {
-      const nextRow = await apiRequest<AttendanceOverrideRow>(`${endpointBase}/record`, {
-        body: payload,
-        method: "PUT",
-      });
-      setRows((currentRows) =>
-        currentRows.map((row) => (row.employee.id === nextRow.employee.id ? nextRow : row)),
-      );
-      setEditingRow(nextRow);
-      setEditDraft({
-        remark: String(nextRow.override?.remark ?? ""),
-        values: Object.fromEntries(fields.map((field) => [field.key, normalizeEditValue(nextRow.override?.[field.key])])),
-      });
-      notification.success(saveSuccessText);
-    } catch (caughtError) {
-      notification.error(caughtError instanceof Error ? caughtError.message : "保存失败");
-    }
+  function handleRowRefresh(nextRow: unknown) {
+    const typedRow = nextRow as AttendanceOverrideRow;
+    setRows((currentRows) =>
+      currentRows.map((row) => (row.employee.id === typedRow.employee.id ? typedRow : row)),
+    );
+    setEditingRow((current) => (current && current.employee.id === typedRow.employee.id ? typedRow : current));
   }
 
   function handleDownload(kind: "template" | "export") {
@@ -407,74 +356,16 @@ export default function AttendanceOverridesPage({
       </section>
 
       {editingRow ? (
-        <div aria-label={editTitle} aria-modal="true" className="master-modal-backdrop attendance-override-edit-backdrop" role="dialog">
-          <div className="master-modal attendance-override-edit-modal">
-            <div className="master-modal-header">
-              <div>
-                <h2>{editTitle}</h2>
-                <div className="attendance-override-edit-meta">
-                  {editingRow ? `${editingRow.employee.emp_no} - ${editingRow.employee.name} / ${selectedMonth || "-"}` : editMetaEmpty}
-                </div>
-              </div>
-              <button aria-label="关闭" className="master-modal-close" onClick={closeEdit} type="button">
-                ×
-              </button>
-            </div>
-            <div className="master-modal-body">
-              <div className="legacy-table-wrap attendance-override-edit-table-wrap">
-                <table className="legacy-table attendance-override-edit-table">
-                  <thead>
-                    <tr>
-                      <th className="legacy-table-head-cell"><div className="master-static-head">字段</div></th>
-                      <th className="legacy-table-head-cell"><div className="master-static-head">系统自动值</div></th>
-                      <th className="legacy-table-head-cell"><div className="master-static-head">手工修正</div></th>
-                      <th className="legacy-table-head-cell"><div className="master-static-head">最终应用值</div></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {fields.map((field) => (
-                      <tr key={field.key}>
-                        <td className="legacy-table-body-cell">{field.label}</td>
-                        <td className="legacy-table-body-cell">{normalizeEditValue(editingRow.automatic?.[field.key]) || "-"}</td>
-                        <td className="legacy-table-body-cell">
-                          <input
-                            className="account-input attendance-override-edit-input"
-                            disabled={isLocked}
-                            inputMode={field.inputMode}
-                            onChange={(event) => updateEditValue(field.key, event.target.value)}
-                            placeholder="自动"
-                            value={editDraft.values[field.key] ?? ""}
-                          />
-                        </td>
-                        <td className="legacy-table-body-cell">{normalizeEditValue(editingRow.applied?.[field.key]) || "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <label className="account-field">
-                <span className="account-field-label">修正备注</span>
-                <textarea
-                  className="account-input attendance-override-edit-remark"
-                  disabled={isLocked}
-                  onChange={(event) => setEditDraft((current) => ({ ...current, remark: event.target.value }))}
-                  placeholder="可填写修正原因"
-                  rows={3}
-                  value={editDraft.remark}
-                />
-              </label>
-              <div className="account-lock-notice">{editingRow.override?.updated_at ? `最近保存 ${(editingRow.override.updated_by_name || "").trim()} ${formatDateTime(editingRow.override.updated_at)}`.trim() : "未保存"}</div>
-            </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={closeEdit} type="button">
-                取消
-              </button>
-              <button className="account-action-button account-action-button--primary" disabled={isLocked} onClick={saveEdit} type="button">
-                保存修改
-              </button>
-            </div>
-          </div>
-        </div>
+        <AttendanceOverrideCalendarModal
+          editTitle={editTitle}
+          employee={editingRow.employee}
+          hasMonthlyOverride={Boolean(editingRow.override)}
+          isLocked={isLocked}
+          isManager={filterMode === "manager"}
+          month={selectedMonth}
+          onClose={() => setEditingRow(null)}
+          onRowRefresh={handleRowRefresh}
+        />
       ) : null}
 
       {showActionsModal ? (
@@ -527,10 +418,6 @@ export default function AttendanceOverridesPage({
 
 function pickDefaultMonth(accountSets: AccountSet[]): string {
   return accountSets.find((accountSet) => accountSet.is_active)?.month ?? accountSets[0]?.month ?? "";
-}
-
-function normalizeEditValue(value: unknown): string {
-  return value === null || value === undefined || value === "" ? "" : String(value);
 }
 
 function summarizeValues(values: OverrideValues | null, fields: FieldConfig[]): string {

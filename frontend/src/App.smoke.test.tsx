@@ -1138,10 +1138,9 @@ describe("App smoke regression", () => {
     expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员考勤修正")).toBeInTheDocument();
-    expect(screen.getByText("字段")).toBeInTheDocument();
-    expect(screen.getByText("系统自动值")).toBeInTheDocument();
-    expect(screen.queryByText("手工修正值")).not.toBeInTheDocument();
-    expect(screen.getByText("最终应用值")).toBeInTheDocument();
+    expect(await screen.findByText(/出勤 1 天/)).toBeInTheDocument();
+    expect(screen.getByText("周一")).toBeInTheDocument();
+    expect(screen.getByText(/最终应用值以月度修正为准/)).toBeInTheDocument();
   });
 
   it("管理人员加班后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
@@ -1944,6 +1943,38 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
               },
             },
           ],
+        }),
+      );
+    case "/api/admin/attendance-override-daily/calendar":
+      return Promise.resolve(
+        jsonResponse({
+          employee: { id: 11, emp_no: "M001", name: "经理甲", dept_name: "信息部" },
+          month: "2026-05",
+          days: [
+            {
+              date: "2026-05-06",
+              check_in_times: ["08:00"],
+              check_out_times: ["17:00"],
+              punch_count: 2,
+              actual_hours: 8,
+              late_minutes: 0,
+              early_leave_minutes: 0,
+              is_half_day: false,
+              exception_reason: "",
+              override: null,
+            },
+          ],
+          overtimes: [],
+          leaves: [],
+          summary: {
+            attendance_days: 1,
+            half_days: 0,
+            leave_by_type: [],
+            evening_overtime_hours: 0,
+            other_overtime_hours: 0,
+            late_minutes_total: 0,
+            early_leave_minutes_total: 0,
+          },
         }),
       );
     case "/api/admin/manager-overtime/records":

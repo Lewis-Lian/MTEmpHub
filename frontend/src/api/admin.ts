@@ -10,6 +10,7 @@ import type {
   AdminEmployee,
   AdminShift,
 } from "../types/admin";
+import type { AttendanceCalendarData } from "../types/query";
 
 let adminBootstrapPromise: Promise<AdminBootstrap> | null = null;
 
@@ -288,4 +289,48 @@ export function switchToSqlite(setupPassword?: string): Promise<{ message: strin
 export function switchToMysql(setupPassword?: string): Promise<{ message: string }> {
   const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
   return apiRequest<{ message: string }>("/api/admin/database-switch-mysql", { method: "POST", headers });
+}
+
+export interface DailyOverrideSavePayload {
+  month: string;
+  emp_id: number;
+  date: string;
+  status?: string;
+  is_evening_overtime?: boolean;
+  work_hours?: string | number;
+  late_minutes?: string | number;
+  early_leave_minutes?: string | number;
+  remark?: string;
+}
+
+export interface DailyOverrideRecordResponse<TRow> {
+  calendar: AttendanceCalendarData;
+  row: TRow;
+}
+
+export function fetchAdminDailyOverrideCalendar(
+  empId: number,
+  month: string,
+): Promise<AttendanceCalendarData> {
+  const query = new URLSearchParams({ emp_id: String(empId), month });
+  return apiRequest<AttendanceCalendarData>(
+    `/api/admin/attendance-override-daily/calendar?${query.toString()}`,
+  );
+}
+
+export function saveAdminDailyOverride<TRow>(
+  payload: DailyOverrideSavePayload,
+): Promise<DailyOverrideRecordResponse<TRow>> {
+  return apiRequest<DailyOverrideRecordResponse<TRow>>("/api/admin/attendance-override-daily/record", {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function clearAdminDailyOverride<TRow>(empId: number, date: string): Promise<DailyOverrideRecordResponse<TRow>> {
+  const query = new URLSearchParams({ emp_id: String(empId), date });
+  return apiRequest<DailyOverrideRecordResponse<TRow>>(
+    `/api/admin/attendance-override-daily/record?${query.toString()}`,
+    { method: "DELETE" },
+  );
 }

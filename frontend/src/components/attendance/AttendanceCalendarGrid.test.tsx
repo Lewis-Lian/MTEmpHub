@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AttendanceCalendarGrid from "./AttendanceCalendarGrid";
 import type { AttendanceCalendarData } from "../../types/query";
 
@@ -256,5 +256,84 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("丧假")).toBeInTheDocument();
     expect(screen.getByText("晚加班")).toBeInTheDocument();
     expect(within(legend as HTMLElement).getByText("缺勤")).toBeInTheDocument(); // 图例的"缺勤"与格内徽章同名，限定图例容器
+  });
+});
+
+describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
+  it("传入 onCellSelect 时点击格子走外部回调且不弹内部明细弹层", () => {
+    const onCellSelect = vi.fn();
+    render(<AttendanceCalendarGrid data={DATA} onCellSelect={onCellSelect} />);
+    fireEvent.click(getCell("2026-07-01"));
+    expect(onCellSelect).toHaveBeenCalledWith("2026-07-01");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("未传 onCellSelect 时保持原有明细弹层行为", () => {
+    render(<AttendanceCalendarGrid data={DATA} />);
+    fireEvent.click(getCell("2026-07-01"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("selectedDate 高亮对应格子", () => {
+    render(<AttendanceCalendarGrid data={DATA} selectedDate="2026-07-02" />);
+    expect(getCell("2026-07-02")).toHaveClass("is-selected");
+    expect(getCell("2026-07-01")).not.toHaveClass("is-selected");
+  });
+
+  it("修正状态覆盖格子背景：全勤绿/半勤黄/缺勤红/晚加橙，且带修正徽章", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-10", override: { status: "全勤" } },
+        { ...DATA.days[0], date: "2026-07-11", override: { status: "上午出勤" } },
+        { ...DATA.days[0], date: "2026-07-12", override: { status: "缺勤" } },
+        { ...DATA.days[0], date: "2026-07-13", override: { is_evening_overtime: true } },
+      ],
+      overtimes: [],
+      leaves: [],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(getCell("2026-07-10")).toHaveClass("is-bg-attendance");
+    expect(getCell("2026-07-11")).toHaveClass("is-bg-half");
+    expect(getCell("2026-07-12")).toHaveClass("is-bg-absent");
+    expect(getCell("2026-07-13")).toHaveClass("is-bg-evening");
+    expect(within(getCell("2026-07-10")).getByText("修正")).toBeInTheDocument();
+    expect(within(getCell("2026-07-13")).getByText("晚加")).toBeInTheDocument();
+  });
+
+  it("假种修正状态：出差/婚假/丧假用专属色，其余假种用请假色", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-10", override: { status: "出差" } },
+        { ...DATA.days[0], date: "2026-07-11", override: { status: "婚假" } },
+        { ...DATA.days[0], date: "2026-07-12", override: { status: "丧假" } },
+        { ...DATA.days[0], date: "2026-07-13", override: { status: "事假" } },
+      ],
+      overtimes: [],
+      leaves: [],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(getCell("2026-07-10")).toHaveClass("is-bg-trip");
+    expect(getCell("2026-07-11")).toHaveClass("is-bg-marriage");
+    expect(getCell("2026-07-12")).toHaveClass("is-bg-funeral");
+    expect(getCell("2026-07-13")).toHaveClass("is-bg-leave");
+  });
+
+  it("无记录的修正日（合成空打卡条目）也渲染格子与修正徽章", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        ...DATA.days,
+        {
+          date: "2026-07-20", check_in_times: [], check_out_times: [], punch_count: 0,
+          actual_hours: 0, late_minutes: 0, early_leave_minutes: 0, is_half_day: false,
+          exception_reason: "", override: { status: "全勤" },
+        },
+      ],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(getCell("2026-07-20")).toHaveClass("is-bg-attendance");
+    expect(within(getCell("2026-07-20")).getByText("修正")).toBeInTheDocument();
   });
 });

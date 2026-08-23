@@ -5752,3 +5752,71 @@ input[type="checkbox"] {
   transform: translateY(0) scale(0.96);
 }
 
+
+/* 逐日考勤修正日历弹窗 */
+.attendance-override-calendar-modal {
+  width: min(1040px, 100%);
+}
+.attendance-override-calendar-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.attendance-override-calendar-notice {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff8e6;
+  border: 1px solid #f0dca8;
+  color: #7a5c00;
+  font-size: 13px;
+}
+.attendance-override-daypanel-hint {
+  color: #6b7686;
+  font-size: 13px;
+  text-align: center;
+  padding: 8px 0;
+}
+.attendance-override-daypanel {
+  border: 1px solid #d8dee9;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f7f9fc;
+}
+.daypanel-section { display: flex; flex-direction: column; gap: 8px; }
+.daypanel-title {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600; color: #2c3650; font-size: 14px;
+}
+.daypanel-title-hint { font-weight: 400; font-size: 12px; color: #6b7686; }
+.daypanel-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; }
+.daypanel-rows .daydetail-row { display: flex; gap: 8px; font-size: 13px; }
+.daypanel-status-group { display: flex; flex-wrap: wrap; gap: 6px; }
+.daypanel-status-button {
+  padding: 5px 12px; border-radius: 14px; border: 1px solid #c6d0e0;
+  background: #fff; color: #3c4658; font-size: 13px; cursor: pointer;
+}
+.daypanel-status-button:hover:not(:disabled) { border-color: #1a56b0; color: #1a56b0; }
+.daypanel-status-button.is-active {
+  background: #1a56b0; border-color: #1a56b0; color: #fff; font-weight: 600;
+}
+.daypanel-status-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.daypanel-extra-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.daypanel-toggle {
+  background: none; border: none; color: #1a56b0; font-size: 13px; cursor: pointer; padding: 2px 0;
+}
+.daypanel-extra-form {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 14px; padding: 10px; border: 1px dashed #c6d0e0; border-radius: 8px; background: #fff;
+}
+.daypanel-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.daypanel-field-wide { grid-column: span 2; }
+.daypanel-field-label { color: #4a5568; }
+.daypanel-field input, .daypanel-field textarea {
+  border: 1px solid #c6d0e0; border-radius: 6px; padding: 5px 8px; font-size: 13px;
+}
+.daypanel-field input:disabled, .daypanel-field textarea:disabled { background: #eef1f6; }
+.daypanel-actions { display: flex; gap: 8px; grid-column: span 2; }
+.attendance-override-daypanel-meta { color: #6b7686; font-size: 12px; }
