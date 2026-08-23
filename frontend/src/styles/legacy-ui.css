@@ -5754,70 +5754,179 @@ input[type="checkbox"] {
 
 
 /* 逐日考勤修正日历弹窗 */
+/* ===== 逐日考勤修正日历弹窗（美化版） ===== */
+
+/* 入场动画：遮罩毛玻璃淡入 + 卡片上移微缩放 */
+.attendance-override-edit-backdrop {
+  background: rgba(13, 31, 48, 0.46);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: override-modal-overlay-in 160ms ease-out;
+}
 .attendance-override-calendar-modal {
   width: min(1040px, 100%);
+  position: relative;
+  animation: override-modal-card-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.attendance-override-calendar-modal::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, #1a56b0, #4f8ae0, #7c4dbe);
+}
+@keyframes override-modal-overlay-in { from { opacity: 0; } }
+@keyframes override-modal-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attendance-override-edit-backdrop,
+  .attendance-override-calendar-modal { animation: none; }
+}
+
+.attendance-override-calendar-modal .attendance-override-edit-meta {
+  margin-top: 2px; font-size: 13px; color: #5a6b84;
+  font-variant-numeric: tabular-nums; letter-spacing: 0.2px;
 }
 .attendance-override-calendar-body {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
+
+/* 提示条：左侧色条 + 渐变底 */
 .attendance-override-calendar-notice {
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #fff8e6;
+  position: relative;
+  padding: 9px 12px 9px 14px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #fff8e6, #fffdf6);
   border: 1px solid #f0dca8;
+  border-left: 4px solid #e0af3c;
   color: #7a5c00;
   font-size: 13px;
 }
+.attendance-override-calendar-body .account-lock-notice.is-locked {
+  border-left: 4px solid #d9534f;
+}
+
+/* 弹窗内汇总条：浅底卡片包裹（作用域限定，不影响员工日历页） */
+.attendance-override-calendar-body .attendance-calendar-summary {
+  background: #f4f7fb;
+  border: 1px solid #e3eaf3;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+/* 日历格子：hover 微浮起 + 选中锚定阴影（作用域限定） */
+.attendance-override-calendar-body .attendance-calendar-cell {
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.attendance-override-calendar-body .attendance-calendar-cell:hover {
+  transform: translateY(-1px);
+}
+.attendance-override-calendar-body .attendance-calendar-cell.is-selected {
+  outline: 2px solid #1a56b0;
+  outline-offset: 1px;
+  box-shadow: 0 4px 14px rgba(26, 86, 176, 0.22);
+}
+
 .attendance-override-daypanel-hint {
   color: #6b7686;
   font-size: 13px;
   text-align: center;
-  padding: 8px 0;
+  padding: 10px 0;
 }
+
+/* 当天面板：三段分区卡片化（原始考勤浅蓝 / 假种浅紫 / 更多信息白） */
 .attendance-override-daypanel {
-  border: 1px solid #d8dee9;
-  border-radius: 10px;
-  padding: 12px 14px;
+  border: 1px solid #dbe4ef;
+  border-radius: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  background: #f7f9fc;
+  gap: 10px;
+  background: #f8fafd;
 }
-.daypanel-section { display: flex; flex-direction: column; gap: 8px; }
+.daypanel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.daypanel-detail { background: #f0f6ff; border: 1px solid #dbeafe; }
+.daypanel-status { background: #f6f3fd; border: 1px solid #e6dffa; }
+.daypanel-extra { background: #ffffff; border: 1px solid #e6ebf2; }
 .daypanel-title {
   display: flex; align-items: center; gap: 8px;
-  font-weight: 600; color: #2c3650; font-size: 14px;
+  font-weight: 600; color: #2c3650; font-size: 13.5px;
 }
+.daypanel-detail > .daypanel-title::before,
+.daypanel-status > .daypanel-title::before {
+  content: ""; width: 3px; height: 14px; border-radius: 2px;
+  background: #1a56b0; flex: none;
+}
+.daypanel-status > .daypanel-title::before { background: #7c4dbe; }
 .daypanel-title-hint { font-weight: 400; font-size: 12px; color: #6b7686; }
 .daypanel-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 16px; }
 .daypanel-rows .daydetail-row { display: flex; gap: 8px; font-size: 13px; }
-.daypanel-status-group { display: flex; flex-wrap: wrap; gap: 6px; }
-.daypanel-status-button {
-  padding: 5px 12px; border-radius: 14px; border: 1px solid #c6d0e0;
-  background: #fff; color: #3c4658; font-size: 13px; cursor: pointer;
+
+/* 当前状态徽章 */
+.daypanel-current-status {
+  font-weight: 600; font-size: 12px; color: #ffffff;
+  background: #1a56b0; border-radius: 10px;
+  padding: 2px 10px; margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
-.daypanel-status-button:hover:not(:disabled) { border-color: #1a56b0; color: #1a56b0; }
+
+/* 假种按钮：hover 浮起、active 按压 */
+.daypanel-status-group { display: flex; flex-wrap: wrap; gap: 7px; }
+.daypanel-status-button {
+  padding: 5px 13px; border-radius: 15px; border: 1px solid #c6d0e0;
+  background: #fff; color: #3c4658; font-size: 13px; cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+.daypanel-status-button:hover:not(:disabled) {
+  border-color: #1a56b0; color: #1a56b0; transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(26, 86, 176, 0.14);
+}
+.daypanel-status-button:active:not(:disabled) { transform: translateY(0); }
 .daypanel-status-button.is-active {
-  background: #1a56b0; border-color: #1a56b0; color: #fff; font-weight: 600;
+  background: linear-gradient(135deg, #1a56b0, #2d6fd4);
+  border-color: #1a56b0; color: #fff; font-weight: 600;
+  box-shadow: 0 3px 10px rgba(26, 86, 176, 0.28);
 }
 .daypanel-status-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .daypanel-extra-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .daypanel-toggle {
-  background: none; border: none; color: #1a56b0; font-size: 13px; cursor: pointer; padding: 2px 0;
+  background: none; border: none; color: #1a56b0; font-size: 13px;
+  cursor: pointer; padding: 2px 0;
 }
+.daypanel-toggle:hover { text-decoration: underline; }
+
+/* 更多信息表单：输入框 focus 光环 */
 .daypanel-extra-form {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 10px 14px; padding: 10px; border: 1px dashed #c6d0e0; border-radius: 8px; background: #fff;
+  gap: 10px 14px; padding: 12px;
+  border: 1px solid #e3e9f2; border-radius: 10px; background: #fbfcfe;
 }
 .daypanel-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
 .daypanel-field-wide { grid-column: span 2; }
 .daypanel-field-label { color: #4a5568; }
 .daypanel-field input, .daypanel-field textarea {
-  border: 1px solid #c6d0e0; border-radius: 6px; padding: 5px 8px; font-size: 13px;
+  border: 1px solid #c6d0e0; border-radius: 8px; padding: 6px 9px; font-size: 13px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.daypanel-field input:focus, .daypanel-field textarea:focus {
+  outline: none; border-color: #1a56b0;
+  box-shadow: 0 0 0 3px rgba(26, 86, 176, 0.12);
 }
 .daypanel-field input:disabled, .daypanel-field textarea:disabled { background: #eef1f6; }
 .daypanel-actions { display: flex; gap: 8px; grid-column: span 2; }
-.attendance-override-daypanel-meta { color: #6b7686; font-size: 12px; }
-.daypanel-current-status { font-weight: 400; font-size: 12px; color: #1a56b0; margin-left: auto; }
+.attendance-override-daypanel-meta { color: #8a97ad; font-size: 12px; }
+
+/* 弹窗内容细滚动条 */
+.attendance-override-calendar-modal .master-modal-body::-webkit-scrollbar { width: 8px; }
+.attendance-override-calendar-modal .master-modal-body::-webkit-scrollbar-track { background: transparent; }
+.attendance-override-calendar-modal .master-modal-body::-webkit-scrollbar-thumb {
+  background: #ccd6e4; border-radius: 4px;
+}
+.attendance-override-calendar-modal .master-modal-body::-webkit-scrollbar-thumb:hover { background: #b3c1d6; }
