@@ -7,6 +7,14 @@
 # ==========================================
 set -euo pipefail
 
+# root 运行会让 npm 把 package-lock.json/node_modules 重写为 root 属主，
+# 之后普通用户 npm install 报 EACCES。必须用部署用户运行（sudo 仅用于 systemctl）。
+if [ "$(id -un)" = "root" ]; then
+    echo "❌ 请勿用 root 运行本脚本"
+    echo "   请切换到部署用户后执行: bash $0"
+    exit 1
+fi
+
 PROJECT_DIR="/var/www/mtemphub"
 SERVICE_NAME="attendance_api"
 PIP_INDEX="https://pypi.tuna.tsinghua.edu.cn/simple"
