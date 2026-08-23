@@ -147,6 +147,65 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(rows[1]["override"]["attendance_days"], 4.0)
         self.assertEqual(rows[1]["override"]["half_days"], 1)
 
+    def test_employee_override_list_automatic_matches_single_record_api(self) -> None:
+        """列表接口的 automatic 行必须与单员工接口一致（防批量查询张冠李戴）。"""
+        with self.app.app_context():
+            from models.daily_record import DailyRecord
+
+            db.session.add_all(
+                [
+                    DailyRecord(
+                        emp_id=self.employee_id,
+                        record_date=date(2026, 5, 11),
+                        check_in_times=["08:00"],
+                        check_out_times=["17:00"],
+                        late_minutes=12,
+                        early_leave_minutes=3,
+                        employee_payload={
+                            "check_in_times": ["08:00"],
+                            "check_out_times": ["17:00"],
+                            "actual_hours": 8,
+                            "late_minutes": 12,
+                            "early_leave_minutes": 3,
+                        },
+                    ),
+                    DailyRecord(
+                        emp_id=self.employee_b_id,
+                        record_date=date(2026, 5, 12),
+                        check_in_times=["09:30"],
+                        check_out_times=["18:30"],
+                        late_minutes=40,
+                        employee_payload={
+                            "check_in_times": ["09:30"],
+                            "check_out_times": ["18:30"],
+                            "actual_hours": 7.5,
+                            "late_minutes": 40,
+                        },
+                    ),
+                ]
+            )
+            db.session.commit()
+
+        list_res = self.client.get(
+            f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id},{self.employee_b_id}"
+        )
+        self.assertEqual(list_res.status_code, 200)
+        rows = list_res.get_json()["rows"]
+        self.assertEqual(len(rows), 2)
+        automatic_by_emp = {row["employee"]["emp_no"]: row["automatic"] for row in rows}
+
+        for emp_no, emp_id in (("E001", self.employee_id), ("E002", self.employee_b_id)):
+            single = self.client.get(
+                f"/api/admin/employee-attendance-overrides/record?emp_id={emp_id}&month=2026-05"
+            )
+            self.assertEqual(single.status_code, 200)
+            self.assertEqual(automatic_by_emp[emp_no], single.get_json()["automatic"])
+
+        # 两员工数据差异明显，automatic 必须可区分（防批量结果错位）
+        self.assertNotEqual(automatic_by_emp["E001"], automatic_by_emp["E002"])
+        self.assertEqual(automatic_by_emp["E001"]["late_early_minutes"], 15)
+        self.assertEqual(automatic_by_emp["E002"]["late_early_minutes"], 40)
+
     def test_manager_override_list_returns_selected_employees(self) -> None:
         self.client.put(
             "/api/admin/manager-attendance-overrides/record",

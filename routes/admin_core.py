@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from collections import defaultdict
 from io import BytesIO
 from datetime import datetime
 from typing import Any
@@ -1525,9 +1526,16 @@ def _build_employee_override_export_workbook(month: str, include_real_rows: bool
             .order_by(Employee.dept_id.asc(), Employee.emp_no.asc(), Employee.name.asc())
             .all()
         )
+        automatic_by_emp = _employee_automatic_rows_by_emp([e.id for e in employees], month)
+        overrides_by_emp = {
+            row.emp_id: row
+            for row in EmployeeAttendanceOverride.query.filter(
+                EmployeeAttendanceOverride.month == month
+            ).all()
+        }
         for employee in employees:
-            automatic = _employee_automatic_row(employee.id, month) or {}
-            override = EmployeeAttendanceOverride.query.filter_by(emp_id=employee.id, month=month).first()
+            automatic = automatic_by_emp.get(employee.id) or {}
+            override = overrides_by_emp.get(employee.id)
             ws.append(
                 [
                     month,
@@ -2334,23 +2342,39 @@ def _employee_override_values(override: EmployeeAttendanceOverride | None) -> di
 
 
 def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None:
+    return _employee_automatic_rows_by_emp([emp_id], month).get(emp_id)
+
+
+def _employee_automatic_rows_by_emp(emp_ids: list[int], month: str) -> dict[int, dict[str, object]]:
     from routes.query_core import _build_final_rows
 
+    if not emp_ids:
+        return {}
     # include_overrides=False：automatic 为「系统原始 + 逐日修正」，不含月度修正（月度优先级最高，applied 单独体现）
-    rows = _build_final_rows(month, [emp_id], include_overrides=False)
-    if not rows:
-        return None
-    row = rows[0]
-    return {
-        "attendance_days": row[3],
-        "actual_attendance_days": row[4],
-        "work_hours": row[17],
-        "half_days": row[18],
-        "late_early_minutes": _employee_late_early_minutes(emp_id, month),
-    }
+    # _build_final_rows 接收 emp_id 列表，但返回行内只有 emp_no（唯一），故用 emp_no 反查 emp_id
+    emp_no_by_id = {e.id: e.emp_no for e in Employee.query.filter(Employee.id.in_(emp_ids)).all()}
+    rows_by_emp_no = {row[1]: row for row in _build_final_rows(month, emp_ids, include_overrides=False)}
+    late_by_emp = _employee_late_early_minutes_by_emp(emp_ids, month)
+    result: dict[int, dict[str, object]] = {}
+    for emp_id, emp_no in emp_no_by_id.items():
+        row = rows_by_emp_no.get(emp_no)
+        if not row:
+            continue
+        result[emp_id] = {
+            "attendance_days": row[3],
+            "actual_attendance_days": row[4],
+            "work_hours": row[17],
+            "half_days": row[18],
+            "late_early_minutes": late_by_emp.get(emp_id, 0),
+        }
+    return result
 
 
 def _employee_late_early_minutes(emp_id: int, month: str) -> int:
+    return _employee_late_early_minutes_by_emp([emp_id], month).get(emp_id, 0)
+
+
+def _employee_late_early_minutes_by_emp(emp_ids: list[int], month: str) -> dict[int, int]:
     from routes.query_core import _month_date_range
     from services.daily_override_service import (
         daily_override_maps,
@@ -2358,28 +2382,36 @@ def _employee_late_early_minutes(emp_id: int, month: str) -> int:
         effective_late_minutes,
     )
 
+    if not emp_ids:
+        return {}
     date_range = _month_date_range(month)
     if not date_range:
-        return 0
+        return {emp_id: 0 for emp_id in emp_ids}
     start_date, end_date = date_range
-    records = (
-        DailyRecord.query.filter_by(emp_id=emp_id)
+    records_by_emp: dict[int, list[DailyRecord]] = defaultdict(list)
+    for record in (
+        DailyRecord.query.filter(DailyRecord.emp_id.in_(emp_ids))
         .filter(DailyRecord.record_date >= start_date, DailyRecord.record_date < end_date)
         .all()
-    )
-    overrides = daily_override_maps(month, [emp_id]).get(emp_id, {})
-    total = 0
-    seen_dates = set()
-    for record in records:
-        override = overrides.get(record.record_date)
-        total += effective_late_minutes(record.late_minutes, override)
-        total += effective_early_leave_minutes(record.early_leave_minutes, override)
-        seen_dates.add(record.record_date)
-    # 修正表有记录但无 DailyRecord 的日期（缺勤日补修正）也计入
-    for day, override in overrides.items():
-        if day not in seen_dates:
-            total += int(override.late_minutes or 0) + int(override.early_leave_minutes or 0)
-    return total
+    ):
+        records_by_emp[record.emp_id].append(record)
+    overrides_by_emp = daily_override_maps(month, emp_ids)
+    totals: dict[int, int] = {}
+    for emp_id in emp_ids:
+        overrides = overrides_by_emp.get(emp_id, {})
+        total = 0
+        seen_dates = set()
+        for record in records_by_emp.get(emp_id, []):
+            override = overrides.get(record.record_date)
+            total += effective_late_minutes(record.late_minutes, override)
+            total += effective_early_leave_minutes(record.early_leave_minutes, override)
+            seen_dates.add(record.record_date)
+        # 修正表有记录但无 DailyRecord 的日期（缺勤日补修正）也计入
+        for day, override in overrides.items():
+            if day not in seen_dates:
+                total += int(override.late_minutes or 0) + int(override.early_leave_minutes or 0)
+        totals[emp_id] = total
+    return totals
 
 
 def _employee_override_payload(row: EmployeeAttendanceOverride | None) -> dict[str, object]:
@@ -2431,13 +2463,14 @@ def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[di
         ).all()
     }
     rows: list[dict[str, object]] = []
+    automatic_by_emp = _employee_automatic_rows_by_emp(list(employees.keys()), month)
     for emp_id in emp_ids:
         employee = employees.get(emp_id)
         if not employee:
             continue
         override = overrides.get(emp_id)
         override_data = _employee_override_values(override)
-        automatic = _employee_automatic_row(emp_id, month)
+        automatic = automatic_by_emp.get(emp_id)
         applied: dict[str, object] = {}
         if automatic:
             for field in _EMPLOYEE_OVERRIDE_FIELDS:
