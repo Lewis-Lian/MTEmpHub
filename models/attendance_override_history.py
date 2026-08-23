@@ -5,6 +5,10 @@ from . import db
 
 class AttendanceOverrideHistory(db.Model):
     __tablename__ = "attendance_override_histories"
+    __table_args__ = (
+        db.Index("ix_attendance_override_history_type_month_created", "override_type", "month", "created_at"),
+    )
+
 
     id = db.Column(db.Integer, primary_key=True)
     override_type = db.Column(db.String(20), nullable=False, index=True)
