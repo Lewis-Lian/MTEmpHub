@@ -1637,60 +1637,6 @@ def leave_records_export_api():
     )
 
 
-def summary_api():
-    emp_id = _pick_emp_id()
-    if not emp_id:
-        return jsonify({"error": "No employee assigned"}), 404
-
-    month = request.args.get("month") or datetime.now().strftime("%Y-%m")
-    year = request.args.get("year", type=int) or datetime.now().year
-
-    monthly = AttendanceService.monthly_summary(emp_id, month)
-    yearly = AttendanceService.yearly_summary(emp_id, year)
-    deduction = AttendanceService.deduction_calc(emp_id, month)
-    annual = AttendanceService.annual_leave_balance(emp_id, year)
-
-    return jsonify(
-        {
-            "emp_id": emp_id,
-            "month": month,
-            "year": year,
-            "monthly": monthly,
-            "yearly": yearly,
-            "deduction": deduction,
-            "annual_leave": annual,
-        }
-    )
-
-
-def daily_records_api():
-    emp_id = _pick_emp_id()
-    if not emp_id:
-        return jsonify([])
-
-    month = request.args.get("month") or datetime.now().strftime("%Y-%m")
-    employee = db.session.get(Employee, emp_id)
-    rows = attendance_views_by_employee(month, [employee], EMPLOYEE_STATS_CONTEXT).get(emp_id, []) if employee else []
-    rows.sort(key=lambda row: row.record_date or date.min, reverse=True)
-    return jsonify(
-        [
-            {
-                "date": r.record_date.isoformat(),
-                "expected_hours": r.expected_hours,
-                "actual_hours": r.actual_hours,
-                "absent_hours": r.absent_hours,
-                "leave_hours": r.leave_hours,
-                "leave_type": r.leave_type,
-                "overtime_hours": r.overtime_hours,
-                "overtime_type": r.overtime_type,
-                "late_minutes": r.late_minutes,
-                "early_leave_minutes": r.early_leave_minutes,
-                "exception_reason": r.exception_reason,
-            }
-            for r in rows
-        ]
-    )
-
 
 def _format_punch_tokens(values: list[object] | None) -> list[str]:
     return [t for t in (_normalize_punch_token(v) for v in (values or [])) if t]
@@ -1926,71 +1872,6 @@ def attendance_calendar_api():
     employee = db.session.get(Employee, emp_id)
     return jsonify(_build_attendance_calendar_payload(employee, month))
 
-
-def overtime_api():
-    emp_id = _pick_emp_id()
-    if not emp_id:
-        return jsonify([])
-
-    rows = OvertimeRecord.query.filter_by(emp_id=emp_id).order_by(OvertimeRecord.start_time.desc()).all()
-    return jsonify(
-        [
-            {
-                "overtime_no": r.overtime_no,
-                "start_time": r.start_time.isoformat() if r.start_time else None,
-                "end_time": r.end_time.isoformat() if r.end_time else None,
-                "effective_hours": r.effective_hours,
-                "is_weekend": r.is_weekend,
-                "is_holiday": r.is_holiday,
-                "salary_option": r.salary_option,
-                "reason": r.reason,
-                "approval_status": r.approval_status,
-            }
-            for r in rows
-        ]
-    )
-
-
-def leave_api():
-    emp_id = _pick_emp_id()
-    if not emp_id:
-        return jsonify([])
-
-    rows = LeaveRecord.query.filter_by(emp_id=emp_id).order_by(LeaveRecord.start_time.desc()).all()
-    return jsonify(
-        [
-            {
-                "leave_no": r.leave_no,
-                "apply_date": r.apply_date.isoformat() if r.apply_date else None,
-                "leave_type": r.leave_type,
-                "start_time": r.start_time.isoformat() if r.start_time else None,
-                "end_time": r.end_time.isoformat() if r.end_time else None,
-                "duration": r.duration,
-                "reason": r.reason,
-                "approval_status": r.approval_status,
-            }
-            for r in rows
-        ]
-    )
-
-
-def annual_leave_api():
-    emp_id = _pick_emp_id()
-    year = request.args.get("year", type=int) or datetime.now().year
-    if not emp_id:
-        return jsonify({"year": year, "total_days": 0, "used_days": 0, "remaining_days": 0})
-
-    row = AnnualLeave.query.filter_by(emp_id=emp_id, year=year).first()
-    if not row:
-        return jsonify({"year": year, "total_days": 0, "used_days": 0, "remaining_days": 0})
-    return jsonify(
-        {
-            "year": row.year,
-            "total_days": row.total_days,
-            "used_days": row.used_days,
-            "remaining_days": row.remaining_days,
-        }
-    )
 
 
 def final_data_api():

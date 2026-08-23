@@ -149,17 +149,6 @@ class ImportService:
             return employee
         return None
 
-    @staticmethod
-    def _resolve_manager_employee(header_map: dict[str, int], row: list[Any]) -> tuple[Employee | None, str, str]:
-        emp_no = clean_text(
-            ImportService._get_row_value(row, ImportService._find_col(header_map, "工号", "人员编号"))
-        )
-        name = clean_text(ImportService._get_row_value(row, ImportService._find_col(header_map, "姓名")))
-
-        employee = ImportService._find_manager_by_emp_no(emp_no) if emp_no else None
-        if not employee and name:
-            employee = ImportService._find_manager_by_name(name)
-        return employee, emp_no, name
 
     @staticmethod
     def _bulk_lookup_managers(
@@ -238,75 +227,6 @@ class ImportService:
             return None
         return row[idx] if idx < len(row) else None
 
-    @staticmethod
-    def _get_or_create_department(dept_no: str, dept_name: str) -> Department:
-        dept_no = dept_no or dept_name or "UNKNOWN"
-        dept = Department.query.filter_by(dept_no=dept_no).first()
-        if not dept:
-            dept = Department(dept_no=dept_no, dept_name=dept_name or dept_no)
-            db.session.add(dept)
-            db.session.flush()
-        elif dept_name and dept.dept_name != dept_name:
-            dept.dept_name = dept_name
-        return dept
-
-    @staticmethod
-    def _get_or_create_employee(emp_no: str, name: str, dept: Department | None) -> Employee:
-        emp = Employee.query.filter_by(emp_no=emp_no).first()
-        if not emp:
-            emp = Employee(emp_no=emp_no, name=name or emp_no, dept_id=dept.id if dept else None)
-            db.session.add(emp)
-            db.session.flush()
-        else:
-            if name:
-                emp.name = name
-            if dept:
-                emp.dept_id = dept.id
-        return emp
-
-    @staticmethod
-    def _get_or_create_shift(shift_no: str, shift_name: str, shift_time_text: Any) -> Shift | None:
-        if not shift_no and not shift_name:
-            return None
-        key = shift_no or shift_name
-        shift = Shift.query.filter_by(shift_no=key).first()
-        slots = ImportService._parse_shift_slots(shift_time_text)
-        is_cross_day = any(s[0] > s[1] for s in slots if len(s) == 2)
-        if not shift:
-            shift = Shift(
-                shift_no=key,
-                shift_name=shift_name or key,
-                time_slots=slots,
-                is_cross_day=is_cross_day,
-            )
-            db.session.add(shift)
-            db.session.flush()
-        else:
-            if shift_name:
-                shift.shift_name = shift_name
-            if slots:
-                shift.time_slots = slots
-                shift.is_cross_day = is_cross_day
-        return shift
-
-    @staticmethod
-    def _find_existing_employee(emp_no: str) -> Employee | None:
-        key = clean_text(emp_no)
-        if not key:
-            return None
-        return Employee.query.filter_by(emp_no=key).first()
-
-    @staticmethod
-    def _find_existing_shift(shift_no: str, shift_name: str) -> Shift | None:
-        no_key = clean_text(shift_no)
-        name_key = clean_text(shift_name)
-        if no_key:
-            shift = Shift.query.filter_by(shift_no=no_key).first()
-            if shift:
-                return shift
-        if name_key:
-            return Shift.query.filter_by(shift_name=name_key).first()
-        return None
 
     @staticmethod
     def _parse_shift_slots(value: Any) -> list[list[str]]:

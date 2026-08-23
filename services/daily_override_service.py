@@ -153,19 +153,3 @@ def serialize_daily_override(row: DailyAttendanceOverride | None) -> dict | None
     return payload
 
 
-def daily_override_response(employee: Employee, month: str) -> dict:
-    """单员工当月逐日修正列表（含全部修正天，供前端日历标记）。"""
-    maps = daily_override_maps(month, [employee.id])
-    overrides = maps.get(employee.id, {})
-    return {
-        "employee": {
-            "id": employee.id,
-            "emp_no": employee.emp_no,
-            "name": employee.name,
-        },
-        "month": month,
-        "overrides": [
-            {"date": day.isoformat(), **serialize_daily_override(row)}
-            for day, row in sorted(overrides.items())
-        ],
-    }

@@ -71,3 +71,4 @@ frontend/vite.config.d.ts
 .worktrees/
 .superpowers/
 instance/migration_progress.json
+.zcode/

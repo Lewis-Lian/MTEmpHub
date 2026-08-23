@@ -114,8 +114,6 @@ class User(db.Model):
     def is_login_disabled(self) -> bool:
         return bool(self.login_disabled_until_admin_unlock)
 
-    def is_login_blocked(self, now: Optional[datetime] = None) -> bool:
-        return self.is_login_disabled() or self.is_temporarily_login_locked(now)
 
     def clear_login_lockout(self) -> None:
         self.login_failed_attempts = 0
