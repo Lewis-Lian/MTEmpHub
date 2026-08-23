@@ -18,12 +18,7 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
   const landingPath = user ? defaultLandingPath(user) : "/login";
 
   return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
+    <BrowserRouter>
       <Routes>
         <Route element={<DatabaseSettingsPage />} path="/database-setup" />
         <Route
