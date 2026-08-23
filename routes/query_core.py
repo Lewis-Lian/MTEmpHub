@@ -1184,6 +1184,8 @@ def account_sets_api():
                 "month": r.month,
                 "name": r.name,
                 "is_active": r.is_active,
+                # 修正页/编辑弹窗据此前置禁用编辑（缺失会导致锁定账套仍可提交、只能靠后端拒绝）
+                "is_locked": bool(r.is_locked),
                 "factory_rest_days": _manager_factory_rest_days(r),
                 "factory_rest_requires_detail": _manager_factory_rest_requires_detail(r),
                 "legacy_factory_rest_days": (r.factory_rest_days or 0),
