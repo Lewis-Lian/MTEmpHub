@@ -5764,7 +5764,7 @@ input[type="checkbox"] {
   animation: override-modal-overlay-in 160ms ease-out;
 }
 .attendance-override-calendar-modal {
-  width: min(1040px, 100%);
+  width: min(1160px, 100%);
   position: relative;
   animation: override-modal-card-in 200ms cubic-bezier(0.23, 1, 0.32, 1);
 }
@@ -5827,11 +5827,51 @@ input[type="checkbox"] {
   box-shadow: 0 4px 14px rgba(26, 86, 176, 0.22);
 }
 
+/* 左日历 + 右详情布局：窄屏退回上下结构 */
+.attendance-override-calendar-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 12px;
+  align-items: start;
+}
+.attendance-override-calendar-side {
+  position: sticky;
+  top: 0;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.attendance-override-calendar-side::-webkit-scrollbar { width: 6px; }
+.attendance-override-calendar-side::-webkit-scrollbar-thumb { background: #ccd6e4; border-radius: 3px; }
+/* 侧栏内表单通栏纵排，更贴合窄栏 */
+.attendance-override-calendar-side .daypanel-extra-form {
+  grid-template-columns: 1fr;
+}
+.attendance-override-calendar-side .daypanel-field--check { padding-top: 0; }
 .attendance-override-daypanel-hint {
   color: #6b7686;
   font-size: 13px;
   text-align: center;
-  padding: 10px 0;
+  border: 1px dashed #ccd6e4;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 16px;
+}
+@media (max-width: 1024px) {
+  .attendance-override-calendar-layout { grid-template-columns: 1fr; }
+  .attendance-override-calendar-side {
+    position: static;
+    max-height: none;
+    overflow-y: visible;
+  }
+  .attendance-override-calendar-side .daypanel-extra-form {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+  .attendance-override-calendar-side .daypanel-field--check { padding-top: 18px; }
+  .attendance-override-daypanel-hint { min-height: 0; }
 }
 
 /* 当天面板：三段分区卡片化（原始考勤浅蓝 / 假种浅紫 / 更多信息白） */
