@@ -5,6 +5,7 @@ import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
@@ -246,35 +247,23 @@ export default function EmployeeDashboardPage() {
 
           <div className="query-filter-field">
             <label className="form-label">显示选项</label>
-            <div className="dashboard-check-stack">
-              <label className="dashboard-check-option">
-                <input
-                  checked={showLeaveCounts}
-                  className="form-check-input m-0"
-                  onChange={(event) => setShowLeaveCounts(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>请假次数</span>
-              </label>
-              <label className="dashboard-check-option">
-                <input
-                  checked={showLeaveDurations}
-                  className="form-check-input m-0"
-                  onChange={(event) => setShowLeaveDurations(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>请假时长</span>
-              </label>
-              <label className="dashboard-check-option">
-                <input
-                  checked={showActualAttendanceDays}
-                  className="form-check-input m-0"
-                  onChange={(event) => setShowActualAttendanceDays(event.target.checked)}
-                  type="checkbox"
-                />
-                <span>实际出勤天数</span>
-              </label>
-            </div>
+            <MultiSelectDropdown
+              onChange={(next) => {
+                setShowLeaveCounts(Boolean(next.show_leave_counts));
+                setShowLeaveDurations(Boolean(next.show_leave_durations));
+                setShowActualAttendanceDays(Boolean(next.show_actual_attendance_days));
+              }}
+              options={[
+                { key: "show_leave_counts", label: "请假次数" },
+                { key: "show_leave_durations", label: "请假时长" },
+                { key: "show_actual_attendance_days", label: "实际出勤天数" },
+              ]}
+              value={{
+                show_leave_counts: showLeaveCounts,
+                show_leave_durations: showLeaveDurations,
+                show_actual_attendance_days: showActualAttendanceDays,
+              }}
+            />
           </div>
 
           <div className="query-filter-actions">

@@ -4,6 +4,7 @@ import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import type { QueryTableCellModalConfig } from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
@@ -365,24 +366,11 @@ export default function QueryPage({
           {options.length ? (
             <div className="query-filter-field">
               <label className="form-label">显示选项</label>
-              <div className="dashboard-check-stack">
-                {options.map((option) => (
-                  <label key={option.key} className="dashboard-check-option">
-                    <input
-                      checked={Boolean(selectedOptions[option.key])}
-                      className="form-check-input m-0"
-                      onChange={(event) => {
-                        setSelectedOptions((current) => ({
-                          ...current,
-                          [option.key]: event.target.checked,
-                        }));
-                      }}
-                      type="checkbox"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
+              <MultiSelectDropdown
+                onChange={setSelectedOptions}
+                options={options}
+                value={selectedOptions}
+              />
             </div>
           ) : null}
 

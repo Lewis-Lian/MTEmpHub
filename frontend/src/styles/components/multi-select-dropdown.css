@@ -1,0 +1,102 @@
+.multi-select-dropdown {
+  position: relative;
+}
+
+.multi-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d7e3ef;
+  border-radius: var(--ent-radius-sm);
+  background: var(--ent-bg);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+  color: var(--ent-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--ent-transition);
+}
+
+.multi-select-trigger:hover {
+  border-color: var(--ent-border-focus);
+}
+
+.multi-select-summary {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.multi-select-arrow {
+  flex-shrink: 0;
+  color: var(--ent-text-tertiary);
+  font-size: 10px;
+}
+
+.multi-select-panel {
+  position: fixed;
+  z-index: var(--z-popover);
+  padding: 8px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-bg);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.multi-select-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--ent-border);
+}
+
+.multi-select-action {
+  padding: 2px 8px;
+  border: none;
+  border-radius: var(--ent-radius-sm);
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.multi-select-action:hover {
+  color: var(--ent-text);
+  background: var(--ent-border-strong);
+}
+
+.multi-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 264px;
+  overflow: auto;
+}
+
+.multi-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--ent-radius-sm);
+  font-size: 13px;
+  color: var(--ent-text);
+  cursor: pointer;
+}
+
+.multi-select-option:hover {
+  background: var(--ent-tertiary-bg);
+}
+
+.multi-select-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--ent-blue);
+  cursor: pointer;
+}

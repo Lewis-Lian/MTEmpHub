@@ -182,52 +182,6 @@
 }
 
 /* ==========================================================================
-   多选显示选项重构为微型高光卡片药丸
-   ========================================================================== */
-.employee-dashboard-page .dashboard-check-stack {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.employee-dashboard-page .dashboard-check-option {
-  display: inline-flex;
-  align-items: center;
-  padding: 8px 16px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: #ffffff;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  color: #475569;
-  transition: var(--qh-transition);
-  user-select: none;
-  gap: 8px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
-}
-
-.employee-dashboard-page .dashboard-check-option:hover {
-  border-color: #94a3b8;
-  background: var(--qh-bg-page);
-}
-
-.employee-dashboard-page .dashboard-check-option:has(input:checked) {
-  border-color: var(--qh-primary);
-  background: rgba(56, 189, 248, 0.08);
-  color: var(--qh-primary);
-  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.12);
-}
-
-.employee-dashboard-page .dashboard-check-option input[type="checkbox"] {
-  accent-color: #0284c7;
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
-  margin: 0;
-}
-
-/* ==========================================================================
    按钮组件与发光、渐变效果
    ========================================================================== */
 .employee-dashboard-page .query-filter-actions {
