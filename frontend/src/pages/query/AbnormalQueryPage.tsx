@@ -4,6 +4,7 @@ import { buildDownloadUrl, fetchObjectRows, fetchQueryBootstrap } from "../../ap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import type { QueryBootstrap } from "../../types/query";
@@ -248,19 +249,13 @@ export default function AbnormalQueryPage() {
 
           <div className="query-filter-field">
             <label className="form-label">显示选项</label>
-            <div className="dashboard-check-stack">
-              <label className="dashboard-check-option">
-                <input
-                  checked={showEmpNo}
-                  className="form-check-input m-0"
-                  onChange={(event) => {
-                    setShowEmpNo(event.target.checked);
-                  }}
-                  type="checkbox"
-                />
-                <span>人员编号</span>
-              </label>
-            </div>
+            <MultiSelectDropdown
+              onChange={(next) => {
+                setShowEmpNo(Boolean(next.show_emp_no));
+              }}
+              options={[{ key: "show_emp_no", label: "人员编号" }]}
+              value={{ show_emp_no: showEmpNo }}
+            />
           </div>
 
           <div className="query-filter-actions">

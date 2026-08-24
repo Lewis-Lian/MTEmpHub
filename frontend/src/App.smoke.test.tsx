@@ -849,6 +849,8 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("heading", { name: "查询条件" })).toBeInTheDocument();
     expect(screen.getByText("按员工范围和账套查询异常考勤汇总。")).toBeInTheDocument();
     expect(screen.getByRole("combobox")).toBeInTheDocument();
+    const abnormalOptionsField = screen.getByText("显示选项").closest("div");
+    fireEvent.click(within(abnormalOptionsField as HTMLElement).getByRole("button"));
     expect(screen.getByRole("checkbox", { name: "人员编号" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
@@ -857,7 +859,9 @@ describe("App smoke regression", () => {
     expect(screen.getByText("异常考勤次数")).toBeInTheDocument();
     expect(screen.getByText("3")).toBeInTheDocument();
 
+    // fireEvent.click 不派发 mousedown，浮层不会被"查询"点击关闭，仍处于展开状态
     fireEvent.click(screen.getByRole("checkbox", { name: "人员编号" }));
+    // 取消唯一选项后摘要变为"未选择"，表格列头按钮也随查询条件消失
     expect(screen.queryByRole("button", { name: "人员编号" })).toBeNull();
     expect(screen.getByText("异常考勤次数")).toBeInTheDocument();
 
@@ -898,6 +902,8 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByRole("heading", { name: "查询条件" })).toBeInTheDocument();
     expect(screen.getByText("查询员工逐日打卡明细，并支持直接导出 Excel。")).toBeInTheDocument();
+    const punchOptionsField = screen.getByText("显示选项").closest("div");
+    fireEvent.click(within(punchOptionsField as HTMLElement).getByRole("button"));
     expect(screen.getByRole("checkbox", { name: "原始刷卡" })).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "上下班打卡" })).toBeInTheDocument();
 
@@ -935,6 +941,8 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("heading", { name: "查询条件" })).toBeInTheDocument();
     expect(screen.getByText("查询管理人员月度考勤结果，并支持模板导出。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "按模板导出" })).toBeInTheDocument();
+    const managerOptionsField = screen.getByText("显示选项").closest("div");
+    fireEvent.click(within(managerOptionsField as HTMLElement).getByRole("button"));
     expect(screen.getByRole("checkbox", { name: "显示实际出勤天数" })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
