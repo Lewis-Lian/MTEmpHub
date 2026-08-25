@@ -334,3 +334,30 @@ export function clearAdminDailyOverride<TRow>(empId: number, date: string): Prom
     { method: "DELETE" },
   );
 }
+
+export interface LateOffsetLeaveRow {
+  leave_no: string;
+  leave_type: string;
+  start_time: string;
+  end_time: string;
+  duration: number;
+  approval_status: string;
+  reason: string;
+}
+
+export interface LateOffsetLeavesResponse {
+  month: string;
+  emp_id: number;
+  emp_name: string;
+  rows: LateOffsetLeaveRow[];
+}
+
+export function fetchAdminLateOffsetLeaves(
+  empId: number,
+  month: string,
+): Promise<LateOffsetLeavesResponse> {
+  const query = new URLSearchParams({ emp_id: String(empId), month });
+  return apiRequest<LateOffsetLeavesResponse>(
+    `/api/admin/late-offset/leaves?${query.toString()}`,
+  );
+}

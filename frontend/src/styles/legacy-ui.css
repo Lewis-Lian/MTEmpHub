@@ -959,6 +959,64 @@ body {
   min-width: 1160px;
 }
 
+/* 迟到冲抵页：首列仅复选框，收窄列宽（该表格类与考勤修正页共用，需限定页面作用域） */
+.late-offset-page .attendance-override-table th:first-child,
+.late-offset-page .attendance-override-table td:first-child {
+  width: 44px;
+  min-width: 44px;
+}
+
+/* 迟到冲抵页：操作列按钮组（确认/清除冲抵 + 请假记录） */
+.late-offset-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* 迟到冲抵页：请假记录弹窗表格
+   双类选择器提高特异性，覆盖 .master-modal 基础的 560px 宽度；
+   width:auto 让表格按内容撑开（各列不换行），常规请假单一行完整展示 */
+.master-modal.late-offset-leaves-modal {
+  width: auto;
+  min-width: min(560px, calc(100vw - 48px));
+  max-width: min(1360px, calc(100vw - 48px));
+}
+
+.late-offset-leaves-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.late-offset-leaves-table th,
+.late-offset-leaves-table td {
+  border: 1px solid var(--ent-border-strong);
+  padding: 6px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.late-offset-leaves-table th {
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text);
+  font-weight: 600;
+}
+
+.late-offset-leaves-table .late-offset-leaves-reason {
+  white-space: normal;
+  min-width: 160px;
+  /* 超长事由换行展示，避免把弹窗撑到出横向滚动条 */
+  max-width: 480px;
+}
+
+.late-offset-leaves-empty {
+  margin: 0;
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
 /* 迟到冲抵页：冲抵分钟输入框（与修正弹窗 daypanel-field input 同风格） */
 .late-offset-input {
   width: 76px;
