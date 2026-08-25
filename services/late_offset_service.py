@@ -30,6 +30,7 @@ from services.manager_attendance_service import (
 )
 
 LATE_OFFSET_MAX_MINUTES = 60
+LATE_OFFSET_REMARK_PREFIX = "迟到冲抵："
 _LATE_OFFSET_MINUTES_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*分钟")
 _LATE_OFFSET_HOURS_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*(?:小时|[hH])")
 _LATE_OFFSET_CN_HOURS_PATTERN = re.compile(r"([一二两三四五六七八九十半])\s*小时")
@@ -168,10 +169,27 @@ def late_offset_candidates(month: str, emp_ids: list[int] | None = None) -> list
         for view in views_by_employee.get(employee.id, []):
             day = view.record_date
             override = overrides.get(day)
-            if override is not None and override.late_minutes is not None:
-                continue
             late = _day_late_minutes(employee, view)
             if late <= 0:
+                continue
+            if override is not None and override.late_minutes is not None:
+                # 已有迟到修正：仅当修正来自迟到冲抵（remark 标记）时展示为已冲抵行，供清除
+                if (override.remark or "").startswith(LATE_OFFSET_REMARK_PREFIX):
+                    rows.append(
+                        {
+                            "emp_id": employee.id,
+                            "emp_no": employee.emp_no,
+                            "emp_name": employee.name,
+                            "dept_name": employee.department.dept_name if employee.department else "",
+                            "is_manager": bool(employee.is_manager),
+                            "date": day.isoformat(),
+                            "status": "confirmed",
+                            "late_minutes": late,
+                            "offset_minutes": max(0, late - int(override.late_minutes)),
+                            "effective_late_minutes": int(override.late_minutes),
+                            "override_late_minutes": int(override.late_minutes),
+                        }
+                    )
                 continue
             offset = int(offsets.get(day, 0))
             rows.append(
@@ -182,6 +200,7 @@ def late_offset_candidates(month: str, emp_ids: list[int] | None = None) -> list
                     "dept_name": employee.department.dept_name if employee.department else "",
                     "is_manager": bool(employee.is_manager),
                     "date": day.isoformat(),
+                    "status": "pending",
                     "late_minutes": late,
                     "offset_minutes": offset,
                     "effective_late_minutes": max(0, late - offset),
@@ -189,6 +208,23 @@ def late_offset_candidates(month: str, emp_ids: list[int] | None = None) -> list
             )
     rows.sort(key=lambda row: (str(row["emp_no"]), str(row["date"])))
     return rows
+
+
+def late_offset_leaves(emp_id: int, month: str) -> list[dict[str, object]]:
+    """某员工在账套月的全部请假单（时间区间口径与冲抵候选一致），按开始时间排序。"""
+    rows = _leave_rows_by_employee([emp_id], month).get(emp_id, [])
+    return [
+        {
+            "leave_no": row.leave_no,
+            "leave_type": row.leave_type,
+            "start_time": row.start_time.strftime("%Y-%m-%d %H:%M") if row.start_time else "",
+            "end_time": row.end_time.strftime("%Y-%m-%d %H:%M") if row.end_time else "",
+            "duration": float(row.duration or 0),
+            "approval_status": row.approval_status or "",
+            "reason": row.reason or "",
+        }
+        for row in sorted(rows, key=lambda item: (item.start_time, item.leave_no))
+    ]
 
 
 def confirm_late_offset(
@@ -226,7 +262,7 @@ def confirm_late_offset(
         db.session.add(override)
     override.late_minutes = max(0, late - offset)
     if not (override.remark or "").strip():
-        override.remark = f"迟到冲抵：迟到{late}分钟-冲抵{offset}分钟"
+        override.remark = f"{LATE_OFFSET_REMARK_PREFIX}迟到{late}分钟-冲抵{offset}分钟"
     try:
         from flask import g
 
@@ -240,4 +276,48 @@ def confirm_late_offset(
         "emp_id": emp_id,
         "date": record_date.isoformat(),
         "late_minutes": override.late_minutes,
+    }
+
+
+def clear_late_offset(emp_id: int, record_date: date) -> dict[str, object]:
+    """清除冲抵：清空当日修正的迟到分钟，迟到恢复系统原始值。
+
+    仅作用于迟到冲抵写入的修正（remark 标记），人工修正拒绝清除。
+    若清除后修正记录其余字段全空，则整条删除，不留孤儿记录。
+    只 flush 不 commit，由调用方（路由层）在同一事务内记录历史后统一提交。
+    """
+    override = DailyAttendanceOverride.query.filter_by(
+        emp_id=emp_id, record_date=record_date
+    ).first()
+    if (
+        override is None
+        or override.late_minutes is None
+        or not (override.remark or "").startswith(LATE_OFFSET_REMARK_PREFIX)
+    ):
+        raise ValueError("当日没有可清除的迟到冲抵")
+
+    override.late_minutes = None
+    override.remark = ""
+    other_fields = (
+        override.status,
+        override.is_evening_overtime,
+        override.work_hours,
+        override.early_leave_minutes,
+    )
+    if all(value is None for value in other_fields):
+        db.session.delete(override)
+    else:
+        try:
+            from flask import g
+
+            current_user = getattr(g, "current_user", None)
+        except RuntimeError:
+            current_user = None
+        if current_user is not None:
+            override.updated_by = current_user.id
+    db.session.flush()
+    return {
+        "emp_id": emp_id,
+        "date": record_date.isoformat(),
+        "late_minutes": None,
     }

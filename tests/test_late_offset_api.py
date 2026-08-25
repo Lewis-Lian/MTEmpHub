@@ -159,6 +159,45 @@ class LateOffsetApiTests(unittest.TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn("已锁定", res.get_json()["error"])
 
+    def test_clear_endpoint_restores_system_value(self) -> None:
+        confirm = self.client.post(
+            "/api/admin/late-offset/confirm",
+            json={"month": "2026-04", "items": [{"emp_id": self.manager_id, "date": "2026-04-18"}]},
+        )
+        self.assertEqual(confirm.status_code, 200)
+
+        res = self.client.post(
+            "/api/admin/late-offset/clear",
+            json={"month": "2026-04", "items": [{"emp_id": self.manager_id, "date": "2026-04-18"}]},
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(len(payload["cleared"]), 1)
+        self.assertIsNone(payload["cleared"][0]["late_minutes"])
+        pending_rows = [row for row in payload["rows"] if row["status"] == "pending"]
+        self.assertEqual(len(pending_rows), 1)
+
+        with self.app.app_context():
+            history = (
+                AttendanceOverrideHistory.query.filter_by(
+                    override_type="daily", emp_id=self.manager_id, month="2026-04"
+                )
+                .filter(AttendanceOverrideHistory.action_type == "late_offset_clear")
+                .all()
+            )
+            self.assertEqual(len(history), 1)
+
+    def test_clear_endpoint_rejects_locked_month(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-04").first()
+            account_set.is_locked = True
+            db.session.commit()
+        res = self.client.post(
+            "/api/admin/late-offset/clear",
+            json={"month": "2026-04", "items": [{"emp_id": self.manager_id, "date": "2026-04-18"}]},
+        )
+        self.assertEqual(res.status_code, 400)
+
     def test_readonly_user_gets_forbidden(self) -> None:
         with self.app.app_context():
             captcha_token = issue_slider_verified_token()
@@ -175,3 +214,52 @@ class LateOffsetApiTests(unittest.TestCase):
             json={"month": "2026-04", "items": [{"emp_id": self.manager_id, "date": "2026-04-18"}]},
         )
         self.assertEqual(confirm.status_code, 403)
+        leaves = self.client.get(
+            f"/api/admin/late-offset/leaves?month=2026-04&emp_id={self.manager_id}"
+        )
+        self.assertEqual(leaves.status_code, 403)
+
+    def test_leaves_endpoint_returns_all_leave_records(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                LeaveRecord(
+                    leave_no="L0002",
+                    emp_id=self.manager_id,
+                    leave_type="年假",
+                    start_time=datetime(2026, 4, 10, 9, 0),
+                    end_time=datetime(2026, 4, 10, 18, 0),
+                    duration=8,
+                    reason="年假一天",
+                    approval_status="已审批",
+                )
+            )
+            db.session.commit()
+
+        res = self.client.get(
+            f"/api/admin/late-offset/leaves?month=2026-04&emp_id={self.manager_id}"
+        )
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertEqual(payload["month"], "2026-04")
+        self.assertEqual(payload["emp_id"], self.manager_id)
+        self.assertEqual(len(payload["rows"]), 2)
+        self.assertEqual(payload["rows"][0]["leave_no"], "L0002")
+        self.assertEqual(payload["rows"][0]["leave_type"], "年假")
+        self.assertEqual(payload["rows"][0]["start_time"], "2026-04-10 09:00")
+        self.assertEqual(payload["rows"][0]["end_time"], "2026-04-10 18:00")
+        self.assertEqual(payload["rows"][0]["approval_status"], "已审批")
+        self.assertEqual(payload["rows"][1]["leave_no"], "L0001")
+        self.assertEqual(payload["rows"][1]["start_time"], "2026-04-18 08:30")
+        self.assertEqual(payload["rows"][1]["duration"], 0.33)
+        self.assertEqual(payload["rows"][1]["reason"], "迟到冲抵20分钟")
+
+    def test_leaves_endpoint_rejects_invalid_month(self) -> None:
+        res = self.client.get(
+            f"/api/admin/late-offset/leaves?month=bad&emp_id={self.manager_id}"
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_leaves_endpoint_rejects_unknown_employee(self) -> None:
+        res = self.client.get("/api/admin/late-offset/leaves?month=2026-04&emp_id=999")
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("员工不存在", res.get_json()["error"])

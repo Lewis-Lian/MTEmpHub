@@ -408,6 +408,22 @@ def late_offset_candidates_api():
     return jsonify({"month": month, "rows": late_offset_candidates(month, emp_ids)})
 
 
+def late_offset_leaves_api():
+    from routes import admin_core as admin_module
+    from services.late_offset_service import late_offset_leaves
+
+    month = admin_module._validate_month(request.args.get("month"))
+    emp_id = request.args.get("emp_id", type=int) or 0
+    if not month or not emp_id:
+        return jsonify({"error": "请选择管理人员和有效月份"}), 400
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
+    return jsonify(
+        {"month": month, "emp_id": emp_id, "emp_name": employee.name, "rows": late_offset_leaves(emp_id, month)}
+    )
+
+
 def late_offset_confirm_api():
     from routes import admin_core as admin_module
     from services.daily_override_service import DAILY_OVERRIDE_FIELDS
@@ -486,6 +502,83 @@ def late_offset_confirm_api():
         {
             "month": month,
             "confirmed": confirmed,
+            "skipped": skipped,
+            "rows": late_offset_candidates(month),
+        }
+    )
+
+
+def late_offset_clear_api():
+    from routes import admin_core as admin_module
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+    from services.late_offset_service import clear_late_offset, late_offset_candidates
+
+    data = request.json or {}
+    month = admin_module._validate_month(data.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    items = data.get("items")
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "请选择要清除冲抵的记录"}), 400
+
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "清除迟到冲抵")
+    if locked_error:
+        return locked_error
+
+    cleared: list[dict] = []
+    skipped: list[dict] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        emp_id = 0
+        try:
+            emp_id = int(item.get("emp_id") or 0)
+        except (TypeError, ValueError):
+            pass
+        date_text = str(item.get("date") or "").strip()
+        if not emp_id or not date_text:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "参数不完整"})
+            continue
+        try:
+            record_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "无效的日期"})
+            continue
+        if record_date.strftime("%Y-%m") != month:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "日期与月份不一致"})
+            continue
+
+        row = DailyAttendanceOverride.query.filter_by(emp_id=emp_id, record_date=record_date).first()
+        before_values = {"record_date": date_text}
+        for field in DAILY_OVERRIDE_FIELDS:
+            before_values[field] = getattr(row, field) if row else None
+        if row:
+            before_values["remark"] = row.remark or ""
+        try:
+            result = clear_late_offset(emp_id, record_date)
+        except ValueError as exc:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": str(exc)})
+            continue
+        updated_row = DailyAttendanceOverride.query.filter_by(
+            emp_id=emp_id, record_date=record_date
+        ).first()
+        after_values = dict(before_values)
+        for field in DAILY_OVERRIDE_FIELDS:
+            after_values[field] = getattr(updated_row, field) if updated_row else None
+        after_values["remark"] = (updated_row.remark or "") if updated_row else ""
+        admin_module._record_override_history(
+            "daily", emp_id, month, "late_offset_clear", before_values, after_values
+        )
+        admin_module.db.session.commit()
+        cleared.append(result)
+
+    if cleared:
+        admin_module._sync_manager_month_stats(month)
+    return jsonify(
+        {
+            "month": month,
+            "cleared": cleared,
             "skipped": skipped,
             "rows": late_offset_candidates(month),
         }

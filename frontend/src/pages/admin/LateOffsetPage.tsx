@@ -6,6 +6,7 @@ import { fetchQueryBootstrap } from "../../api/query";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import { useNotification } from "../../components/feedback/Notification";
+import LateOffsetLeavesModal from "../../components/admin/LateOffsetLeavesModal";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
@@ -18,9 +19,11 @@ interface LateOffsetRow {
   dept_name: string;
   is_manager?: boolean;
   date: string;
+  status?: "pending" | "confirmed";
   late_minutes: number;
   offset_minutes: number;
   effective_late_minutes: number;
+  override_late_minutes?: number;
 }
 
 interface LateOffsetCandidatesResponse {
@@ -31,6 +34,13 @@ interface LateOffsetCandidatesResponse {
 interface LateOffsetConfirmResponse {
   month: string;
   confirmed: Array<{ emp_id: number; date: string; late_minutes: number }>;
+  skipped: Array<{ emp_id: number; date: string; error: string }>;
+  rows: LateOffsetRow[];
+}
+
+interface LateOffsetClearResponse {
+  month: string;
+  cleared: Array<{ emp_id: number; date: string; late_minutes: number | null }>;
   skipped: Array<{ emp_id: number; date: string; error: string }>;
   rows: LateOffsetRow[];
 }
@@ -58,6 +68,7 @@ export default function LateOffsetPage() {
   const [rows, setRows] = useState<LateOffsetRow[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [offsetEdits, setOffsetEdits] = useState<Record<string, number>>({});
+  const [leaveTarget, setLeaveTarget] = useState<{ empId: number; empNo: string; empName: string } | null>(null);
   const [isQuerying, setIsQuerying] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasQueried, setHasQueried] = useState(false);
@@ -158,6 +169,38 @@ export default function LateOffsetPage() {
     [notification, offsetEdits, selectedMonth],
   );
 
+  const clearItems = useCallback(
+    async (items: LateOffsetRow[]) => {
+      if (!items.length || !selectedMonth) {
+        return;
+      }
+      setIsConfirming(true);
+      try {
+        const payload = await apiRequest<LateOffsetClearResponse>("/api/admin/late-offset/clear", {
+          body: {
+            month: selectedMonth,
+            items: items.map((row) => ({ emp_id: row.emp_id, date: row.date })),
+          },
+          method: "POST",
+        });
+        setRows(payload.rows ?? []);
+        setSelectedKeys(new Set());
+        setOffsetEdits({});
+        if (payload.cleared?.length) {
+          notification.success(`已清除冲抵 ${payload.cleared.length} 条，迟到恢复系统值`);
+        }
+        if (payload.skipped?.length) {
+          notification.warning(`${payload.skipped.length} 条未处理，首条原因：${payload.skipped[0].error}`);
+        }
+      } catch (error) {
+        notification.error(error instanceof Error ? error.message : "清除迟到冲抵失败");
+      } finally {
+        setIsConfirming(false);
+      }
+    },
+    [notification, selectedMonth],
+  );
+
   const toggleRow = (row: LateOffsetRow) => {
     setSelectedKeys((prev) => {
       const next = new Set(prev);
@@ -172,7 +215,9 @@ export default function LateOffsetPage() {
   };
 
   const toggleAll = () => {
-    setSelectedKeys((prev) => (prev.size === rows.length ? new Set() : new Set(rows.map(rowKey))));
+    setSelectedKeys((prev) =>
+      prev.size === pendingRows.length ? new Set() : new Set(pendingRows.map(rowKey)),
+    );
   };
 
   const handleOffsetChange = (row: LateOffsetRow, value: string) => {
@@ -183,7 +228,8 @@ export default function LateOffsetPage() {
     }));
   };
 
-  const selectedRows = rows.filter((row) => selectedKeys.has(rowKey(row)));
+  const pendingRows = rows.filter((row) => row.status !== "confirmed");
+  const selectedRows = pendingRows.filter((row) => selectedKeys.has(rowKey(row)));
 
   if (isLoading) {
     return <LoadingState message="正在准备管理人员迟到冲抵页面..." />;
@@ -196,16 +242,13 @@ export default function LateOffsetPage() {
   const headers: Array<string | { label: ReactNode }> = [
     {
       label: (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "4px" }}>
-          <input
-            aria-label="全选"
-            checked={rows.length > 0 && selectedKeys.size === rows.length}
-            disabled={isConfirming || isLocked || !rows.length}
-            onChange={toggleAll}
-            type="checkbox"
-          />
-          选择
-        </span>
+        <input
+          aria-label="全选"
+          checked={pendingRows.length > 0 && selectedKeys.size === pendingRows.length}
+          disabled={isConfirming || isLocked || !pendingRows.length}
+          onChange={toggleAll}
+          type="checkbox"
+        />
       ),
     },
     "工号",
@@ -219,12 +262,13 @@ export default function LateOffsetPage() {
   ];
   const tableRows: ReactNode[][] = rows.map((row) => {
     const key = rowKey(row);
+    const isConfirmed = row.status === "confirmed";
     const isChecked = selectedKeys.has(key);
     return [
       <input
         aria-label={`选择 ${row.emp_name} ${row.date}`}
         checked={isChecked}
-        disabled={isConfirming || isLocked}
+        disabled={isConfirming || isLocked || isConfirmed}
         key={`check-${key}`}
         onChange={() => toggleRow(row)}
         type="checkbox"
@@ -234,26 +278,66 @@ export default function LateOffsetPage() {
       row.dept_name,
       row.date,
       String(row.late_minutes),
-      <input
-        aria-label={`编辑冲抵分钟 ${row.emp_name} ${row.date}`}
-        className="late-offset-input"
-        disabled={isConfirming || isLocked}
-        key={`offset-${key}`}
-        min={0}
-        onChange={(event) => handleOffsetChange(row, event.target.value)}
-        type="number"
-        value={offsetEdits[key] ?? row.offset_minutes}
-      />,
-      String(Math.max(0, row.late_minutes - (offsetEdits[key] ?? row.offset_minutes))),
-      <button
-        className="account-action-button"
-        disabled={isConfirming || isLocked}
-        key={`confirm-${key}`}
-        onClick={() => void confirmItems([row])}
-        type="button"
-      >
-        确认冲抵
-      </button>,
+      isConfirmed ? (
+        `${row.offset_minutes}（已冲抵）`
+      ) : (
+        <input
+          aria-label={`编辑冲抵分钟 ${row.emp_name} ${row.date}`}
+          className="late-offset-input"
+          disabled={isConfirming || isLocked}
+          key={`offset-${key}`}
+          min={0}
+          onChange={(event) => handleOffsetChange(row, event.target.value)}
+          type="number"
+          value={offsetEdits[key] ?? row.offset_minutes}
+        />
+      ),
+      String(isConfirmed ? row.override_late_minutes : Math.max(0, row.late_minutes - (offsetEdits[key] ?? row.offset_minutes))),
+      isConfirmed ? (
+        <div className="late-offset-row-actions" key={`actions-${key}`}>
+          <button
+            className="account-action-button"
+            disabled={isConfirming || isLocked}
+            key={`clear-${key}`}
+            onClick={() => void clearItems([row])}
+            type="button"
+          >
+            清除冲抵
+          </button>
+          <button
+            className="account-action-button"
+            key={`leaves-${key}`}
+            onClick={() =>
+              setLeaveTarget({ empId: row.emp_id, empNo: row.emp_no, empName: row.emp_name })
+            }
+            type="button"
+          >
+            请假记录
+          </button>
+        </div>
+      ) : (
+        <div className="late-offset-row-actions" key={`actions-${key}`}>
+          <button
+            className="account-action-button"
+            disabled={isConfirming || isLocked}
+            key={`confirm-${key}`}
+            onClick={() => void confirmItems([row])}
+            type="button"
+          >
+            确认冲抵
+          </button>
+          <button
+            className="account-action-button"
+            key={`leaves-${key}`}
+            onClick={() =>
+              setLeaveTarget({ empId: row.emp_id, empNo: row.emp_no, empName: row.emp_name })
+            }
+            type="button"
+          >
+            请假记录
+          </button>
+        </div>
+      ),
     ];
   });
 
@@ -324,6 +408,14 @@ export default function LateOffsetPage() {
       </aside>
 
       <section className="query-workspace">
+        {/* 全覆盖式极光磨砂玻璃加载遮罩（与其他查询页同款） */}
+        <div className={`query-workspace-loading ${isQuerying ? "is-active" : ""}`} role="status">
+          <div className="query-loading-spinner-wrap">
+            <div className="query-loading-spinner-ring" />
+            <div className="query-loading-spinner-pulse" />
+          </div>
+          <div className="query-loading-text">正在查询迟到冲抵数据...</div>
+        </div>
         <QueryResultPanel>
           <QueryTable
             emptyText={hasQueried ? "当月没有可冲抵的迟到记录" : "请先选择月份查询"}
@@ -334,6 +426,16 @@ export default function LateOffsetPage() {
           />
         </QueryResultPanel>
       </section>
+
+      {leaveTarget ? (
+        <LateOffsetLeavesModal
+          empId={leaveTarget.empId}
+          empName={leaveTarget.empName}
+          empNo={leaveTarget.empNo}
+          month={selectedMonth}
+          onClose={() => setLeaveTarget(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -77,7 +77,9 @@ from routes.admin_attendance_overrides import (
     delete_daily_attendance_override_record_api,
     save_daily_attendance_override_record_api,
     late_offset_candidates_api,
+    late_offset_clear_api,
     late_offset_confirm_api,
+    late_offset_leaves_api,
     download_employee_attendance_override_template,
     export_employee_attendance_overrides,
     import_employee_attendance_overrides,
@@ -564,10 +566,22 @@ def late_offset_candidates():
     return late_offset_candidates_api()
 
 
+@api_admin_bp.get("/late-offset/leaves")
+@admin_required
+def late_offset_leaves():
+    return late_offset_leaves_api()
+
+
 @api_admin_bp.post("/late-offset/confirm")
 @admin_required
 def late_offset_confirm():
     return late_offset_confirm_api()
+
+
+@api_admin_bp.post("/late-offset/clear")
+@admin_required
+def late_offset_clear():
+    return late_offset_clear_api()
 
 
 @api_admin_bp.get("/manager-attendance-overrides")

@@ -26,6 +26,7 @@ from models.user import User  # noqa: F401 —— 注册外键关联表
 from models.user import UserDepartmentAssignment, UserEmployeeAssignment  # noqa: F401 —— 注册外键关联表
 from services.late_offset_service import (
     LATE_OFFSET_MAX_MINUTES,
+    clear_late_offset,
     late_offset_candidates,
     late_offset_minutes,
     confirm_late_offset,
@@ -377,11 +378,12 @@ class LateOffsetConfirmTests(LateOffsetCandidateTests):
             self.assertEqual(existing.work_hours, 4.0)
             self.assertEqual(existing.late_minutes, 0)
 
-    def test_confirmed_day_no_longer_candidate(self) -> None:
+    def test_confirmed_day_no_longer_pending(self) -> None:
         with self.app.app_context():
             confirm_late_offset(self.manager_id, date(2026, 4, 18))
             db.session.commit()
-        self.assertEqual(self._candidates(), [])
+        rows = self._candidates()
+        self.assertEqual([row["status"] for row in rows], ["confirmed"])
 
     def test_confirm_reduces_manager_late_penalty(self) -> None:
         with self.app.app_context():
@@ -430,3 +432,80 @@ class LateOffsetConfirmTests(LateOffsetCandidateTests):
             db.session.commit()
             with self.assertRaises(ValueError):
                 confirm_late_offset(self.manager_id, date(2026, 4, 18))
+
+    def test_confirmed_offset_appears_as_confirmed_row(self) -> None:
+        with self.app.app_context():
+            confirm_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+        rows = self._candidates()
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["status"], "confirmed")
+        self.assertEqual(row["late_minutes"], 20)
+        self.assertEqual(row["offset_minutes"], 20)
+        self.assertEqual(row["override_late_minutes"], 0)
+
+    def test_manual_override_without_offset_remark_not_confirmed_row(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id,
+                    record_date=date(2026, 4, 18),
+                    late_minutes=5,
+                    remark="人工调整",
+                )
+            )
+            db.session.commit()
+        self.assertEqual(self._candidates(), [])
+
+    def test_clear_restores_pending_candidate(self) -> None:
+        with self.app.app_context():
+            confirm_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+            result = clear_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+            self.assertIsNone(result["late_minutes"])
+        rows = self._candidates()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["status"], "pending")
+        self.assertEqual(rows[0]["offset_minutes"], 20)
+
+    def test_clear_removes_orphan_override_row(self) -> None:
+        with self.app.app_context():
+            confirm_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+            clear_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+            remaining = DailyAttendanceOverride.query.filter_by(
+                emp_id=self.manager_id, record_date=date(2026, 4, 18)
+            ).all()
+            self.assertEqual(remaining, [])
+
+    def test_clear_keeps_other_override_fields(self) -> None:
+        with self.app.app_context():
+            confirm_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.commit()
+            override = DailyAttendanceOverride.query.filter_by(
+                emp_id=self.manager_id, record_date=date(2026, 4, 18)
+            ).first()
+            override.status = "病假"
+            db.session.commit()
+
+            clear_late_offset(self.manager_id, date(2026, 4, 18))
+            db.session.refresh(override)
+            self.assertIsNone(override.late_minutes)
+            self.assertEqual(override.status, "病假")
+
+    def test_clear_rejects_non_offset_override(self) -> None:
+        with self.app.app_context():
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id,
+                    record_date=date(2026, 4, 18),
+                    late_minutes=5,
+                    remark="人工调整",
+                )
+            )
+            db.session.commit()
+            with self.assertRaises(ValueError):
+                clear_late_offset(self.manager_id, date(2026, 4, 18))

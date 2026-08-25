@@ -1208,12 +1208,14 @@ describe("App smoke regression", () => {
     expect(accountSelect.value).toBe("2026-05");
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
-    expect(await screen.findByText("M001")).toBeInTheDocument();
-    expect(await screen.findByText("经理甲")).toBeInTheDocument();
+    expect(await screen.findAllByText("M001")).toHaveLength(2);
+    expect(await screen.findAllByText("经理甲")).toHaveLength(2);
     expect(await screen.findByText("2026-05-12")).toBeInTheDocument();
     expect(await screen.findByText("20")).toBeInTheDocument();
-    expect(await screen.findByText("0")).toBeInTheDocument();
+    expect(await screen.findAllByText("0")).toHaveLength(2);
     expect(screen.queryByText("人员类型")).not.toBeInTheDocument();
+    expect(screen.queryByText("选择")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
     const selectAll = screen.getByLabelText("全选") as HTMLInputElement;
     expect(selectAll.checked).toBe(false);
     fireEvent.click(selectAll);
@@ -1222,6 +1224,20 @@ describe("App smoke regression", () => {
     expect(screen.getByRole("button", { name: "确认冲抵(1)" })).toBeInTheDocument();
     expect(screen.getByLabelText("编辑冲抵分钟 经理甲 2026-05-12")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认冲抵" })).toBeInTheDocument();
+    expect(await screen.findByText("2026-05-13")).toBeInTheDocument();
+    expect(screen.getByText("30（已冲抵）")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "清除冲抵" })).toBeInTheDocument();
+    const confirmedCheck = screen.getByLabelText("选择 经理甲 2026-05-13") as HTMLInputElement;
+    expect(confirmedCheck.disabled).toBe(true);
+
+    fireEvent.click(screen.getAllByRole("button", { name: "请假记录" })[0]);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(await screen.findByText("L2026001")).toBeInTheDocument();
+    expect(screen.getByText("年假")).toBeInTheDocument();
+    expect(screen.getByText("2026-05-12 08:40")).toBeInTheDocument();
+    expect(screen.getByText("迟到冲抵20分钟")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("管理人员加班后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
@@ -2157,9 +2173,51 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
               dept_name: "信息部",
               is_manager: true,
               date: "2026-05-12",
+              status: "pending",
               late_minutes: 20,
               offset_minutes: 20,
               effective_late_minutes: 0,
+            },
+            {
+              emp_id: 11,
+              emp_no: "M001",
+              emp_name: "经理甲",
+              dept_name: "信息部",
+              is_manager: true,
+              date: "2026-05-13",
+              status: "confirmed",
+              late_minutes: 30,
+              offset_minutes: 30,
+              effective_late_minutes: 0,
+              override_late_minutes: 0,
+            },
+          ],
+        }),
+      );
+    case "/api/admin/late-offset/leaves":
+      return Promise.resolve(
+        jsonResponse({
+          month: "2026-05",
+          emp_id: 11,
+          emp_name: "经理甲",
+          rows: [
+            {
+              leave_no: "L2026001",
+              leave_type: "事假",
+              start_time: "2026-05-12 08:40",
+              end_time: "2026-05-12 09:00",
+              duration: 0.33,
+              approval_status: "已审批",
+              reason: "迟到冲抵20分钟",
+            },
+            {
+              leave_no: "L2026002",
+              leave_type: "年假",
+              start_time: "2026-05-20 09:00",
+              end_time: "2026-05-20 18:00",
+              duration: 8,
+              approval_status: "已审批",
+              reason: "年假一天",
             },
           ],
         }),
