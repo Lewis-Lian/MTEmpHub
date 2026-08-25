@@ -394,6 +394,104 @@ def delete_daily_attendance_override_record_api():
 
 
 
+# ---------------------------------------------------------------- 迟到冲抵
+
+
+def late_offset_candidates_api():
+    from routes import admin_core as admin_module
+    from services.late_offset_service import late_offset_candidates
+
+    month = admin_module._validate_month(request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    emp_ids = _requested_emp_ids() if request.args.get("emp_ids") else None
+    return jsonify({"month": month, "rows": late_offset_candidates(month, emp_ids)})
+
+
+def late_offset_confirm_api():
+    from routes import admin_core as admin_module
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+    from services.late_offset_service import confirm_late_offset, late_offset_candidates
+
+    data = request.json or {}
+    month = admin_module._validate_month(data.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    items = data.get("items")
+    if not isinstance(items, list) or not items:
+        return jsonify({"error": "请选择要冲抵的记录"}), 400
+
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "迟到冲抵确认")
+    if locked_error:
+        return locked_error
+
+    confirmed: list[dict] = []
+    skipped: list[dict] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        emp_id = 0
+        try:
+            emp_id = int(item.get("emp_id") or 0)
+        except (TypeError, ValueError):
+            pass
+        date_text = str(item.get("date") or "").strip()
+        offset_minutes = None
+        if item.get("offset_minutes") not in (None, ""):
+            try:
+                offset_minutes = int(item.get("offset_minutes"))
+            except (TypeError, ValueError):
+                skipped.append({"emp_id": emp_id, "date": date_text, "error": "冲抵分钟须为整数"})
+                continue
+        if not emp_id or not date_text:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "参数不完整"})
+            continue
+        try:
+            record_date = datetime.strptime(date_text, "%Y-%m-%d").date()
+        except ValueError:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "无效的日期"})
+            continue
+        if record_date.strftime("%Y-%m") != month:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": "日期与月份不一致"})
+            continue
+
+        row = DailyAttendanceOverride.query.filter_by(emp_id=emp_id, record_date=record_date).first()
+        before_values = {"record_date": date_text}
+        for field in DAILY_OVERRIDE_FIELDS:
+            before_values[field] = getattr(row, field) if row else None
+        if row:
+            before_values["remark"] = row.remark or ""
+        try:
+            result = confirm_late_offset(emp_id, record_date, offset_minutes=offset_minutes)
+        except ValueError as exc:
+            skipped.append({"emp_id": emp_id, "date": date_text, "error": str(exc)})
+            continue
+        updated_row = DailyAttendanceOverride.query.filter_by(
+            emp_id=emp_id, record_date=record_date
+        ).first()
+        after_values = dict(before_values)
+        for field in DAILY_OVERRIDE_FIELDS:
+            after_values[field] = getattr(updated_row, field) if updated_row else None
+        after_values["remark"] = (updated_row.remark or "") if updated_row else ""
+        admin_module._record_override_history(
+            "daily", emp_id, month, "late_offset", before_values, after_values
+        )
+        admin_module.db.session.commit()
+        confirmed.append(result)
+
+    if confirmed:
+        admin_module._sync_manager_month_stats(month)
+    return jsonify(
+        {
+            "month": month,
+            "confirmed": confirmed,
+            "skipped": skipped,
+            "rows": late_offset_candidates(month),
+        }
+    )
+
+
 @admin_required
 def download_manager_attendance_override_template():
     from routes import admin_core as admin_module

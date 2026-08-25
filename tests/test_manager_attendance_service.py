@@ -136,7 +136,7 @@ class ManagerLateSummaryTests(unittest.TestCase):
         self.assertEqual(rows[0]["personal_sick_days"], 7.0)
         self.assertEqual(rows[0]["summary"], "扣7天，6元")
 
-    def test_manager_summary_ignores_single_day_late_minutes_when_day_reaches_thirty(self) -> None:
+    def test_manager_summary_counts_late_minutes_even_when_day_reaches_thirty(self) -> None:
         with self.app.app_context():
             record = DailyRecord.query.filter_by(emp_id=self.manager_id, record_date=date(2026, 4, 18)).first()
             record.late_minutes = 30
@@ -155,11 +155,11 @@ class ManagerLateSummaryTests(unittest.TestCase):
                 [self.manager_id],
             )
 
-        self.assertEqual(rows[0]["late_early_minutes"], 3)
+        self.assertEqual(rows[0]["late_early_minutes"], 33)
         self.assertEqual(rows[0]["personal_sick_days"], 7.0)
-        self.assertEqual(rows[0]["summary"], "扣7天，3元")
+        self.assertEqual(rows[0]["summary"], "扣7天，33元")
 
-    def test_manager_summary_ignores_all_late_penalty_when_every_late_day_reaches_thirty(self) -> None:
+    def test_manager_summary_counts_all_late_penalty_when_every_late_day_reaches_thirty(self) -> None:
         with self.app.app_context():
             for record_date in (date(2026, 4, 18), date(2026, 4, 30)):
                 record = DailyRecord.query.filter_by(emp_id=self.manager_id, record_date=record_date).first()
@@ -179,9 +179,9 @@ class ManagerLateSummaryTests(unittest.TestCase):
                 [self.manager_id],
             )
 
-        self.assertEqual(rows[0]["late_early_minutes"], 0)
+        self.assertEqual(rows[0]["late_early_minutes"], 60)
         self.assertEqual(rows[0]["personal_sick_days"], 7.0)
-        self.assertEqual(rows[0]["summary"], "扣7天")
+        self.assertEqual(rows[0]["summary"], "扣7天，60元")
 
 
 class ManagerAttendanceBatchingTests(unittest.TestCase):

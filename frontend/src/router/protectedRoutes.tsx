@@ -7,6 +7,7 @@ const DepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage"));
 const DisabledUsersPage = lazy(() => import("../pages/admin/DisabledUsersPage"));
 const EmployeeAttendanceOverridesPage = lazy(() => import("../pages/admin/EmployeeAttendanceOverridesPage"));
 const EmployeesPage = lazy(() => import("../pages/admin/EmployeesPage"));
+const LateOffsetPage = lazy(() => import("../pages/admin/LateOffsetPage"));
 const ManagerAnnualLeaveAdminPage = lazy(() => import("../pages/admin/ManagerAnnualLeaveAdminPage"));
 const ManagerAttendanceOverridesPage = lazy(() => import("../pages/admin/ManagerAttendanceOverridesPage"));
 const ManagerOvertimeAdminPage = lazy(() => import("../pages/admin/ManagerOvertimeAdminPage"));
@@ -56,6 +57,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(ShiftsPage), path: "/admin/shifts/manage" },
   { element: lazyPage(EmployeeAttendanceOverridesPage), path: "/admin/employee-attendance-overrides" },
   { element: lazyPage(ManagerAttendanceOverridesPage), path: "/admin/manager-attendance-overrides" },
+  { element: lazyPage(LateOffsetPage), path: "/admin/late-offset" },
   { element: lazyPage(ManagerOvertimeAdminPage), path: "/admin/manager-overtime" },
   { element: lazyPage(ManagerAnnualLeaveAdminPage), path: "/admin/manager-annual-leave" },
 ];

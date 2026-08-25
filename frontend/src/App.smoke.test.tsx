@@ -1195,6 +1195,35 @@ describe("App smoke regression", () => {
     expect(screen.getByText(/最终应用值以月度修正为准/)).toBeInTheDocument();
   });
 
+  it("迟到冲抵页展示候选并支持确认操作", async () => {
+    window.history.replaceState({}, "", "/admin/late-offset");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByText("查询条件")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "选择管理人员" })).toBeInTheDocument();
+    const accountSelect = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(accountSelect.value).toBe("2026-05");
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+
+    expect(await screen.findByText("M001")).toBeInTheDocument();
+    expect(await screen.findByText("经理甲")).toBeInTheDocument();
+    expect(await screen.findByText("2026-05-12")).toBeInTheDocument();
+    expect(await screen.findByText("20")).toBeInTheDocument();
+    expect(await screen.findByText("0")).toBeInTheDocument();
+    expect(screen.queryByText("人员类型")).not.toBeInTheDocument();
+    const selectAll = screen.getByLabelText("全选") as HTMLInputElement;
+    expect(selectAll.checked).toBe(false);
+    fireEvent.click(selectAll);
+    expect(selectAll.checked).toBe(true);
+    expect((screen.getByLabelText("选择 经理甲 2026-05-12") as HTMLInputElement).checked).toBe(true);
+    expect(screen.getByRole("button", { name: "确认冲抵(1)" })).toBeInTheDocument();
+    expect(screen.getByLabelText("编辑冲抵分钟 经理甲 2026-05-12")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认冲抵" })).toBeInTheDocument();
+  });
+
   it("管理人员加班后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
     window.history.replaceState({}, "", "/admin/manager-overtime");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
@@ -2112,6 +2141,25 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
                 half_days: 1,
                 late_early_minutes: 10,
               },
+            },
+          ],
+        }),
+      );
+    case "/api/admin/late-offset/candidates":
+      return Promise.resolve(
+        jsonResponse({
+          month: "2026-05",
+          rows: [
+            {
+              emp_id: 11,
+              emp_no: "M001",
+              emp_name: "经理甲",
+              dept_name: "信息部",
+              is_manager: true,
+              date: "2026-05-12",
+              late_minutes: 20,
+              offset_minutes: 20,
+              effective_late_minutes: 0,
             },
           ],
         }),

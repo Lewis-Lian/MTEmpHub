@@ -478,6 +478,20 @@ def _manager_attendance_days_from_views(
     return _round2(total)
 
 
+def manager_day_late_minutes(row: object) -> int:
+    """单日迟到分钟（管理侧口径）：打卡结果含"迟到"时取迟到时长，否则 0。"""
+    raw = row.raw_data if isinstance(row.raw_data, dict) else {}
+    nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
+    result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
+    if "迟到" not in result:
+        return 0
+    return (
+        _raw_minutes(raw, "迟到时长", "严重迟到时长")
+        or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
+        or int(row.late_minutes or 0)
+    )
+
+
 def _manager_schedule_late_minutes_from_views(
     employee: Employee,
     rows: list[object],
@@ -493,20 +507,12 @@ def _manager_schedule_late_minutes_from_views(
         day = getattr(row, "record_date", None)
         override = daily_overrides.get(day) if day else None
         if override is not None and override.late_minutes is not None:
-            # 逐日修正的迟到分钟直接生效（不适用 ≥30 分钟排除规则）
+            # 逐日修正的迟到分钟直接生效
             total += int(override.late_minutes)
         else:
-            raw = row.raw_data if isinstance(row.raw_data, dict) else {}
-            nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
-            result = str(raw.get("上班1打卡结果") or nested_raw.get("上班1打卡结果") or "")
-            if "迟到" in result:
-                day_minutes = (
-                    _raw_minutes(raw, "迟到时长", "严重迟到时长")
-                    or _raw_minutes(nested_raw, "迟到时长", "严重迟到时长")
-                    or int(row.late_minutes or 0)
-                )
-                if day_minutes < 30:
-                    total += day_minutes
+            day_minutes = manager_day_late_minutes(row)
+            if day_minutes > 0:
+                total += day_minutes
         if day:
             seen.add(day)
     # 修正表有记录但无 DailyRecord 的日期
