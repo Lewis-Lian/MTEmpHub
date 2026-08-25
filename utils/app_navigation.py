@@ -177,6 +177,13 @@ MODULES: list[dict[str, Any]] = [
                 "description": "修正管理人员考勤统计结果。",
             },
             {
+                "key": "late_offset",
+                "label": "管理人员迟到冲抵",
+                "href": "/admin/late-offset",
+                "admin_only": True,
+                "description": "用请假单中的分钟级冲抵说明核销管理人员迟到。",
+            },
+            {
                 "key": "manager_overtime",
                 "label": "管理人员加班",
                 "href": "/admin/manager-overtime",

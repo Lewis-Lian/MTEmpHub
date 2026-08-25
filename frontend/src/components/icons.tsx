@@ -113,6 +113,10 @@ export const ClockPlusIcon = icon(
   "M10 3a7 7 0 107 7M10 6v4.5l3 1.5M17 13v4M15 15h4"
 );
 
+export const ClockCheckIcon = icon(
+  "M10 3a7 7 0 107 7M10 6v4.5l3 1.5M13.5 15.5l2 2 3.5-4.5"
+);
+
 /* ── 模块 slug → 图标映射 ── */
 
 const moduleIconMap: Record<string, React.FC<IconProps>> = {
@@ -144,6 +148,7 @@ const entryIconMap: Record<string, React.FC<IconProps>> = {
   shifts: TimerIcon,
   employee_attendance_overrides: PenIcon,
   manager_attendance_overrides: PenIcon,
+  late_offset: ClockCheckIcon,
   manager_overtime: ClockPlusIcon,
   manager_annual_leave: CalendarIcon,
   accounts: UserCogIcon,
