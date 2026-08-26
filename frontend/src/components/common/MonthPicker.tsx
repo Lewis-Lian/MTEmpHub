@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import DropdownMotion from "../motion/DropdownMotion";
 
 interface MonthPickerProps {
   value: string; // 格式 YYYY-MM
@@ -210,78 +211,76 @@ export default function MonthPicker({
       </div>
 
       {/* 下拉面板 */}
-      {isOpen && (
-        <div className="month-picker-dropdown">
-          <div className="month-picker-panel-body">
-            {/* 年份导航栏 (<< < YYYY年 > >>) */}
-            <div className="month-picker-header">
-              <div className="month-picker-nav-group">
-                <button
-                  className="month-picker-nav-btn"
-                  onClick={handleDecadePrev}
-                  type="button"
-                  title="上十个年份"
-                >
-                  «
-                </button>
-                <button
-                  className="month-picker-nav-btn"
-                  onClick={handleYearPrev}
-                  type="button"
-                  title="上一个年份"
-                >
-                  ‹
-                </button>
-              </div>
-              <span className="month-picker-year-label">{panelYear}年</span>
-              <div className="month-picker-nav-group">
-                <button
-                  className="month-picker-nav-btn"
-                  onClick={handleYearNext}
-                  type="button"
-                  title="下一个年份"
-                >
-                  ›
-                </button>
-                <button
-                  className="month-picker-nav-btn"
-                  onClick={handleDecadeNext}
-                  type="button"
-                  title="下十个年份"
-                >
-                  »
-                </button>
-              </div>
+      <DropdownMotion className="month-picker-dropdown" isOpen={isOpen}>
+        <div className="month-picker-panel-body">
+          {/* 年份导航栏 (<< < YYYY年 > >>) */}
+          <div className="month-picker-header">
+            <div className="month-picker-nav-group">
+              <button
+                className="month-picker-nav-btn"
+                onClick={handleDecadePrev}
+                type="button"
+                title="上十个年份"
+              >
+                «
+              </button>
+              <button
+                className="month-picker-nav-btn"
+                onClick={handleYearPrev}
+                type="button"
+                title="上一个年份"
+              >
+                ‹
+              </button>
             </div>
-
-            {/* 月份 3x4 点选网格 */}
-            <div className="month-picker-grid">
-              {months.map((m) => (
-                <button
-                  className={`month-picker-cell${tempMonth === m.num ? " is-selected" : ""}`}
-                  key={m.num}
-                  onClick={(e) => handleMonthSelect(m.num, e)}
-                  type="button"
-                >
-                  {m.label}
-                </button>
-              ))}
+            <span className="month-picker-year-label">{panelYear}年</span>
+            <div className="month-picker-nav-group">
+              <button
+                className="month-picker-nav-btn"
+                onClick={handleYearNext}
+                type="button"
+                title="下一个年份"
+              >
+                ›
+              </button>
+              <button
+                className="month-picker-nav-btn"
+                onClick={handleDecadeNext}
+                type="button"
+                title="下十个年份"
+              >
+                »
+              </button>
             </div>
           </div>
 
-          {/* 底部确定按钮操作区 */}
-          <div className="month-picker-footer">
-            <button
-              className="month-picker-btn-confirm"
-              disabled={tempMonth === null}
-              onClick={handleConfirm}
-              type="button"
-            >
-              确定
-            </button>
+          {/* 月份 3x4 点选网格 */}
+          <div className="month-picker-grid">
+            {months.map((m) => (
+              <button
+                className={`month-picker-cell${tempMonth === m.num ? " is-selected" : ""}`}
+                key={m.num}
+                onClick={(e) => handleMonthSelect(m.num, e)}
+                type="button"
+              >
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+
+        {/* 底部确定按钮操作区 */}
+        <div className="month-picker-footer">
+          <button
+            className="month-picker-btn-confirm"
+            disabled={tempMonth === null}
+            onClick={handleConfirm}
+            type="button"
+          >
+            确定
+          </button>
+        </div>
+      </DropdownMotion>
     </div>
   );
 }
