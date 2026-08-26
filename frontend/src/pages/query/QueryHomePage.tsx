@@ -5,6 +5,7 @@ import { fetchMe } from "../../api/auth";
 import AttendanceCalendarGrid from "../../components/attendance/AttendanceCalendarGrid";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
+import KpiNumber from "../../components/query/KpiNumber";
 import type { AttendanceCalendarData, QueryBootstrap } from "../../types/query";
 import "./QueryHome.css";
 
@@ -227,7 +228,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.attendance_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-attendance" value={summary?.attendance_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -244,7 +245,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.benefit_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-benefit" value={summary?.benefit_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -260,7 +261,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.overtime_remaining_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-overtime" value={summary?.overtime_remaining_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -277,7 +278,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.late_early_minutes ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-late" value={summary?.late_early_minutes ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">分钟</span>
               </div>
             </div>

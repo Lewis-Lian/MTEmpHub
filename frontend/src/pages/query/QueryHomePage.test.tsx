@@ -77,6 +77,11 @@ describe("QueryHomePage 纯首页权限用户", () => {
     await waitFor(() => {
       expect(screen.queryByText("正在加载首页摘要...")).toBeNull();
     });
+
+    // KPI 数字经 number-flow 渲染出摘要值（mock 中 attendance_days: 20）
+    await waitFor(() => {
+      expect(screen.getByTestId("kpi-attendance").textContent).toContain("20");
+    });
   });
 
   it("后端未返回管理人员 emp_id 时不出考勤日历面板", async () => {
