@@ -65,6 +65,7 @@ export interface HomeSummaryResponse {
   account_set_name: string;
   support_message?: string;
   manager?: {
+    emp_id: number;
     emp_no: string;
     name: string;
     dept_name: string;

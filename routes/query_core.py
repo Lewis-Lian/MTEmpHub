@@ -1330,6 +1330,7 @@ def home_manager_summary_api():
             "month": month,
             "account_set_name": account_set.name,
             "manager": {
+                "emp_id": manager.id,
                 "emp_no": manager.emp_no,
                 "name": manager.name,
                 "dept_name": manager.department.dept_name if manager.department else "",
@@ -1866,8 +1867,18 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
 
 def attendance_calendar_api():
     emp_id = request.args.get("emp_id", type=int)
-    # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
-    allowed = _accessible_emp_ids()
+    if g.current_user.can_access_page("attendance_calendar") or g.current_user.can_access_page("employee_dashboard"):
+        # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
+        allowed = _accessible_emp_ids()
+    else:
+        # 仅首页权限的账号只能在首页查看绑定管理人员本人的考勤日历
+        profile_emp_no = (g.current_user.profile_emp_no or "").strip()
+        profile_emp = (
+            Employee.query.with_entities(Employee.id).filter_by(emp_no=profile_emp_no, is_manager=True).first()
+            if profile_emp_no
+            else None
+        )
+        allowed = [profile_emp.id] if profile_emp else []
     if not emp_id or emp_id not in allowed:
         return jsonify({"error": "无效的员工范围"}), 400
     month = request.args.get("month") or ""
