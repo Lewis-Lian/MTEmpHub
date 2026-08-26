@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import DropdownMotion from "../motion/DropdownMotion";
 
 interface YearPickerProps {
   value: string; // e.g. "2026"
@@ -138,46 +139,44 @@ export default function YearPicker({
         </div>
       </div>
 
-      {isOpen && (
-        <div className="month-picker-dropdown">
-          <div className="month-picker-panel-body">
-            <div className="month-picker-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px" }}>
-              <button
-                className="month-picker-nav-btn"
-                onClick={handlePrev}
-                type="button"
-                title="上一页"
-              >
-                «
-              </button>
-              <span className="month-picker-year-label" style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>
-                {panelStartYear} - {panelStartYear + 11}
-              </span>
-              <button
-                className="month-picker-nav-btn"
-                onClick={handleNext}
-                type="button"
-                title="下一页"
-              >
-                »
-              </button>
-            </div>
+      <DropdownMotion className="month-picker-dropdown" isOpen={isOpen}>
+        <div className="month-picker-panel-body">
+          <div className="month-picker-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 8px" }}>
+            <button
+              className="month-picker-nav-btn"
+              onClick={handlePrev}
+              type="button"
+              title="上一页"
+            >
+              «
+            </button>
+            <span className="month-picker-year-label" style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>
+              {panelStartYear} - {panelStartYear + 11}
+            </span>
+            <button
+              className="month-picker-nav-btn"
+              onClick={handleNext}
+              type="button"
+              title="下一页"
+            >
+              »
+            </button>
+          </div>
 
-            <div className="month-picker-grid">
-              {years.map((y) => (
-                <button
-                  className={`month-picker-cell${selectedYearNum === y ? " is-selected" : ""}`}
-                  key={y}
-                  onClick={(e) => handleYearSelect(y, e)}
-                  type="button"
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
+          <div className="month-picker-grid">
+            {years.map((y) => (
+              <button
+                className={`month-picker-cell${selectedYearNum === y ? " is-selected" : ""}`}
+                key={y}
+                onClick={(e) => handleYearSelect(y, e)}
+                type="button"
+              >
+                {y}
+              </button>
+            ))}
           </div>
         </div>
-      )}
+      </DropdownMotion>
     </div>
   );
 }
