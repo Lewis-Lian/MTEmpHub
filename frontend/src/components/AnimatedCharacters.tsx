@@ -1,3 +1,4 @@
+import { useMotionValue, useSpring, motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 
 interface PupilProps {
@@ -15,54 +16,44 @@ function Pupil({
   forceLookX,
   forceLookY,
 }: PupilProps) {
-  const [mouseX, setMouseX] = useState(0);
-  const [mouseY, setMouseY] = useState(0);
   const pupilRef = useRef<HTMLDivElement>(null);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  // 弹簧参数对齐原 transition: transform 0.1s ease-out 的跟手感
+  const x = useSpring(rawX, { stiffness: 500, damping: 40 });
+  const y = useSpring(rawY, { stiffness: 500, damping: 40 });
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      setMouseX(event.clientX);
-      setMouseY(event.clientY);
+      if (forceLookX !== undefined && forceLookY !== undefined) {
+        rawX.set(forceLookX);
+        rawY.set(forceLookY);
+        return;
+      }
+      if (!pupilRef.current) return;
+      const pupil = pupilRef.current.getBoundingClientRect();
+      const deltaX = event.clientX - (pupil.left + pupil.width / 2);
+      const deltaY = event.clientY - (pupil.top + pupil.height / 2);
+      const distance = Math.min(Math.hypot(deltaX, deltaY), maxDistance);
+      const angle = Math.atan2(deltaY, deltaX);
+      rawX.set(Math.cos(angle) * distance);
+      rawY.set(Math.sin(angle) * distance);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  const calculatePupilPosition = () => {
-    if (!pupilRef.current) {
-      return { x: 0, y: 0 };
-    }
-    if (forceLookX !== undefined && forceLookY !== undefined) {
-      return { x: forceLookX, y: forceLookY };
-    }
-
-    const pupil = pupilRef.current.getBoundingClientRect();
-    const pupilCenterX = pupil.left + pupil.width / 2;
-    const pupilCenterY = pupil.top + pupil.height / 2;
-    const deltaX = mouseX - pupilCenterX;
-    const deltaY = mouseY - pupilCenterY;
-    const distance = Math.min(Math.sqrt(deltaX ** 2 + deltaY ** 2), maxDistance);
-    const angle = Math.atan2(deltaY, deltaX);
-
-    return {
-      x: Math.cos(angle) * distance,
-      y: Math.sin(angle) * distance,
-    };
-  };
-
-  const pupilPosition = calculatePupilPosition();
+  }, [forceLookX, forceLookY, maxDistance, rawX, rawY]);
 
   return (
-    <div
+    <motion.div
       ref={pupilRef}
       style={{
         width: `${size}px`,
         height: `${size}px`,
         backgroundColor: pupilColor,
         borderRadius: "999px",
-        transform: `translate(${pupilPosition.x}px, ${pupilPosition.y}px)`,
-        transition: "transform 0.1s ease-out",
+        x,
+        y,
       }}
     />
   );
@@ -89,43 +80,32 @@ function EyeBall({
   forceLookX,
   forceLookY,
 }: EyeBallProps) {
-  const [mouseX, setMouseX] = useState(0);
-  const [mouseY, setMouseY] = useState(0);
   const eyeRef = useRef<HTMLDivElement>(null);
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+  const x = useSpring(rawX, { stiffness: 500, damping: 40 });
+  const y = useSpring(rawY, { stiffness: 500, damping: 40 });
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
-      setMouseX(event.clientX);
-      setMouseY(event.clientY);
+      if (forceLookX !== undefined && forceLookY !== undefined) {
+        rawX.set(forceLookX);
+        rawY.set(forceLookY);
+        return;
+      }
+      if (!eyeRef.current) return;
+      const eye = eyeRef.current.getBoundingClientRect();
+      const deltaX = event.clientX - (eye.left + eye.width / 2);
+      const deltaY = event.clientY - (eye.top + eye.height / 2);
+      const distance = Math.min(Math.hypot(deltaX, deltaY), maxDistance);
+      const angle = Math.atan2(deltaY, deltaX);
+      rawX.set(Math.cos(angle) * distance);
+      rawY.set(Math.sin(angle) * distance);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, []);
-
-  const calculatePupilPosition = () => {
-    if (!eyeRef.current) {
-      return { x: 0, y: 0 };
-    }
-    if (forceLookX !== undefined && forceLookY !== undefined) {
-      return { x: forceLookX, y: forceLookY };
-    }
-
-    const eye = eyeRef.current.getBoundingClientRect();
-    const eyeCenterX = eye.left + eye.width / 2;
-    const eyeCenterY = eye.top + eye.height / 2;
-    const deltaX = mouseX - eyeCenterX;
-    const deltaY = mouseY - eyeCenterY;
-    const distance = Math.min(Math.sqrt(deltaX ** 2 + deltaY ** 2), maxDistance);
-    const angle = Math.atan2(deltaY, deltaX);
-
-    return {
-      x: Math.cos(angle) * distance,
-      y: Math.sin(angle) * distance,
-    };
-  };
-
-  const pupilPosition = calculatePupilPosition();
+  }, [forceLookX, forceLookY, maxDistance, rawX, rawY]);
 
   return (
     <div
@@ -143,14 +123,14 @@ function EyeBall({
       }}
     >
       {!isBlinking ? (
-        <div
+        <motion.div
           style={{
             width: `${pupilSize}px`,
             height: `${pupilSize}px`,
             backgroundColor: pupilColor,
             borderRadius: "999px",
-            transform: `translate(${pupilPosition.x}px, ${pupilPosition.y}px)`,
-            transition: "transform 0.1s ease-out",
+            x,
+            y,
           }}
         />
       ) : null}
