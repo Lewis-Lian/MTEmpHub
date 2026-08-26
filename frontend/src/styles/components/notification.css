@@ -27,13 +27,6 @@
   pointer-events: auto;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
   overflow: hidden;
-  animation: notification-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-/* 离开/关闭时的渐隐动画 */
-.notification-item.is-leaving {
-  animation: notification-fade-out 0.2s ease forwards;
 }
 
 /* 各种类型的样式变体 */
@@ -156,28 +149,6 @@
 }
 
 /* 关键帧动画 */
-@keyframes notification-slide-in {
-  from {
-    opacity: 0;
-    transform: translate3d(100%, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes notification-fade-out {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(20px, 0, 0);
-  }
-}
-
 @keyframes notification-progress {
   from {
     transform: scaleX(1);

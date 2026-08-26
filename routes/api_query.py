@@ -155,7 +155,7 @@ def punch_records_modal_export():
 
 
 @api_query_bp.get("/attendance-calendar")
-@any_page_permission_required(("attendance_calendar", "employee_dashboard"))
+@any_page_permission_required(("attendance_calendar", "employee_dashboard", "query_home"))
 def attendance_calendar():
     return attendance_calendar_api()
 

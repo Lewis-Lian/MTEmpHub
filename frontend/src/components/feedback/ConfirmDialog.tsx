@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { AnimatePresence, motion } from "motion/react";
 
 import "../../styles/components/confirm-dialog.css";
 
@@ -135,30 +136,44 @@ function ConfirmDialogComponent({
   };
 
   const content = (
-    <div
-      className={`confirm-backdrop${state.isOpen ? " is-open" : ""}`}
-      onClick={handleBackdropClick}
-    >
-      <div className={`confirm-card confirm-theme-${state.type ?? "warning"}`}>
-        <div className="confirm-header">
-          <div className="confirm-icon-wrapper">
-            <ConfirmIcon type={state.type} />
-          </div>
-          <h3 className="confirm-title">{state.title}</h3>
-        </div>
-        <div className="confirm-body">
-          <p className="confirm-message">{state.message}</p>
-        </div>
-        <div className="confirm-footer">
-          <button className="confirm-btn confirm-btn-cancel" onClick={onCancel}>
-            {state.cancelText}
-          </button>
-          <button className="confirm-btn confirm-btn-confirm" onClick={onConfirm}>
-            {state.confirmText}
-          </button>
-        </div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {state.isOpen ? (
+        <motion.div
+          animate={{ opacity: 1 }}
+          className="confirm-backdrop"
+          exit={{ opacity: 0, transition: { duration: 0.2 } }}
+          initial={{ opacity: 0 }}
+          onClick={handleBackdropClick}
+          transition={{ duration: 0.2 }}
+        >
+          <motion.div
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className={`confirm-card confirm-theme-${state.type ?? "warning"}`}
+            exit={{ opacity: 0, scale: 0.95, y: 10, transition: { duration: 0.15 } }}
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <div className="confirm-header">
+              <div className="confirm-icon-wrapper">
+                <ConfirmIcon type={state.type} />
+              </div>
+              <h3 className="confirm-title">{state.title}</h3>
+            </div>
+            <div className="confirm-body">
+              <p className="confirm-message">{state.message}</p>
+            </div>
+            <div className="confirm-footer">
+              <button className="confirm-btn confirm-btn-cancel" onClick={onCancel}>
+                {state.cancelText}
+              </button>
+              <button className="confirm-btn confirm-btn-confirm" onClick={onConfirm}>
+                {state.confirmText}
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   );
 
   return typeof document !== "undefined" ? createPortal(content, document.body) : <>{content}</>;

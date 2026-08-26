@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import MultiSelectDropdown from "./MultiSelectDropdown";
 
@@ -61,18 +61,26 @@ describe("MultiSelectDropdown", () => {
     });
   });
 
-  it("点击组件外部时收起选项列表", () => {
+  it("点击组件外部时收起选项列表", async () => {
     renderDropdown({});
     fireEvent.click(screen.getByRole("button", { name: /未选择/ }));
     expect(screen.getAllByRole("checkbox").length).toBe(3);
     fireEvent.mouseDown(document.body);
-    expect(screen.queryByRole("checkbox")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("checkbox")).toBeNull());
   });
 
-  it("按 Esc 收起选项列表", () => {
+  it("按 Esc 收起选项列表", async () => {
     renderDropdown({});
     fireEvent.click(screen.getByRole("button", { name: /未选择/ }));
     fireEvent.keyDown(document, { key: "Escape" });
-    expect(screen.queryByRole("checkbox")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("checkbox")).toBeNull());
+  });
+
+  it("按 Escape 关闭面板后，面板经退场动画从 DOM 移除", async () => {
+    renderDropdown({});
+    fireEvent.click(screen.getByRole("button", { name: /未选择/ }));
+    expect(screen.getByRole("group")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("group")).toBeNull());
   });
 });

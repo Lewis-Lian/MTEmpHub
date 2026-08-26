@@ -4322,16 +4322,6 @@ input[type="checkbox"] {
   padding: 0 !important;
   box-sizing: border-box !important;
   transform-origin: top left !important;
-  animation: monthPickerSlideDown 0.15s cubic-bezier(0.23, 1, 0.32, 1) !important;
-}
-
-@keyframes monthPickerSlideDown {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
 }
 
 .month-picker-panel-body {

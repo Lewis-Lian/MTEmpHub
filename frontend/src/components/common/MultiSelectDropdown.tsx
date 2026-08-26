@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import DropdownMotion from "../motion/DropdownMotion";
 import "../../styles/components/multi-select-dropdown.css";
 
 export interface MultiSelectOption {
@@ -97,41 +98,43 @@ function MultiSelectDropdown({
         <span className="multi-select-summary">{summary}</span>
         <span aria-hidden="true" className="multi-select-arrow">{isOpen ? "▲" : "▼"}</span>
       </button>
-      {isOpen && panelStyle
-        ? createPortal(
-            <div className="multi-select-panel" style={panelStyle}>
-              <div className="multi-select-actions">
-                <button
-                  className="multi-select-action"
-                  onClick={() => applyToAll(true)}
-                  type="button"
-                >
-                  全选
-                </button>
-                <button
-                  className="multi-select-action"
-                  onClick={() => applyToAll(false)}
-                  type="button"
-                >
-                  清空
-                </button>
-              </div>
-              <div className="multi-select-list" role="group">
-                {options.map((option) => (
-                  <label key={option.key} className="multi-select-option">
-                    <input
-                      checked={Boolean(value[option.key])}
-                      onChange={(event) => toggleKey(option.key, event.target.checked)}
-                      type="checkbox"
-                    />
-                    <span>{option.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>,
-            document.body,
-          )
-        : null}
+      {createPortal(
+        <DropdownMotion
+          className="multi-select-panel"
+          isOpen={isOpen && panelStyle !== null}
+          style={panelStyle ?? undefined}
+        >
+          <div className="multi-select-actions">
+            <button
+              className="multi-select-action"
+              onClick={() => applyToAll(true)}
+              type="button"
+            >
+              全选
+            </button>
+            <button
+              className="multi-select-action"
+              onClick={() => applyToAll(false)}
+              type="button"
+            >
+              清空
+            </button>
+          </div>
+          <div className="multi-select-list" role="group">
+            {options.map((option) => (
+              <label key={option.key} className="multi-select-option">
+                <input
+                  checked={Boolean(value[option.key])}
+                  onChange={(event) => toggleKey(option.key, event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </DropdownMotion>,
+        document.body,
+      )}
     </div>
   );
 }

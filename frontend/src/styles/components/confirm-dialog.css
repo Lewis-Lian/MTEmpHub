@@ -13,14 +13,6 @@
   place-items: center;
   padding: 24px;
   box-sizing: border-box;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-
-.confirm-backdrop.is-open {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 /* 弹窗卡片 */
@@ -32,13 +24,7 @@
   box-shadow: 0 20px 25px -5px rgba(24, 49, 83, 0.15), 0 10px 10px -5px rgba(24, 49, 83, 0.08);
   border: 1px solid var(--ent-border-strong);
   overflow: hidden;
-  transform: scale(0.95) translate3d(0, 10px, 0);
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
-}
-
-.confirm-backdrop.is-open .confirm-card {
-  transform: scale(1) translate3d(0, 0, 0);
 }
 
 /* 弹窗头部 */

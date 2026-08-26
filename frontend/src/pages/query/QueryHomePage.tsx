@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAttendanceCalendar, fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
 import { fetchMe } from "../../api/auth";
 import AttendanceCalendarGrid from "../../components/attendance/AttendanceCalendarGrid";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
+import KpiNumber from "../../components/query/KpiNumber";
 import type { AttendanceCalendarData, QueryBootstrap } from "../../types/query";
 import "./QueryHome.css";
 
@@ -13,7 +14,7 @@ export default function QueryHomePage() {
   const [month, setMonth] = useState("");
   const [summary, setSummary] = useState<Record<string, number | string> | null>(null);
   const [managerLabel, setManagerLabel] = useState("");
-  const [managerInfo, setManagerInfo] = useState<{ emp_no: string; name: string; dept_name: string } | null>(null);
+  const [managerInfo, setManagerInfo] = useState<{ emp_id: number; emp_no: string; name: string; dept_name: string } | null>(null);
   const [message, setMessage] = useState("正在加载首页摘要...");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -91,11 +92,8 @@ export default function QueryHomePage() {
     };
   }, [month]);
 
-  // 首页日历展示绑定管理人员本人的考勤，员工 id 通过工号在可见员工列表中匹配
-  const managerEmployeeId = useMemo(
-    () => bootstrap?.employees.find((employee) => employee.emp_no === managerInfo?.emp_no)?.id ?? null,
-    [bootstrap, managerInfo],
-  );
+  // 首页日历展示绑定管理人员本人的考勤，员工 id 由 home-summary 的 manager.emp_id 直接提供
+  const managerEmployeeId = managerInfo?.emp_id ?? null;
 
   useEffect(() => {
     if (!managerEmployeeId || !month) {
@@ -116,8 +114,8 @@ export default function QueryHomePage() {
         if (!mounted) {
           return;
         }
-        // 无日历接口权限的账号（如纯首页权限用户）直接隐藏面板
-        if (caughtError instanceof ApiError && caughtError.status === 403) {
+        // 无日历接口权限（403）或绑定管理人员超出可见范围（400）时直接隐藏面板
+        if (caughtError instanceof ApiError && (caughtError.status === 403 || caughtError.status === 400)) {
           setCalendarForbidden(true);
           return;
         }
@@ -230,7 +228,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.attendance_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-attendance" value={summary?.attendance_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -247,7 +245,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.benefit_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-benefit" value={summary?.benefit_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -263,7 +261,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.overtime_remaining_days ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-overtime" value={summary?.overtime_remaining_days ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">天</span>
               </div>
             </div>
@@ -280,7 +278,7 @@ export default function QueryHomePage() {
                 </span>
               </div>
               <div className="qh-kpi-hero-body">
-                <strong className="qh-kpi-hero-value">{summary?.late_early_minutes ?? 0}</strong>
+                <strong className="qh-kpi-hero-value"><KpiNumber testId="kpi-late" value={summary?.late_early_minutes ?? 0} /></strong>
                 <span className="qh-kpi-hero-unit">分钟</span>
               </div>
             </div>
