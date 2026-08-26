@@ -489,6 +489,7 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         april_payload = viewer_client.get("/api/query/home-summary?month=2026-04").get_json()
         self.assertTrue(april_payload["has_data"])
         self.assertEqual(april_payload["month"], "2026-04")
+        self.assertEqual(april_payload["manager"]["emp_id"], self.manager_id)
         self.assertEqual(april_payload["manager"]["emp_no"], "M001")
         self.assertEqual(april_payload["manager"]["name"], "经理甲")
         self.assertEqual(april_payload["manager"]["dept_name"], "行政部")

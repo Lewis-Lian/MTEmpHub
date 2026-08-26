@@ -79,7 +79,7 @@ describe("QueryHomePage 纯首页权限用户", () => {
     });
   });
 
-  it("无法匹配到员工时不出考勤日历面板", async () => {
+  it("后端未返回管理人员 emp_id 时不出考勤日历面板", async () => {
     render(<QueryHomePage />);
 
     await waitFor(() => {
@@ -94,10 +94,9 @@ describe("QueryHomePage 纯首页权限用户", () => {
 describe("QueryHomePage 首页考勤日历", () => {
   beforeEach(() => {
     mockFetchMe.mockResolvedValue({ username: "100701010", role: "readonly" });
+    // 纯首页权限用户的 bootstrap 可见员工列表为空，日历员工 id 只能来自 home-summary
     mockBootstrap.mockResolvedValue({
-      employees: [
-        { id: 7, emp_no: "100701010", name: "余兆中", dept_id: null, dept_name: "制造一部", is_manager: true },
-      ],
+      employees: [],
       account_sets: [
         { id: 1, month: "2026-05", name: "2026年5月", is_active: true },
       ],
@@ -108,7 +107,7 @@ describe("QueryHomePage 首页考勤日历", () => {
       month: "2026-05",
       account_set_name: "2026年5月",
       support_message: "已加载首页摘要",
-      manager: { emp_no: "100701010", name: "余兆中", dept_name: "制造一部" },
+      manager: { emp_id: 7, emp_no: "100701010", name: "余兆中", dept_name: "制造一部" },
       summary: { attendance_days: 20 },
     });
   });
@@ -152,6 +151,20 @@ describe("QueryHomePage 首页考勤日历", () => {
     });
     await waitFor(() => {
       expect(screen.queryByText("考勤日历")).toBeNull();
+    });
+    expect(screen.getByText("请假与外勤类型占比")).toBeInTheDocument();
+  });
+
+  it("日历接口返回 400（绑定管理人员超出可见范围）时隐藏面板", async () => {
+    mockCalendar.mockRejectedValue(new ApiError("无效的员工范围", 400, null));
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(mockCalendar).toHaveBeenCalled();
+    });
+    await waitFor(() => {
+      expect(screen.queryByText("考勤日历")).toBeNull();
+      expect(screen.queryByText("无效的员工范围")).toBeNull();
     });
     expect(screen.getByText("请假与外勤类型占比")).toBeInTheDocument();
   });
