@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { MotionConfig } from "motion/react";
 import { ApiError } from "./api/client";
 import { fetchMe, type AuthUser } from "./api/auth";
 import AppRouter from "./router";
@@ -66,11 +67,13 @@ export default function App() {
   }
 
   return (
-    <NotificationProvider>
-      <ConfirmProvider>
-        <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />
-      </ConfirmProvider>
-    </NotificationProvider>
+    <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}>
+      <NotificationProvider>
+        <ConfirmProvider>
+          <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />
+        </ConfirmProvider>
+      </NotificationProvider>
+    </MotionConfig>
   );
 }
 
