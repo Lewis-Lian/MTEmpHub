@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import DropdownMotion from "../motion/DropdownMotion";
 
 interface TimePickerProps {
   value: string;
@@ -130,104 +131,88 @@ export default function TimePicker({ value, onChange, placeholder = "选择时�
         </svg>
       </div>
 
-      {isOpen && (
-        <div
+      <DropdownMotion isOpen={isOpen} style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, background: "#fff", border: "1px solid #e2e8f0", borderRadius: "8px", boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)", display: "flex", height: "200px", zIndex: 1600, overflow: "hidden" }}>
+        {/* Hours column */}
+        <ul
+          className="time-picker-list"
           style={{
-            position: "absolute",
-            top: "calc(100% + 4px)",
-            left: 0,
-            background: "#fff",
-            border: "1px solid #e2e8f0",
-            borderRadius: "8px",
-            boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-            display: "flex",
-            height: "200px",
-            zIndex: 1600,
-            overflow: "hidden",
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            width: "60px",
+            overflowY: "auto",
+            borderRight: "1px solid #e2e8f0",
+            scrollbarWidth: "none", // for Firefox
           }}
         >
-          {/* Hours column */}
-          <ul
-            className="time-picker-list"
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              width: "60px",
-              overflowY: "auto",
-              borderRight: "1px solid #e2e8f0",
-              scrollbarWidth: "none", // for Firefox
-            }}
-          >
-            {hours.map((h) => (
-              <li
-                key={`h-${h}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleHourSelect(h);
-                }}
-                style={{
-                  padding: "8px 0",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  background: h === selectedHour ? "#eff6ff" : "transparent",
-                  color: h === selectedHour ? "#2563eb" : "#334155",
-                  fontWeight: h === selectedHour ? "600" : "400",
-                }}
-                onMouseEnter={(e) => {
-                  if (h !== selectedHour) e.currentTarget.style.background = "#f8fafc";
-                }}
-                onMouseLeave={(e) => {
-                  if (h !== selectedHour) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {h}
-              </li>
-            ))}
-          </ul>
+          {hours.map((h) => (
+            <li
+              key={`h-${h}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleHourSelect(h);
+              }}
+              style={{
+                padding: "8px 0",
+                textAlign: "center",
+                cursor: "pointer",
+                fontSize: "14px",
+                background: h === selectedHour ? "#eff6ff" : "transparent",
+                color: h === selectedHour ? "#2563eb" : "#334155",
+                fontWeight: h === selectedHour ? "600" : "400",
+              }}
+              onMouseEnter={(e) => {
+                if (h !== selectedHour) e.currentTarget.style.background = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                if (h !== selectedHour) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              {h}
+            </li>
+          ))}
+        </ul>
 
-          {/* Minutes column */}
-          <ul
-            className="time-picker-list"
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              width: "60px",
-              overflowY: "auto",
-              scrollbarWidth: "none", // for Firefox
-            }}
-          >
-            {minutes.map((m) => (
-              <li
-                key={`m-${m}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMinSelect(m);
-                }}
-                style={{
-                  padding: "8px 0",
-                  textAlign: "center",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  background: m === selectedMin ? "#eff6ff" : "transparent",
-                  color: m === selectedMin ? "#2563eb" : "#334155",
-                  fontWeight: m === selectedMin ? "600" : "400",
-                }}
-                onMouseEnter={(e) => {
-                  if (m !== selectedMin) e.currentTarget.style.background = "#f8fafc";
-                }}
-                onMouseLeave={(e) => {
-                  if (m !== selectedMin) e.currentTarget.style.background = "transparent";
-                }}
-              >
-                {m}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+        {/* Minutes column */}
+        <ul
+          className="time-picker-list"
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            width: "60px",
+            overflowY: "auto",
+            scrollbarWidth: "none", // for Firefox
+          }}
+        >
+          {minutes.map((m) => (
+            <li
+              key={`m-${m}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleMinSelect(m);
+              }}
+              style={{
+                padding: "8px 0",
+                textAlign: "center",
+                cursor: "pointer",
+                fontSize: "14px",
+                background: m === selectedMin ? "#eff6ff" : "transparent",
+                color: m === selectedMin ? "#2563eb" : "#334155",
+                fontWeight: m === selectedMin ? "600" : "400",
+              }}
+              onMouseEnter={(e) => {
+                if (m !== selectedMin) e.currentTarget.style.background = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                if (m !== selectedMin) e.currentTarget.style.background = "transparent";
+              }}
+            >
+              {m}
+            </li>
+          ))}
+        </ul>
+      </DropdownMotion>
     </div>
   );
 }

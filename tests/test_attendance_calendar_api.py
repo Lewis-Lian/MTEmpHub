@@ -251,5 +251,98 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
 
 
+class HomeOnlyUserCalendarApiTests(unittest.TestCase):
+    """纯首页权限（仅 query_home）用户可以在首页查看本人考勤日历，且范围限定为本人。"""
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.app = Flask(__name__)
+        self.app.config.update(
+            TESTING=True,
+            SECRET_KEY="test-secret",
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.tmpdir.name}/cal_home_only.db",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+            JWT_EXPIRES_DELTA=timedelta(hours=12),
+            FRONTEND_ORIGIN="http://localhost:5173",
+            SESSION_COOKIE_NAME="api_access_token",
+            SESSION_COOKIE_SAMESITE="None",
+            SESSION_COOKIE_SECURE=False,
+        )
+        db.init_app(self.app)
+        register_routes(self.app)
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="制造一部")
+            db.session.add(dept)
+            db.session.flush()
+            emp = Employee(emp_no="E001", name="员工甲", dept_id=dept.id, is_manager=False)
+            mgr = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            db.session.add_all([emp, mgr])
+            db.session.flush()
+            home_user = User(
+                username="homeuser",
+                role="readonly",
+                page_permissions={"query_home": True},
+                profile_emp_no="M001",
+            )
+            home_user.set_password("home123")
+            db.session.add(home_user)
+            db.session.flush()
+            # 即使员工分配让 E001 进入可见范围，纯首页用户也不应查出他人日历
+            db.session.add(UserEmployeeAssignment(user_id=home_user.id, emp_id=emp.id))
+            db.session.commit()
+            self.emp_id = emp.id
+            self.mgr_id = mgr.id
+
+        self.client = attach_origin(self.app.test_client())
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "homeuser", "password": "home123", "captcha_token": captcha_token},
+        )
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+    def _get(self, query: str):
+        return self.client.get(f"/api/query/attendance-calendar{query}")
+
+    def test_home_only_user_views_self_calendar(self):
+        """仅首页权限的账号可按绑定管理人员工号查看本人考勤日历。"""
+        resp = self._get(f"?emp_id={self.mgr_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
+
+    def test_home_only_user_cannot_view_other_employees(self):
+        """仅首页权限的账号即使有员工分配，也不能查看他人考勤日历。"""
+        resp = self._get(f"?emp_id={self.emp_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_home_only_user_without_profile_emp_no_gets_400(self):
+        """未绑定管理人员工号的纯首页账号查任何员工都返回 400。"""
+        with self.app.app_context():
+            home_user = User.query.filter_by(username="homeuser").first()
+            home_user.profile_emp_no = None
+            db.session.commit()
+
+        resp = self._get(f"?emp_id={self.mgr_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_home_only_user_with_non_manager_profile_gets_400(self):
+        """绑定工号不是管理人员时，纯首页账号不能借其查看普通员工日历。"""
+        with self.app.app_context():
+            home_user = User.query.filter_by(username="homeuser").first()
+            home_user.profile_emp_no = "E001"
+            db.session.commit()
+
+        resp = self._get(f"?emp_id={self.emp_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

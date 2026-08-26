@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import { AnimatePresence, motion } from "motion/react";
 
 import "../../styles/components/notification.css";
 
@@ -113,9 +114,11 @@ function NotificationContainer({
 }) {
   return (
     <div className="notification-container">
-      {notifications.map((item) => (
-        <NotificationItemComponent key={item.id} item={item} onClose={onClose} />
-      ))}
+      <AnimatePresence>
+        {notifications.map((item) => (
+          <NotificationItemComponent key={item.id} item={item} onClose={onClose} />
+        ))}
+      </AnimatePresence>
     </div>
   );
 }
@@ -171,33 +174,10 @@ function NotificationItemComponent({
   onClose: (id: string) => void;
 }) {
   const [isHovered, setIsHovered] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // 独立的退出动画定时器 ref，避免与自动关闭定时器互相干扰。
-  const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const duration = item.duration ?? 10000;
 
-  // 组件卸载时清理退出动画定时器，避免卸载后触发 onClose 调用父组件 setState。
-  useEffect(() => {
-    return () => {
-      if (leaveTimerRef.current) {
-        clearTimeout(leaveTimerRef.current);
-        leaveTimerRef.current = null;
-      }
-    };
-  }, []);
-
-  // 退出淡出函数：先播放 200ms 的 CSS 动画，然后销毁
-  const handleClose = useCallback(() => {
-    setIsLeaving(true);
-    leaveTimerRef.current = setTimeout(() => {
-      onClose(item.id);
-    }, 200); // 与 CSS 的渐隐过渡时间保持一致
-  }, [item.id, onClose]);
-
-  // 控制自动关闭定时器：
-  // 当鼠标悬停时清除定时器；鼠标移出后重新开始计时
   useEffect(() => {
     if (isHovered) {
       if (timerRef.current) {
@@ -206,7 +186,7 @@ function NotificationItemComponent({
       }
     } else {
       timerRef.current = setTimeout(() => {
-        handleClose();
+        onClose(item.id);
       }, duration);
     }
 
@@ -215,11 +195,15 @@ function NotificationItemComponent({
         clearTimeout(timerRef.current);
       }
     };
-  }, [isHovered, duration, handleClose]);
+  }, [isHovered, duration, item.id, onClose]);
 
   return (
-    <div
-      className={`notification-item notification-${item.type}${isLeaving ? " is-leaving" : ""}`}
+    <motion.div
+      animate={{ opacity: 1, x: 0 }}
+      className={`notification-item notification-${item.type}`}
+      exit={{ opacity: 0, x: "100%" }}
+      initial={{ opacity: 0, x: "100%" }}
+      layout
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -227,25 +211,25 @@ function NotificationItemComponent({
         <NotificationIcon type={item.type} />
       </div>
       <div className="notification-content">{item.message}</div>
-      <button className="notification-close-btn" onClick={handleClose} aria-label="关闭">
+      <button className="notification-close-btn" onClick={() => onClose(item.id)} aria-label="关闭">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
           <line x1="18" y1="6" x2="6" y2="18" />
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
 
-      {/* 倒计时进度条：鼠标悬停时保持在 100%，移出后伴随定时器重新执行动画 */}
-      {!isHovered && !isLeaving ? (
+      {/* 倒计时进度条：保留 CSS 驱动；悬停暂停，退场时随整条通知移除 */}
+      {!isHovered ? (
         <div
           className="notification-progress-bar"
           style={{ animationDuration: `${duration}ms` }}
         />
-      ) : !isLeaving ? (
+      ) : (
         <div
           className="notification-progress-bar"
           style={{ transform: "scaleX(1)", animation: "none" }}
         />
-      ) : null}
-    </div>
+      )}
+    </motion.div>
   );
 }
