@@ -55,6 +55,9 @@ const attendanceSourceLabels: Record<string, string> = {
   auto_fallback: "自动回退",
 };
 
+const resignPreviewLabelStyle = { display: "inline-block", minWidth: "72px", color: "#94a3b8" };
+const resignPreviewValueStyle = { color: "#334155", fontWeight: 600 };
+
 function todayLocalDate(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -522,6 +525,11 @@ export default function EmployeesPage() {
     { label: "操作", sortable: false },
   ];
   const employmentLabel = (row: AdminEmployee) => (row.resigned_at ? `已离职 ${row.resigned_at}` : "在职");
+
+  const resignEmpNoTrimmed = resignEmpNo.trim();
+  const resignMatchedEmployee = resignEmpNoTrimmed
+    ? rows.find((row) => row.emp_no === resignEmpNoTrimmed) ?? null
+    : null;
 
   function renderRowActions(row: AdminEmployee) {
     const menuOpen = openMenuId === row.id;
@@ -1291,6 +1299,47 @@ export default function EmployeesPage() {
                   value={resignEmpNo}
                 />
               </label>
+              {resignEmpNoTrimmed ? (
+                <div
+                  data-testid="resign-employee-preview"
+                  style={{
+                    padding: "10px 16px",
+                    background: "#f1f5f9",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: "8px",
+                    fontSize: "13px",
+                    lineHeight: "1.9",
+                    color: "#475569",
+                  }}
+                >
+                  {resignMatchedEmployee ? (
+                    <>
+                      <div>
+                        <span style={resignPreviewLabelStyle}>姓名</span>
+                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.name}</strong>
+                      </div>
+                      <div>
+                        <span style={resignPreviewLabelStyle}>部门</span>
+                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.dept_name || "未绑定部门"}</strong>
+                      </div>
+                      <div>
+                        <span style={resignPreviewLabelStyle}>人员类型</span>
+                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.is_manager ? "管理人员" : "普通员工"}</strong>
+                      </div>
+                      <div>
+                        <span style={resignPreviewLabelStyle}>在职状态</span>
+                        {resignMatchedEmployee.resigned_at ? (
+                          <strong style={{ color: "#dc2626", fontWeight: 600 }}>已于 {resignMatchedEmployee.resigned_at} 离职，无需重复办理</strong>
+                        ) : (
+                          <strong style={resignPreviewValueStyle}>在职</strong>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <span style={{ color: "#dc2626" }}>未找到编号为 {resignEmpNoTrimmed} 的员工，请核对后重新输入</span>
+                  )}
+                </div>
+              ) : null}
               <label className="account-field" style={{ margin: 0 }}>
                 <span className="account-field-label">离职日期</span>
                 <input
