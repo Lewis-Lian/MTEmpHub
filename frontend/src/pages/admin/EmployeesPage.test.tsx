@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFetchEmployees = vi.hoisted(() => vi.fn());
@@ -105,5 +105,42 @@ describe("EmployeesPage 离职功能", () => {
     fireEvent.click(resignButtons[resignButtons.length - 1]);
 
     expect(await screen.findByLabelText("离职人员编号")).toHaveValue("E100");
+  });
+
+  it("办理离职输入在职员工工号后回显灰色只读信息供核对", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号"), { target: { value: "E100" } });
+
+    const preview = await screen.findByTestId("resign-employee-preview");
+    expect(within(preview).getByText("在职员工")).toBeTruthy();
+    expect(within(preview).getByText("行政部")).toBeTruthy();
+    expect(within(preview).getByText("普通员工")).toBeTruthy();
+    expect(within(preview).getByText("在职")).toBeTruthy();
+  });
+
+  it("办理离职输入未登记工号时提示未找到", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号"), { target: { value: "E999" } });
+
+    const preview = await screen.findByTestId("resign-employee-preview");
+    expect(within(preview).getByText(/未找到/)).toBeTruthy();
+  });
+
+  it("办理离职输入已离职工号时回显信息并警示已离职", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号"), { target: { value: "E200" } });
+
+    const preview = await screen.findByTestId("resign-employee-preview");
+    expect(within(preview).getByText("已离职员工")).toBeTruthy();
+    expect(within(preview).getByText(/已于 2026-08-31 离职/)).toBeTruthy();
   });
 });
