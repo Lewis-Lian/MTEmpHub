@@ -248,17 +248,23 @@ export default function EmployeesPage() {
 
   async function submitResign(event: FormEvent) {
     event.preventDefault();
-    const empNo = resignEmpNo.trim();
-    if (!empNo) {
-      notification.warning("请输入人员编号");
+    const lookupValue = resignEmpNo.trim();
+    if (!lookupValue) {
+      notification.warning("请输入人员编号或姓名");
       return;
     }
     if (!resignDate) {
       notification.warning("请选择离职日期");
       return;
     }
+    const matches = rows.filter((row) => row.emp_no === lookupValue || row.name === lookupValue);
+    if (matches.length > 1) {
+      notification.warning("该姓名对应多名员工，请输入人员编号精确办理");
+      return;
+    }
+    const empNo = matches.length === 1 ? matches[0].emp_no : lookupValue;
     const isConfirmed = await confirm({
-      message: `确定为员工 ${empNo} 办理离职（离职日期 ${resignDate}）？办理后其关联账号将被禁用，各查询与统计页面不再显示该员工。`,
+      message: `确定为员工 ${empNo}${matches.length === 1 ? ` ${matches[0].name}` : ""} 办理离职（离职日期 ${resignDate}）？办理后其关联账号将被禁用，各查询与统计页面不再显示该员工。`,
       type: "danger",
     });
     if (!isConfirmed) {
@@ -526,10 +532,10 @@ export default function EmployeesPage() {
   ];
   const employmentLabel = (row: AdminEmployee) => (row.resigned_at ? `已离职 ${row.resigned_at}` : "在职");
 
-  const resignEmpNoTrimmed = resignEmpNo.trim();
-  const resignMatchedEmployee = resignEmpNoTrimmed
-    ? rows.find((row) => row.emp_no === resignEmpNoTrimmed) ?? null
-    : null;
+  const resignLookupValue = resignEmpNo.trim();
+  const resignMatches = resignLookupValue
+    ? rows.filter((row) => row.emp_no === resignLookupValue || row.name === resignLookupValue)
+    : [];
 
   function renderRowActions(row: AdminEmployee) {
     const menuOpen = openMenuId === row.id;
@@ -1289,17 +1295,17 @@ export default function EmployeesPage() {
             </div>
             <div className="admin-stack">
               <label className="account-field" style={{ margin: 0 }}>
-                <span className="account-field-label">离职人员编号</span>
+                <span className="account-field-label">离职人员编号/姓名</span>
                 <input
                   className="account-input"
                   id="resignEmpNo"
                   onChange={(event) => setResignEmpNo(event.target.value)}
-                  placeholder="请输入离职人员编号"
+                  placeholder="请输入人员编号或姓名"
                   required
                   value={resignEmpNo}
                 />
               </label>
-              {resignEmpNoTrimmed ? (
+              {resignLookupValue ? (
                 <div
                   data-testid="resign-employee-preview"
                   style={{
@@ -1312,31 +1318,45 @@ export default function EmployeesPage() {
                     color: "#475569",
                   }}
                 >
-                  {resignMatchedEmployee ? (
+                  {resignMatches.length === 1 ? (
                     <>
                       <div>
+                        <span style={resignPreviewLabelStyle}>人员编号</span>
+                        <strong style={resignPreviewValueStyle}>{resignMatches[0].emp_no}</strong>
+                      </div>
+                      <div>
                         <span style={resignPreviewLabelStyle}>姓名</span>
-                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.name}</strong>
+                        <strong style={resignPreviewValueStyle}>{resignMatches[0].name}</strong>
                       </div>
                       <div>
                         <span style={resignPreviewLabelStyle}>部门</span>
-                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.dept_name || "未绑定部门"}</strong>
+                        <strong style={resignPreviewValueStyle}>{resignMatches[0].dept_name || "未绑定部门"}</strong>
                       </div>
                       <div>
                         <span style={resignPreviewLabelStyle}>人员类型</span>
-                        <strong style={resignPreviewValueStyle}>{resignMatchedEmployee.is_manager ? "管理人员" : "普通员工"}</strong>
+                        <strong style={resignPreviewValueStyle}>{resignMatches[0].is_manager ? "管理人员" : "普通员工"}</strong>
                       </div>
                       <div>
                         <span style={resignPreviewLabelStyle}>在职状态</span>
-                        {resignMatchedEmployee.resigned_at ? (
-                          <strong style={{ color: "#dc2626", fontWeight: 600 }}>已于 {resignMatchedEmployee.resigned_at} 离职，无需重复办理</strong>
+                        {resignMatches[0].resigned_at ? (
+                          <strong style={{ color: "#dc2626", fontWeight: 600 }}>已于 {resignMatches[0].resigned_at} 离职，无需重复办理</strong>
                         ) : (
                           <strong style={resignPreviewValueStyle}>在职</strong>
                         )}
                       </div>
                     </>
+                  ) : resignMatches.length > 1 ? (
+                    <>
+                      <div style={{ color: "#dc2626" }}>该姓名对应 {resignMatches.length} 名员工，请输入人员编号精确办理：</div>
+                      {resignMatches.map((row) => (
+                        <div key={row.id}>
+                          <strong style={resignPreviewValueStyle}>{row.emp_no}</strong>
+                          {` ${row.name} · ${row.dept_name || "未绑定部门"} · ${row.resigned_at ? `已于 ${row.resigned_at} 离职` : "在职"}`}
+                        </div>
+                      ))}
+                    </>
                   ) : (
-                    <span style={{ color: "#dc2626" }}>未找到编号为 {resignEmpNoTrimmed} 的员工，请核对后重新输入</span>
+                    <span style={{ color: "#dc2626" }}>未找到编号/姓名为 {resignLookupValue} 的员工，请核对后重新输入</span>
                   )}
                 </div>
               ) : null}
