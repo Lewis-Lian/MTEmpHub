@@ -32,8 +32,11 @@ export function fetchAdminRows<T>(path: string): Promise<T> {
   return apiRequest<T>(path);
 }
 
-export async function fetchAdminEmployees(): Promise<AdminEmployee[]> {
-  return expectArrayResponse<AdminEmployee>(await apiRequest<unknown>("/api/admin/employees"), "员工列表");
+export type EmployeeStatusFilter = "active" | "resigned" | "all";
+
+export async function fetchAdminEmployees(status?: EmployeeStatusFilter): Promise<AdminEmployee[]> {
+  const path = status ? `/api/admin/employees?status=${status}` : "/api/admin/employees";
+  return expectArrayResponse<AdminEmployee>(await apiRequest<unknown>(path), "员工列表");
 }
 
 export async function fetchAdminDepartments(): Promise<AdminDepartment[]> {
@@ -80,6 +83,19 @@ export function deleteAdminEmployee(employeeId: number): Promise<{ status: strin
 export function batchAdminEmployees(payload: Record<string, unknown>): Promise<{ status: string; affected: number }> {
   return apiRequest<{ status: string; affected: number }>("/api/admin/employees/batch", {
     body: payload,
+    method: "POST",
+  });
+}
+
+export function resignAdminEmployee(payload: { emp_no: string; resigned_at: string }): Promise<{ status: string; employee: AdminEmployee }> {
+  return apiRequest<{ status: string; employee: AdminEmployee }>("/api/admin/employees/resign", {
+    body: payload,
+    method: "POST",
+  });
+}
+
+export function reinstateAdminEmployee(employeeId: number): Promise<{ status: string; employee: AdminEmployee }> {
+  return apiRequest<{ status: string; employee: AdminEmployee }>(`/api/admin/employees/${employeeId}/reinstate`, {
     method: "POST",
   });
 }
