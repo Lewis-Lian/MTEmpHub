@@ -5,7 +5,7 @@ import os
 import subprocess
 from collections import defaultdict
 from io import BytesIO
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from flask import abort, jsonify, request, send_file, g
@@ -1128,6 +1128,78 @@ def delete_shift(shift_id: int):
     db.session.delete(shift)
     db.session.commit()
     return jsonify({"status": "ok"})
+
+
+RESIGN_DISABLE_REASON = "employee_resigned"
+
+
+def _disable_accounts_for_resignation(employee: Employee) -> None:
+    for assignment in UserEmployeeAssignment.query.filter_by(emp_id=employee.id).all():
+        user = assignment.user
+        if user is None or user.role == "admin":
+            continue
+        if user.is_login_disabled():
+            continue
+        user.login_disabled_until_admin_unlock = True
+        user.login_disabled_reason = RESIGN_DISABLE_REASON
+
+
+def _release_resignation_lock_for_users(employee: Employee) -> None:
+    for assignment in UserEmployeeAssignment.query.filter_by(emp_id=employee.id).all():
+        user = assignment.user
+        if user is None or user.login_disabled_reason != RESIGN_DISABLE_REASON:
+            continue
+        still_bound_to_resigned = (
+            UserEmployeeAssignment.query.filter(
+                UserEmployeeAssignment.user_id == user.id,
+                UserEmployeeAssignment.emp_id != employee.id,
+            )
+            .join(Employee, Employee.id == UserEmployeeAssignment.emp_id)
+            .filter(Employee.resigned_at.isnot(None))
+            .first()
+        )
+        if still_bound_to_resigned:
+            continue
+        user.login_disabled_until_admin_unlock = False
+        user.login_disabled_reason = None
+
+
+def resign_employee_by_emp_no():
+    data = request.json or {}
+    emp_no = (data.get("emp_no") or "").strip()
+    if not emp_no:
+        return jsonify({"error": "请输入工号"}), 400
+
+    raw_date = (data.get("resigned_at") or "").strip()
+    if raw_date:
+        try:
+            resigned_at = datetime.strptime(raw_date, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "离职日期格式不正确，应为 YYYY-MM-DD"}), 400
+    else:
+        resigned_at = date.today()
+
+    employee = Employee.query.filter_by(emp_no=emp_no).first()
+    if not employee:
+        return jsonify({"error": "工号不存在"}), 400
+    if employee.resigned_at:
+        return jsonify({"error": "该员工已离职"}), 400
+
+    employee.resigned_at = resigned_at
+    _disable_accounts_for_resignation(employee)
+    db.session.commit()
+    return jsonify({"status": "ok", "employee": _serialize_employee(employee)})
+
+
+def reinstate_employee(employee_id: int):
+    employee = _require_model(Employee, employee_id)
+    if not employee.resigned_at:
+        return jsonify({"error": "该员工未离职"}), 400
+
+    employee.resigned_at = None
+    _release_resignation_lock_for_users(employee)
+    db.session.commit()
+    return jsonify({"status": "ok", "employee": _serialize_employee(employee)})
 
 
 def employees_list():

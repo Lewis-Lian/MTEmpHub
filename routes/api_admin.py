@@ -31,6 +31,8 @@ from routes.admin_core import (
     list_account_sets,
     list_shifts,
     lock_account_set,
+    reinstate_employee,
+    resign_employee_by_emp_no,
     manager_annual_leave_records,
     manager_overtime_records,
     update_manager_annual_leave_record,
@@ -492,6 +494,18 @@ def employees_delete(employee_id: int):
 @admin_required
 def employees_batch():
     return batch_operate_employees()
+
+
+@api_admin_bp.post("/employees/resign")
+@admin_required
+def employees_resign():
+    return resign_employee_by_emp_no()
+
+
+@api_admin_bp.post("/employees/<int:employee_id>/reinstate")
+@admin_required
+def employees_reinstate(employee_id: int):
+    return reinstate_employee(employee_id)
 
 
 @api_admin_bp.get("/employee-attendance-overrides")
