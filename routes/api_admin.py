@@ -78,6 +78,7 @@ from routes.admin_attendance_overrides import (
     save_manager_attendance_override_record_api,
     daily_attendance_override_calendar_api,
     delete_daily_attendance_override_record_api,
+    save_daily_attendance_override_batch_api,
     save_daily_attendance_override_record_api,
     late_offset_candidates_api,
     late_offset_clear_api,
@@ -567,6 +568,12 @@ def daily_attendance_override_calendar():
 @admin_required
 def daily_attendance_override_record_put():
     return save_daily_attendance_override_record_api()
+
+
+@api_admin_bp.put("/attendance-override-daily/batch")
+@admin_required
+def daily_attendance_override_batch_put():
+    return save_daily_attendance_override_batch_api()
 
 
 @api_admin_bp.delete("/attendance-override-daily/record")

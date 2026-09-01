@@ -356,4 +356,35 @@ describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
     expect(getCell("2026-07-20")).toHaveClass("is-bg-attendance");
     expect(within(getCell("2026-07-20")).getByText("修正")).toBeInTheDocument();
   });
+
+  it("菜票修正：is_meal_ticket 为 true 的格子显示「菜」徽章，false/未修正不显示", () => {
+    const data: AttendanceCalendarData = {
+      ...DATA,
+      days: [
+        { ...DATA.days[0], date: "2026-07-10", override: { is_meal_ticket: true } },
+        { ...DATA.days[0], date: "2026-07-11", override: { is_meal_ticket: false } },
+        { ...DATA.days[0], date: "2026-07-12", override: { is_meal_ticket: true, status: "全勤" } },
+      ],
+      overtimes: [],
+      leaves: [],
+    };
+    render(<AttendanceCalendarGrid data={data} />);
+    expect(within(getCell("2026-07-10")).getByText("菜")).toHaveClass("cal-badge-meal");
+    expect(within(getCell("2026-07-11")).queryByText("菜")).toBeNull();
+    // 与其他修正共存时同格展示
+    expect(within(getCell("2026-07-12")).getByText("菜")).toBeInTheDocument();
+    expect(within(getCell("2026-07-12")).getByText("修正")).toBeInTheDocument();
+  });
+
+  it("multiSelectedDates 高亮多选格子", () => {
+    render(
+      <AttendanceCalendarGrid
+        data={DATA}
+        multiSelectedDates={["2026-07-01", "2026-07-03"]}
+      />,
+    );
+    expect(getCell("2026-07-01")).toHaveClass("is-multi-selected");
+    expect(getCell("2026-07-03")).toHaveClass("is-multi-selected");
+    expect(getCell("2026-07-02")).not.toHaveClass("is-multi-selected");
+  });
 });

@@ -281,6 +281,14 @@ def _parse_daily_override_payload(data: dict, employee) -> tuple[dict, tuple | N
     else:
         values["is_evening_overtime"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
 
+    flag = data.get("is_meal_ticket")
+    if flag in (None, ""):
+        values["is_meal_ticket"] = None
+    elif isinstance(flag, bool):
+        values["is_meal_ticket"] = flag
+    else:
+        values["is_meal_ticket"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
+
     values["remark"] = (data.get("remark") or "").strip()
     return values, None
 
@@ -348,6 +356,73 @@ def save_daily_attendance_override_record_api():
         if employee.is_manager:
             # 逐日修正影响出勤/假种天数，需同步重算加班查询页数据源
             admin_module._sync_manager_month_stats(month)
+
+    return _daily_record_response(employee, month)
+
+
+def save_daily_attendance_override_batch_api():
+    """批量修正"当天算菜票"：多选日期只改 is_meal_ticket 位，保留同日其他修正字段。"""
+    from routes import admin_core as admin_module
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+
+    data = request.json or {}
+    emp_id = int(data.get("emp_id") or 0)
+    month = admin_module._validate_month(data.get("month"))
+    if not emp_id or not month:
+        return jsonify({"error": "请选择员工和有效月份"}), 400
+
+    flag = data.get("is_meal_ticket")
+    if not isinstance(flag, bool):
+        return jsonify({"error": "is_meal_ticket 必须为布尔值"}), 400
+
+    parsed_dates: list = []
+    for item in data.get("dates") or []:
+        text = str(item or "").strip()
+        try:
+            record_date = datetime.strptime(text, "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": f"无效的日期：{text}"}), 400
+        if record_date.strftime("%Y-%m") != month:
+            return jsonify({"error": f"日期与月份不一致：{text}"}), 400
+        if record_date not in parsed_dates:
+            parsed_dates.append(record_date)
+    if not parsed_dates:
+        return jsonify({"error": "请选择至少一个日期"}), 400
+
+    account_set = admin_module._account_set_for_month(month)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "批量保存菜票修正")
+    if locked_error:
+        return locked_error
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
+
+    rows = {
+        row.record_date: row
+        for row in DailyAttendanceOverride.query.filter(
+            DailyAttendanceOverride.emp_id == emp_id,
+            DailyAttendanceOverride.record_date.in_(parsed_dates),
+        ).all()
+    }
+    for record_date in parsed_dates:
+        row = rows.get(record_date)
+        before_values: dict[str, object] = {"record_date": record_date.isoformat()}
+        for field in DAILY_OVERRIDE_FIELDS:
+            before_values[field] = getattr(row, field) if row else None
+        if row:
+            before_values["remark"] = row.remark or ""
+        after_values = dict(before_values)
+        after_values["is_meal_ticket"] = flag
+        if not admin_module._has_override_state_changes(before_values, after_values):
+            continue
+        if not row:
+            row = DailyAttendanceOverride(emp_id=emp_id, record_date=record_date)
+            admin_module.db.session.add(row)
+            rows[record_date] = row
+        row.is_meal_ticket = flag
+        row.updated_by = admin_module.g.current_user.id
+        admin_module._record_override_history("daily", emp_id, month, "meal_ticket_batch", before_values, after_values)
+    admin_module.db.session.commit()
 
     return _daily_record_response(employee, month)
 

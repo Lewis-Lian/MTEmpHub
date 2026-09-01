@@ -43,6 +43,7 @@ MANAGER_LEAVE_FIELD_BY_STATUS = {
 DAILY_OVERRIDE_FIELDS = (
     "status",
     "is_evening_overtime",
+    "is_meal_ticket",
     "work_hours",
     "late_minutes",
     "early_leave_minutes",
