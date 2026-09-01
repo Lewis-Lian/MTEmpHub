@@ -226,3 +226,55 @@ class TestReinstateApi(EmployeeResignationTestBase):
             user = db.session.get(User, user_id)
             self.assertTrue(user.is_login_disabled())
             self.assertEqual(user.login_disabled_reason, "too_many_failed_attempts")
+
+
+class TestResignationQueryFilter(EmployeeResignationTestBase):
+    def test_query_bootstrap_excludes_resigned(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/query/bootstrap")
+
+        self.assertEqual(response.status_code, 200)
+        emp_nos = {row["emp_no"] for row in response.get_json()["employees"]}
+        self.assertIn("E100", emp_nos)
+        self.assertNotIn("E200", emp_nos)
+
+    def test_employees_list_defaults_to_active(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/admin/employees")
+
+        emp_nos = {row["emp_no"] for row in response.get_json()}
+        self.assertEqual(emp_nos, {"E100"})
+
+    def test_employees_list_resigned_only(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/admin/employees?status=resigned")
+
+        emp_nos = {row["emp_no"] for row in response.get_json()}
+        self.assertEqual(emp_nos, {"E200"})
+
+    def test_employees_list_all(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/admin/employees?status=all")
+
+        emp_nos = {row["emp_no"] for row in response.get_json()}
+        self.assertEqual(emp_nos, {"E100", "E200"})
+
+    def test_manager_attendance_excludes_resigned(self) -> None:
+        self._login()
+        with self.app.app_context():
+            active = db.session.get(Employee, self.active_emp_id)
+            resigned = db.session.get(Employee, self.resigned_emp_id)
+            active.is_manager = True
+            resigned.is_manager = True
+            db.session.commit()
+
+        response = self.client.get("/api/query/manager-attendance?month=2026-08")
+
+        self.assertEqual(response.status_code, 200)
+        text = str(response.get_json())
+        self.assertIn("在职员工", text)
+        self.assertNotIn("已离职员工", text)

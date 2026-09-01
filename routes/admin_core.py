@@ -1209,6 +1209,11 @@ def employees_list():
         if not allowed_ids:
             return jsonify([])
         query = query.filter(Employee.id.in_(allowed_ids))
+    status = (request.args.get("status") or "active").strip()
+    if status == "active":
+        query = query.filter(Employee.resigned_at.is_(None))
+    elif status == "resigned":
+        query = query.filter(Employee.resigned_at.isnot(None))
     rows = _unique_employees(query.order_by(Employee.emp_no.asc()).all())
     return jsonify([_serialize_employee(e) for e in rows])
 

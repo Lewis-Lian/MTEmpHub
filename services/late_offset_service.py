@@ -145,8 +145,9 @@ def _day_offset_target(
 
 def late_offset_candidates(month: str, emp_ids: list[int] | None = None) -> list[dict[str, object]]:
     """管理人员当月所有迟到日的冲抵候选；emp_ids 为 None 查全部管理人员，空列表返回空。"""
-    query = Employee.query.filter(Employee.is_manager.is_(True)).order_by(
-        Employee.emp_no.asc(), Employee.name.asc()
+    query = (
+        Employee.query.filter(Employee.is_manager.is_(True), Employee.resigned_at.is_(None))
+        .order_by(Employee.emp_no.asc(), Employee.name.asc())
     )
     if emp_ids is not None:
         if not emp_ids:

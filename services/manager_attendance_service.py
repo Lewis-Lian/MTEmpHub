@@ -536,7 +536,10 @@ def build_manager_rows(
       工伤不进考勤天数，因而被当作缺勤处理：缺勤天数 = 本月天数 − 出勤天数，
       按「加班额度 → 年假额度 → 事/病假」顺序扣减（厂休重叠不减免工伤天数）。
     """
-    query = Employee.query.options(joinedload(Employee.department)).filter(Employee.is_manager.is_(True))
+    query = (
+        Employee.query.options(joinedload(Employee.department))
+        .filter(Employee.is_manager.is_(True), Employee.resigned_at.is_(None))
+    )
     if emp_ids is not None:
         if not emp_ids:
             return []

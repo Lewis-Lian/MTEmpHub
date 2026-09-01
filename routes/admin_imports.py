@@ -518,6 +518,12 @@ def export_employees_xlsx():
     if employee_ids:
         query = query.filter(admin_module.Employee.id.in_(employee_ids))
 
+    status = (request.args.get("status") or "active").strip()
+    if status == "active":
+        query = query.filter(admin_module.Employee.resigned_at.is_(None))
+    elif status == "resigned":
+        query = query.filter(admin_module.Employee.resigned_at.isnot(None))
+
     employee_type = (request.args.get("type") or "").strip()
     if employee_type == "employee":
         query = query.filter(admin_module.Employee.is_manager.is_(False))
