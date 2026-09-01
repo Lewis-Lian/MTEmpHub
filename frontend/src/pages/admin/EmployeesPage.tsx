@@ -21,6 +21,9 @@ import DepartmentPicker from "../../components/query/DepartmentPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+// 本页 main 复用 employee-dashboard-page 类名，下拉框样式全部来自查询页共享样式；
+// 不显式引入时，直接进入本页（未先访问过查询页）会缺失这些样式
+import "../query/dashboard-shared.css";
 import type { AdminDepartment, AdminEmployee, AdminShift } from "../../types/admin";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
 
@@ -804,6 +807,7 @@ export default function EmployeesPage() {
               id="employeeKeywordInput"
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="工号 / 姓名"
+              style={{ height: "38px", borderRadius: "8px", boxSizing: "border-box", border: "1px solid #cbd5e1", padding: "0 12px" }}
               value={keyword}
             />
           </div>
