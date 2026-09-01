@@ -5,6 +5,8 @@ import {
   clearAdminDailyOverride,
   fetchAdminDailyOverrideCalendar,
   saveAdminDailyOverride,
+  saveAdminDailyOverrideBatch,
+  type DailyOverrideBatchPayload,
   type DailyOverrideSavePayload,
 } from "../../api/admin";
 import AttendanceCalendarGrid from "../attendance/AttendanceCalendarGrid";
@@ -54,6 +56,7 @@ interface DetailFormState {
   lateMinutes: string;
   earlyLeaveMinutes: string;
   eveningOvertime: boolean;
+  mealTicket: boolean;
   remark: string;
 }
 
@@ -62,6 +65,7 @@ const EMPTY_FORM: DetailFormState = {
   lateMinutes: "",
   earlyLeaveMinutes: "",
   eveningOvertime: false,
+  mealTicket: false,
   remark: "",
 };
 
@@ -83,6 +87,8 @@ export default function AttendanceOverrideCalendarModal({
   const [detailExpanded, setDetailExpanded] = useState(true);
   const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [multiSelectedDates, setMultiSelectedDates] = useState<string[]>([]);
 
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const selectedDay = useMemo(
@@ -126,6 +132,7 @@ export default function AttendanceOverrideCalendarModal({
       lateMinutes: currentOverride?.late_minutes == null ? "" : String(currentOverride.late_minutes),
       earlyLeaveMinutes: currentOverride?.early_leave_minutes == null ? "" : String(currentOverride.early_leave_minutes),
       eveningOvertime: Boolean(currentOverride?.is_evening_overtime),
+      mealTicket: Boolean(currentOverride?.is_meal_ticket),
       remark: currentOverride?.remark ?? "",
     });
     setDetailExpanded(true);
@@ -140,6 +147,7 @@ export default function AttendanceOverrideCalendarModal({
       late_minutes: form.lateMinutes,
       early_leave_minutes: form.earlyLeaveMinutes,
       is_evening_overtime: form.eveningOvertime,
+      is_meal_ticket: form.mealTicket,
       remark: form.remark,
       ...overrides,
     };
@@ -217,8 +225,18 @@ export default function AttendanceOverrideCalendarModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 首次点击格子仅选中（展开当天信息），再次点击同一格才循环切换出勤状态；假种在下方面板设置
+  // 首次点击格子仅选中（展开当天信息），再次点击同一格才循环切换出勤状态；假种在下方面板设置；
+  // 多选模式下点击格子只做勾选/取消，不触发选中与状态循环
   function handleCellClick(date: string) {
+    if (isMultiSelect) {
+      if (isLocked) {
+        return;
+      }
+      setMultiSelectedDates((current) =>
+        current.includes(date) ? current.filter((item) => item !== date) : [...current, date],
+      );
+      return;
+    }
     const isFirstClick = selectedDate !== date;
     setSelectedDate(date);
     if (isFirstClick || isLocked || !calendar) {
@@ -234,6 +252,7 @@ export default function AttendanceOverrideCalendarModal({
         date,
         status: nextStatus,
         is_evening_overtime: dayOverride?.is_evening_overtime ?? undefined,
+        is_meal_ticket: dayOverride?.is_meal_ticket ?? undefined,
         work_hours: dayOverride?.work_hours ?? "",
         late_minutes: dayOverride?.late_minutes ?? "",
         early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
@@ -241,6 +260,31 @@ export default function AttendanceOverrideCalendarModal({
       },
       `已标记 ${nextStatus}`,
     );
+  }
+
+  // 多选模式下批量标记/取消菜票，成功后用后端日历刷新并清空勾选
+  async function handleBatchMealTicket(flag: boolean) {
+    if (multiSelectedDates.length === 0 || isSaving) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const payload: DailyOverrideBatchPayload = {
+        month,
+        emp_id: employee.id,
+        dates: [...multiSelectedDates],
+        is_meal_ticket: flag,
+      };
+      const response = await saveAdminDailyOverrideBatch<unknown>(payload);
+      setCalendar(response.calendar);
+      setMultiSelectedDates([]);
+      onRowRefresh(response.row);
+      notification.success(flag ? "已批量标记算菜票" : "已批量取消菜票");
+    } catch (caughtError: unknown) {
+      notification.error(caughtError instanceof Error ? caughtError.message : "批量保存失败");
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function handleClear() {
@@ -297,8 +341,54 @@ export default function AttendanceOverrideCalendarModal({
             ) : calendar ? (
               <div className="attendance-override-calendar-layout">
                 <div className="attendance-override-calendar-main">
+                  <div className="attendance-override-multiselect-bar">
+                    {isMultiSelect ? (
+                      <>
+                        <span className="attendance-override-multiselect-count">{`已选 ${multiSelectedDates.length} 天`}</span>
+                        <button
+                          className="account-action-button account-action-button--primary"
+                          disabled={isLocked || isSaving || multiSelectedDates.length === 0}
+                          onClick={() => void handleBatchMealTicket(true)}
+                          type="button"
+                        >
+                          批量算菜票
+                        </button>
+                        <button
+                          className="account-action-button"
+                          disabled={isLocked || isSaving || multiSelectedDates.length === 0}
+                          onClick={() => void handleBatchMealTicket(false)}
+                          type="button"
+                        >
+                          批量取消菜票
+                        </button>
+                        <button
+                          className="daypanel-toggle"
+                          onClick={() => {
+                            setIsMultiSelect(false);
+                            setMultiSelectedDates([]);
+                          }}
+                          type="button"
+                        >
+                          退出多选
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className="account-action-button"
+                        disabled={isLocked || isSaving}
+                        onClick={() => {
+                          setIsMultiSelect(true);
+                          setMultiSelectedDates([]);
+                        }}
+                        type="button"
+                      >
+                        多选
+                      </button>
+                    )}
+                  </div>
                   <AttendanceCalendarGrid
                     data={calendar}
+                    multiSelectedDates={isMultiSelect ? multiSelectedDates : []}
                     onCellSelect={handleCellClick}
                     selectedDate={selectedDate}
                   />
@@ -340,6 +430,7 @@ export default function AttendanceOverrideCalendarModal({
       currentOverride &&
         (currentOverride.status ||
           currentOverride.is_evening_overtime != null ||
+          currentOverride.is_meal_ticket != null ||
           currentOverride.work_hours != null ||
           currentOverride.late_minutes != null ||
           currentOverride.early_leave_minutes != null ||
@@ -441,6 +532,16 @@ export default function AttendanceOverrideCalendarModal({
                 <span className="daypanel-field-label">晚上加班</span>
                 <span className="daypanel-field-sub">0.5 出勤</span>
               </label>
+              <label className="daypanel-field daypanel-field--check" title="标记当天算菜票，仅作标记不影响出勤统计">
+                <input
+                  checked={form.mealTicket}
+                  disabled={isLocked || isSaving}
+                  onChange={(event) => setForm((current) => ({ ...current, mealTicket: event.target.checked }))}
+                  type="checkbox"
+                />
+                <span className="daypanel-field-label">算菜票</span>
+                <span className="daypanel-field-sub">仅标记</span>
+              </label>
               <label className="daypanel-field">
                 <span className="daypanel-field-label">工时（小时）</span>
                 <input
@@ -492,6 +593,7 @@ export default function AttendanceOverrideCalendarModal({
                         late_minutes: form.lateMinutes === "" ? null : Number(form.lateMinutes),
                         early_leave_minutes: form.earlyLeaveMinutes === "" ? null : Number(form.earlyLeaveMinutes),
                         is_evening_overtime: form.eveningOvertime,
+                        is_meal_ticket: form.mealTicket,
                         remark: form.remark,
                       });
                     }

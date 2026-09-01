@@ -4573,6 +4573,19 @@ input[type="checkbox"] {
   gap: 12px;
   align-items: start;
 }
+/* 日历上方多选工具栏：进入多选后勾选日期批量算/取消菜票 */
+.attendance-override-multiselect-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.attendance-override-multiselect-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1e7f4f;
+}
 .attendance-override-calendar-side {
   position: sticky;
   top: 0;

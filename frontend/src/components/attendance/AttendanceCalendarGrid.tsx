@@ -23,15 +23,18 @@ interface AttendanceCalendarGridProps {
   data: AttendanceCalendarData;
   /** 外部选中日期（修正模式高亮），不传时组件内部自管理（明细弹层） */
   selectedDate?: string | null;
+  /** 外部多选日期（修正模式批量勾选高亮），仅高亮不改变点击行为 */
+  multiSelectedDates?: string[];
   /** 提供时点击格子走外部回调，不弹内部明细弹层 */
   onCellSelect?: (date: string) => void;
 }
 
-export default function AttendanceCalendarGrid({ data, selectedDate, onCellSelect }: AttendanceCalendarGridProps) {
+export default function AttendanceCalendarGrid({ data, selectedDate, multiSelectedDates, onCellSelect }: AttendanceCalendarGridProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
   const cells = useMemo(() => buildCells(data), [data]);
   // selectedDate 传入（含 null）即由外部控制高亮；未传时组件内部自管理
   const activeSelectedDate = selectedDate !== undefined ? selectedDate : internalSelectedDate;
+  const multiSelectedSet = useMemo(() => new Set(multiSelectedDates ?? []), [multiSelectedDates]);
   const selected = cells.find((cell) => cell.date === activeSelectedDate) ?? null;
   const hasMonthData = data.days.length > 0 || data.overtimes.length > 0 || data.leaves.length > 0;
 
@@ -80,7 +83,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, onCellSelec
           return (
             <button
               aria-label={cell.date}
-              className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}${bgKey !== "none" ? ` is-bg-${bgKey}` : ""}${activeSelectedDate === cell.date ? " is-selected" : ""}`}
+              className={`attendance-calendar-cell${cell.day || cell.overtimes.length > 0 || cell.leaves.length > 0 ? " has-data" : ""}${bgKey !== "none" ? ` is-bg-${bgKey}` : ""}${activeSelectedDate === cell.date ? " is-selected" : ""}${multiSelectedSet.has(cell.date) ? " is-multi-selected" : ""}`}
               key={cell.date}
               onClick={() => handleCellClick(cell.date)}
               type="button"
@@ -90,6 +93,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, onCellSelec
               {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
               {override && <span className="cal-badge cal-badge-override">修正</span>}
               {override?.is_evening_overtime && <span className="cal-badge cal-badge-evening">晚加</span>}
+              {override?.is_meal_ticket && <span className="cal-badge cal-badge-meal">菜</span>}
               {override?.status && !ATTENDANCE_STATUS_KEYS.has(override.status) && !override.is_evening_overtime && (
                 <span className={`cal-badge${LEAVE_STATUS_BG[override.status] ? " cal-badge-leave" : ""}`}>
                   {override.status}
@@ -236,6 +240,7 @@ function hasOverrideContent(override: DailyAttendanceOverrideValues | null | und
   return Boolean(
     override.status ||
       override.is_evening_overtime != null ||
+      override.is_meal_ticket != null ||
       override.work_hours != null ||
       override.late_minutes != null ||
       override.early_leave_minutes != null ||

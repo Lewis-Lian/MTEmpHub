@@ -353,10 +353,18 @@ export interface DailyOverrideSavePayload {
   date: string;
   status?: string;
   is_evening_overtime?: boolean;
+  is_meal_ticket?: boolean;
   work_hours?: string | number;
   late_minutes?: string | number;
   early_leave_minutes?: string | number;
   remark?: string;
+}
+
+export interface DailyOverrideBatchPayload {
+  month: string;
+  emp_id: number;
+  dates: string[];
+  is_meal_ticket: boolean;
 }
 
 export interface DailyOverrideRecordResponse<TRow> {
@@ -378,6 +386,15 @@ export function saveAdminDailyOverride<TRow>(
   payload: DailyOverrideSavePayload,
 ): Promise<DailyOverrideRecordResponse<TRow>> {
   return apiRequest<DailyOverrideRecordResponse<TRow>>("/api/admin/attendance-override-daily/record", {
+    body: payload,
+    method: "PUT",
+  });
+}
+
+export function saveAdminDailyOverrideBatch<TRow>(
+  payload: DailyOverrideBatchPayload,
+): Promise<DailyOverrideRecordResponse<TRow>> {
+  return apiRequest<DailyOverrideRecordResponse<TRow>>("/api/admin/attendance-override-daily/batch", {
     body: payload,
     method: "PUT",
   });

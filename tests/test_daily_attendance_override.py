@@ -28,6 +28,7 @@ from routes.auth_helpers import issue_slider_verified_token
 from tests.csrf_helper import attach_origin
 
 DAILY_ENDPOINT = "/api/admin/attendance-override-daily/record"
+BATCH_ENDPOINT = "/api/admin/attendance-override-daily/batch"
 CALENDAR_ENDPOINT = "/api/admin/attendance-override-daily/calendar"
 
 
@@ -316,6 +317,112 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         self.assertEqual(day["override"]["status"], "全勤")
         day_with_punch = next(d for d in payload["days"] if d["date"] == "2026-05-06")
         self.assertIsNone(day_with_punch["override"])
+
+    # ------------------------------------------------ 当天算菜票修正（单日 + 批量多选）
+
+    def _calendar_override(self, day: str) -> dict | None:
+        res = self.client.get(
+            f"{CALENDAR_ENDPOINT}?emp_id={self.employee_id}&month=2026-05"
+        )
+        self.assertEqual(res.status_code, 200)
+        days = res.get_json()["days"]
+        return next((d["override"] for d in days if d["date"] == day), None)
+
+    def test_save_meal_ticket_flag(self) -> None:
+        """单日保存接口支持 is_meal_ticket，日历 override 原样返回。"""
+        res = self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": True}
+        )
+        self.assertEqual(res.status_code, 200)
+        override = self._calendar_override("2026-05-06")
+        self.assertIsNotNone(override)
+        self.assertIs(override["is_meal_ticket"], True)
+
+        res = self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": False}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIs(self._calendar_override("2026-05-06")["is_meal_ticket"], False)
+
+    def test_meal_ticket_not_affect_attendance_summary(self) -> None:
+        """菜票是纯标记，不影响考勤天数等汇总。"""
+        self._add_daily(date(2026, 5, 6), "08:00", "17:00")
+        res = self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": True}
+        )
+        self.assertEqual(res.status_code, 200)
+        calendar = self.client.get(
+            f"{CALENDAR_ENDPOINT}?emp_id={self.employee_id}&month=2026-05"
+        ).get_json()
+        self.assertEqual(calendar["summary"]["attendance_days"], 1.0)
+
+    def test_batch_mark_meal_ticket_keeps_other_fields(self) -> None:
+        """批量端点只改菜票位，保留同日已有其他修正字段。"""
+        self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "status": "全勤", "work_hours": 8}
+        )
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "dates": ["2026-05-06", "2026-05-07"],
+                "is_meal_ticket": True,
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("calendar", res.get_json())
+        override6 = self._calendar_override("2026-05-06")
+        self.assertIs(override6["is_meal_ticket"], True)
+        self.assertEqual(override6["status"], "全勤")
+        self.assertEqual(override6["work_hours"], 8)
+        self.assertIs(self._calendar_override("2026-05-07")["is_meal_ticket"], True)
+
+    def test_batch_unmark_meal_ticket(self) -> None:
+        """批量取消菜票：已标记日期翻回 False。"""
+        self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": True},
+        )
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": False},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIs(self._calendar_override("2026-05-06")["is_meal_ticket"], False)
+
+    def test_batch_meal_ticket_validations(self) -> None:
+        """批量端点校验：空日期 / 非布尔标记 / 跨月日期。"""
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": [], "is_meal_ticket": True},
+        )
+        self.assertEqual(res.status_code, 400)
+
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": "yes"},
+        )
+        self.assertEqual(res.status_code, 400)
+
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-06-01"], "is_meal_ticket": True},
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_batch_meal_ticket_locked_account_set_rejected(self) -> None:
+        with self.app.app_context():
+            account_set = AccountSet.query.filter_by(month="2026-05").first()
+            account_set.is_locked = True
+            db.session.commit()
+
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": True},
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("锁定", res.get_json()["error"])
 
     # ------------------------------------------------------------ 管理人员侧
 

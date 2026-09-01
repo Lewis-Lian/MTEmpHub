@@ -381,3 +381,45 @@ class AppBootstrapTests(unittest.TestCase):
                     self.assertIn("profile_emp_no", columns)
                     self.assertIn("profile_name", columns)
                     self.assertIn("profile_dept_id", columns)
+
+    def test_schema_compatibility_adds_daily_override_meal_ticket_column(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'compat-daily-override.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                app_module = self._load_app_module()
+                bootstrap_service = importlib.reload(importlib.import_module("services.bootstrap_service"))
+                app = app_module.create_app()
+
+                with app.app_context():
+                    db.drop_all()
+                    # 复刻生产旧库 daily_attendance_overrides 结构：缺 is_meal_ticket
+                    db.session.execute(
+                        text(
+                            "CREATE TABLE daily_attendance_overrides ("
+                            "id INTEGER NOT NULL PRIMARY KEY, "
+                            "emp_id INTEGER NOT NULL, "
+                            "record_date DATE NOT NULL, "
+                            "status VARCHAR(20), "
+                            "is_evening_overtime BOOLEAN, "
+                            "work_hours FLOAT, "
+                            "late_minutes INTEGER, "
+                            "early_leave_minutes INTEGER, "
+                            "remark TEXT, "
+                            "updated_by INTEGER, "
+                            "updated_at DATETIME NOT NULL)"
+                        )
+                    )
+                    db.session.commit()
+
+                    bootstrap_service.ensure_schema_compatibility()
+
+                    columns = {column["name"] for column in inspect(db.engine).get_columns("daily_attendance_overrides")}
+                    self.assertIn("is_meal_ticket", columns)
