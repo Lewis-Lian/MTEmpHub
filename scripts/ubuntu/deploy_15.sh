@@ -41,7 +41,7 @@ After=network.target
 User=mt
 WorkingDirectory=/var/www/mtemphub
 Environment="PATH=/var/www/mtemphub/.venv/bin"
-ExecStart=/var/www/mtemphub/.venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 wsgi:app
+ExecStart=/var/www/mtemphub/.venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 --timeout 600 wsgi:app
 Restart=always
 
 [Install]
@@ -71,9 +71,11 @@ server {
     location /api/ {
         proxy_pass http://127.0.0.1:5000;
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Real-IP $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # 账套重新计算是同步长请求，默认 60s 会先于 gunicorn 超时返回 504
+        proxy_read_timeout 600;
     }
 }
 EOF

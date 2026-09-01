@@ -18,5 +18,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        # 账套重新计算是同步长请求，默认 60s 会先于 gunicorn 超时返回 504
+        proxy_read_timeout 600;
     }
 }
