@@ -64,13 +64,18 @@ def _coerce_response(response: Response | tuple[Response, int]) -> tuple[Respons
 @login_required
 def bootstrap():
     if g.current_user.role == "admin":
-        employees = Employee.query.options(joinedload(Employee.department)).order_by(Employee.emp_no.asc()).all()
+        employees = (
+            Employee.query.options(joinedload(Employee.department))
+            .filter(Employee.resigned_at.is_(None))
+            .order_by(Employee.emp_no.asc())
+            .all()
+        )
     else:
         emp_ids = _accessible_emp_ids()
         if emp_ids:
             employees = (
                 Employee.query.options(joinedload(Employee.department))
-                .filter(Employee.id.in_(emp_ids))
+                .filter(Employee.id.in_(emp_ids), Employee.resigned_at.is_(None))
                 .order_by(Employee.emp_no.asc())
                 .all()
             )

@@ -743,7 +743,10 @@ def _accessible_emp_ids() -> list[int]:
     if getattr(g, "current_user", None) is None:
         return []
     if g.current_user.role == "admin":
-        return [e.id for e in Employee.query.with_entities(Employee.id).all()]
+        return [
+            e.id
+            for e in Employee.query.with_entities(Employee.id).filter(Employee.resigned_at.is_(None)).all()
+        ]
         
     emp_rows = UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id).all()
     dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
@@ -767,7 +770,11 @@ def _accessible_emp_ids() -> list[int]:
                     expanded_dept_ids.add(child_id)
                     queue.append(child_id)
                     
-        dept_emp_ids = Employee.query.with_entities(Employee.id).filter(Employee.dept_id.in_(expanded_dept_ids)).all()
+        dept_emp_ids = (
+            Employee.query.with_entities(Employee.id)
+            .filter(Employee.dept_id.in_(expanded_dept_ids), Employee.resigned_at.is_(None))
+            .all()
+        )
         ids.update(row.id for row in dept_emp_ids)
         
     return list(ids)
