@@ -353,7 +353,7 @@ export interface DailyOverrideSavePayload {
   date: string;
   status?: string;
   is_evening_overtime?: boolean;
-  is_meal_ticket?: boolean;
+  is_actual_attendance?: boolean;
   work_hours?: string | number;
   late_minutes?: string | number;
   early_leave_minutes?: string | number;
@@ -364,7 +364,10 @@ export interface DailyOverrideBatchPayload {
   month: string;
   emp_id: number;
   dates: string[];
-  is_meal_ticket: boolean;
+  /** 缺省不动状态；空串清除状态（跟随系统）；合法状态设置之 */
+  status?: string;
+  /** 缺省不动实际打卡标记 */
+  is_actual_attendance?: boolean;
 }
 
 export interface DailyOverrideRecordResponse<TRow> {

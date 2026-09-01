@@ -382,7 +382,7 @@ class AppBootstrapTests(unittest.TestCase):
                     self.assertIn("profile_name", columns)
                     self.assertIn("profile_dept_id", columns)
 
-    def test_schema_compatibility_adds_daily_override_meal_ticket_column(self) -> None:
+    def test_schema_compatibility_adds_daily_override_actual_attendance_column(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
                 os.environ,
@@ -400,7 +400,7 @@ class AppBootstrapTests(unittest.TestCase):
 
                 with app.app_context():
                     db.drop_all()
-                    # 复刻生产旧库 daily_attendance_overrides 结构：缺 is_meal_ticket
+                    # 复刻生产旧库 daily_attendance_overrides 结构：缺 is_actual_attendance
                     db.session.execute(
                         text(
                             "CREATE TABLE daily_attendance_overrides ("
@@ -422,4 +422,4 @@ class AppBootstrapTests(unittest.TestCase):
                     bootstrap_service.ensure_schema_compatibility()
 
                     columns = {column["name"] for column in inspect(db.engine).get_columns("daily_attendance_overrides")}
-                    self.assertIn("is_meal_ticket", columns)
+                    self.assertIn("is_actual_attendance", columns)

@@ -97,7 +97,7 @@ export interface AttendanceCalendarDay {
 export interface DailyAttendanceOverrideValues {
   status?: string | null;
   is_evening_overtime?: boolean | null;
-  is_meal_ticket?: boolean | null;
+  is_actual_attendance?: boolean | null;
   work_hours?: number | null;
   late_minutes?: number | null;
   early_leave_minutes?: number | null;

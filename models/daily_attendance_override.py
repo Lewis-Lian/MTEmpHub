@@ -16,7 +16,7 @@ class DailyAttendanceOverride(db.Model):
     record_date = db.Column(db.Date, nullable=False, index=True)
     status = db.Column(db.String(20), nullable=True)
     is_evening_overtime = db.Column(db.Boolean, nullable=True)
-    is_meal_ticket = db.Column(db.Boolean, nullable=True)
+    is_actual_attendance = db.Column(db.Boolean, nullable=True)
     work_hours = db.Column(db.Float, nullable=True)
     late_minutes = db.Column(db.Integer, nullable=True)
     early_leave_minutes = db.Column(db.Integer, nullable=True)
