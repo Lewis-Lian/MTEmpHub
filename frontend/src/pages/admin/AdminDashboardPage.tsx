@@ -5,6 +5,7 @@ import {
   calculateAccountSet,
   createAccountSet,
   deleteAccountSet,
+  fetchAccountSetCalculationProgress,
   fetchAccountSetImports,
   fetchAccountSets,
   lockAccountSet,
@@ -190,6 +191,57 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function runCalculation(mode: "employee" | "manager") {
+    if (!selectedAccountSet) {
+      return;
+    }
+
+    setProgressVisible(true);
+    setProgress(0);
+    setLoadingText(
+      mode === "employee"
+        ? "正在对员工考勤进行汇总与数据结算..."
+        : "正在计算管理人员考勤及年假加班额度...",
+    );
+
+    // 轮询后端真实计算进度（文件导入按行、管理人员汇总按人推进）
+    const poll = setInterval(() => {
+      void fetchAccountSetCalculationProgress(selectedAccountSet.id, mode)
+        .then((progress) => {
+          if (progress.status !== "idle") {
+            setProgress(progress.percent);
+            if (progress.stage) {
+              setLoadingText(progress.stage);
+            }
+          }
+        })
+        .catch(() => {
+          // 单次轮询失败不中断进度显示，等计算响应或下一次轮询
+        });
+    }, 1000);
+
+    try {
+      await calculateAccountSet(selectedAccountSet.id, mode);
+      setProgress(100);
+      setLoadingText(mode === "employee" ? "员工考勤结算成功！" : "管理人员考勤计算成功！");
+      await reloadAccountSets(selectedAccountSet.id);
+      notification.success(mode === "employee" ? "员工计算成功" : "管理人员计算成功");
+    } catch (caughtError) {
+      notification.error(
+        caughtError instanceof ApiError
+          ? caughtError.message
+          : mode === "employee"
+            ? "员工考勤结算失败"
+            : "管理人员考勤计算失败",
+      );
+    } finally {
+      clearInterval(poll);
+      setTimeout(() => {
+        setProgressVisible(false);
+      }, 500);
+    }
+  }
+
   function currentFactoryRestState(date: string): FactoryRestPeriod {
     const currentEntry = factoryRestEntries.find((entry) => entry.date === date);
     if (!currentEntry) {
@@ -278,40 +330,7 @@ export default function AdminDashboardPage() {
           <button
             className="btn-calc-employee"
             disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-            onClick={() =>
-              void runAction(async () => {
-                if (!selectedAccountSet) {
-                  return;
-                }
-
-                setProgressVisible(true);
-                setProgress(0);
-                setLoadingText("正在对员工考勤进行汇总与数据结算...");
-
-                let current = 0;
-                const interval = setInterval(() => {
-                  current += Math.floor(Math.random() * 10) + 4;
-                  if (current >= 98) current = 98;
-                  setProgress(current);
-                }, 120);
-
-                try {
-                  await calculateAccountSet(selectedAccountSet.id, "employee");
-                  clearInterval(interval);
-                  setProgress(100);
-                  setLoadingText("员工考勤结算成功！");
-                  await reloadAccountSets(selectedAccountSet.id);
-                  notification.success("员工计算成功");
-                } catch (caughtError) {
-                  clearInterval(interval);
-                  notification.error(caughtError instanceof ApiError ? caughtError.message : "员工考勤结算失败");
-                } finally {
-                  setTimeout(() => {
-                    setProgressVisible(false);
-                  }, 500);
-                }
-              })
-            }
+            onClick={() => void runAction(() => runCalculation("employee"))}
             type="button"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -324,40 +343,7 @@ export default function AdminDashboardPage() {
           <button
             className="btn-calc-manager"
             disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-            onClick={() =>
-              void runAction(async () => {
-                if (!selectedAccountSet) {
-                  return;
-                }
-
-                setProgressVisible(true);
-                setProgress(0);
-                setLoadingText("正在计算管理人员考勤及年假加班额度...");
-
-                let current = 0;
-                const interval = setInterval(() => {
-                  current += Math.floor(Math.random() * 12) + 5;
-                  if (current >= 98) current = 98;
-                  setProgress(current);
-                }, 100);
-
-                try {
-                  await calculateAccountSet(selectedAccountSet.id, "manager");
-                  clearInterval(interval);
-                  setProgress(100);
-                  setLoadingText("管理人员考勤计算成功！");
-                  await reloadAccountSets(selectedAccountSet.id);
-                  notification.success("管理人员计算成功");
-                } catch (caughtError) {
-                  clearInterval(interval);
-                  notification.error(caughtError instanceof ApiError ? caughtError.message : "管理人员考勤计算失败");
-                } finally {
-                  setTimeout(() => {
-                    setProgressVisible(false);
-                  }, 500);
-                }
-              })
-            }
+            onClick={() => void runAction(() => runCalculation("manager"))}
             type="button"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1091,18 +1077,15 @@ export default function AdminDashboardPage() {
 
                           setProgressVisible(true);
                           setProgress(0);
-                          setLoadingText("正在上传并归档原始文件...");
-
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 8;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 100);
+                          setLoadingText("正在上传原始文件...");
 
                           try {
-                            await uploadAccountSetRawFiles(selectedAccountSet.id, files);
-                            clearInterval(interval);
+                            await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
+                              setProgress(percent);
+                              if (percent >= 100) {
+                                setLoadingText("上传完成，正在归档原始文件...");
+                              }
+                            });
                             setProgress(100);
                             setLoadingText("文件上传成功！正在同步账套状态...");
                             setUploadFiles(Array.from({ length: 6 }, () => null));
@@ -1110,7 +1093,6 @@ export default function AdminDashboardPage() {
                             notification.success("上传成功，已归档到账套。");
                             setShowModal(null);
                           } catch (caughtError) {
-                            clearInterval(interval);
                             notification.error(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
                           } finally {
                             setTimeout(() => {

@@ -4,6 +4,7 @@ import calendar
 import math
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Callable
 
 from models import db
 from models.account_set import AccountSet
@@ -527,6 +528,7 @@ def build_manager_rows(
     emp_ids: list[int] | None = None,
     include_overrides: bool = True,
     sync_month_stats: bool = False,
+    progress_cb: Callable[[int, int], None] | None = None,
 ) -> list[dict[str, object]]:
     """计算管理人员月度考勤及扣薪。
 
@@ -561,7 +563,10 @@ def build_manager_rows(
     # 若当月没有账套或没有厂休明细，则无法判断具体重叠日期，本次计算不做重叠扣减。
     can_subtract_factory_rest_overlap = bool(factory_rest_periods_by_date)
 
-    for employee in employees:
+    total_employees = len(employees)
+    for emp_idx, employee in enumerate(employees):
+        if progress_cb is not None:
+            progress_cb(emp_idx + 1, total_employees)
         raw = _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
         attendance_rows = attendance_rows_by_employee.get(employee.id, [])

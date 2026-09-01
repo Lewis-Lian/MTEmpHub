@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
-from typing import Any
+from typing import Any, Callable
 
 from models import db
 from services.import_pipeline import classify_import_file, normalize_import_rows
@@ -45,7 +45,7 @@ class ImportService:
         )
 
     @staticmethod
-    def import_file(file_path: str) -> dict:
+    def import_file(file_path: str, progress_cb: Callable[[int, int], None] | None = None) -> dict:
         filename = os.path.basename(file_path)
         file_type = classify_import_file(filename)
         normalized = normalize_import_rows(file_path, file_type=file_type)
@@ -56,21 +56,21 @@ class ImportService:
                 return {"status": "error", "message": "Empty file or unsupported xls structure"}
 
             if file_type == "overtime":
-                stats = ImportService._import_overtime(rows)
+                stats = ImportService._import_overtime(rows, progress_cb)
                 return {"status": "ok", "file_type": "overtime", **stats}
             if file_type == "leave":
-                stats = ImportService._import_leave(rows)
+                stats = ImportService._import_leave(rows, progress_cb)
                 return {"status": "ok", "file_type": "leave", **stats}
             if file_type == "manager_monthly":
-                stats = ImportService._import_manager_monthly_report(rows, filename)
+                stats = ImportService._import_manager_monthly_report(rows, filename, progress_cb)
                 return {"status": "ok", "file_type": "manager_monthly", **stats}
             if file_type == "manager_daily":
-                stats = ImportService._import_manager_daily_records(rows)
+                stats = ImportService._import_manager_daily_records(rows, progress_cb)
                 return {"status": "ok", "file_type": "manager_daily", **stats}
             if file_type == "monthly":
-                stats = ImportService._import_monthly_report(rows, filename)
+                stats = ImportService._import_monthly_report(rows, filename, progress_cb)
                 return {"status": "ok", "file_type": "monthly", **stats}
-            stats = ImportService._import_daily_records(rows)
+            stats = ImportService._import_daily_records(rows, progress_cb)
             return {"status": "ok", "file_type": "daily", **stats}
         finally:
             if normalized.cleanup_dir and os.path.isdir(normalized.cleanup_dir):
@@ -237,7 +237,7 @@ class ImportService:
         return slots
 
     @staticmethod
-    def _import_overtime(rows: list[list[Any]]) -> dict[str, int]:
+    def _import_overtime(rows: list[list[Any]], progress_cb: Callable[[int, int], None] | None = None) -> dict[str, int]:
         header_idx = ImportService._find_header_row(rows, ["加班单号", "工号", "开始时间", "结束时间"])
         header_map = ImportService._build_header_map(rows[header_idx])
         imported = 0
@@ -281,7 +281,11 @@ class ImportService:
             for e in Employee.query.filter(Employee.emp_no.in_(unique_emp_nos)).all():
                 non_manager_by_no.setdefault(e.emp_no, e)
 
-        for row in rows[header_idx + 1 :]:
+        data_rows = rows[header_idx + 1 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             overtime_no = clean_text(ImportService._get_row_value(row, overtime_col_idx))
             if not overtime_no:
                 skipped_no_key += 1
@@ -329,7 +333,7 @@ class ImportService:
         }
 
     @staticmethod
-    def _import_leave(rows: list[list[Any]]) -> dict[str, int]:
+    def _import_leave(rows: list[list[Any]], progress_cb: Callable[[int, int], None] | None = None) -> dict[str, int]:
         header_idx = ImportService._find_header_row(rows, ["请假单号", "工号", "请假类型", "开始时间", "结束时间"])
         header_map = ImportService._build_header_map(rows[header_idx])
         imported = 0
@@ -381,7 +385,11 @@ class ImportService:
             for bal in AnnualLeave.query.filter(AnnualLeave.emp_id.in_(all_leave_emp_ids)).all():
                 annual_leave_by_key[(bal.emp_id, bal.year)] = bal
 
-        for row in rows[header_idx + 1 :]:
+        data_rows = rows[header_idx + 1 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             leave_no = clean_text(ImportService._get_row_value(row, leave_col_idx))
             if not leave_no:
                 skipped_no_key += 1
@@ -456,7 +464,7 @@ class ImportService:
         }
 
     @staticmethod
-    def _import_daily_records(rows: list[list[Any]]) -> dict[str, int]:
+    def _import_daily_records(rows: list[list[Any]], progress_cb: Callable[[int, int], None] | None = None) -> dict[str, int]:
         header_idx = ImportService._find_header_row(rows, ["人员编号", "人员名称", "考勤日期"])
         header_map = ImportService._build_header_map(rows[header_idx])
         imported = 0
@@ -509,7 +517,11 @@ class ImportService:
             for r in DailyRecord.query.filter(DailyRecord.emp_id.in_(resolved_emp_ids)).all():
                 existing_records[(r.emp_id, r.record_date)] = r
 
-        for row in rows[header_idx + 1 :]:
+        data_rows = rows[header_idx + 1 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx))
             if not emp_no:
                 skipped_no_key += 1
@@ -592,7 +604,9 @@ class ImportService:
         }
 
     @staticmethod
-    def _import_manager_monthly_report(rows: list[list[Any]], filename: str) -> dict[str, int]:
+    def _import_manager_monthly_report(
+        rows: list[list[Any]], filename: str, progress_cb: Callable[[int, int], None] | None = None
+    ) -> dict[str, int]:
         header_idx, header_map = ImportService._build_manager_header_map(rows)
         report_month = ImportService._extract_report_month(filename)
         imported = 0
@@ -631,7 +645,11 @@ class ImportService:
             ).all():
                 existing_reports[r.emp_id] = r
 
-        for row in rows[header_idx + 2 :]:
+        data_rows = rows[header_idx + 2 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
             name = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
             if not emp_no and not name:
@@ -671,7 +689,7 @@ class ImportService:
         }
 
     @staticmethod
-    def _import_manager_daily_records(rows: list[list[Any]]) -> dict[str, int]:
+    def _import_manager_daily_records(rows: list[list[Any]], progress_cb: Callable[[int, int], None] | None = None) -> dict[str, int]:
         header_idx, header_map = ImportService._build_manager_header_map(rows)
         imported = 0
         scanned = 0
@@ -708,7 +726,11 @@ class ImportService:
             for r in DailyRecord.query.filter(DailyRecord.emp_id.in_(resolved_emp_ids)).all():
                 existing_records[(r.emp_id, r.record_date)] = r
 
-        for row in rows[header_idx + 2 :]:
+        data_rows = rows[header_idx + 2 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx)) if emp_no_idx >= 0 else ""
             name = clean_text(ImportService._get_row_value(row, name_idx)) if name_idx >= 0 else ""
             record_date = ImportService._parse_manager_record_date(ImportService._get_row_value(row, date_idx))
@@ -777,7 +799,9 @@ class ImportService:
         return "1970-01"
 
     @staticmethod
-    def _import_monthly_report(rows: list[list[Any]], filename: str) -> dict[str, int]:
+    def _import_monthly_report(
+        rows: list[list[Any]], filename: str, progress_cb: Callable[[int, int], None] | None = None
+    ) -> dict[str, int]:
         header_idx = ImportService._find_header_row(rows, ["人员编号", "人员名称", "部门编号", "部门名称"])
         header = rows[header_idx]
         header_map = ImportService._build_header_map(header)
@@ -815,7 +839,11 @@ class ImportService:
             ).all():
                 existing_reports[r.emp_id] = r
 
-        for row in rows[header_idx + 1 :]:
+        data_rows = rows[header_idx + 1 :]
+        total_rows = len(data_rows)
+        for row_idx, row in enumerate(data_rows):
+            if progress_cb is not None:
+                progress_cb(row_idx + 1, total_rows)
             emp_no = clean_text(ImportService._get_row_value(row, emp_no_idx))
             if not emp_no:
                 skipped_no_key += 1

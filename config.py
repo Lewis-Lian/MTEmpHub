@@ -38,6 +38,11 @@ class Config:
         "UPLOAD_FOLDER",
         os.path.join(os.path.dirname(__file__), "static", "uploads"),
     )
+    # 账套计算进度文件目录（计算过程写入，前端轮询读取）
+    CALC_PROGRESS_DIR = os.getenv(
+        "CALC_PROGRESS_DIR",
+        os.path.join(os.path.dirname(__file__), "instance", "calc_progress"),
+    )
 
     @classmethod
     def validate(cls) -> None:

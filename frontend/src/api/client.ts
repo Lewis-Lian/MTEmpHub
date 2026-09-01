@@ -52,6 +52,47 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   return payload as T;
 }
 
+// fetch 无法获取上传进度，带进度的请求（如文件上传）走 XMLHttpRequest
+export function apiUploadRequest<T>(
+  path: string,
+  options: { body: FormData; onProgress?: (percent: number) => void },
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE_URL}${path}`);
+    xhr.withCredentials = true;
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && event.total > 0) {
+        options.onProgress?.(Math.round((event.loaded / event.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      const contentType = xhr.getResponseHeader("Content-Type") ?? "";
+      let payload: unknown;
+      try {
+        payload = contentType.includes("application/json") ? JSON.parse(xhr.responseText) : xhr.responseText;
+      } catch {
+        // onload 是事件回调，抛出的异常不会 reject Promise，必须在这里显式失败
+        reject(new Error("服务器响应解析失败"));
+        return;
+      }
+
+      if (xhr.status < 200 || xhr.status >= 300) {
+        const message = (extractErrorMessage(payload) ?? xhr.statusText) || "请求失败";
+        reject(new ApiError(message, xhr.status, payload));
+        return;
+      }
+
+      resolve(payload as T);
+    };
+    xhr.onerror = () => reject(new Error("网络错误，请求失败"));
+
+    xhr.send(options.body);
+  });
+}
+
 // 从后端响应中提取可展示的错误信息：
 // - JSON 形如 { error: "..." } 或 { error: { message: "..." } } → 取对应文本
 // - error 为字符串则直接使用；为对象则降级 JSON.stringify，避免得到 "[object Object]"

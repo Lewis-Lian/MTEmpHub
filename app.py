@@ -37,6 +37,7 @@ def create_app() -> Flask:
     Config.validate()
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+    os.makedirs(app.config["CALC_PROGRESS_DIR"], exist_ok=True)
 
     db.init_app(app)
     Migrate(app, db)
