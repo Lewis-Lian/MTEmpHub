@@ -78,3 +78,151 @@ class TestEmployeeResignationField(EmployeeResignationTestBase):
         rows = {row["emp_no"]: row for row in response.get_json()}
         self.assertIsNone(rows["E100"]["resigned_at"])
         self.assertEqual(rows["E200"]["resigned_at"], "2026-08-31")
+
+
+class TestResignApi(EmployeeResignationTestBase):
+    def _bind_user(self, username: str, emp_id: int, role: str = "readonly") -> int:
+        with self.app.app_context():
+            user = User(username=username, role=role)
+            user.set_password("pw123456")
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=emp_id))
+            db.session.commit()
+            return user.id
+
+    def test_resign_by_emp_no_sets_date_and_disables_account(self) -> None:
+        self._login()
+        user_id = self._bind_user("e100", self.active_emp_id)
+
+        response = self.client.post(
+            "/api/admin/employees/resign",
+            json={"emp_no": "E100", "resigned_at": "2026-08-15"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["employee"]["resigned_at"], "2026-08-15")
+        with self.app.app_context():
+            employee = db.session.get(Employee, self.active_emp_id)
+            user = db.session.get(User, user_id)
+            self.assertEqual(employee.resigned_at, date(2026, 8, 15))
+            self.assertTrue(user.is_login_disabled())
+            self.assertEqual(user.login_disabled_reason, "employee_resigned")
+
+    def test_resign_defaults_to_today(self) -> None:
+        self._login()
+
+        response = self.client.post("/api/admin/employees/resign", json={"emp_no": "E100"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["employee"]["resigned_at"], date.today().isoformat())
+
+    def test_resign_unknown_emp_no_returns_400(self) -> None:
+        self._login()
+
+        response = self.client.post("/api/admin/employees/resign", json={"emp_no": "NOPE"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "工号不存在"})
+
+    def test_resign_already_resigned_returns_400(self) -> None:
+        self._login()
+
+        response = self.client.post("/api/admin/employees/resign", json={"emp_no": "E200"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "该员工已离职"})
+
+    def test_resign_invalid_date_returns_400(self) -> None:
+        self._login()
+
+        response = self.client.post(
+            "/api/admin/employees/resign", json={"emp_no": "E100", "resigned_at": "2026/08/15"}
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "离职日期格式不正确，应为 YYYY-MM-DD"})
+
+    def test_resign_skips_admin_accounts(self) -> None:
+        self._login()
+        self._bind_user("boss", self.active_emp_id, role="admin")
+
+        response = self.client.post("/api/admin/employees/resign", json={"emp_no": "E100"})
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            user = db.session.query(User).filter_by(username="boss").first()
+            self.assertFalse(user.is_login_disabled())
+
+    def test_resign_does_not_overwrite_other_disable_reason(self) -> None:
+        self._login()
+        user_id = self._bind_user("e100", self.active_emp_id)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "too_many_failed_attempts"
+            db.session.commit()
+
+        response = self.client.post("/api/admin/employees/resign", json={"emp_no": "E100"})
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertEqual(user.login_disabled_reason, "too_many_failed_attempts")
+
+
+class TestReinstateApi(EmployeeResignationTestBase):
+    def _bind_user(self, username: str, emp_id: int) -> int:
+        with self.app.app_context():
+            user = User(username=username, role="readonly")
+            user.set_password("pw123456")
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=emp_id))
+            db.session.commit()
+            return user.id
+
+    def test_reinstate_clears_date_and_unlocks_account(self) -> None:
+        self._login()
+        user_id = self._bind_user("e200", self.resigned_emp_id)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "employee_resigned"
+            db.session.commit()
+
+        response = self.client.post(f"/api/admin/employees/{self.resigned_emp_id}/reinstate")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.get_json()["employee"]["resigned_at"])
+        with self.app.app_context():
+            employee = db.session.get(Employee, self.resigned_emp_id)
+            user = db.session.get(User, user_id)
+            self.assertIsNone(employee.resigned_at)
+            self.assertFalse(user.is_login_disabled())
+            self.assertIsNone(user.login_disabled_reason)
+
+    def test_reinstate_not_resigned_returns_400(self) -> None:
+        self._login()
+
+        response = self.client.post(f"/api/admin/employees/{self.active_emp_id}/reinstate")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.get_json(), {"error": "该员工未离职"})
+
+    def test_reinstate_keeps_manual_disable_reason(self) -> None:
+        self._login()
+        user_id = self._bind_user("e200", self.resigned_emp_id)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "too_many_failed_attempts"
+            db.session.commit()
+
+        response = self.client.post(f"/api/admin/employees/{self.resigned_emp_id}/reinstate")
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertTrue(user.is_login_disabled())
+            self.assertEqual(user.login_disabled_reason, "too_many_failed_attempts")
