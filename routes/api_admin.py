@@ -28,6 +28,7 @@ from routes.admin_core import (
     delete_unbound_departments,
     departments_list,
     employees_list,
+    get_account_set_calc_progress,
     list_account_sets,
     list_shifts,
     lock_account_set,
@@ -764,6 +765,12 @@ def account_sets_delete(account_set_id: int):
 @admin_required
 def account_sets_calculate(account_set_id: int):
     return calculate_account_set(account_set_id)
+
+
+@api_admin_bp.get("/account-sets/<int:account_set_id>/calculate/progress")
+@admin_required
+def account_sets_calculate_progress(account_set_id: int):
+    return get_account_set_calc_progress(account_set_id)
 
 
 @api_admin_bp.get("/account-sets/<int:account_set_id>/imports")

@@ -44,6 +44,7 @@ from models.user import (
     UserDepartmentAssignment,
 )
 from services.import_service import ImportService
+from services.calculation_progress_service import get_calc_progress, update_calc_progress
 from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows
 from utils.helpers import parse_bool_zh
 
@@ -960,6 +961,17 @@ def delete_account_set(account_set_id: int):
     return jsonify({"status": "ok"})
 
 
+def get_account_set_calc_progress(account_set_id: int):
+    mode = (request.args.get("mode") or "").strip()
+    # mode 会拼入进度文件路径，白名单外的值一律按未开始处理
+    if mode not in ("employee", "manager", "all"):
+        return jsonify({"status": "idle", "percent": 0, "stage": ""})
+    progress = get_calc_progress(account_set_id, mode)
+    if progress is None:
+        return jsonify({"status": "idle", "percent": 0, "stage": ""})
+    return jsonify(progress)
+
+
 def calculate_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     locked_error = _ensure_account_set_unlocked(row, "重新计算")
@@ -980,7 +992,24 @@ def calculate_account_set(account_set_id: int):
     failed = 0
     results = []
 
-    for rec in records:
+    # ---- 计算进度（写入进度文件，前端轮询）----
+    stage_count = len(records) + (1 if mode == "manager" else 0)
+    last_percent = -100
+
+    def _report(stage_index: int, done: int, total: int, stage: str) -> None:
+        nonlocal last_percent
+        fraction = done / total if total > 0 else 1.0
+        percent = min(int((stage_index + fraction) * 100 / stage_count), 100)
+        # 行级回调很密集，百分比变化不足 2 时跳过写盘
+        if percent < 100 and percent - last_percent < 2:
+            return
+        last_percent = percent
+        update_calc_progress(row.id, mode, percent, stage)
+
+    update_calc_progress(row.id, mode, 0, "开始计算...")
+
+    for stage_idx, rec in enumerate(records):
+        stage_text = f"正在导入 {rec.source_filename or ''}（{stage_idx + 1}/{len(records)}）"
         path = (rec.stored_path or "").strip()
         filename = rec.source_filename or os.path.basename(path)
         if not path or not os.path.exists(path):
@@ -989,11 +1018,15 @@ def calculate_account_set(account_set_id: int):
             rec.error_message = "archive file not found"
             rec.imported_count = 0
             results.append({"file": filename, "status": "error", "error": rec.error_message})
+            _report(stage_idx, 1, 1, stage_text)
             db.session.commit()
             continue
 
         try:
-            imported = ImportService.import_file(path)
+            imported = ImportService.import_file(
+                path,
+                progress_cb=lambda done, total, _idx=stage_idx, _stage=stage_text: _report(_idx, done, total, _stage),
+            )
             if imported.get("status") == "ok":
                 success += 1
                 rec.status = "ok"
@@ -1024,7 +1057,11 @@ def calculate_account_set(account_set_id: int):
                 factory_rest_days=_effective_factory_rest_days(row),
                 monthly_benefit_days=row.monthly_benefit_days or 0,
             )
-            manager_stats_sync = _sync_manager_month_stats(row.month, manager_options)
+            manager_stats_sync = _sync_manager_month_stats(
+                row.month,
+                manager_options,
+                progress_cb=lambda done, total: _report(len(records), done, total, "正在汇总管理人员考勤..."),
+            )
             if manager_stats_sync["error_count"]:
                 failed += manager_stats_sync["error_count"]
         except Exception:
@@ -1039,6 +1076,7 @@ def calculate_account_set(account_set_id: int):
                 "errors": ["考勤统计同步失败，请查看服务端日志"],
             }
 
+    update_calc_progress(row.id, mode, 100, "计算完成", status="finished")
     return jsonify(
         {
             "status": "ok" if failed == 0 else "partial",
@@ -1743,6 +1781,7 @@ def _stat_key_for_month(month: str) -> tuple[int, str]:
 def _sync_manager_month_stats(
     month: str,
     options: ManagerAttendanceOptions | None = None,
+    progress_cb=None,
 ) -> dict[str, object]:
     """重算指定月份的管理人员考勤，并把加班/年休结果写回 manager_month_stats。
 
@@ -1756,7 +1795,7 @@ def _sync_manager_month_stats(
     """
     if options is None:
         options = _manager_attendance_options(month)
-    manager_rows = build_manager_rows(options, sync_month_stats=True)
+    manager_rows = build_manager_rows(options, sync_month_stats=True, progress_cb=progress_cb)
     result = _sync_manager_stats_from_manager_rows(month, manager_rows)
     db.session.commit()
     return result

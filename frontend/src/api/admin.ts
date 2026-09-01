@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import { ApiError } from "./client";
+import { ApiError, apiUploadRequest } from "./client";
 import type {
   AdminAccountSet,
   AdminAccountSetFactoryRestEntry,
@@ -229,13 +229,17 @@ export async function fetchAccountSetImports(accountSetId: number): Promise<Admi
   );
 }
 
-export function uploadAccountSetRawFiles(accountSetId: number, files: File[]): Promise<{ status: string; message?: string }> {
+export function uploadAccountSetRawFiles(
+  accountSetId: number,
+  files: File[],
+  onProgress?: (percent: number) => void,
+): Promise<{ status: string; message?: string }> {
   const formData = new FormData();
   formData.append("account_set_id", String(accountSetId));
   files.forEach((file) => formData.append("files", file));
-  return apiRequest<{ status: string; message?: string }>("/api/admin/import/raw-files", {
+  return apiUploadRequest<{ status: string; message?: string }>("/api/admin/import/raw-files", {
     body: formData,
-    method: "POST",
+    onProgress,
   });
 }
 
@@ -248,6 +252,21 @@ export function calculateAccountSet(
     {
       method: "POST",
     },
+  );
+}
+
+export interface AccountSetCalculationProgress {
+  status: "idle" | "running" | "finished";
+  percent: number;
+  stage: string;
+}
+
+export function fetchAccountSetCalculationProgress(
+  accountSetId: number,
+  mode: "employee" | "manager",
+): Promise<AccountSetCalculationProgress> {
+  return apiRequest<AccountSetCalculationProgress>(
+    `/api/admin/account-sets/${accountSetId}/calculate/progress?mode=${encodeURIComponent(mode)}`,
   );
 }
 
