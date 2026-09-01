@@ -85,6 +85,15 @@ def ensure_schema_compatibility() -> None:
                 )
             )
             db.session.commit()
+        if "resigned_at" not in employee_columns:
+            db.session.execute(text("ALTER TABLE employees ADD COLUMN resigned_at DATE"))
+            db.session.commit()
+            try:
+                db.session.execute(text("CREATE INDEX ix_employees_resigned_at ON employees(resigned_at)"))
+                db.session.commit()
+            except OperationalError:
+                # 索引可能已存在（旧库迁移重复执行），幂等跳过
+                db.session.rollback()
 
     account_set_columns = _get_column_names(inspector, "account_sets")
     if account_set_columns is not None:

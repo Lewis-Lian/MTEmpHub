@@ -301,6 +301,49 @@ class AppBootstrapTests(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"FLASK_DEBUG": value}, clear=False):
                     self.assertFalse(app_module._resolve_debug_flag())
 
+    def test_schema_compatibility_adds_employee_resigned_at_column(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'compat-employees.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                app_module = self._load_app_module()
+                bootstrap_service = importlib.reload(importlib.import_module("services.bootstrap_service"))
+                app = app_module.create_app()
+
+                with app.app_context():
+                    db.drop_all()
+                    # 复刻生产旧库 employees 结构：已有历次补列的全部列，仅缺 resigned_at
+                    db.session.execute(
+                        text(
+                            "CREATE TABLE employees ("
+                            "id INTEGER NOT NULL PRIMARY KEY, "
+                            "emp_no VARCHAR(80) NOT NULL, "
+                            "name VARCHAR(120) NOT NULL, "
+                            "dept_id INTEGER, "
+                            "is_manager BOOLEAN NOT NULL DEFAULT 0, "
+                            "is_nursing BOOLEAN NOT NULL DEFAULT 0, "
+                            "include_in_manager_stats BOOLEAN NOT NULL DEFAULT 0, "
+                            "employee_stats_attendance_source VARCHAR(20) NOT NULL DEFAULT 'employee', "
+                            "manager_stats_attendance_source VARCHAR(20) NOT NULL DEFAULT 'manager', "
+                            "created_at DATETIME NOT NULL)"
+                        )
+                    )
+                    db.session.commit()
+
+                    bootstrap_service.ensure_schema_compatibility()
+
+                    columns = {column["name"] for column in inspect(db.engine).get_columns("employees")}
+                    self.assertIn("resigned_at", columns)
+                    index_names = {index["name"] for index in inspect(db.engine).get_indexes("employees")}
+                    self.assertIn("ix_employees_resigned_at", index_names)
+
     def test_schema_compatibility_adds_user_profile_columns(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
