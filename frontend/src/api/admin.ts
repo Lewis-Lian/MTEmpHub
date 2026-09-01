@@ -229,18 +229,39 @@ export async function fetchAccountSetImports(accountSetId: number): Promise<Admi
   );
 }
 
+export interface AccountSetRawFileUploadResult {
+  file: string;
+  status: "ok" | "error";
+  message?: string;
+  error?: string;
+}
+
 export function uploadAccountSetRawFiles(
   accountSetId: number,
   files: File[],
   onProgress?: (percent: number) => void,
-): Promise<{ status: string; message?: string }> {
+): Promise<{ status: string; success?: number; failed?: number; results?: AccountSetRawFileUploadResult[] }> {
   const formData = new FormData();
   formData.append("account_set_id", String(accountSetId));
   files.forEach((file) => formData.append("files", file));
-  return apiUploadRequest<{ status: string; message?: string }>("/api/admin/import/raw-files", {
-    body: formData,
-    onProgress,
-  });
+  return apiUploadRequest<{ status: string; success?: number; failed?: number; results?: AccountSetRawFileUploadResult[] }>(
+    "/api/admin/import/raw-files",
+    {
+      body: formData,
+      onProgress,
+    },
+  );
+}
+
+export function resetAccountSetImported(
+  accountSetId: number,
+): Promise<{ status: string; month?: string; deleted?: Record<string, number> }> {
+  return apiRequest<{ status: string; month?: string; deleted?: Record<string, number> }>(
+    `/api/admin/account-sets/${accountSetId}/reset-imported`,
+    {
+      method: "POST",
+    },
+  );
 }
 
 export function calculateAccountSet(

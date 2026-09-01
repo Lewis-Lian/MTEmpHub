@@ -767,6 +767,14 @@ def account_sets_calculate(account_set_id: int):
     return calculate_account_set(account_set_id)
 
 
+@api_admin_bp.post("/account-sets/<int:account_set_id>/reset-imported")
+@admin_required
+def account_sets_reset_imported(account_set_id: int):
+    from routes import admin_core as admin_module
+
+    return admin_module.reset_account_set_imported(account_set_id)
+
+
 @api_admin_bp.get("/account-sets/<int:account_set_id>/calculate/progress")
 @admin_required
 def account_sets_calculate_progress(account_set_id: int):
