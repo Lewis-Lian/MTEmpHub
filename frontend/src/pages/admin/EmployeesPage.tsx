@@ -100,6 +100,7 @@ export default function EmployeesPage() {
   const [resignEmpNo, setResignEmpNo] = useState("");
   const [resignDate, setResignDate] = useState(() => todayLocalDate());
   const [isResigning, setIsResigning] = useState(false);
+  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
 
   const notification = useNotification();
   const confirm = useConfirm();
@@ -521,6 +522,73 @@ export default function EmployeesPage() {
     { label: "操作", sortable: false },
   ];
   const employmentLabel = (row: AdminEmployee) => (row.resigned_at ? `已离职 ${row.resigned_at}` : "在职");
+
+  function renderRowActions(row: AdminEmployee) {
+    const menuOpen = openMenuId === row.id;
+    return (
+      <div className="toolbar" style={{ position: "relative" }}>
+        <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>
+        <div style={{ position: "relative", display: "inline-block" }}>
+          <button
+            aria-label="更多操作"
+            className="account-action-button"
+            onClick={() => setOpenMenuId(menuOpen ? null : row.id)}
+            type="button"
+          >
+            ⋯
+          </button>
+          {menuOpen ? (
+            <>
+              <div onClick={() => setOpenMenuId(null)} style={{ position: "fixed", inset: 0, zIndex: 40 }} />
+              <div
+                style={{
+                  position: "absolute",
+                  right: 0,
+                  top: "calc(100% + 4px)",
+                  zIndex: 50,
+                  background: "#ffffff",
+                  border: "1px solid var(--ent-border-strong, #cbd5e1)",
+                  borderRadius: "8px",
+                  boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.15)",
+                  minWidth: "120px",
+                  padding: "4px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {row.resigned_at ? (
+                  <button
+                    className="account-action-button"
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      void reinstateEmployee(row);
+                    }}
+                    style={{ display: "block", width: "100%", border: "none", textAlign: "left", padding: "8px 12px", borderRadius: "6px" }}
+                    type="button"
+                  >
+                    恢复在职
+                  </button>
+                ) : (
+                  <button
+                    className="account-action-button"
+                    onClick={() => {
+                      setOpenMenuId(null);
+                      openResignModal(row.emp_no);
+                    }}
+                    style={{ display: "block", width: "100%", border: "none", textAlign: "left", padding: "8px 12px", borderRadius: "6px" }}
+                    type="button"
+                  >
+                    办理离职
+                  </button>
+                )}
+              </div>
+            </>
+          ) : null}
+        </div>
+        <button className="account-action-button account-action-button--danger" onClick={() => removeEmployee(row)} type="button">删除</button>
+      </div>
+    );
+  }
+
   const employeeTableRows = loading
     ? []
     : filteredRows.map((row) => [
@@ -535,15 +603,7 @@ export default function EmployeesPage() {
         attendanceSourceLabels[row.manager_stats_attendance_source ?? ""] ?? "-",
         row.dept_name || "-",
         row.shift_no ? `${row.shift_no}${row.shift_name ? ` - ${row.shift_name}` : ""}` : "不绑定",
-        <div className="toolbar">
-          <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>
-          {row.resigned_at ? (
-            <button className="account-action-button" onClick={() => reinstateEmployee(row)} type="button">恢复在职</button>
-          ) : (
-            <button className="account-action-button" onClick={() => openResignModal(row.emp_no)} type="button">办理离职</button>
-          )}
-          <button className="account-action-button account-action-button--danger" onClick={() => removeEmployee(row)} type="button">删除</button>
-        </div>,
+        renderRowActions(row),
       ]);
   const employeeTableSortRows = loading
     ? []
