@@ -27,6 +27,7 @@ export interface AdminEmployee {
   is_nursing?: boolean;
   employee_stats_attendance_source?: string;
   manager_stats_attendance_source?: string;
+  resigned_at?: string | null;
 }
 
 export interface AdminBootstrap {
