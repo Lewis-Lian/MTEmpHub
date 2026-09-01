@@ -318,7 +318,7 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         day_with_punch = next(d for d in payload["days"] if d["date"] == "2026-05-06")
         self.assertIsNone(day_with_punch["override"])
 
-    # ------------------------------------------------ 当天算菜票修正（单日 + 批量多选）
+    # ------------------------------------- 实际打卡修正与批量修正（单日 + 批量多选）
 
     def _calendar_override(self, day: str) -> dict | None:
         res = self.client.get(
@@ -328,27 +328,27 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         days = res.get_json()["days"]
         return next((d["override"] for d in days if d["date"] == day), None)
 
-    def test_save_meal_ticket_flag(self) -> None:
-        """单日保存接口支持 is_meal_ticket，日历 override 原样返回。"""
+    def test_save_actual_attendance_flag(self) -> None:
+        """单日保存接口支持 is_actual_attendance，日历 override 原样返回。"""
         res = self._put_daily(
-            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": True}
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": True}
         )
         self.assertEqual(res.status_code, 200)
         override = self._calendar_override("2026-05-06")
         self.assertIsNotNone(override)
-        self.assertIs(override["is_meal_ticket"], True)
+        self.assertIs(override["is_actual_attendance"], True)
 
         res = self._put_daily(
-            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": False}
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": False}
         )
         self.assertEqual(res.status_code, 200)
-        self.assertIs(self._calendar_override("2026-05-06")["is_meal_ticket"], False)
+        self.assertIs(self._calendar_override("2026-05-06")["is_actual_attendance"], False)
 
-    def test_meal_ticket_not_affect_attendance_summary(self) -> None:
-        """菜票是纯标记，不影响考勤天数等汇总。"""
+    def test_actual_attendance_flag_not_affect_attendance_days(self) -> None:
+        """实际打卡标记只影响实际出勤天数，不影响考勤天数汇总。"""
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
         res = self._put_daily(
-            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_meal_ticket": True}
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": True}
         )
         self.assertEqual(res.status_code, 200)
         calendar = self.client.get(
@@ -356,8 +356,35 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         ).get_json()
         self.assertEqual(calendar["summary"]["attendance_days"], 1.0)
 
-    def test_batch_mark_meal_ticket_keeps_other_fields(self) -> None:
-        """批量端点只改菜票位，保留同日已有其他修正字段。"""
+    def test_actual_attendance_flag_counts_into_actual_days(self) -> None:
+        """勾"算实际打卡"的天计 1 天实际出勤；明确取消的按 0 天；未设置走刷卡口径。"""
+        # 6 日刷卡 2 次（刷卡口径 1 天），12 日无任何记录（0 天）
+        self._add_daily(date(2026, 5, 6), "08:00", "17:00")
+        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 1.0)
+
+        # 无打卡记录日勾"算实际打卡" → 实际出勤 +1
+        res = self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-12", "is_actual_attendance": True}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 2.0)
+
+        # 有刷卡记录日明确"不算" → 实际出勤按 0 天计
+        res = self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": False}
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 1.0)
+
+        # 清除修正 → 恢复刷卡口径
+        res = self.client.delete(
+            f"{DAILY_ENDPOINT}?emp_id={self.employee_id}&date=2026-05-06"
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 2.0)
+
+    def test_batch_mark_actual_attendance_keeps_other_fields(self) -> None:
+        """批量端点只改实际打卡位，保留同日已有其他修正字段。"""
         self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "status": "全勤", "work_hours": 8}
         )
@@ -367,51 +394,116 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
                 "month": "2026-05",
                 "emp_id": self.employee_id,
                 "dates": ["2026-05-06", "2026-05-07"],
-                "is_meal_ticket": True,
+                "is_actual_attendance": True,
             },
         )
         self.assertEqual(res.status_code, 200)
         self.assertIn("calendar", res.get_json())
         override6 = self._calendar_override("2026-05-06")
-        self.assertIs(override6["is_meal_ticket"], True)
+        self.assertIs(override6["is_actual_attendance"], True)
         self.assertEqual(override6["status"], "全勤")
         self.assertEqual(override6["work_hours"], 8)
-        self.assertIs(self._calendar_override("2026-05-07")["is_meal_ticket"], True)
+        self.assertIs(self._calendar_override("2026-05-07")["is_actual_attendance"], True)
 
-    def test_batch_unmark_meal_ticket(self) -> None:
-        """批量取消菜票：已标记日期翻回 False。"""
+    def test_batch_unmark_actual_attendance(self) -> None:
+        """批量取消实际打卡：已标记日期翻回 False。"""
         self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": True},
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_actual_attendance": True},
         )
         res = self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": False},
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_actual_attendance": False},
         )
         self.assertEqual(res.status_code, 200)
-        self.assertIs(self._calendar_override("2026-05-06")["is_meal_ticket"], False)
+        self.assertIs(self._calendar_override("2026-05-06")["is_actual_attendance"], False)
 
-    def test_batch_meal_ticket_validations(self) -> None:
-        """批量端点校验：空日期 / 非布尔标记 / 跨月日期。"""
+    def test_batch_set_status_keeps_other_fields(self) -> None:
+        """批量端点支持只改状态：多日期标病假，保留同日实际打卡等其他修正。"""
+        self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": True}
+        )
         res = self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": [], "is_meal_ticket": True},
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "dates": ["2026-05-06", "2026-05-07"],
+                "status": "病假",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        override6 = self._calendar_override("2026-05-06")
+        self.assertEqual(override6["status"], "病假")
+        self.assertIs(override6["is_actual_attendance"], True)
+        self.assertEqual(self._calendar_override("2026-05-07")["status"], "病假")
+
+    def test_batch_status_and_flag_together(self) -> None:
+        """批量端点可同时设置状态与实际打卡。"""
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={
+                "month": "2026-05",
+                "emp_id": self.employee_id,
+                "dates": ["2026-05-06", "2026-05-07"],
+                "status": "事假",
+                "is_actual_attendance": False,
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+        override = self._calendar_override("2026-05-06")
+        self.assertEqual(override["status"], "事假")
+        self.assertIs(override["is_actual_attendance"], False)
+        self.assertEqual(self._employee_automatic()["attendance_days"], 0.0)
+
+    def test_batch_clear_status(self) -> None:
+        """批量端点 status 传空串 → 清除状态，恢复跟随系统。"""
+        self._put_daily(
+            {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "status": "病假"}
+        )
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "status": ""},
+        )
+        self.assertEqual(res.status_code, 200)
+        self.assertIsNone(self._calendar_override("2026-05-06")["status"])
+
+    def test_batch_requires_status_or_flag(self) -> None:
+        """status 与 is_actual_attendance 都缺省 → 400。"""
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"]},
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("至少", res.get_json()["error"])
+
+    def test_batch_actual_attendance_validations(self) -> None:
+        """批量端点校验：空日期 / 非布尔标记 / 非法状态 / 跨月日期。"""
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": [], "is_actual_attendance": True},
         )
         self.assertEqual(res.status_code, 400)
 
         res = self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": "yes"},
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_actual_attendance": "yes"},
         )
         self.assertEqual(res.status_code, 400)
 
         res = self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-06-01"], "is_meal_ticket": True},
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "status": "年假"},
         )
         self.assertEqual(res.status_code, 400)
 
-    def test_batch_meal_ticket_locked_account_set_rejected(self) -> None:
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-06-01"], "is_actual_attendance": True},
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_batch_actual_attendance_locked_account_set_rejected(self) -> None:
         with self.app.app_context():
             account_set = AccountSet.query.filter_by(month="2026-05").first()
             account_set.is_locked = True
@@ -419,7 +511,7 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
 
         res = self.client.put(
             BATCH_ENDPOINT,
-            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_meal_ticket": True},
+            json={"month": "2026-05", "emp_id": self.employee_id, "dates": ["2026-05-06"], "is_actual_attendance": True},
         )
         self.assertEqual(res.status_code, 400)
         self.assertIn("锁定", res.get_json()["error"])
@@ -439,6 +531,26 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         row = res.get_json()["rows"][0]
         self.assertEqual(row["automatic"]["injury_days"], 1.0)
+
+    def test_manager_batch_status_updates_manager_fields(self) -> None:
+        """管理人员批量标「工伤」→ 管理人员列表工伤天数按勾选天数累计。"""
+        res = self.client.put(
+            BATCH_ENDPOINT,
+            json={
+                "month": "2026-05",
+                "emp_id": self.manager_id,
+                "dates": ["2026-05-12", "2026-05-13"],
+                "status": "工伤",
+            },
+        )
+        self.assertEqual(res.status_code, 200)
+
+        res = self.client.get(
+            f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}"
+        )
+        self.assertEqual(res.status_code, 200)
+        row = res.get_json()["rows"][0]
+        self.assertEqual(row["automatic"]["injury_days"], 2.0)
 
     def test_manager_full_status_syncs_overtime_stats(self) -> None:
         """管理人员逐日修正后加班统计表同步重算。

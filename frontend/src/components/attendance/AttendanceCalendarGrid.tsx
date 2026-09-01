@@ -93,7 +93,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
               {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
               {override && <span className="cal-badge cal-badge-override">修正</span>}
               {override?.is_evening_overtime && <span className="cal-badge cal-badge-evening">晚加</span>}
-              {override?.is_meal_ticket && <span className="cal-badge cal-badge-meal">菜</span>}
+              {override?.is_actual_attendance === true && <span className="cal-badge cal-badge-actual">实</span>}
               {override?.status && !ATTENDANCE_STATUS_KEYS.has(override.status) && !override.is_evening_overtime && (
                 <span className={`cal-badge${LEAVE_STATUS_BG[override.status] ? " cal-badge-leave" : ""}`}>
                   {override.status}
@@ -240,7 +240,7 @@ function hasOverrideContent(override: DailyAttendanceOverrideValues | null | und
   return Boolean(
     override.status ||
       override.is_evening_overtime != null ||
-      override.is_meal_ticket != null ||
+      override.is_actual_attendance != null ||
       override.work_hours != null ||
       override.late_minutes != null ||
       override.early_leave_minutes != null ||

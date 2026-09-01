@@ -20,6 +20,14 @@ import type { AttendanceCalendarData, DailyAttendanceOverrideValues } from "../.
 export const EMPLOYEE_LEAVE_STATUSES = ["病假", "工伤", "丧假", "事假", "补休（调休）", "婚假"];
 export const MANAGER_LEAVE_STATUSES = ["工伤", "出差", "婚假", "丧假"];
 
+// 批量设置面板的状态选项（出勤类 + 假种），与后端 *_DAILY_STATUSES 保持一致
+export const EMPLOYEE_DAILY_STATUS_OPTIONS = ["全勤", "上午出勤", "下午出勤", "缺勤", ...EMPLOYEE_LEAVE_STATUSES];
+export const MANAGER_DAILY_STATUS_OPTIONS = ["全勤", "上午出勤", "下午出勤", "缺勤", ...MANAGER_LEAVE_STATUSES];
+
+// 批量面板下拉的哨兵值：不动该字段 / 清除状态恢复跟随系统
+const BATCH_STATUS_CLEAR = "__clear__";
+type BatchActualChoice = "keep" | "on" | "off";
+
 // 快速连点合并为一次保存请求的等待窗口
 const SAVE_DEBOUNCE_MS = 350;
 
@@ -56,7 +64,7 @@ interface DetailFormState {
   lateMinutes: string;
   earlyLeaveMinutes: string;
   eveningOvertime: boolean;
-  mealTicket: boolean;
+  actualAttendance: boolean;
   remark: string;
 }
 
@@ -65,7 +73,7 @@ const EMPTY_FORM: DetailFormState = {
   lateMinutes: "",
   earlyLeaveMinutes: "",
   eveningOvertime: false,
-  mealTicket: false,
+  actualAttendance: false,
   remark: "",
 };
 
@@ -89,8 +97,12 @@ export default function AttendanceOverrideCalendarModal({
   const [isSaving, setIsSaving] = useState(false);
   const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [multiSelectedDates, setMultiSelectedDates] = useState<string[]>([]);
+  const [batchStatus, setBatchStatus] = useState("");
+  const [batchActual, setBatchActual] = useState<BatchActualChoice>("keep");
 
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
+  const batchStatusOptions = isManager ? MANAGER_DAILY_STATUS_OPTIONS : EMPLOYEE_DAILY_STATUS_OPTIONS;
+  const hasBatchChanges = batchStatus !== "" || batchActual !== "keep";
   const selectedDay = useMemo(
     () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
     [calendar, selectedDate],
@@ -132,7 +144,7 @@ export default function AttendanceOverrideCalendarModal({
       lateMinutes: currentOverride?.late_minutes == null ? "" : String(currentOverride.late_minutes),
       earlyLeaveMinutes: currentOverride?.early_leave_minutes == null ? "" : String(currentOverride.early_leave_minutes),
       eveningOvertime: Boolean(currentOverride?.is_evening_overtime),
-      mealTicket: Boolean(currentOverride?.is_meal_ticket),
+      actualAttendance: Boolean(currentOverride?.is_actual_attendance),
       remark: currentOverride?.remark ?? "",
     });
     setDetailExpanded(true);
@@ -147,7 +159,7 @@ export default function AttendanceOverrideCalendarModal({
       late_minutes: form.lateMinutes,
       early_leave_minutes: form.earlyLeaveMinutes,
       is_evening_overtime: form.eveningOvertime,
-      is_meal_ticket: form.mealTicket,
+      is_actual_attendance: form.actualAttendance,
       remark: form.remark,
       ...overrides,
     };
@@ -252,7 +264,7 @@ export default function AttendanceOverrideCalendarModal({
         date,
         status: nextStatus,
         is_evening_overtime: dayOverride?.is_evening_overtime ?? undefined,
-        is_meal_ticket: dayOverride?.is_meal_ticket ?? undefined,
+        is_actual_attendance: dayOverride?.is_actual_attendance ?? undefined,
         work_hours: dayOverride?.work_hours ?? "",
         late_minutes: dayOverride?.late_minutes ?? "",
         early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
@@ -262,9 +274,9 @@ export default function AttendanceOverrideCalendarModal({
     );
   }
 
-  // 多选模式下批量标记/取消菜票，成功后用后端日历刷新并清空勾选
-  async function handleBatchMealTicket(flag: boolean) {
-    if (multiSelectedDates.length === 0 || isSaving) {
+  // 多选模式下批量应用状态/实际打卡设置，成功后用后端日历刷新并清空勾选
+  async function handleBatchApply() {
+    if (multiSelectedDates.length === 0 || isSaving || !hasBatchChanges) {
       return;
     }
     setIsSaving(true);
@@ -273,13 +285,22 @@ export default function AttendanceOverrideCalendarModal({
         month,
         emp_id: employee.id,
         dates: [...multiSelectedDates],
-        is_meal_ticket: flag,
       };
+      if (batchStatus === BATCH_STATUS_CLEAR) {
+        payload.status = "";
+      } else if (batchStatus) {
+        payload.status = batchStatus;
+      }
+      if (batchActual !== "keep") {
+        payload.is_actual_attendance = batchActual === "on";
+      }
       const response = await saveAdminDailyOverrideBatch<unknown>(payload);
       setCalendar(response.calendar);
       setMultiSelectedDates([]);
+      setBatchStatus("");
+      setBatchActual("keep");
       onRowRefresh(response.row);
-      notification.success(flag ? "已批量标记算菜票" : "已批量取消菜票");
+      notification.success(`已批量应用 ${payload.dates.length} 天`);
     } catch (caughtError: unknown) {
       notification.error(caughtError instanceof Error ? caughtError.message : "批量保存失败");
     } finally {
@@ -345,27 +366,59 @@ export default function AttendanceOverrideCalendarModal({
                     {isMultiSelect ? (
                       <>
                         <span className="attendance-override-multiselect-count">{`已选 ${multiSelectedDates.length} 天`}</span>
-                        <button
-                          className="account-action-button account-action-button--primary"
-                          disabled={isLocked || isSaving || multiSelectedDates.length === 0}
-                          onClick={() => void handleBatchMealTicket(true)}
-                          type="button"
-                        >
-                          批量算菜票
-                        </button>
-                        <button
-                          className="account-action-button"
-                          disabled={isLocked || isSaving || multiSelectedDates.length === 0}
-                          onClick={() => void handleBatchMealTicket(false)}
-                          type="button"
-                        >
-                          批量取消菜票
-                        </button>
+                        <div className="attendance-override-batch-panel" data-testid="daily-override-batch-panel">
+                          <label className="attendance-override-batch-field">
+                            <span className="attendance-override-batch-label">考勤状态</span>
+                            <select
+                              aria-label="批量考勤状态"
+                              disabled={isLocked || isSaving}
+                              onChange={(event) => setBatchStatus(event.target.value)}
+                              value={batchStatus}
+                            >
+                              <option value="">不动</option>
+                              <option value={BATCH_STATUS_CLEAR}>跟随系统（清除状态）</option>
+                              {batchStatusOptions.map((status) => (
+                                <option key={status} value={status}>{status}</option>
+                              ))}
+                            </select>
+                          </label>
+                          <div aria-label="批量实际打卡" className="attendance-override-batch-field" role="group">
+                            <span className="attendance-override-batch-label">实际打卡</span>
+                            <div className="attendance-override-batch-choices">
+                              {([
+                                ["keep", "不动"],
+                                ["on", "算"],
+                                ["off", "不算"],
+                              ] as const).map(([value, label]) => (
+                                <label key={value}>
+                                  <input
+                                    checked={batchActual === value}
+                                    disabled={isLocked || isSaving}
+                                    name="batch-actual-attendance"
+                                    onChange={() => setBatchActual(value)}
+                                    type="radio"
+                                  />
+                                  <span>{label}</span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            className="account-action-button account-action-button--primary"
+                            disabled={isLocked || isSaving || multiSelectedDates.length === 0 || !hasBatchChanges}
+                            onClick={() => void handleBatchApply()}
+                            type="button"
+                          >
+                            批量应用
+                          </button>
+                        </div>
                         <button
                           className="daypanel-toggle"
                           onClick={() => {
                             setIsMultiSelect(false);
                             setMultiSelectedDates([]);
+                            setBatchStatus("");
+                            setBatchActual("keep");
                           }}
                           type="button"
                         >
@@ -430,7 +483,7 @@ export default function AttendanceOverrideCalendarModal({
       currentOverride &&
         (currentOverride.status ||
           currentOverride.is_evening_overtime != null ||
-          currentOverride.is_meal_ticket != null ||
+          currentOverride.is_actual_attendance != null ||
           currentOverride.work_hours != null ||
           currentOverride.late_minutes != null ||
           currentOverride.early_leave_minutes != null ||
@@ -532,15 +585,15 @@ export default function AttendanceOverrideCalendarModal({
                 <span className="daypanel-field-label">晚上加班</span>
                 <span className="daypanel-field-sub">0.5 出勤</span>
               </label>
-              <label className="daypanel-field daypanel-field--check" title="标记当天算菜票，仅作标记不影响出勤统计">
+              <label className="daypanel-field daypanel-field--check" title="勾选后当天计 1 天实际出勤，取消则不计，未勾选按刷卡口径">
                 <input
-                  checked={form.mealTicket}
+                  checked={form.actualAttendance}
                   disabled={isLocked || isSaving}
-                  onChange={(event) => setForm((current) => ({ ...current, mealTicket: event.target.checked }))}
+                  onChange={(event) => setForm((current) => ({ ...current, actualAttendance: event.target.checked }))}
                   type="checkbox"
                 />
-                <span className="daypanel-field-label">算菜票</span>
-                <span className="daypanel-field-sub">仅标记</span>
+                <span className="daypanel-field-label">算实际打卡</span>
+                <span className="daypanel-field-sub">计 1 天</span>
               </label>
               <label className="daypanel-field">
                 <span className="daypanel-field-label">工时（小时）</span>
@@ -593,7 +646,7 @@ export default function AttendanceOverrideCalendarModal({
                         late_minutes: form.lateMinutes === "" ? null : Number(form.lateMinutes),
                         early_leave_minutes: form.earlyLeaveMinutes === "" ? null : Number(form.earlyLeaveMinutes),
                         is_evening_overtime: form.eveningOvertime,
-                        is_meal_ticket: form.mealTicket,
+                        is_actual_attendance: form.actualAttendance,
                         remark: form.remark,
                       });
                     }

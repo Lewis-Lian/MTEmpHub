@@ -292,6 +292,15 @@ def _actual_attendance_day_value(record) -> float:
     return 1.0 if _raw_punch_count(record) >= 2 else 0.0
 
 
+def _effective_actual_attendance_day_value(record, override) -> float:
+    """当日实际出勤天数：实际打卡修正优先（勾选算→1、明确不算→0），否则按刷卡口径。"""
+    if override is not None and override.is_actual_attendance is not None:
+        return 1.0 if override.is_actual_attendance else 0.0
+    if record is None:
+        return 0.0
+    return _actual_attendance_day_value(record)
+
+
 def _effective_attendance_day_value(record, override, is_evening_overtime: bool) -> float:
     """当日考勤天数（含逐日修正与晚加班条口径）：
     勾选晚上加班 → 固定 0.5；状态修正 → 按状态映射；当日有晚加班条 → 固定 0.5；
@@ -985,8 +994,18 @@ def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = 
             daily_override_by_emp.get(employee.id, {}),
             evening_dates_by_emp.get(employee.id, set()),
         )
+        # 实际出勤天数（effective 口径）：实际打卡修正优先，未设置按刷卡口径；
+        # 覆盖「有 DailyRecord 的日期」∪「逐日修正表有记录的日期」（无记录日也可修正）
+        employee_daily_overrides = daily_override_by_emp.get(employee.id, {})
+        records_by_date = {r.record_date: r for r in daily_rows if r.record_date}
         actual_attendance_days = round(
-            sum(_actual_attendance_day_value(r) for r in daily_rows), 2
+            sum(
+                _effective_actual_attendance_day_value(
+                    records_by_date.get(day), employee_daily_overrides.get(day)
+                )
+                for day in set(records_by_date) | set(employee_daily_overrides)
+            ),
+            2,
         )
         override = overrides.get(employee.id)
         if override:

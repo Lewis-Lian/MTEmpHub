@@ -1,4 +1,4 @@
-"""add daily_attendance_overrides.is_meal_ticket
+"""add daily_attendance_overrides.is_actual_attendance
 
 Revision ID: d4e5f6a7b8c9
 Revises: c3d4e5f6a7b8
@@ -18,9 +18,9 @@ depends_on = None
 
 def upgrade():
     with op.batch_alter_table('daily_attendance_overrides', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('is_meal_ticket', sa.Boolean(), nullable=True))
+        batch_op.add_column(sa.Column('is_actual_attendance', sa.Boolean(), nullable=True))
 
 
 def downgrade():
     with op.batch_alter_table('daily_attendance_overrides', schema=None) as batch_op:
-        batch_op.drop_column('is_meal_ticket')
+        batch_op.drop_column('is_actual_attendance')

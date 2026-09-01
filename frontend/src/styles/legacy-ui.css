@@ -4573,7 +4573,7 @@ input[type="checkbox"] {
   gap: 12px;
   align-items: start;
 }
-/* 日历上方多选工具栏：进入多选后勾选日期批量算/取消菜票 */
+/* 日历上方多选工具栏：进入多选后勾选日期批量设置状态/实际打卡 */
 .attendance-override-multiselect-bar {
   display: flex;
   align-items: center;
@@ -4585,6 +4585,44 @@ input[type="checkbox"] {
   font-size: 13px;
   font-weight: 600;
   color: #1e7f4f;
+}
+/* 批量设置面板：状态下拉 + 实际打卡三选 + 应用 */
+.attendance-override-batch-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid #e3e9f2;
+  border-radius: 10px;
+  background: #f8fafd;
+}
+.attendance-override-batch-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.attendance-override-batch-label {
+  font-size: 13px;
+  color: #5a6b85;
+}
+.attendance-override-batch-field select {
+  padding: 4px 8px;
+  border: 1px solid #ccd6e4;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 13px;
+}
+.attendance-override-batch-choices {
+  display: flex;
+  gap: 10px;
+}
+.attendance-override-batch-choices label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
 }
 .attendance-override-calendar-side {
   position: sticky;

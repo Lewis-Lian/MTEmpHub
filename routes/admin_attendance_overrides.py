@@ -281,13 +281,13 @@ def _parse_daily_override_payload(data: dict, employee) -> tuple[dict, tuple | N
     else:
         values["is_evening_overtime"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
 
-    flag = data.get("is_meal_ticket")
+    flag = data.get("is_actual_attendance")
     if flag in (None, ""):
-        values["is_meal_ticket"] = None
+        values["is_actual_attendance"] = None
     elif isinstance(flag, bool):
-        values["is_meal_ticket"] = flag
+        values["is_actual_attendance"] = flag
     else:
-        values["is_meal_ticket"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
+        values["is_actual_attendance"] = str(flag).strip().lower() in ("true", "1", "yes", "是")
 
     values["remark"] = (data.get("remark") or "").strip()
     return values, None
@@ -361,19 +361,36 @@ def save_daily_attendance_override_record_api():
 
 
 def save_daily_attendance_override_batch_api():
-    """批量修正"当天算菜票"：多选日期只改 is_meal_ticket 位，保留同日其他修正字段。"""
+    """批量逐日修正：多选日期合并写入 status / is_actual_attendance，保留同日其他修正字段。
+
+    status 缺省不动该字段，空串清除状态（跟随系统），合法状态设置之；
+    is_actual_attendance 缺省不动，布尔值设置之；两者至少提供一个。
+    """
     from routes import admin_core as admin_module
-    from services.daily_override_service import DAILY_OVERRIDE_FIELDS
+    from services.daily_override_service import DAILY_OVERRIDE_FIELDS, daily_statuses_for
 
     data = request.json or {}
     emp_id = int(data.get("emp_id") or 0)
     month = admin_module._validate_month(data.get("month"))
     if not emp_id or not month:
         return jsonify({"error": "请选择员工和有效月份"}), 400
+    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    if not employee:
+        return jsonify({"error": "员工不存在"}), 400
 
-    flag = data.get("is_meal_ticket")
-    if not isinstance(flag, bool):
-        return jsonify({"error": "is_meal_ticket 必须为布尔值"}), 400
+    values: dict[str, object] = {}
+    if "status" in data:
+        status = str(data.get("status") or "").strip()
+        if status and status not in daily_statuses_for(employee):
+            return jsonify({"error": f"无效的考勤状态：{status}"}), 400
+        values["status"] = status or None
+    flag = data.get("is_actual_attendance")
+    if flag is not None:
+        if not isinstance(flag, bool):
+            return jsonify({"error": "is_actual_attendance 必须为布尔值"}), 400
+        values["is_actual_attendance"] = flag
+    if not values:
+        return jsonify({"error": "请至少选择要修改的考勤状态或实际打卡"}), 400
 
     parsed_dates: list = []
     for item in data.get("dates") or []:
@@ -390,12 +407,9 @@ def save_daily_attendance_override_batch_api():
         return jsonify({"error": "请选择至少一个日期"}), 400
 
     account_set = admin_module._account_set_for_month(month)
-    locked_error = admin_module._ensure_account_set_unlocked(account_set, "批量保存菜票修正")
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "批量保存逐日修正")
     if locked_error:
         return locked_error
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
-    if not employee:
-        return jsonify({"error": "员工不存在"}), 400
 
     rows = {
         row.record_date: row
@@ -404,6 +418,7 @@ def save_daily_attendance_override_batch_api():
             DailyAttendanceOverride.record_date.in_(parsed_dates),
         ).all()
     }
+    has_changes = False
     for record_date in parsed_dates:
         row = rows.get(record_date)
         before_values: dict[str, object] = {"record_date": record_date.isoformat()}
@@ -412,17 +427,22 @@ def save_daily_attendance_override_batch_api():
         if row:
             before_values["remark"] = row.remark or ""
         after_values = dict(before_values)
-        after_values["is_meal_ticket"] = flag
+        after_values.update(values)
         if not admin_module._has_override_state_changes(before_values, after_values):
             continue
         if not row:
             row = DailyAttendanceOverride(emp_id=emp_id, record_date=record_date)
             admin_module.db.session.add(row)
             rows[record_date] = row
-        row.is_meal_ticket = flag
+        for key, value in values.items():
+            setattr(row, key, value)
         row.updated_by = admin_module.g.current_user.id
-        admin_module._record_override_history("daily", emp_id, month, "meal_ticket_batch", before_values, after_values)
+        admin_module._record_override_history("daily", emp_id, month, "batch", before_values, after_values)
+        has_changes = True
     admin_module.db.session.commit()
+    if has_changes and employee.is_manager:
+        # 状态批量修正影响出勤/假种天数，需同步重算加班查询页数据源
+        admin_module._sync_manager_month_stats(month)
 
     return _daily_record_response(employee, month)
 

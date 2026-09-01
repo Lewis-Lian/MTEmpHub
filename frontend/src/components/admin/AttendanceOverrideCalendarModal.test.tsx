@@ -315,17 +315,17 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(screen.queryByRole("button", { name: "标记 事假" })).toBeNull();
   });
 
-  it("单日面板勾选「算菜票」并保存", async () => {
+  it("单日面板勾选「算实际打卡」并保存", async () => {
     mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
-    fireEvent.click(screen.getByLabelText(/算菜票/));
+    fireEvent.click(screen.getByLabelText(/算实际打卡/));
     fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
 
     await waitFor(() => {
-      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-01", is_meal_ticket: true }));
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-01", is_actual_attendance: true }));
     });
   });
 
@@ -350,11 +350,14 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(mockSaveBatch).not.toHaveBeenCalled();
   });
 
-  it("多选模式下批量算菜票调用批量接口并刷新", async () => {
+  it("多选批量设置面板：同时应用状态与实际打卡并刷新", async () => {
     const onRowRefresh = vi.fn();
     const row = { employee: EMPLOYEE };
     mockSaveBatch.mockResolvedValue({
-      calendar: calendarData({ "2026-07-01": { is_meal_ticket: true }, "2026-07-15": { is_meal_ticket: true } }),
+      calendar: calendarData({
+        "2026-07-01": { status: "病假", is_actual_attendance: true },
+        "2026-07-15": { status: "病假", is_actual_attendance: true },
+      }),
       row,
     });
     renderModal({ onRowRefresh });
@@ -363,38 +366,102 @@ describe("AttendanceOverrideCalendarModal", () => {
     fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
-    fireEvent.click(screen.getByRole("button", { name: "批量算菜票" }));
+    fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "病假" } });
+    fireEvent.click(screen.getByLabelText("算"));
+    fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
 
     await waitFor(() => {
       expect(mockSaveBatch).toHaveBeenCalledWith({
         month: "2026-07",
         emp_id: EMPLOYEE.id,
         dates: ["2026-07-01", "2026-07-15"],
-        is_meal_ticket: true,
+        status: "病假",
+        is_actual_attendance: true,
       });
     });
     expect(onRowRefresh).toHaveBeenCalledWith(row);
-    // 成功后清空勾选并显示菜徽章
+    // 成功后清空勾选并显示实徽章
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "2026-07-01" })).not.toHaveClass("is-multi-selected");
     });
-    expect(screen.getAllByText("菜")).toHaveLength(2);
+    expect(screen.getAllByText("实")).toHaveLength(2);
   });
 
-  it("多选模式下批量取消菜票传 false", async () => {
+  it("多选批量只选状态时 payload 不含实际打卡", async () => {
     mockSaveBatch.mockResolvedValue({ calendar: calendarData(), row: {} });
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
     fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
-    fireEvent.click(screen.getByRole("button", { name: "批量取消菜票" }));
+    fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "事假" } });
+    fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
+
+    await waitFor(() => {
+      expect(mockSaveBatch).toHaveBeenCalledWith({
+        month: "2026-07",
+        emp_id: EMPLOYEE.id,
+        dates: ["2026-07-15"],
+        status: "事假",
+      });
+    });
+  });
+
+  it("多选批量选「跟随系统」传空串清除状态", async () => {
+    mockSaveBatch.mockResolvedValue({ calendar: calendarData(), row: {} });
+    renderModal();
+
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "__clear__" } });
+    fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
 
     await waitFor(() => {
       expect(mockSaveBatch).toHaveBeenCalledWith(
-        expect.objectContaining({ dates: ["2026-07-15"], is_meal_ticket: false }),
+        expect.objectContaining({ dates: ["2026-07-15"], status: "" }),
       );
     });
+  });
+
+  it("多选批量只选实际打卡「不算」传 false", async () => {
+    mockSaveBatch.mockResolvedValue({ calendar: calendarData(), row: {} });
+    renderModal();
+
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByLabelText("不算"));
+    fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
+
+    await waitFor(() => {
+      expect(mockSaveBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ dates: ["2026-07-15"], is_actual_attendance: false }),
+      );
+    });
+  });
+
+  it("多选批量状态与实际打卡都选不动时应用按钮禁用", async () => {
+    renderModal();
+
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    expect(screen.getByRole("button", { name: "批量应用" })).toBeDisabled();
+    expect(mockSaveBatch).not.toHaveBeenCalled();
+  });
+
+  it("多选批量面板按人员类型显示状态选项", async () => {
+    mockSaveBatch.mockResolvedValue({ calendar: calendarData(), row: {} });
+    renderModal({ isManager: true });
+
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    const select = screen.getByLabelText("批量考勤状态") as HTMLSelectElement;
+    const options = Array.from(select.options).map((option) => option.value);
+    expect(options).toContain("出差");
+    expect(options).not.toContain("事假");
   });
 
   it("退出多选模式清空勾选并恢复单选交互", async () => {

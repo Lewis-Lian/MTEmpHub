@@ -13,7 +13,7 @@
 .cal-badge-late { background: #fff8dc; color: #8a6d00; border-color: #ece1a0; }
 .cal-badge-early { background: #f3e8fd; color: #6b2fbf; border-color: #e0cffa; }
 .cal-badge-holiday { background: #fdeeee; color: #b02a2a; border-color: #f6cfcf; }
-.cal-badge-meal { background: #e8f7ee; color: #1e7f4f; border-color: #bfe6cf; font-weight: 600; }
+.cal-badge-actual { background: #e8f7ee; color: #1e7f4f; border-color: #bfe6cf; font-weight: 600; }
 
 .attendance-calendar-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;

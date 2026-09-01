@@ -170,8 +170,8 @@ def ensure_schema_compatibility() -> None:
 
     daily_override_columns = _get_column_names(inspector, "daily_attendance_overrides")
     if daily_override_columns is not None:
-        if "is_meal_ticket" not in daily_override_columns:
-            db.session.execute(text("ALTER TABLE daily_attendance_overrides ADD COLUMN is_meal_ticket BOOLEAN"))
+        if "is_actual_attendance" not in daily_override_columns:
+            db.session.execute(text("ALTER TABLE daily_attendance_overrides ADD COLUMN is_actual_attendance BOOLEAN"))
             db.session.commit()
 
     # 性能复合索引（模型层与 Alembic 迁移 b2c3d4e5f6a7 同名同列）：
