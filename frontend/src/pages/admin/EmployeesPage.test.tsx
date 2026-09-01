@@ -83,14 +83,27 @@ describe("EmployeesPage 离职功能", () => {
     );
   });
 
-  it("已离职行提供恢复在职按钮", async () => {
+  it("已离职行通过更多操作菜单提供恢复在职", async () => {
     mockReinstate.mockResolvedValue({ status: "ok", employee: employees[1] });
     render(<EmployeesPage />);
     await screen.findByText("在职员工");
     fireEvent.change(screen.getByLabelText("在职状态"), { target: { value: "resigned" } });
 
+    fireEvent.click(await screen.findByRole("button", { name: "更多操作" }));
     fireEvent.click(await screen.findByRole("button", { name: "恢复在职" }));
 
     await waitFor(() => expect(mockReinstate).toHaveBeenCalledWith(2));
+  });
+
+  it("在职行通过更多操作菜单发起办理离职并预填工号", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "更多操作" })[0]);
+    // 顶部"办理离职"主入口与菜单项同名，取最后渲染的菜单项
+    const resignButtons = screen.getAllByRole("button", { name: "办理离职" });
+    fireEvent.click(resignButtons[resignButtons.length - 1]);
+
+    expect(await screen.findByLabelText("离职人员编号")).toHaveValue("E100");
   });
 });
