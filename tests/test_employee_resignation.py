@@ -278,3 +278,130 @@ class TestResignationQueryFilter(EmployeeResignationTestBase):
         text = str(response.get_json())
         self.assertIn("在职员工", text)
         self.assertNotIn("已离职员工", text)
+
+    def _login_readonly(self, username: str, password: str) -> None:
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        self.client.post(
+            "/api/auth/login",
+            json={"username": username, "password": password, "captcha_token": captcha_token},
+        )
+
+    def test_directly_bound_resigned_employee_not_queryable(self) -> None:
+        # 离职员工留有历史考勤数据，直接绑定的账号在查询中心也不得查到
+        with self.app.app_context():
+            from models.daily_record import DailyRecord
+
+            db.session.add(
+                DailyRecord(emp_id=self.resigned_emp_id, record_date=date(2026, 8, 20), actual_hours=8)
+            )
+            user = User(username="viewer", role="readonly", page_permissions={"punch_records": True})
+            user.set_password("pw123456")
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=self.resigned_emp_id))
+            db.session.commit()
+
+        self._login_readonly("viewer", "pw123456")
+
+        response = self.client.get("/api/query/punch-records?month=2026-08")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("已离职员工", str(response.get_json()))
+
+
+class TestResignationAccountLinkage(EmployeeResignationTestBase):
+    def _create_user_bound_to(self, username: str, emp_ids: list[int]) -> int:
+        with self.app.app_context():
+            user = User(username=username, role="readonly")
+            user.set_password("pw123456")
+            db.session.add(user)
+            db.session.flush()
+            for emp_id in emp_ids:
+                db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=emp_id))
+            db.session.commit()
+            return user.id
+
+    def test_unlock_rejected_for_resignation_disabled_account(self) -> None:
+        self._login()
+        user_id = self._create_user_bound_to("e200", [self.resigned_emp_id])
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "employee_resigned"
+            db.session.commit()
+
+        response = self.client.post(f"/api/admin/disabled-users/{user_id}/unlock")
+
+        self.assertEqual(response.status_code, 400)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertTrue(user.is_login_disabled())
+
+    def test_unlock_allowed_for_other_disable_reasons(self) -> None:
+        self._login()
+        user_id = self._create_user_bound_to("e200", [self.resigned_emp_id])
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "too_many_failed_attempts"
+            db.session.commit()
+
+        response = self.client.post(f"/api/admin/disabled-users/{user_id}/unlock")
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertFalse(user.is_login_disabled())
+
+    def test_manager_batch_creation_skips_resigned(self) -> None:
+        self._login()
+        with self.app.app_context():
+            active = db.session.get(Employee, self.active_emp_id)
+            resigned = db.session.get(Employee, self.resigned_emp_id)
+            active.is_manager = True
+            resigned.is_manager = True
+            db.session.commit()
+
+        response = self.client.post(
+            "/api/admin/users/manager-batch", json={"password": "pw123456"}
+        )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.get_json()
+        created_usernames = {user["username"] for user in body["created_users"]}
+        self.assertIn("E100", created_usernames)
+        self.assertNotIn("E200", created_usernames)
+
+    def test_reinstate_unlocks_only_when_no_other_resigned_binding(self) -> None:
+        self._login()
+        with self.app.app_context():
+            third_emp = Employee(emp_no="E300", name="第三人")
+            db.session.add(third_emp)
+            db.session.commit()
+            third_emp_id = third_emp.id
+
+        user_id = self._create_user_bound_to("shared", [self.resigned_emp_id, third_emp_id])
+
+        with self.app.app_context():
+            third = db.session.get(Employee, third_emp_id)
+            third.resigned_at = date(2026, 9, 1)
+            # 两名绑定员工先后离职，账号因离职被禁用
+            user = db.session.get(User, user_id)
+            user.login_disabled_until_admin_unlock = True
+            user.login_disabled_reason = "employee_resigned"
+            db.session.commit()
+
+        # 恢复第一名员工：账号仍绑定另一名离职员工，不应解禁
+        first = self.client.post(f"/api/admin/employees/{self.resigned_emp_id}/reinstate")
+        self.assertEqual(first.status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertTrue(user.is_login_disabled())
+
+        # 恢复第二名员工后，账号才解禁
+        second = self.client.post(f"/api/admin/employees/{third_emp_id}/reinstate")
+        self.assertEqual(second.status_code, 200)
+        with self.app.app_context():
+            user = db.session.get(User, user_id)
+            self.assertFalse(user.is_login_disabled())

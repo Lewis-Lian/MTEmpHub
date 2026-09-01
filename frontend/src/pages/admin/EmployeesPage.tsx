@@ -52,6 +52,11 @@ const attendanceSourceLabels: Record<string, string> = {
   auto_fallback: "自动回退",
 };
 
+function todayLocalDate(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function employeeToForm(row: AdminEmployee): EmployeeFormState {
   return {
     emp_no: row.emp_no,
@@ -90,7 +95,7 @@ export default function EmployeesPage() {
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
   const [showResignModal, setShowResignModal] = useState(false);
   const [resignEmpNo, setResignEmpNo] = useState("");
-  const [resignDate, setResignDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [resignDate, setResignDate] = useState(() => todayLocalDate());
   const [isResigning, setIsResigning] = useState(false);
 
   const notification = useNotification();
@@ -230,7 +235,7 @@ export default function EmployeesPage() {
 
   function openResignModal(empNo: string) {
     setResignEmpNo(empNo);
-    setResignDate(new Date().toISOString().slice(0, 10));
+    setResignDate(todayLocalDate());
     setShowResignModal(true);
   }
 
