@@ -9,6 +9,7 @@ import {
   fetchAccountSetImports,
   fetchAccountSets,
   lockAccountSet,
+  resetAccountSetImported,
   unlockAccountSet,
   updateAccountSet,
   uploadAccountSetRawFiles,
@@ -732,6 +733,47 @@ export default function AdminDashboardPage() {
                             return;
                           }
                           const isConfirmed = await confirm({
+                            message:
+                              `确认清空 ${selectedAccountSet.month} 账套的已导入数据吗？` +
+                              "将删除该月的月报、日报、请假单、加班单数据及全部归档文件，" +
+                              "清空后需要重新上传源文件并重新计算，且不影响其他月份。",
+                            type: "danger",
+                          });
+                          if (!isConfirmed) {
+                            return;
+                          }
+                          setProgressVisible(true);
+                          setProgress(0);
+                          setLoadingText("正在清空已导入数据...");
+                          try {
+                            const result = await resetAccountSetImported(selectedAccountSet.id);
+                            setProgress(100);
+                            setLoadingText("已导入数据已清空！");
+                            const deletedTotal = Object.values(result.deleted ?? {}).reduce((sum, count) => sum + count, 0);
+                            notification.success(`已清空 ${selectedAccountSet.month} 已导入数据（共 ${deletedTotal} 条记录），请重新上传源文件。`);
+                            await reloadAccountSets(selectedAccountSet.id);
+                          } catch (caughtError) {
+                            notification.error(caughtError instanceof ApiError ? caughtError.message : "清空已导入数据失败");
+                          } finally {
+                            setTimeout(() => {
+                              setProgressVisible(false);
+                            }, 500);
+                          }
+                        })
+                      }
+                      type="button"
+                    >
+                      清空已导入数据
+                    </button>
+                    <button
+                      className="btn-delete-set"
+                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                      onClick={() =>
+                        void runAction(async () => {
+                          if (!selectedAccountSet) {
+                            return;
+                          }
+                          const isConfirmed = await confirm({
                             message: "确认删除该账套吗？将同时删除账套下的归档文件记录。",
                             type: "danger",
                           });
@@ -1080,17 +1122,26 @@ export default function AdminDashboardPage() {
                           setLoadingText("正在上传原始文件...");
 
                           try {
-                            await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
+                            const response = await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
                               setProgress(percent);
                               if (percent >= 100) {
                                 setLoadingText("上传完成，正在归档原始文件...");
                               }
                             });
                             setProgress(100);
-                            setLoadingText("文件上传成功！正在同步账套状态...");
+                            setLoadingText("文件上传完成！正在同步账套状态...");
                             setUploadFiles(Array.from({ length: 6 }, () => null));
                             await reloadAccountSets(selectedAccountSet.id);
-                            notification.success("上传成功，已归档到账套。");
+                            const rejectedFiles = (response.results ?? []).filter((result) => result.status === "error");
+                            if (rejectedFiles.length) {
+                              notification.warning(
+                                `上传完成，${rejectedFiles.length} 个文件被拒绝：${rejectedFiles
+                                  .map((result) => `${result.file}（${result.error ?? "未知原因"}）`)
+                                  .join("；")}`,
+                              );
+                            } else {
+                              notification.success("上传成功，已归档到账套。");
+                            }
                             setShowModal(null);
                           } catch (caughtError) {
                             notification.error(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");

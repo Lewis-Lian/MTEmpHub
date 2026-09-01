@@ -13,6 +13,52 @@ from routes.auth_helpers import admin_required
 
 logger = logging.getLogger(__name__)
 
+# 月份校验只针对月报/日报四类；请假单/加班单文件名惯例不含年月
+_MONTH_VALIDATED_TYPES = {"monthly", "daily", "manager_monthly", "manager_daily"}
+# 日报内容特征列：月报是按人聚合指标，若同时出现这些逐日打卡列，说明内容是日报
+_DAILY_CONTENT_MARKERS = ("刷卡时间数据", "星期", "段1实际上班时间")
+
+
+def _validate_uploaded_file(file, filename: str, file_type: str, account_set) -> str | None:
+    """上传前的防线校验，返回错误文案；None 表示通过。
+
+    历史事故：把日报改名为「（月报）」上传，全程无提示，日报的逐日打卡列
+    被当作月报指标写入 MonthlyReport，污染整月统计。
+    """
+    if file_type in _MONTH_VALIDATED_TYPES:
+        from services.import_service import ImportService
+
+        report_month = ImportService._extract_report_month(filename)
+        if report_month == "1970-01":
+            return "文件名中未识别到年月，无法确认所属月份（如「2026_8月…」）"
+        if report_month != account_set.month:
+            return f"文件名月份（{report_month}）与账套月份（{account_set.month}）不一致，请勿错传"
+    if file_type in ("monthly", "manager_monthly"):
+        if _monthly_content_looks_like_daily(file):
+            return "文件内容是日报格式（含逐日打卡列），与月报类型不符，请检查是否改错了文件名"
+    return None
+
+
+def _monthly_content_looks_like_daily(file) -> bool:
+    try:
+        wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        try:
+            ws = wb[wb.sheetnames[0]]
+            texts: list[str] = []
+            for row_idx, row in enumerate(ws.iter_rows(values_only=True)):
+                texts.extend(str(value) for value in row if value is not None)
+                if row_idx >= 9:
+                    break
+        finally:
+            wb.close()
+    except Exception:
+        # 解析失败不在这里拦，交给后续导入阶段按表头规则报错
+        return False
+    finally:
+        file.seek(0)
+    joined = "\n".join(texts)
+    return all(marker in joined for marker in _DAILY_CONTENT_MARKERS)
+
 
 @admin_required
 def download_manager_overtime_template():
@@ -94,6 +140,13 @@ def import_raw_files():
     for file in uploaded_files:
         filename = file.filename.strip()
         file_type = admin_module._account_set_file_type(filename)
+
+        validation_error = _validate_uploaded_file(file, filename, file_type, account_set)
+        if validation_error:
+            failed += 1
+            results.append({"file": filename, "status": "error", "error": validation_error})
+            continue
+
         previous_record = admin_module.AccountSetImport.query.filter_by(
             account_set_id=account_set.id, file_type=file_type
         ).first()

@@ -932,6 +932,57 @@ def unlock_account_set(account_set_id: int):
     return jsonify({"status": "ok", "account_set": _serialize_account_set(row)})
 
 
+def reset_account_set_imported(account_set_id: int):
+    """清空账套已导入数据：按账套月份删月报/日报/请假/加班及归档，供错传后重置。
+
+    管理人员月统计与年假余额不在清理范围：重传正确文件并重新计算后由计算管线
+    自行同步；归档文件与导入记录一并删除，避免残留错文件被再次计算。
+    """
+    from models.leave import LeaveRecord
+    from models.monthly_report import MonthlyReport
+
+    row = _require_model(AccountSet, account_set_id)
+    locked_error = _ensure_account_set_unlocked(row, "清空已导入数据")
+    if locked_error:
+        return locked_error
+
+    year, month = int(row.month[:4]), int(row.month[5:7])
+    start_date = date(year, month, 1)
+    next_year, next_month = (year + 1, 1) if month == 12 else (year, month + 1)
+    next_date = date(next_year, next_month, 1)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    next_dt = datetime.combine(next_date, datetime.min.time())
+
+    deleted = {
+        "monthly_reports": MonthlyReport.query.filter(
+            MonthlyReport.report_month == row.month
+        ).delete(synchronize_session=False),
+        "daily_records": DailyRecord.query.filter(
+            DailyRecord.record_date >= start_date, DailyRecord.record_date < next_date
+        ).delete(synchronize_session=False),
+        "leave_records": LeaveRecord.query.filter(
+            LeaveRecord.start_time >= start_dt, LeaveRecord.start_time < next_dt
+        ).delete(synchronize_session=False),
+        "overtime_records": OvertimeRecord.query.filter(
+            OvertimeRecord.start_time >= start_dt, OvertimeRecord.start_time < next_dt
+        ).delete(synchronize_session=False),
+    }
+
+    for record in row.imports:
+        path = (record.stored_path or "").strip()
+        if path and os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+    deleted["import_records"] = AccountSetImport.query.filter_by(
+        account_set_id=row.id
+    ).delete(synchronize_session=False)
+
+    db.session.commit()
+    return jsonify({"status": "ok", "month": row.month, "deleted": deleted})
+
+
 def delete_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     locked_error = _ensure_account_set_unlocked(row, "删除账套")
