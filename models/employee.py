@@ -23,6 +23,7 @@ class Employee(db.Model):
     include_in_manager_stats = db.Column(db.Boolean, default=False, nullable=False)
     employee_stats_attendance_source = db.Column(db.String(20), default=ATTENDANCE_SOURCE_EMPLOYEE, nullable=False)
     manager_stats_attendance_source = db.Column(db.String(20), default=ATTENDANCE_SOURCE_MANAGER, nullable=False)
+    resigned_at = db.Column(db.Date, nullable=True, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     department = db.relationship("Department", back_populates="employees")

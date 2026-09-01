@@ -332,6 +332,7 @@ def _serialize_employee(employee: Employee) -> dict:
         "shift_id": shift.id if shift else None,
         "shift_no": shift.shift_no if shift else "",
         "shift_name": shift.shift_name if shift else "",
+        "resigned_at": employee.resigned_at.isoformat() if employee.resigned_at else None,
     }
 
 
