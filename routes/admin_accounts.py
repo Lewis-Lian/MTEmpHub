@@ -52,6 +52,8 @@ def unlock_disabled_user_api(user_id: int):
     from routes import admin_core as admin_module
 
     user = admin_module._require_model(admin_module.User, user_id)
+    if user.login_disabled_reason == admin_module.RESIGN_DISABLE_REASON:
+        return jsonify({"error": "该账号因员工离职被禁用，请先在员工管理页恢复对应员工在职"}), 400
     user.clear_login_lockout()
     admin_module.db.session.commit()
     return jsonify({"status": "ok", "user": admin_module._serialize_user(user)})
@@ -174,7 +176,10 @@ def register_admin_account_routes(admin_bp) -> None:
         manager_permissions = _manager_self_query_permissions()
 
         managers = (
-            admin_module.Employee.query.filter(admin_module.Employee.is_manager.is_(True))
+            admin_module.Employee.query.filter(
+                admin_module.Employee.is_manager.is_(True),
+                admin_module.Employee.resigned_at.is_(None),
+            )
             .order_by(admin_module.Employee.emp_no.asc())
             .all()
         )

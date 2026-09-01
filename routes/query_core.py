@@ -776,7 +776,17 @@ def _accessible_emp_ids() -> list[int]:
             .all()
         )
         ids.update(row.id for row in dept_emp_ids)
-        
+
+    # 出口统一过滤：直接绑定的员工同样不得包含已离职（部门来源已过滤，此处幂等）
+    if ids:
+        active_ids = {
+            row.id
+            for row in Employee.query.with_entities(Employee.id)
+            .filter(Employee.id.in_(ids), Employee.resigned_at.is_(None))
+            .all()
+        }
+        ids &= active_ids
+
     return list(ids)
 
 
