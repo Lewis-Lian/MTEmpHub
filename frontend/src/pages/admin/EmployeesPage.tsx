@@ -11,8 +11,11 @@ import {
   fetchAdminEmployees,
   fetchAdminShifts,
   importAdminEmployees,
+  reinstateAdminEmployee,
+  resignAdminEmployee,
   updateAdminEmployee,
 } from "../../api/admin";
+import type { EmployeeStatusFilter } from "../../api/admin";
 
 import DepartmentPicker from "../../components/query/DepartmentPicker";
 import EmployeePicker from "../../components/query/EmployeePicker";
@@ -73,6 +76,7 @@ export default function EmployeesPage() {
   const [keyword, setKeyword] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [nursingFilter, setNursingFilter] = useState("");
+  const [employmentFilter, setEmploymentFilter] = useState<EmployeeStatusFilter>("active");
   const [employeeSourceFilter, setEmployeeSourceFilter] = useState("");
   const [managerSourceFilter, setManagerSourceFilter] = useState("");
   const [filterEmployeeIds, setFilterEmployeeIds] = useState<number[]>([]);
@@ -84,6 +88,10 @@ export default function EmployeesPage() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
+  const [showResignModal, setShowResignModal] = useState(false);
+  const [resignEmpNo, setResignEmpNo] = useState("");
+  const [resignDate, setResignDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [isResigning, setIsResigning] = useState(false);
 
   const notification = useNotification();
   const confirm = useConfirm();
@@ -104,7 +112,7 @@ export default function EmployeesPage() {
     setLoading(true);
     try {
       const [nextEmployees, nextDepartments, nextShifts] = await Promise.all([
-        fetchAdminEmployees(),
+        fetchAdminEmployees("all"),
         fetchAdminDepartments(),
         fetchAdminShifts(),
       ]);
@@ -130,6 +138,12 @@ export default function EmployeesPage() {
     }
     const normalizedKeyword = keyword.trim().toLowerCase();
     if (normalizedKeyword && !`${row.emp_no} ${row.name}`.toLowerCase().includes(normalizedKeyword)) {
+      return false;
+    }
+    if (employmentFilter === "active" && row.resigned_at) {
+      return false;
+    }
+    if (employmentFilter === "resigned" && !row.resigned_at) {
       return false;
     }
     if (typeFilter === "employee" && row.is_manager) {
@@ -158,6 +172,7 @@ export default function EmployeesPage() {
     setKeyword("");
     setTypeFilter("");
     setNursingFilter("");
+    setEmploymentFilter("active");
     setEmployeeSourceFilter("");
     setManagerSourceFilter("");
     setFilterEmployeeIds([]);
@@ -209,6 +224,61 @@ export default function EmployeesPage() {
       await loadRows();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "删除员工失败";
+      notification.error(errMsg);
+    }
+  }
+
+  function openResignModal(empNo: string) {
+    setResignEmpNo(empNo);
+    setResignDate(new Date().toISOString().slice(0, 10));
+    setShowResignModal(true);
+  }
+
+  async function submitResign(event: FormEvent) {
+    event.preventDefault();
+    const empNo = resignEmpNo.trim();
+    if (!empNo) {
+      notification.warning("请输入人员编号");
+      return;
+    }
+    if (!resignDate) {
+      notification.warning("请选择离职日期");
+      return;
+    }
+    const isConfirmed = await confirm({
+      message: `确定为员工 ${empNo} 办理离职（离职日期 ${resignDate}）？办理后其关联账号将被禁用，各查询与统计页面不再显示该员工。`,
+      type: "danger",
+    });
+    if (!isConfirmed) {
+      return;
+    }
+    setIsResigning(true);
+    try {
+      const result = await resignAdminEmployee({ emp_no: empNo, resigned_at: resignDate });
+      notification.success(`员工 ${result.employee.name} 已办理离职`);
+      setShowResignModal(false);
+      await loadRows();
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "办理离职失败";
+      notification.error(errMsg);
+    } finally {
+      setIsResigning(false);
+    }
+  }
+
+  async function reinstateEmployee(row: AdminEmployee) {
+    const isConfirmed = await confirm({
+      message: `确定恢复员工 ${row.emp_no} - ${row.name} 为在职？其关联账号将自动解除禁用。`,
+    });
+    if (!isConfirmed) {
+      return;
+    }
+    try {
+      await reinstateAdminEmployee(row.id);
+      notification.success(`员工 ${row.name} 已恢复在职`);
+      await loadRows();
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "恢复在职失败";
       notification.error(errMsg);
     }
   }
@@ -325,6 +395,12 @@ export default function EmployeesPage() {
   function buildFilteredExportUrl() {
     const query = new URLSearchParams();
     filterEmployeeIds.forEach((id) => query.append("ids", String(id)));
+    if (employmentFilter !== "all") {
+      query.set("status", employmentFilter);
+    }
+    if (keyword.trim()) {
+      query.set("keyword", keyword.trim());
+    }
     if (typeFilter) {
       query.set("type", typeFilter);
     }
@@ -428,6 +504,7 @@ export default function EmployeesPage() {
     "人员编号",
     "人员姓名",
     "人员类型",
+    "在职状态",
     "哺乳假",
     "员工考勤统计来源",
     "管理人员考勤统计来源",
@@ -435,6 +512,7 @@ export default function EmployeesPage() {
     "班次",
     { label: "操作", sortable: false },
   ];
+  const employmentLabel = (row: AdminEmployee) => (row.resigned_at ? `已离职 ${row.resigned_at}` : "在职");
   const employeeTableRows = loading
     ? []
     : filteredRows.map((row) => [
@@ -443,6 +521,7 @@ export default function EmployeesPage() {
         row.emp_no,
         row.name,
         row.is_manager ? "管理人员" : "普通员工",
+        employmentLabel(row),
         row.is_nursing ? "是" : "否",
         attendanceSourceLabels[row.employee_stats_attendance_source ?? ""] ?? "-",
         attendanceSourceLabels[row.manager_stats_attendance_source ?? ""] ?? "-",
@@ -450,6 +529,11 @@ export default function EmployeesPage() {
         row.shift_no ? `${row.shift_no}${row.shift_name ? ` - ${row.shift_name}` : ""}` : "不绑定",
         <div className="toolbar">
           <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>
+          {row.resigned_at ? (
+            <button className="account-action-button" onClick={() => reinstateEmployee(row)} type="button">恢复在职</button>
+          ) : (
+            <button className="account-action-button" onClick={() => openResignModal(row.emp_no)} type="button">办理离职</button>
+          )}
           <button className="account-action-button account-action-button--danger" onClick={() => removeEmployee(row)} type="button">删除</button>
         </div>,
       ]);
@@ -461,6 +545,7 @@ export default function EmployeesPage() {
         row.emp_no,
         row.name,
         row.is_manager ? "管理人员" : "普通员工",
+        employmentLabel(row),
         row.is_nursing ? "是" : "否",
         attendanceSourceLabels[row.employee_stats_attendance_source ?? ""] ?? "-",
         attendanceSourceLabels[row.manager_stats_attendance_source ?? ""] ?? "-",
@@ -622,6 +707,18 @@ export default function EmployeesPage() {
               </svg>
               导入/导出员工
             </button>
+            <button
+              className="btn btn-outline-secondary"
+              onClick={() => openResignModal("")}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              办理离职
+            </button>
           </div>
           
           <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
@@ -672,11 +769,39 @@ export default function EmployeesPage() {
             <span style={{ color: "var(--ent-text-secondary)" }}>哺乳假：</span>
             <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_nursing).length} 人</strong>
           </div>
+          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
+          <div className="admin-row">
+            <span style={{ color: "var(--ent-text-secondary)" }}>已离职：</span>
+            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.resigned_at).length} 人</strong>
+          </div>
         </div>
       </div>
 
       <div className="master-filter-panel" style={{ marginBottom: "12px", position: "relative" }}>
         <div className="master-filter-grid">
+          <div className="query-filter-field">
+            <label className="form-label" htmlFor="employmentFilterSelect">在职状态</label>
+            <select
+              className="form-select"
+              id="employmentFilterSelect"
+              onChange={(event) => setEmploymentFilter(event.target.value as EmployeeStatusFilter)}
+              value={employmentFilter}
+            >
+              <option value="active">在职</option>
+              <option value="resigned">已离职</option>
+              <option value="all">全部</option>
+            </select>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label" htmlFor="employeeKeywordInput">关键词</label>
+            <input
+              className="form-control"
+              id="employeeKeywordInput"
+              onChange={(event) => setKeyword(event.target.value)}
+              placeholder="工号 / 姓名"
+              value={keyword}
+            />
+          </div>
           <div className="query-filter-field">
             <label className="form-label">员工筛选器</label>
             <EmployeePicker
@@ -1060,6 +1185,71 @@ export default function EmployeesPage() {
           </div>
         </div>
       </div>
+
+      {showResignModal ? (
+        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowResignModal(false); }} style={{
+          position: "fixed",
+          left: "0",
+          top: "0",
+          width: "100%",
+          height: "100%",
+          zIndex: 1500,
+          background: "rgba(15, 23, 42, 0.3)",
+          backdropFilter: "blur(8px)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+        }}>
+          <form
+            className="master-modal-container"
+            onSubmit={submitResign}
+            style={{ width: "100%", maxWidth: "440px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}
+          >
+            <button className="master-modal-close admin-modal-close" onClick={() => setShowResignModal(false)} type="button">×</button>
+            <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
+              <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>办理离职</span>
+            </div>
+            <div className="admin-stack">
+              <label className="account-field" style={{ margin: 0 }}>
+                <span className="account-field-label">离职人员编号</span>
+                <input
+                  className="account-input"
+                  id="resignEmpNo"
+                  onChange={(event) => setResignEmpNo(event.target.value)}
+                  placeholder="请输入离职人员编号"
+                  required
+                  value={resignEmpNo}
+                />
+              </label>
+              <label className="account-field" style={{ margin: 0 }}>
+                <span className="account-field-label">离职日期</span>
+                <input
+                  className="account-input"
+                  id="resignDate"
+                  onChange={(event) => setResignDate(event.target.value)}
+                  required
+                  type="date"
+                  value={resignDate}
+                />
+              </label>
+              <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "#fffbeb", borderRadius: "8px", color: "#92400e", fontSize: "13px", border: "1px solid #fde68a", lineHeight: "1.6" }}>
+                办理后：其关联登录账号将被自动禁用，各查询与统计页面不再显示该员工；可在"已离职"筛选下恢复在职。
+              </div>
+            </div>
+            <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+              <button className="account-action-button" onClick={() => setShowResignModal(false)} type="button">取消</button>
+              <button
+                className="account-action-button account-action-button--primary"
+                disabled={isResigning}
+                type="submit"
+              >
+                {isResigning ? "提交中..." : "确认离职"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </main>
   );
 }

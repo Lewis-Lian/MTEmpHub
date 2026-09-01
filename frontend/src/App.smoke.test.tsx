@@ -616,9 +616,10 @@ describe("App smoke regression", () => {
     fireEvent.click(screen.getByRole("button", { name: "导入/导出员工" }));
     expect(await screen.findByText("数据导入与导出")).toBeInTheDocument();
 
+    // 默认在职状态筛选下，导出 URL 同时携带 status=active（仅导出在职员工）
     expect(screen.getByRole("link", { name: "导出当前筛选结果" })).toHaveAttribute(
       "href",
-      "/api/admin/employees/export?type=employee",
+      "/api/admin/employees/export?status=active&type=employee",
     );
   });
 
