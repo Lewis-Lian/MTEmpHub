@@ -12,7 +12,6 @@
 .cal-badge-late { background: #fff8dc; color: #8a6d00; border-color: #ece1a0; }
 .cal-badge-early { background: #f3e8fd; color: #6b2fbf; border-color: #e0cffa; }
 .cal-badge-holiday { background: #fdeeee; color: #b02a2a; border-color: #f6cfcf; }
-.cal-badge-actual { background: #e8f7ee; color: #1e7f4f; border-color: #bfe6cf; font-weight: 600; }
 
 .attendance-calendar-grid {
   display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px;
@@ -47,6 +46,12 @@
   background: #7e57c2; box-shadow: 0 0 0 1.5px #fff; z-index: 1;
 }
 .cal-override-dot--static { position: static; display: inline-block; box-shadow: none; }
+/* 「不算实际打卡」负向修正红点：位于修正紫点左侧 */
+.cal-actual-off-dot {
+  position: absolute; top: 7px; right: 21px; width: 8px; height: 8px; border-radius: 50%;
+  background: #c0392b; box-shadow: 0 0 0 1.5px #fff; z-index: 1;
+}
+.cal-actual-off-dot--static { position: static; display: inline-block; box-shadow: none; }
 
 .attendance-calendar-legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .attendance-calendar-legend .cal-badge { cursor: default; }

@@ -397,7 +397,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     });
     expect(screen.queryByTestId("daily-override-batch-panel")).toBeNull();
     expect(screen.queryByTestId("daily-override-panel")).toBeNull();
-    expect(screen.getAllByText("实")).toHaveLength(2);
+    // 批量勾「算实际打卡」跟随默认口径，格子无专门标记，以修正角点体现
+    expect(screen.getAllByTitle("手工修正")).toHaveLength(2);
   });
 
   it("多选批量只选状态时 payload 不含实际打卡", async () => {

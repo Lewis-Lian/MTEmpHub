@@ -259,6 +259,7 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.getByText("晚加班")).toBeInTheDocument();
     expect(within(legend as HTMLElement).getByText("缺勤")).toBeInTheDocument(); // 图例的"缺勤"与格内徽章同名，限定图例容器
     expect(within(legend as HTMLElement).getByText("手工修正")).toBeInTheDocument(); // 角点图例项
+    expect(within(legend as HTMLElement).getByText("不算实勤")).toBeInTheDocument(); // 负向实际打卡角点图例项
   });
 });
 
@@ -361,7 +362,7 @@ describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
     expect(within(getCell("2026-07-20")).getByTitle("手工修正")).toBeInTheDocument();
   });
 
-  it("实际打卡修正：is_actual_attendance 为 true 的格子显示「实」徽章，false/未修正不显示", () => {
+  it("实际打卡修正：勾「不算」的格子显示红点角标，勾「算」与未修正不显示任何标记", () => {
     const data: AttendanceCalendarData = {
       ...DATA,
       days: [
@@ -373,11 +374,14 @@ describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
       leaves: [],
     };
     render(<AttendanceCalendarGrid data={data} />);
-    expect(within(getCell("2026-07-10")).getByText("实")).toHaveClass("cal-badge-actual");
+    // 勾「算」跟随默认刷卡口径，格子无专门标记（仍有修正角点）
+    expect(within(getCell("2026-07-10")).queryByText("实")).toBeNull();
+    expect(within(getCell("2026-07-10")).getByTitle("手工修正")).toBeInTheDocument();
+    // 勾「不算」为负向修正：红点角标
+    expect(within(getCell("2026-07-11")).getByTitle("不算实勤")).toBeInTheDocument();
     expect(within(getCell("2026-07-11")).queryByText("实")).toBeNull();
-    // 与其他修正共存时同格展示
-    expect(within(getCell("2026-07-12")).getByText("实")).toBeInTheDocument();
-    expect(within(getCell("2026-07-12")).getByTitle("手工修正")).toBeInTheDocument();
+    expect(within(getCell("2026-07-11")).getByTitle("手工修正")).toBeInTheDocument();
+    expect(within(getCell("2026-07-12")).queryByText("实")).toBeNull();
   });
 
   it("multiSelectedDates 高亮多选格子", () => {
