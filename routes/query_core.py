@@ -680,6 +680,34 @@ def _calc_two_punch_hours_with_shift_break(record) -> float | None:
     return round(hours, 2)
 
 
+def _missed_punch_backfill_hours(record) -> float | None:
+    """漏卡补齐：当天 ≥2 次真实刷卡但配对不出合理工时（如下班卡缺失）时，
+    视首末刷卡为实际上/下班，跨距扣除班次休息窗口后计工时——
+    等效于把漏掉的卡按班次时段补上（吴冬冬 2026-08-23 场景）。"""
+    raw = _extract_raw_punch_data(record)
+    tokens = sorted({t for t in (_normalize_punch_token(x) for x in re.findall(r"(\d{1,2}:\d{2})", raw)) if t})
+    if len(tokens) < 2:
+        return None
+    start = _parse_slot_dt(record.record_date, tokens[0])
+    end = _parse_slot_dt(record.record_date, tokens[-1], start)
+    if not start or not end:
+        return None
+    if end < start:
+        end += timedelta(days=1)
+
+    total_seconds = (end - start).total_seconds()
+    if total_seconds <= 0:
+        return None
+    for b_start, b_end in _build_shift_break_windows(record):
+        overlap_start = max(start, b_start)
+        overlap_end = min(end, b_end)
+        if overlap_end > overlap_start:
+            total_seconds -= (overlap_end - overlap_start).total_seconds()
+    if total_seconds <= 0:
+        return None
+    return round(total_seconds / 3600.0, 2)
+
+
 def _calc_record_work_hours(record) -> tuple[float, int]:
     special_hours = _calc_two_punch_hours_with_shift_break(record)
     if special_hours is not None:
@@ -740,6 +768,11 @@ def _calc_record_work_hours(record) -> tuple[float, int]:
             unmatched += 1
 
     unmatched += max(len(out_times) - len(used_out), 0)
+    # 配对工时 <2h 视为漏卡：先按班次补齐（首末刷卡跨距扣休息窗口），补不齐再走原值兜底
+    if total_hours < 2:
+        backfilled = _missed_punch_backfill_hours(record)
+        if backfilled is not None:
+            return backfilled, unmatched
     if total_hours <= 0 and (record.actual_hours or 0) > 0:
         source_hours = float(record.actual_hours or 0)
         if getattr(record, "source", "") == "manager":
