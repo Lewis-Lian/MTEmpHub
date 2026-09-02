@@ -4573,33 +4573,24 @@ input[type="checkbox"] {
   gap: 12px;
   align-items: start;
 }
-/* 日历上方多选工具栏：进入多选后勾选日期批量设置状态/实际打卡 */
-.attendance-override-multiselect-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
+/* 右侧多选批量面板：勾选满 2 天后替代当天详情面板（纵排贴合窄栏） */
 .attendance-override-multiselect-count {
   font-size: 13px;
   font-weight: 600;
   color: #1e7f4f;
 }
-/* 批量设置面板：状态下拉 + 实际打卡三选 + 应用 */
 .attendance-override-batch-panel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 12px;
-  flex-wrap: wrap;
-  padding: 8px 12px;
+  padding: 12px;
   border: 1px solid #e3e9f2;
-  border-radius: 10px;
-  background: #f8fafd;
+  border-radius: 14px;
+  background: var(--ent-bg);
 }
 .attendance-override-batch-field {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
 }
 .attendance-override-batch-label {
@@ -4612,6 +4603,7 @@ input[type="checkbox"] {
   border-radius: 6px;
   background: #fff;
   font-size: 13px;
+  width: 100%;
 }
 .attendance-override-batch-choices {
   display: flex;

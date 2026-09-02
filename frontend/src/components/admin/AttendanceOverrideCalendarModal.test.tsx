@@ -139,7 +139,7 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(mockSave.mock.calls[1][0]).toMatchObject({ date: "2026-07-15", status: "上午出勤" });
   });
 
-  it("切换到其他格子后重新选中，同样首次点击不切换", async () => {
+  it("单选后点击另一格自动进入多选，右侧切换为批量面板", async () => {
     mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
     renderModal();
 
@@ -147,11 +147,15 @@ describe("AttendanceOverrideCalendarModal", () => {
     const cellA = screen.getByRole("button", { name: "2026-07-15" });
     const cellB = screen.getByRole("button", { name: "2026-07-01" });
 
-    fireEvent.click(cellA); // 选中 A
-    fireEvent.click(cellB); // 选中 B（A 取消选中）
-    fireEvent.click(cellA); // 重新选中 A，不切换
-    expect(mockSave).not.toHaveBeenCalled();
+    fireEvent.click(cellA); // 选中 A：单选模式
     expect(screen.getByTestId("daily-override-panel")).toBeInTheDocument();
+
+    fireEvent.click(cellB); // 点击不同格：自动进入多选
+    expect(cellA).toHaveClass("is-multi-selected");
+    expect(cellB).toHaveClass("is-multi-selected");
+    expect(screen.getByTestId("daily-override-batch-panel")).toBeInTheDocument();
+    expect(screen.queryByTestId("daily-override-panel")).toBeNull();
+    expect(mockSave).not.toHaveBeenCalled();
   });
 
   it("快速连点格子只保存最终状态（防抖合并）", async () => {
@@ -329,23 +333,31 @@ describe("AttendanceOverrideCalendarModal", () => {
     });
   });
 
-  it("多选模式：点击格子勾选/取消，不触发单日保存", async () => {
+  it("多选中点击格子继续勾选/取消，取消到剩一个自动回单选", async () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     const cellA = screen.getByRole("button", { name: "2026-07-01" });
     const cellB = screen.getByRole("button", { name: "2026-07-15" });
+    const cellC = screen.getByRole("button", { name: "2026-07-02" });
 
-    fireEvent.click(cellA); // 勾选 A
-    fireEvent.click(cellB); // 勾选 B
-    expect(cellA).toHaveClass("is-multi-selected");
-    expect(cellB).toHaveClass("is-multi-selected");
+    fireEvent.click(cellA); // 单选 A
+    fireEvent.click(cellB); // 进入多选 [A, B]
     expect(screen.getByText(/已选 2 天/)).toBeInTheDocument();
 
-    fireEvent.click(cellA); // 取消 A
+    fireEvent.click(cellC); // 继续加选
+    expect(screen.getByText(/已选 3 天/)).toBeInTheDocument();
+
+    fireEvent.click(cellC); // 取消 C，剩 2 个仍为多选
+    expect(screen.getByText(/已选 2 天/)).toBeInTheDocument();
+
+    fireEvent.click(cellA); // 取消到剩 1 个 → 自动回单选 B
     expect(cellA).not.toHaveClass("is-multi-selected");
-    expect(screen.getByText(/已选 1 天/)).toBeInTheDocument();
+    expect(cellB).not.toHaveClass("is-multi-selected");
+    expect(cellB).toHaveClass("is-selected");
+    expect(screen.queryByTestId("daily-override-batch-panel")).toBeNull();
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByText("2026-07-15")).toBeInTheDocument();
     expect(mockSave).not.toHaveBeenCalled();
     expect(mockSaveBatch).not.toHaveBeenCalled();
   });
@@ -363,9 +375,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal({ onRowRefresh });
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
-    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" })); // 点击第二格自动进入多选
     fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "病假" } });
     fireEvent.click(screen.getByLabelText("算"));
     fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
@@ -380,10 +391,12 @@ describe("AttendanceOverrideCalendarModal", () => {
       });
     });
     expect(onRowRefresh).toHaveBeenCalledWith(row);
-    // 成功后清空勾选并显示实徽章
+    // 成功后清空勾选，回到无选中的骨架占位
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "2026-07-01" })).not.toHaveClass("is-multi-selected");
     });
+    expect(screen.queryByTestId("daily-override-batch-panel")).toBeNull();
+    expect(screen.queryByTestId("daily-override-panel")).toBeNull();
     expect(screen.getAllByText("实")).toHaveLength(2);
   });
 
@@ -392,8 +405,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 进入多选
     fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "事假" } });
     fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
 
@@ -401,7 +414,7 @@ describe("AttendanceOverrideCalendarModal", () => {
       expect(mockSaveBatch).toHaveBeenCalledWith({
         month: "2026-07",
         emp_id: EMPLOYEE.id,
-        dates: ["2026-07-15"],
+        dates: ["2026-07-15", "2026-07-01"],
         status: "事假",
       });
     });
@@ -412,14 +425,14 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 进入多选
     fireEvent.change(screen.getByLabelText("批量考勤状态"), { target: { value: "__clear__" } });
     fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
 
     await waitFor(() => {
       expect(mockSaveBatch).toHaveBeenCalledWith(
-        expect.objectContaining({ dates: ["2026-07-15"], status: "" }),
+        expect.objectContaining({ dates: ["2026-07-15", "2026-07-01"], status: "" }),
       );
     });
   });
@@ -429,14 +442,14 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 进入多选
     fireEvent.click(screen.getByLabelText("不算"));
     fireEvent.click(screen.getByRole("button", { name: "批量应用" }));
 
     await waitFor(() => {
       expect(mockSaveBatch).toHaveBeenCalledWith(
-        expect.objectContaining({ dates: ["2026-07-15"], is_actual_attendance: false }),
+        expect.objectContaining({ dates: ["2026-07-15", "2026-07-01"], is_actual_attendance: false }),
       );
     });
   });
@@ -445,8 +458,8 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 进入多选
     expect(screen.getByRole("button", { name: "批量应用" })).toBeDisabled();
     expect(mockSaveBatch).not.toHaveBeenCalled();
   });
@@ -456,34 +469,43 @@ describe("AttendanceOverrideCalendarModal", () => {
     renderModal({ isManager: true });
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 进入多选
     const select = screen.getByLabelText("批量考勤状态") as HTMLSelectElement;
     const options = Array.from(select.options).map((option) => option.value);
     expect(options).toContain("出差");
     expect(options).not.toContain("事假");
   });
 
-  it("退出多选模式清空勾选并恢复单选交互", async () => {
+  it("多选中点「取消全选」清空勾选并恢复单选交互", async () => {
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
-    fireEvent.click(screen.getByRole("button", { name: "多选" }));
     const cell = screen.getByRole("button", { name: "2026-07-15" });
-    fireEvent.click(cell);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" })); // 单选
+    fireEvent.click(cell); // 进入多选
     expect(cell).toHaveClass("is-multi-selected");
 
-    fireEvent.click(screen.getByRole("button", { name: "退出多选" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消全选" }));
     expect(cell).not.toHaveClass("is-multi-selected");
+    expect(screen.queryByTestId("daily-override-batch-panel")).toBeNull();
 
     fireEvent.click(cell); // 恢复单选：首次点击仅选中
     expect(screen.getByTestId("daily-override-panel")).toBeInTheDocument();
     expect(mockSave).not.toHaveBeenCalled();
   });
 
-  it("账套锁定时多选按钮禁用", async () => {
+  it("账套锁定时点击不同格子不进入多选，保持单选查看", async () => {
     renderModal({ isLocked: true });
     await screen.findByText(/出勤 1 天/);
-    expect(screen.getByRole("button", { name: "多选" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByText("2026-07-01")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" })); // 锁定时仅切换查看
+    expect(screen.queryByTestId("daily-override-batch-panel")).toBeNull();
+    const nextPanel = screen.getByTestId("daily-override-panel");
+    expect(within(nextPanel).getByText("2026-07-15")).toBeInTheDocument();
+    expect(mockSave).not.toHaveBeenCalled();
   });
 });
