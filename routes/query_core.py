@@ -1852,6 +1852,10 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
             "late_minutes": r.late_minutes or 0,
             "early_leave_minutes": r.early_leave_minutes or 0,
             "is_half_day": _is_half_day_record(r),
+            # 当日实际出勤天数（0/1）：前端红点派生口径——未计入即标记
+            "actual_attendance_days": _effective_actual_attendance_day_value(
+                r, daily_overrides.get(r.record_date)
+            ),
             "exception_reason": r.exception_reason or "",
             "override": serialize_daily_override(daily_overrides.get(r.record_date)),
         }
@@ -1872,6 +1876,7 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
                 "late_minutes": 0,
                 "early_leave_minutes": 0,
                 "is_half_day": False,
+                "actual_attendance_days": _effective_actual_attendance_day_value(None, override),
                 "exception_reason": "",
                 "override": serialize_daily_override(override),
             }

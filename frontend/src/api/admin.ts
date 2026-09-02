@@ -352,8 +352,9 @@ export interface DailyOverrideSavePayload {
   emp_id: number;
   date: string;
   status?: string;
-  is_evening_overtime?: boolean;
-  is_actual_attendance?: boolean;
+  /** null=跟随系统（不动时传原值）；true/false 为明确修正 */
+  is_evening_overtime?: boolean | null;
+  is_actual_attendance?: boolean | null;
   work_hours?: string | number;
   late_minutes?: string | number;
   early_leave_minutes?: string | number;

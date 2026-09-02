@@ -91,9 +91,9 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
               <div className="cal-day-number">{cell.dayOfMonth}</div>
               {/* 角点为纯视觉标记；格子的 aria-label 保持纯日期（弹窗测试按精确名称定位），修正值在选中后的面板中完整可读 */}
               {override && <span aria-hidden="true" className="cal-override-dot" title="手工修正" />}
-              {/* 勾「不算实际打卡」为负向修正（默认刷卡口径会计 1 天），以红点标记；勾「算」跟随默认口径不标记 */}
-              {override?.is_actual_attendance === false && (
-                <span aria-hidden="true" className="cal-actual-off-dot" title="不算实勤" />
+              {/* 红点为派生口径：当日未计入实际出勤天数（无刷卡或「不算」修正）即标记；修正「算」后消失 */}
+              {cell.day?.actual_attendance_days === 0 && (
+                <span aria-hidden="true" className="cal-actual-off-dot" title="未计实勤" />
               )}
               {renderPunchSummary(cell)}
               <div className="cal-badges">{renderBadges(cell, override)}</div>
@@ -116,7 +116,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
         </span>
         <span className="cal-badge">
           <span aria-hidden="true" className="cal-actual-off-dot cal-actual-off-dot--static" />
-          不算实勤
+          未计实勤
         </span>
       </div>
 

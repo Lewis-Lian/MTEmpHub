@@ -4629,7 +4629,6 @@ input[type="checkbox"] {
 .attendance-override-calendar-side .daypanel-extra-form {
   grid-template-columns: 1fr;
 }
-.attendance-override-calendar-side .daypanel-field--check { padding-top: 0; }
 /* 右栏未选中时的骨架占位（模拟当天面板结构，微光扫过） */
 .daypanel-skeleton {
   border: 1px solid #e3e9f2;
@@ -4677,7 +4676,6 @@ input[type="checkbox"] {
   .attendance-override-calendar-side .daypanel-extra-form {
     grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   }
-  .attendance-override-calendar-side .daypanel-field--check { padding-top: 18px; }
 }
 
 /* 当天面板：三段分区卡片化（原始考勤浅蓝 / 假种浅紫 / 更多信息白） */
@@ -4757,11 +4755,9 @@ input[type="checkbox"] {
 .daypanel-field { display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
 .daypanel-field-wide { grid-column: 1 / -1; }
 .daypanel-field-label { color: #4a5568; }
-/* 晚上加行内开关 */
-.daypanel-field--check { flex-direction: row; align-items: center; gap: 6px; padding-top: 18px; }
-.daypanel-field--check input[type="checkbox"] {
-  width: 16px; height: 16px; margin: 0; accent-color: #1a56b0; cursor: pointer;
-}
+/* 布尔三选（不动/算/不算）：标签与选项同排，窄栏自动换行 */
+.daypanel-field--tri { flex-direction: row; align-items: center; gap: 8px; flex-wrap: wrap; }
+.daypanel-field--tri .daypanel-field-label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
 .daypanel-field-sub {
   font-size: 11px; color: #7c4dbe; background: #f1ebfb;
   border-radius: 8px; padding: 1px 6px; white-space: nowrap;

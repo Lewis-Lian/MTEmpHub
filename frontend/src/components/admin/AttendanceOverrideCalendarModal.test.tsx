@@ -33,6 +33,7 @@ function calendarData(overrides: Record<string, unknown> = {}): AttendanceCalend
         late_minutes: 0,
         early_leave_minutes: 0,
         is_half_day: false,
+        actual_attendance_days: 1,
         exception_reason: "",
         override: (overrides["2026-07-01"] as never) ?? null,
       },
@@ -45,6 +46,7 @@ function calendarData(overrides: Record<string, unknown> = {}): AttendanceCalend
         late_minutes: 0,
         early_leave_minutes: 0,
         is_half_day: false,
+        actual_attendance_days: 0,
         exception_reason: "",
         override: (overrides["2026-07-15"] as never) ?? null,
       },
@@ -242,7 +244,7 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(screen.getByLabelText("工时（小时）")).toBeVisible(); // 无需点开，默认展开
 
     fireEvent.change(screen.getByLabelText("工时（小时）"), { target: { value: "8" } });
-    fireEvent.click(screen.getByLabelText(/晚上加班/));
+    fireEvent.click(within(screen.getByRole("group", { name: "单日晚上加班" })).getByText("算"));
     fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
 
     await waitFor(() => {
@@ -319,15 +321,34 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(screen.queryByRole("button", { name: "标记 事假" })).toBeNull();
   });
 
-  it("单日面板勾选「算实际打卡」并保存", async () => {
+  it("单日实际打卡三选：算传 true、不算传 false、不动保持原值不覆盖", async () => {
     mockSave.mockResolvedValue({ calendar: calendarData(), row: {} });
     renderModal();
 
     await screen.findByText(/出勤 1 天/);
     fireEvent.click(screen.getByRole("button", { name: "2026-07-01" }));
-    fireEvent.click(screen.getByLabelText(/算实际打卡/));
-    fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
+    const actualGroup = screen.getByRole("group", { name: "单日实际打卡" });
 
+    // 选「算」保存 → true
+    fireEvent.click(within(actualGroup).getByText("算"));
+    fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-01", is_actual_attendance: true }));
+    });
+
+    // 选「不算」保存 → false；此后日历带「算」修正返回，面板 currentOverride=true
+    mockSave.mockResolvedValue({ calendar: calendarData({ "2026-07-01": { is_actual_attendance: true } }), row: {} });
+    mockSave.mockClear();
+    fireEvent.click(within(actualGroup).getByText("不算"));
+    fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
+    await waitFor(() => {
+      expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-01", is_actual_attendance: false }));
+    });
+
+    // 已修正 true 的天选「不动」保存 → 保持 true（不被未勾选状态覆盖成 false/null）
+    mockSave.mockClear();
+    fireEvent.click(within(actualGroup).getByText("不动"));
+    fireEvent.click(screen.getByRole("button", { name: "保存修正" }));
     await waitFor(() => {
       expect(mockSave).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-07-01", is_actual_attendance: true }));
     });
