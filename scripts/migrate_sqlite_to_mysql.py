@@ -95,11 +95,12 @@ def migrate():
     app_mysql = _create_app_with_uri(MYSQL_URL)
     with app_mysql.app_context():
         from models import db as mysql_db
-        from flask_migrate import upgrade
+        from flask_migrate import stamp
 
-        # 用 migration 建表
+        # 基线迁移 681e8410935f 只补外键不建表，空库直接 create_all + stamp 到最新版本
         print("  正在创建表结构...")
-        upgrade()
+        mysql_db.create_all()
+        stamp()
 
         # 按顺序插入数据
         total_tables = len(MIGRATION_ORDER)

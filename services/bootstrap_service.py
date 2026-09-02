@@ -9,8 +9,15 @@ from models.user import User
 
 
 def initialize_database() -> None:
-    from flask_migrate import upgrade
-    upgrade()
+    from flask_migrate import stamp, upgrade
+
+    # 最早的迁移 681e8410935f 是基线迁移（只补外键，不建表，假设表已由 create_all 建好），
+    # 全新空库直接 upgrade 会因反射不到表而崩溃：先 create_all + stamp 到最新版本。
+    if not inspect(db.engine).get_table_names():
+        db.create_all()
+        stamp()
+    else:
+        upgrade()
     ensure_schema_compatibility()
 
 

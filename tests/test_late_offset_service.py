@@ -402,7 +402,7 @@ class LateOffsetConfirmTests(LateOffsetCandidateTests):
 
     def test_nursing_manager_excluded(self) -> None:
         with self.app.app_context():
-            manager = Employee.query.get(self.manager_id)
+            manager = db.session.get(Employee, self.manager_id)
             manager.is_nursing = True
             db.session.commit()
         self.assertEqual(self._candidates(), [])
