@@ -95,13 +95,14 @@ export default function AttendanceOverrideCalendarModal({
   const [detailExpanded, setDetailExpanded] = useState(true);
   const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
-  const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [multiSelectedDates, setMultiSelectedDates] = useState<string[]>([]);
   const [batchStatus, setBatchStatus] = useState("");
   const [batchActual, setBatchActual] = useState<BatchActualChoice>("keep");
 
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const batchStatusOptions = isManager ? MANAGER_DAILY_STATUS_OPTIONS : EMPLOYEE_DAILY_STATUS_OPTIONS;
+  // 选中 1 天为单选模式；勾选满 2 天及以上自动进入多选（右侧批量面板）
+  const isMultiSelect = multiSelectedDates.length >= 2;
   const hasBatchChanges = batchStatus !== "" || batchActual !== "keep";
   const selectedDay = useMemo(
     () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
@@ -237,41 +238,61 @@ export default function AttendanceOverrideCalendarModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 首次点击格子仅选中（展开当天信息），再次点击同一格才循环切换出勤状态；假种在下方面板设置；
-  // 多选模式下点击格子只做勾选/取消，不触发选中与状态循环
+  // 点击 1 天为单选（右侧当天面板），单选下再点不同格子连同原选中一起进入多选；
+  // 多选中点击格子做勾选/取消，取消到剩 1 天自动回单选；
+  // 单选下再次点击同一格循环切换出勤状态，假种在下方面板设置
   function handleCellClick(date: string) {
     if (isMultiSelect) {
       if (isLocked) {
         return;
       }
-      setMultiSelectedDates((current) =>
-        current.includes(date) ? current.filter((item) => item !== date) : [...current, date],
+      const next = multiSelectedDates.includes(date)
+        ? multiSelectedDates.filter((item) => item !== date)
+        : [...multiSelectedDates, date];
+      if (next.length >= 2) {
+        setMultiSelectedDates(next);
+      } else {
+        resetMultiSelection();
+        setSelectedDate(next.length === 1 ? next[0] : null);
+      }
+      return;
+    }
+    if (selectedDate === date) {
+      if (isLocked || !calendar) {
+        return;
+      }
+      const dayOverride = calendar.days.find((day) => day.date === date)?.override ?? null;
+      const nextStatus = nextCycleStatus(dayOverride?.status);
+      patchDayOverride(date, { status: nextStatus });
+      scheduleSave(
+        {
+          month,
+          emp_id: employee.id,
+          date,
+          status: nextStatus,
+          is_evening_overtime: dayOverride?.is_evening_overtime ?? undefined,
+          is_actual_attendance: dayOverride?.is_actual_attendance ?? undefined,
+          work_hours: dayOverride?.work_hours ?? "",
+          late_minutes: dayOverride?.late_minutes ?? "",
+          early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
+          remark: dayOverride?.remark ?? "",
+        },
+        `已标记 ${nextStatus}`,
       );
       return;
     }
-    const isFirstClick = selectedDate !== date;
-    setSelectedDate(date);
-    if (isFirstClick || isLocked || !calendar) {
+    if (selectedDate && !isLocked) {
+      setMultiSelectedDates([selectedDate, date]);
+      setSelectedDate(null);
       return;
     }
-    const dayOverride = calendar.days.find((day) => day.date === date)?.override ?? null;
-    const nextStatus = nextCycleStatus(dayOverride?.status);
-    patchDayOverride(date, { status: nextStatus });
-    scheduleSave(
-      {
-        month,
-        emp_id: employee.id,
-        date,
-        status: nextStatus,
-        is_evening_overtime: dayOverride?.is_evening_overtime ?? undefined,
-        is_actual_attendance: dayOverride?.is_actual_attendance ?? undefined,
-        work_hours: dayOverride?.work_hours ?? "",
-        late_minutes: dayOverride?.late_minutes ?? "",
-        early_leave_minutes: dayOverride?.early_leave_minutes ?? "",
-        remark: dayOverride?.remark ?? "",
-      },
-      `已标记 ${nextStatus}`,
-    );
+    setSelectedDate(date);
+  }
+
+  function resetMultiSelection() {
+    setMultiSelectedDates([]);
+    setBatchStatus("");
+    setBatchActual("keep");
   }
 
   // 多选模式下批量应用状态/实际打卡设置，成功后用后端日历刷新并清空勾选
@@ -296,9 +317,7 @@ export default function AttendanceOverrideCalendarModal({
       }
       const response = await saveAdminDailyOverrideBatch<unknown>(payload);
       setCalendar(response.calendar);
-      setMultiSelectedDates([]);
-      setBatchStatus("");
-      setBatchActual("keep");
+      resetMultiSelection();
       onRowRefresh(response.row);
       notification.success(`已批量应用 ${payload.dates.length} 天`);
     } catch (caughtError: unknown) {
@@ -362,92 +381,15 @@ export default function AttendanceOverrideCalendarModal({
             ) : calendar ? (
               <div className="attendance-override-calendar-layout">
                 <div className="attendance-override-calendar-main">
-                  <div className="attendance-override-multiselect-bar">
-                    {isMultiSelect ? (
-                      <>
-                        <span className="attendance-override-multiselect-count">{`已选 ${multiSelectedDates.length} 天`}</span>
-                        <div className="attendance-override-batch-panel" data-testid="daily-override-batch-panel">
-                          <label className="attendance-override-batch-field">
-                            <span className="attendance-override-batch-label">考勤状态</span>
-                            <select
-                              aria-label="批量考勤状态"
-                              disabled={isLocked || isSaving}
-                              onChange={(event) => setBatchStatus(event.target.value)}
-                              value={batchStatus}
-                            >
-                              <option value="">不动</option>
-                              <option value={BATCH_STATUS_CLEAR}>跟随系统（清除状态）</option>
-                              {batchStatusOptions.map((status) => (
-                                <option key={status} value={status}>{status}</option>
-                              ))}
-                            </select>
-                          </label>
-                          <div aria-label="批量实际打卡" className="attendance-override-batch-field" role="group">
-                            <span className="attendance-override-batch-label">实际打卡</span>
-                            <div className="attendance-override-batch-choices">
-                              {([
-                                ["keep", "不动"],
-                                ["on", "算"],
-                                ["off", "不算"],
-                              ] as const).map(([value, label]) => (
-                                <label key={value}>
-                                  <input
-                                    checked={batchActual === value}
-                                    disabled={isLocked || isSaving}
-                                    name="batch-actual-attendance"
-                                    onChange={() => setBatchActual(value)}
-                                    type="radio"
-                                  />
-                                  <span>{label}</span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                          <button
-                            className="account-action-button account-action-button--primary"
-                            disabled={isLocked || isSaving || multiSelectedDates.length === 0 || !hasBatchChanges}
-                            onClick={() => void handleBatchApply()}
-                            type="button"
-                          >
-                            批量应用
-                          </button>
-                        </div>
-                        <button
-                          className="daypanel-toggle"
-                          onClick={() => {
-                            setIsMultiSelect(false);
-                            setMultiSelectedDates([]);
-                            setBatchStatus("");
-                            setBatchActual("keep");
-                          }}
-                          type="button"
-                        >
-                          退出多选
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        className="account-action-button"
-                        disabled={isLocked || isSaving}
-                        onClick={() => {
-                          setIsMultiSelect(true);
-                          setMultiSelectedDates([]);
-                        }}
-                        type="button"
-                      >
-                        多选
-                      </button>
-                    )}
-                  </div>
                   <AttendanceCalendarGrid
                     data={calendar}
-                    multiSelectedDates={isMultiSelect ? multiSelectedDates : []}
+                    multiSelectedDates={multiSelectedDates}
                     onCellSelect={handleCellClick}
                     selectedDate={selectedDate}
                   />
                 </div>
                 <aside className="attendance-override-calendar-side">
-                  {selectedDay ? renderDayPanel() : (
+                  {isMultiSelect ? renderBatchPanel() : selectedDay ? renderDayPanel() : (
                     <div aria-hidden="true" className="daypanel-skeleton">
                       <span className="daypanel-skeleton-title" />
                       <span className="daypanel-skeleton-row" />
@@ -470,6 +412,72 @@ export default function AttendanceOverrideCalendarModal({
               </div>
             ) : null}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 多选模式右侧批量面板：勾选满 2 天后替代当天详情面板
+  function renderBatchPanel() {
+    return (
+      <div className="attendance-override-batch-panel" data-testid="daily-override-batch-panel">
+        <div className="daypanel-title">
+          <span>批量修正</span>
+          <span className="attendance-override-multiselect-count">{`已选 ${multiSelectedDates.length} 天`}</span>
+        </div>
+        <label className="attendance-override-batch-field">
+          <span className="attendance-override-batch-label">考勤状态</span>
+          <select
+            aria-label="批量考勤状态"
+            disabled={isLocked || isSaving}
+            onChange={(event) => setBatchStatus(event.target.value)}
+            value={batchStatus}
+          >
+            <option value="">不动</option>
+            <option value={BATCH_STATUS_CLEAR}>跟随系统（清除状态）</option>
+            {batchStatusOptions.map((status) => (
+              <option key={status} value={status}>{status}</option>
+            ))}
+          </select>
+        </label>
+        <div aria-label="批量实际打卡" className="attendance-override-batch-field" role="group">
+          <span className="attendance-override-batch-label">实际打卡</span>
+          <div className="attendance-override-batch-choices">
+            {([
+              ["keep", "不动"],
+              ["on", "算"],
+              ["off", "不算"],
+            ] as const).map(([value, label]) => (
+              <label key={value}>
+                <input
+                  checked={batchActual === value}
+                  disabled={isLocked || isSaving}
+                  name="batch-actual-attendance"
+                  onChange={() => setBatchActual(value)}
+                  type="radio"
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="daypanel-actions">
+          <button
+            className="account-action-button account-action-button--primary"
+            disabled={isLocked || isSaving || multiSelectedDates.length === 0 || !hasBatchChanges}
+            onClick={() => void handleBatchApply()}
+            type="button"
+          >
+            批量应用
+          </button>
+          <button
+            className="account-action-button"
+            disabled={isLocked || isSaving}
+            onClick={resetMultiSelection}
+            type="button"
+          >
+            取消全选
+          </button>
         </div>
       </div>
     );
