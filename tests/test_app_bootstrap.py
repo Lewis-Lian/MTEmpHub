@@ -423,3 +423,34 @@ class AppBootstrapTests(unittest.TestCase):
 
                     columns = {column["name"] for column in inspect(db.engine).get_columns("daily_attendance_overrides")}
                     self.assertIn("is_actual_attendance", columns)
+
+    def test_create_app_writes_unhandled_errors_to_error_log(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            log_dir = os.path.join(tmpdir, "logs")
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'errlog.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                    "LOG_DIR": log_dir,
+                },
+                clear=False,
+            ):
+                app_module = self._load_app_module()
+                app = app_module.create_app()
+
+                @app.get("/__boom__")
+                def _boom():  # noqa: ANN001
+                    raise RuntimeError("boom-for-test")
+
+                response = app.test_client().get("/__boom__")
+                self.assertEqual(response.status_code, 500)
+
+                log_path = os.path.join(log_dir, "error.log")
+                self.assertTrue(os.path.exists(log_path), "未处理异常应写入 error.log")
+                with open(log_path, encoding="utf-8") as fh:
+                    content = fh.read()
+                self.assertIn("boom-for-test", content)
+                self.assertIn("Traceback", content)
