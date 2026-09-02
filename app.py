@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import os
+from logging.handlers import RotatingFileHandler
 
 from dotenv import load_dotenv
 from flask import Flask, jsonify
@@ -27,6 +29,26 @@ from routes import configure_api_cors, register_routes
 _compat_app: Flask | None = None
 
 
+def _configure_error_log(app: Flask) -> None:
+    """500 级未处理异常写入 logs/error.log，避免仅存在于开发终端、事后无法排查。"""
+    log_dir = os.getenv("LOG_DIR", os.path.join(app.root_path, "logs"))
+    os.makedirs(log_dir, exist_ok=True)
+    # app.logger 按名字共享，同进程多次 create_app（如测试）时替换旧 handler，避免重复记录
+    app.logger.handlers[:] = [
+        handler for handler in app.logger.handlers if not getattr(handler, "_mt_emphub_error_log", False)
+    ]
+    handler = RotatingFileHandler(
+        os.path.join(log_dir, "error.log"),
+        maxBytes=1_000_000,
+        backupCount=3,
+        encoding="utf-8",
+    )
+    handler._mt_emphub_error_log = True
+    handler.setLevel(logging.ERROR)
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
+    app.logger.addHandler(handler)
+
+
 def create_app() -> Flask:
     load_dotenv()
 
@@ -43,6 +65,7 @@ def create_app() -> Flask:
     Migrate(app, db)
     configure_api_cors(app)
     register_routes(app)
+    _configure_error_log(app)
 
     @app.get("/health")
     def health_check():
