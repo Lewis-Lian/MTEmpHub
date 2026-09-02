@@ -301,6 +301,44 @@ class AppBootstrapTests(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"FLASK_DEBUG": value}, clear=False):
                     self.assertFalse(app_module._resolve_debug_flag())
 
+    def test_initialize_database_on_fresh_empty_database_creates_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "APP_ENV": "test",
+                    "DATABASE_URL": f"sqlite:///{os.path.join(tmpdir, 'init-fresh.db')}",
+                    "SECRET_KEY": "test-secret",
+                    "UPLOAD_FOLDER": os.path.join(tmpdir, "uploads"),
+                },
+                clear=False,
+            ):
+                app_module = self._load_app_module()
+                bootstrap_service = importlib.reload(importlib.import_module("services.bootstrap_service"))
+                app = app_module.create_app()
+
+                with app.app_context():
+                    bootstrap_service.initialize_database()
+
+                    table_names = set(inspect(db.engine).get_table_names())
+                    self.assertIn("users", table_names)
+                    self.assertIn("account_sets", table_names)
+                    self.assertIn("alembic_version", table_names)
+
+                    # create_all 后应 stamp 到迁移链 head（而非中间版本），后续 upgrade 直接 no-op
+                    from alembic.config import Config as AlembicConfig
+                    from alembic.script import ScriptDirectory
+
+                    migrations_dir = os.path.join(app.root_path, "migrations")
+                    alembic_cfg = AlembicConfig()
+                    alembic_cfg.set_main_option("script_location", migrations_dir)
+                    head = ScriptDirectory.from_config(alembic_cfg).get_current_head()
+                    version_num = db.session.execute(text("SELECT version_num FROM alembic_version")).scalar()
+                    self.assertEqual(version_num, head)
+
+                    # 二次初始化幂等：已 stamp 到 head 时走 upgrade 分支应为 no-op，不崩溃
+                    bootstrap_service.initialize_database()
+
     def test_schema_compatibility_adds_employee_resigned_at_column(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             with mock.patch.dict(
