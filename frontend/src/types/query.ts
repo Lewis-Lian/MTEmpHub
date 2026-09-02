@@ -90,6 +90,8 @@ export interface AttendanceCalendarDay {
   late_minutes: number;
   early_leave_minutes: number;
   is_half_day: boolean;
+  /** 当日实际出勤天数（0/1）：未计入时前端以红点角标标记（含「不算」修正与无刷卡口径） */
+  actual_attendance_days: number;
   exception_reason: string;
   override?: DailyAttendanceOverrideValues | null;
 }

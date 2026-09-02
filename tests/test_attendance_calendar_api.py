@@ -308,6 +308,32 @@ class AttendanceCalendarApiTests(unittest.TestCase):
             grid_half_days * 0.5 + (punched_days - grid_half_days) * 1.0,
         )
 
+    def test_actual_attendance_days_field(self):
+        """红点派生口径：days.actual_attendance_days 表示当日是否计入实际出勤天数——
+        刷卡 ≥2 次计 1；无刷卡计 0；「算」修正强制 1；「不算」修正强制 0。"""
+        from models.daily_attendance_override import DailyAttendanceOverride
+
+        self._add_daily(record_date=date(2026, 7, 1), check_in_times=["07:30"],
+                        check_out_times=["17:00"], actual_hours=8.0)          # 2 次卡 → 1
+        self._add_daily(record_date=date(2026, 7, 2), check_in_times=[],
+                        check_out_times=[], actual_hours=0.0)                 # 无刷卡 → 0
+        self._add_daily(record_date=date(2026, 7, 4), check_in_times=["07:30"],
+                        check_out_times=["17:00"], actual_hours=8.0)          # 有卡但修正不算 → 0
+        with self.app.app_context():
+            db.session.add_all([
+                DailyAttendanceOverride(emp_id=self.emp_id, record_date=date(2026, 7, 3),
+                                        is_actual_attendance=True),   # 无记录日修正算 → 1
+                DailyAttendanceOverride(emp_id=self.emp_id, record_date=date(2026, 7, 4),
+                                        is_actual_attendance=False),  # 有卡日修正不算 → 0
+            ])
+            db.session.commit()
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
+        days = {d["date"]: d["actual_attendance_days"] for d in data["days"]}
+        self.assertEqual(days["2026-07-01"], 1.0)
+        self.assertEqual(days["2026-07-02"], 0.0)
+        self.assertEqual(days["2026-07-03"], 1.0)
+        self.assertEqual(days["2026-07-04"], 0.0)
+
     def test_days_fields_serialized(self):
         """days 序列化：HH:MM 数组、punch_count、迟到、异常。"""
         self._add_daily(record_date=date(2026, 7, 3), check_in_times=["07:45", "2026-07-03 12:00"],

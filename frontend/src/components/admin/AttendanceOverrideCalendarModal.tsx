@@ -63,17 +63,34 @@ interface DetailFormState {
   workHours: string;
   lateMinutes: string;
   earlyLeaveMinutes: string;
-  eveningOvertime: boolean;
-  actualAttendance: boolean;
+  eveningOvertime: TriChoice;
+  actualAttendance: TriChoice;
   remark: string;
+}
+
+// 单日面板布尔修正字段的三选：""（不动，跟随系统/保持原值）| "on"（算）| "off"（不算）
+type TriChoice = "" | "on" | "off";
+
+const TRI_CHOICES = [["", "不动"], ["on", "算"], ["off", "不算"]] as const;
+
+function triChoiceFrom(value: boolean | null | undefined): TriChoice {
+  if (value === true) return "on";
+  if (value === false) return "off";
+  return "";
+}
+
+function triChoiceToBool(choice: TriChoice, current: boolean | null | undefined): boolean | null {
+  if (choice === "on") return true;
+  if (choice === "off") return false;
+  return current ?? null;
 }
 
 const EMPTY_FORM: DetailFormState = {
   workHours: "",
   lateMinutes: "",
   earlyLeaveMinutes: "",
-  eveningOvertime: false,
-  actualAttendance: false,
+  eveningOvertime: "",
+  actualAttendance: "",
   remark: "",
 };
 
@@ -144,8 +161,8 @@ export default function AttendanceOverrideCalendarModal({
       workHours: currentOverride?.work_hours == null ? "" : String(currentOverride.work_hours),
       lateMinutes: currentOverride?.late_minutes == null ? "" : String(currentOverride.late_minutes),
       earlyLeaveMinutes: currentOverride?.early_leave_minutes == null ? "" : String(currentOverride.early_leave_minutes),
-      eveningOvertime: Boolean(currentOverride?.is_evening_overtime),
-      actualAttendance: Boolean(currentOverride?.is_actual_attendance),
+      eveningOvertime: triChoiceFrom(currentOverride?.is_evening_overtime),
+      actualAttendance: triChoiceFrom(currentOverride?.is_actual_attendance),
       remark: currentOverride?.remark ?? "",
     });
     setDetailExpanded(true);
@@ -159,8 +176,8 @@ export default function AttendanceOverrideCalendarModal({
       work_hours: form.workHours,
       late_minutes: form.lateMinutes,
       early_leave_minutes: form.earlyLeaveMinutes,
-      is_evening_overtime: form.eveningOvertime,
-      is_actual_attendance: form.actualAttendance,
+      is_evening_overtime: triChoiceToBool(form.eveningOvertime, currentOverride?.is_evening_overtime),
+      is_actual_attendance: triChoiceToBool(form.actualAttendance, currentOverride?.is_actual_attendance),
       remark: form.remark,
       ...overrides,
     };
@@ -583,26 +600,40 @@ export default function AttendanceOverrideCalendarModal({
           </div>
           {detailExpanded ? (
             <div className="daypanel-extra-form">
-              <label className="daypanel-field daypanel-field--check" title="确认晚上加班后按 0.5 天出勤计">
-                <input
-                  checked={form.eveningOvertime}
-                  disabled={isLocked || isSaving}
-                  onChange={(event) => setForm((current) => ({ ...current, eveningOvertime: event.target.checked }))}
-                  type="checkbox"
-                />
-                <span className="daypanel-field-label">晚上加班</span>
-                <span className="daypanel-field-sub">0.5 出勤</span>
-              </label>
-              <label className="daypanel-field daypanel-field--check" title="勾选后当天计 1 天实际出勤，取消则不计，未勾选按刷卡口径">
-                <input
-                  checked={form.actualAttendance}
-                  disabled={isLocked || isSaving}
-                  onChange={(event) => setForm((current) => ({ ...current, actualAttendance: event.target.checked }))}
-                  type="checkbox"
-                />
-                <span className="daypanel-field-label">算实际打卡</span>
-                <span className="daypanel-field-sub">计 1 天</span>
-              </label>
+              <div aria-label="单日晚上加班" className="daypanel-field daypanel-field--tri" role="group" title="确认晚上加班后按 0.5 天出勤计；不动=跟随系统">
+                <span className="daypanel-field-label">晚上加班<span className="daypanel-field-sub">0.5 出勤</span></span>
+                <div className="attendance-override-batch-choices">
+                  {TRI_CHOICES.map(([value, label]) => (
+                    <label key={value}>
+                      <input
+                        checked={form.eveningOvertime === value}
+                        disabled={isLocked || isSaving}
+                        name="daily-evening-overtime"
+                        onChange={() => setForm((current) => ({ ...current, eveningOvertime: value }))}
+                        type="radio"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div aria-label="单日实际打卡" className="daypanel-field daypanel-field--tri" role="group" title="算=当天计 1 天实际出勤，不算=不计；不动=按刷卡口径跟随系统">
+                <span className="daypanel-field-label">实际打卡<span className="daypanel-field-sub">计 1 天</span></span>
+                <div className="attendance-override-batch-choices">
+                  {TRI_CHOICES.map(([value, label]) => (
+                    <label key={value}>
+                      <input
+                        checked={form.actualAttendance === value}
+                        disabled={isLocked || isSaving}
+                        name="daily-actual-attendance"
+                        onChange={() => setForm((current) => ({ ...current, actualAttendance: value }))}
+                        type="radio"
+                      />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
               <label className="daypanel-field">
                 <span className="daypanel-field-label">工时（小时）</span>
                 <input
@@ -653,8 +684,8 @@ export default function AttendanceOverrideCalendarModal({
                         work_hours: form.workHours === "" ? null : Number(form.workHours),
                         late_minutes: form.lateMinutes === "" ? null : Number(form.lateMinutes),
                         early_leave_minutes: form.earlyLeaveMinutes === "" ? null : Number(form.earlyLeaveMinutes),
-                        is_evening_overtime: form.eveningOvertime,
-                        is_actual_attendance: form.actualAttendance,
+                        is_evening_overtime: triChoiceToBool(form.eveningOvertime, currentOverride?.is_evening_overtime),
+                        is_actual_attendance: triChoiceToBool(form.actualAttendance, currentOverride?.is_actual_attendance),
                         remark: form.remark,
                       });
                     }
