@@ -89,17 +89,15 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
               type="button"
             >
               <div className="cal-day-number">{cell.dayOfMonth}</div>
+              {/* 角点为纯视觉标记；格子的 aria-label 保持纯日期（弹窗测试按精确名称定位），修正值在选中后的面板中完整可读 */}
+              {override && <span aria-hidden="true" className="cal-override-dot" title="手工修正" />}
               {renderPunchSummary(cell)}
-              {bgKey === "absent" && <span className="cal-badge cal-badge-absent">缺勤</span>}
-              {override && <span className="cal-badge cal-badge-override">修正</span>}
-              {override?.is_evening_overtime && <span className="cal-badge cal-badge-evening">晚加</span>}
-              {override?.is_actual_attendance === true && <span className="cal-badge cal-badge-actual">实</span>}
-              {override?.status && !ATTENDANCE_STATUS_KEYS.has(override.status) && !override.is_evening_overtime && (
-                <span className={`cal-badge${LEAVE_STATUS_BG[override.status] ? " cal-badge-leave" : ""}`}>
-                  {override.status}
-                </span>
-              )}
-              {renderBadges(cell)}
+              <div className="cal-badges">
+                {renderBadges(cell, override)}
+                {override?.is_actual_attendance === true && (
+                  <span className="cal-badge cal-badge-actual">实</span>
+                )}
+              </div>
             </button>
           );
         })}
@@ -113,6 +111,10 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
         <span className="cal-badge is-bg-evening">晚加班</span>
         <span className="cal-badge is-bg-attendance">出勤</span>
         <span className="cal-badge is-bg-absent">缺勤</span>
+        <span className="cal-badge">
+          <span aria-hidden="true" className="cal-override-dot cal-override-dot--static" />
+          手工修正
+        </span>
       </div>
 
       {selected && (selected.day || selected.overtimes.length > 0 || selected.leaves.length > 0) && !onCellSelect ? (
@@ -230,7 +232,7 @@ const LEAVE_STATUS_BG: Record<string, CellBackgroundKey> = {
   丧假: "funeral",
 };
 
-// 出勤类状态由背景色表达（缺勤另有红底徽标），不渲染状态文字徽标
+// 出勤类状态由背景色表达，不渲染状态文字徽标
 const ATTENDANCE_STATUS_KEYS = new Set(["全勤", "上午出勤", "下午出勤", "缺勤"]);
 
 function hasOverrideContent(override: DailyAttendanceOverrideValues | null | undefined): boolean {
@@ -337,41 +339,50 @@ function renderPunchSummary(cell: DayCell) {
   return <div className="cal-punch">{text}</div>;
 }
 
-function renderBadges(cell: DayCell): ReactNode[] {
+// 徽章只保留背景色表达不了的增量信息：假种文字（含修正假种与 OA 假种合并去重）、
+// 加班分类小时（周末/节假加底色与出勤同为绿，徽章是唯一区分）、实际打卡「实」；
+// 缺勤/半勤/晚加/修正由背景色与右上角点表达，不再渲染文字徽章
+function renderBadges(cell: DayCell, override?: DailyAttendanceOverrideValues | null): ReactNode[] {
   const badges: ReactNode[] = [];
-  const day = cell.day;
 
-  if (day) {
-    if (day.is_half_day) {
-      badges.push(<span className="cal-badge" key="half">半勤</span>);
-    }
+  // 修正假种状态与 OA 假种合并按假种去重（晚加修正优先时沿用旧口径不显示修正假种）
+  const leaveTypes = new Set(cell.leaves.map((leave) => leave.leave_type));
+  const status = override?.status;
+  if (status && !ATTENDANCE_STATUS_KEYS.has(status) && !override?.is_evening_overtime) {
+    leaveTypes.add(status);
   }
-  // 同日同假种可能有多张 OA 单，格子徽章按假种去重展示
-  Array.from(new Set(cell.leaves.map((leave) => leave.leave_type))).forEach((leaveType) => {
+  leaveTypes.forEach((leaveType) => {
     badges.push(
       <span className="cal-badge cal-badge-leave" key={`leave-${leaveType}`}>{leaveType}</span>,
     );
   });
-  cell.overtimes.forEach((overtime, index) => {
-    if (overtime.is_evening) {
-      badges.push(
-        <span className="cal-badge cal-badge-evening" key={`overtime-${index}`}>晚加 +{overtime.hours}h</span>,
-      );
-    } else if (overtime.is_holiday) {
-      badges.push(
-        <span className="cal-badge cal-badge-holiday" key={`overtime-${index}`}>节假 +{overtime.hours}h</span>,
-      );
-    } else if (overtime.is_weekend) {
-      badges.push(
-        <span className="cal-badge cal-badge-overtime" key={`overtime-${index}`}>周 +{overtime.hours}h</span>,
-      );
-    } else {
-      badges.push(
-        <span className="cal-badge cal-badge-overtime" key={`overtime-${index}`}>+{overtime.hours}h</span>,
-      );
-    }
+
+  // 同类型加班合并合计，每类一条
+  const overtimeSums = { evening: 0, holiday: 0, weekend: 0, other: 0 };
+  cell.overtimes.forEach((overtime) => {
+    if (overtime.is_evening) overtimeSums.evening += overtime.hours;
+    else if (overtime.is_holiday) overtimeSums.holiday += overtime.hours;
+    else if (overtime.is_weekend) overtimeSums.weekend += overtime.hours;
+    else overtimeSums.other += overtime.hours;
   });
+  if (overtimeSums.evening > 0) {
+    badges.push(<span className="cal-badge cal-badge-evening" key="ot-evening">晚加 +{formatHours(overtimeSums.evening)}h</span>);
+  }
+  if (overtimeSums.holiday > 0) {
+    badges.push(<span className="cal-badge cal-badge-holiday" key="ot-holiday">节假 +{formatHours(overtimeSums.holiday)}h</span>);
+  }
+  if (overtimeSums.weekend > 0) {
+    badges.push(<span className="cal-badge cal-badge-overtime" key="ot-weekend">周 +{formatHours(overtimeSums.weekend)}h</span>);
+  }
+  if (overtimeSums.other > 0) {
+    badges.push(<span className="cal-badge cal-badge-overtime" key="ot-other">+{formatHours(overtimeSums.other)}h</span>);
+  }
   return badges;
+}
+
+// 合计小时去掉浮点尾差，最多保留一位小数
+function formatHours(total: number): string {
+  return String(Math.round(total * 10) / 10);
 }
 
 function renderTimes(times: string[]) {

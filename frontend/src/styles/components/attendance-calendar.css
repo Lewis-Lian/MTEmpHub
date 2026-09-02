@@ -6,7 +6,6 @@
   font-size: 12px; background: #eef1f6; color: #3c4658; border: 1px solid #d8dee9;
 }
 .cal-badge-attendance { background: #e6f4ea; color: #1c7c3c; border-color: #bfe3cc; }
-.cal-badge-absent { background: #ffffff; color: #b02a2a; border-color: #e6b0aa; }
 .cal-badge-leave { background: #e8f0fe; color: #1a56b0; border-color: #c6dafc; }
 .cal-badge-evening { background: #fff3e0; color: #b25e00; border-color: #ffd9a8; }
 .cal-badge-overtime { background: #fdeeee; color: #b02a2a; border-color: #f6cfcf; }
@@ -22,6 +21,7 @@
   text-align: center; font-size: 12px; color: #6b7686; padding: 4px 0;
 }
 .attendance-calendar-cell {
+  position: relative;
   min-height: 84px; border: 1px solid #d8dee9; border-radius: 8px; background: #fff;
   padding: 6px; display: flex; flex-direction: column; gap: 4px; text-align: left;
   cursor: pointer; font-size: 12px;
@@ -38,7 +38,15 @@
 .attendance-calendar-cell.is-bg-absent { background: #ec7063; }
 .cal-day-number { font-weight: 600; color: #3c4658; }
 .cal-punch { color: #4a5568; font-variant-numeric: tabular-nums; }
-.attendance-calendar-cell .cal-badge { padding: 1px 6px; font-size: 11px; align-self: flex-start; }
+.attendance-calendar-cell .cal-badge { padding: 1px 6px; font-size: 11px; }
+/* 格子徽章统一横向排列，不再各占一行 */
+.cal-badges { display: flex; flex-wrap: wrap; gap: 3px; }
+/* 手工修正角点：右上角紫点，白圈保证彩色背景上可见；z-index 防止窄格内容顶到角点下方 */
+.cal-override-dot {
+  position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%;
+  background: #7e57c2; box-shadow: 0 0 0 1.5px #fff; z-index: 1;
+}
+.cal-override-dot--static { position: static; display: inline-block; box-shadow: none; }
 
 .attendance-calendar-legend { display: flex; flex-wrap: wrap; gap: 6px; }
 .attendance-calendar-legend .cal-badge { cursor: default; }
@@ -125,6 +133,3 @@
   outline: 2px dashed #1e7f4f; outline-offset: 1px;
 }
 .attendance-calendar-cell.is-bg-leave { background: #d6e4ff; }
-.cal-badge-override {
-  background: #ede7f6; color: #5e35b1; border-color: #d1c4e9; font-weight: 600;
-}
