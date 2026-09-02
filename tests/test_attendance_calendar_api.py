@@ -230,7 +230,7 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertAlmostEqual(data["summary"]["attendance_days"], 0.5)
 
     def test_sub_two_hours_day_counts_as_half_day(self):
-        """刷卡配对工时 <2 小时按 0.5 天计：格子与汇总都标半勤（吴冬冬 2026-08-23 场景）。"""
+        """真实刷卡只覆盖 <2 小时（非漏卡）按 0.5 天计：格子与汇总都标半勤。"""
         self._add_daily(record_date=date(2026, 8, 23), check_in_times=["08:00", "08:01"],
                         check_out_times=["08:02"], actual_hours=1.0)
         data = self._get(f"?emp_id={self.emp_id}&month=2026-08").get_json()
@@ -238,6 +238,53 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertTrue(day["is_half_day"])
         self.assertEqual(data["summary"]["half_days"], 1)
         self.assertAlmostEqual(data["summary"]["attendance_days"], 0.5)
+
+    def test_missed_punch_backfilled_from_shift_counts_full_day(self):
+        """漏卡天按班次补齐（吴冬冬 2026-08-23 场景）：下班1/上班2 缺卡导致配对工时
+        仅 1 分钟，按首末刷卡跨距（07:31→17:00）减班次午休（11:20~12:00）计 8.82h，
+        全天 1 天、非半勤。"""
+        with self.app.app_context():
+            from models.shift import Shift
+            from models.employee_shift import EmployeeShiftAssignment
+
+            dept = Department.query.first()
+            emp = Employee(emp_no="E003", name="员工丙", dept_id=dept.id, is_manager=False,
+                           employee_stats_attendance_source="manager")
+            db.session.add(emp)
+            db.session.flush()
+            shift = Shift(shift_no="S002", shift_name="员工通用班次",
+                          time_slots=[["08:00", "11:20"], ["12:00", "17:00"]])
+            db.session.add(shift)
+            db.session.flush()
+            db.session.add(EmployeeShiftAssignment(emp_id=emp.id, shift_id=shift.id))
+            viewer = User.query.filter_by(username="viewer").first()
+            db.session.add(UserEmployeeAssignment(user_id=viewer.id, emp_id=emp.id))
+            db.session.add(DailyRecord(
+                emp_id=emp.id,
+                record_date=date(2026, 8, 23),
+                check_in_times=[],
+                check_out_times=[],
+                raw_data={},
+                manager_payload={
+                    "actual_hours": 1.0,
+                    "check_in_times": [],
+                    "check_out_times": [],
+                    "raw_data": {
+                        "上班1打卡时间": "07:31", "上班1打卡结果": "正常",
+                        "上班2打卡时间": "16:59", "上班2打卡结果": "迟到",
+                        "下班2打卡时间": "17:00", "下班2打卡结果": "正常",
+                    },
+                },
+            ))
+            db.session.commit()
+            emp_id = emp.id
+
+        data = self._get(f"?emp_id={emp_id}&month=2026-08").get_json()
+        day = data["days"][0]
+        self.assertAlmostEqual(day["actual_hours"], 8.82, places=2)
+        self.assertFalse(day["is_half_day"])
+        self.assertEqual(data["summary"]["half_days"], 0)
+        self.assertAlmostEqual(data["summary"]["attendance_days"], 1.0)
 
     def test_half_day_grid_matches_summary(self):
         """方案 B 验收：日历半勤格数与汇总半勤天数一致，且每个半勤格恰计 0.5 天。"""
