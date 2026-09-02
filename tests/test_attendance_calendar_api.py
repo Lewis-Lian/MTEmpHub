@@ -196,6 +196,71 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertEqual(data["summary"]["half_days"], 1)
         self.assertAlmostEqual(data["summary"]["attendance_days"], 1.5)
 
+    def test_manager_source_minutes_hours_marks_half_day(self):
+        """manager 来源 actual_hours 存分钟（导入原始值）：半勤/天数按刷卡重算口径，
+        不被 278 这类分钟值污染（吴冬冬 2026-08-07 场景）。"""
+        with self.app.app_context():
+            dept = Department.query.first()
+            emp = Employee(emp_no="E002", name="员工乙", dept_id=dept.id, is_manager=False,
+                           employee_stats_attendance_source="manager")
+            db.session.add(emp)
+            db.session.flush()
+            viewer = User.query.filter_by(username="viewer").first()
+            db.session.add(UserEmployeeAssignment(user_id=viewer.id, emp_id=emp.id))
+            db.session.add(DailyRecord(
+                emp_id=emp.id,
+                record_date=date(2026, 8, 7),
+                check_in_times=[],
+                check_out_times=[],
+                raw_data={},
+                manager_payload={
+                    "actual_hours": 278.0,
+                    "check_in_times": [],
+                    "check_out_times": [],
+                    "raw_data": {"上班1打卡时间": "07:31", "下班1打卡时间": "12:09"},
+                },
+            ))
+            db.session.commit()
+            emp_id = emp.id
+
+        data = self._get(f"?emp_id={emp_id}&month=2026-08").get_json()
+        day = data["days"][0]
+        self.assertTrue(day["is_half_day"])
+        self.assertTrue(data["summary"]["half_days"], 1)
+        self.assertAlmostEqual(data["summary"]["attendance_days"], 0.5)
+
+    def test_sub_two_hours_day_counts_as_half_day(self):
+        """刷卡配对工时 <2 小时按 0.5 天计：格子与汇总都标半勤（吴冬冬 2026-08-23 场景）。"""
+        self._add_daily(record_date=date(2026, 8, 23), check_in_times=["08:00", "08:01"],
+                        check_out_times=["08:02"], actual_hours=1.0)
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-08").get_json()
+        day = data["days"][0]
+        self.assertTrue(day["is_half_day"])
+        self.assertEqual(data["summary"]["half_days"], 1)
+        self.assertAlmostEqual(data["summary"]["attendance_days"], 0.5)
+
+    def test_half_day_grid_matches_summary(self):
+        """方案 B 验收：日历半勤格数与汇总半勤天数一致，且每个半勤格恰计 0.5 天。"""
+        self._add_daily(record_date=date(2026, 7, 1), check_in_times=["07:30"],
+                        check_out_times=["11:30"], actual_hours=4.0)          # 半勤
+        self._add_daily(record_date=date(2026, 7, 2), check_in_times=["08:00", "08:01"],
+                        check_out_times=["08:02"], actual_hours=1.0)          # <2h 半天
+        self._add_daily(record_date=date(2026, 7, 3), check_in_times=["07:30"],
+                        check_out_times=["17:00"], actual_hours=8.0)          # 全天
+        self._add_daily(record_date=date(2026, 7, 4), check_in_times=[],
+                        check_out_times=[], actual_hours=0.0)                 # 无刷卡 0 天
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
+        grid_half_days = sum(1 for d in data["days"] if d["is_half_day"])
+        self.assertEqual(data["summary"]["half_days"], grid_half_days)
+        # 出勤天数 = 非半勤的有卡天各计 1.0 + 半勤天各计 0.5（无卡天不计）
+        punched_days = sum(
+            1 for d in data["days"] if d["punch_count"] > 0 or d["check_in_times"] or d["check_out_times"]
+        )
+        self.assertAlmostEqual(
+            data["summary"]["attendance_days"],
+            grid_half_days * 0.5 + (punched_days - grid_half_days) * 1.0,
+        )
+
     def test_days_fields_serialized(self):
         """days 序列化：HH:MM 数组、punch_count、迟到、异常。"""
         self._add_daily(record_date=date(2026, 7, 3), check_in_times=["07:45", "2026-07-03 12:00"],

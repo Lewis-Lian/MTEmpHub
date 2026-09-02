@@ -267,24 +267,21 @@ def _has_punch_record(record) -> bool:
 
 
 def _is_half_day_record(record) -> bool:
-    actual_hours = record.actual_hours or 0
-    if actual_hours <= 0:
-        actual_hours, _ = _calc_record_work_hours(record)
-    return _raw_punch_count(record) == 2 and 2 <= actual_hours < 5.1
+    """半天考勤判定（与考勤天数合计同口径）：有刷卡且当日计 0.5 天——
+    配对工时 <2 按半天计；2 次刷卡且工时 ∈ [2, 5.1) 为半勤。
+    工时按刷卡重算，不信任导入原始 actual_hours（manager 来源存的是分钟）。"""
+    if not _has_punch_record(record):
+        return False
+    actual_hours = _calc_record_work_hours(record)[0]
+    if actual_hours < 2:
+        return True
+    return _raw_punch_count(record) == 2 and actual_hours < 5.1
 
 
 def _attendance_day_value(record) -> float:
     if not _has_punch_record(record):
         return 0.0
-    actual_hours = record.actual_hours or 0
-    if actual_hours <= 0:
-        actual_hours, _ = _calc_record_work_hours(record)
-    if actual_hours < 2:
-        return 0.5
-    # 与半勤判定一致：真实刷卡 2 次且工时在 [2, 5.1) 视为半天考勤，计 0.5 天。
-    if _is_half_day_record(record):
-        return 0.5
-    return 1.0
+    return 0.5 if _is_half_day_record(record) else 1.0
 
 
 def _actual_attendance_day_value(record) -> float:
@@ -328,7 +325,8 @@ def _effective_work_hours(record, override) -> float:
 
 
 def _effective_is_half_day(record, override, work_hours: float) -> bool:
-    """当日半勤判定：状态为上午/下午出勤 → 是；其他状态修正 → 否；无状态修正按原刷卡口径。
+    """当日半勤判定：状态为上午/下午出勤 → 是；其他状态修正 → 否；无状态修正与
+    _is_half_day_record 同口径（工时 <2 计半天；2 次刷卡且 [2, 5.1) 为半勤），工时取修正后值。
 
     半勤判定用 _raw_punch_count（优先读 raw_data["刷卡时间数据"] 等真实刷卡源），
     而非 _punch_count：后者直接读 check_in/out_times，该数组在导入时会被「段X实际上/下班时间」
@@ -336,9 +334,11 @@ def _effective_is_half_day(record, override, work_hours: float) -> bool:
     """
     if override is not None and override.status:
         return override.status in HALF_DAY_STATUSES
-    if record is None:
+    if record is None or not _has_punch_record(record):
         return False
-    return _raw_punch_count(record) == 2 and 2 <= work_hours < 5.1
+    if work_hours < 2:
+        return True
+    return _raw_punch_count(record) == 2 and work_hours < 5.1
 
 
 def _effective_daily_aggregate(
