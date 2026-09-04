@@ -253,14 +253,14 @@ export default function EmployeesPage() {
     event.preventDefault();
     const lookupValue = resignEmpNo.trim();
     if (!lookupValue) {
-      notification.warning("请输入人员编号或姓名");
+      notification.warning("请输入人员编号、姓名或卡号");
       return;
     }
     if (!resignDate) {
       notification.warning("请选择离职日期");
       return;
     }
-    const matches = rows.filter((row) => row.emp_no === lookupValue || row.name === lookupValue);
+    const matches = rows.filter((row) => row.emp_no === lookupValue || row.name === lookupValue || row.card_no === lookupValue);
     if (matches.length > 1) {
       notification.warning("该姓名对应多名员工，请输入人员编号精确办理");
       return;
@@ -538,7 +538,7 @@ export default function EmployeesPage() {
 
   const resignLookupValue = resignEmpNo.trim();
   const resignMatches = resignLookupValue
-    ? rows.filter((row) => row.emp_no === resignLookupValue || row.name === resignLookupValue)
+    ? rows.filter((row) => row.emp_no === resignLookupValue || row.name === resignLookupValue || row.card_no === resignLookupValue)
     : [];
 
   function renderRowActions(row: AdminEmployee) {
@@ -1305,12 +1305,12 @@ export default function EmployeesPage() {
             </div>
             <div className="admin-stack">
               <label className="account-field" style={{ margin: 0 }}>
-                <span className="account-field-label">离职人员编号/姓名</span>
+                <span className="account-field-label">离职人员编号/姓名/卡号</span>
                 <input
                   className="account-input"
                   id="resignEmpNo"
                   onChange={(event) => setResignEmpNo(event.target.value)}
-                  placeholder="请输入人员编号或姓名"
+                  placeholder="请输入人员编号、姓名或卡号"
                   required
                   value={resignEmpNo}
                 />
@@ -1366,7 +1366,7 @@ export default function EmployeesPage() {
                       ))}
                     </>
                   ) : (
-                    <span style={{ color: "#dc2626" }}>未找到编号/姓名为 {resignLookupValue} 的员工，请核对后重新输入</span>
+                    <span style={{ color: "#dc2626" }}>未找到编号/姓名/卡号为 {resignLookupValue} 的员工，请核对后重新输入</span>
                   )}
                 </div>
               ) : null}
