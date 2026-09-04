@@ -17,6 +17,7 @@ class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     emp_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
     name = db.Column(db.String(100), nullable=False)
+    card_no = db.Column(db.String(50), unique=True, nullable=True)
     dept_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
     is_nursing = db.Column(db.Boolean, default=False, nullable=False)

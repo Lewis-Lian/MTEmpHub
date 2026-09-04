@@ -419,6 +419,7 @@ def import_employees_xlsx():
     header_idx, header_map = admin_module._parse_header_row(raw_rows, ["人员编号", "人员姓名", "部门名称", "班次编号"])
     emp_no_idx = header_map.get("人员编号", -1)
     name_idx = header_map.get("人员姓名", -1)
+    card_idx = header_map.get("卡号", -1)
     dept_idx = header_map.get("部门名称", -1)
     shift_idx = header_map.get("班次编号", -1)
     manager_idx = header_map.get("是否管理人员", -1)
@@ -429,7 +430,8 @@ def import_employees_xlsx():
         return jsonify({"error": "missing required headers: 人员编号, 人员姓名"}), 400
 
     imported = 0
-    for row in raw_rows[header_idx + 1 :]:
+    seen_card_owners: dict[str, str] = {}
+    for row_index, row in enumerate(raw_rows[header_idx + 1 :], start=header_idx + 2):
         emp_no = (
             str(row[emp_no_idx]).strip()
             if emp_no_idx < len(row) and row[emp_no_idx] is not None
@@ -438,6 +440,11 @@ def import_employees_xlsx():
         name = (
             str(row[name_idx]).strip()
             if name_idx < len(row) and row[name_idx] is not None
+            else ""
+        )
+        card_no = (
+            str(row[card_idx]).strip()
+            if card_idx >= 0 and card_idx < len(row) and row[card_idx] is not None
             else ""
         )
         dept_name = (
@@ -470,6 +477,19 @@ def import_employees_xlsx():
         )
         if not emp_no or not name:
             continue
+        if card_no:
+            card_owner = seen_card_owners.get(card_no)
+            if card_owner is not None and card_owner != emp_no:
+                return jsonify({"error": f"第 {row_index} 行：卡号 {card_no} 已被工号 {card_owner} 使用"}), 400
+            conflict = admin_module.Employee.query.filter(
+                admin_module.Employee.card_no == card_no,
+                admin_module.Employee.emp_no != emp_no,
+            ).first()
+            if conflict:
+                return jsonify(
+                    {"error": f"第 {row_index} 行：卡号 {card_no} 已被工号 {conflict.emp_no} 使用"}
+                ), 400
+            seen_card_owners[card_no] = emp_no
         department = admin_module._resolve_department(dept_name) if dept_name else None
         shift = admin_module._resolve_shift(shift_no) if shift_no else None
         employee = admin_module.Employee.query.filter_by(emp_no=emp_no).first()
@@ -477,6 +497,7 @@ def import_employees_xlsx():
             employee = admin_module.Employee(
                 emp_no=emp_no,
                 name=name,
+                card_no=card_no or None,
                 dept_id=department.id if department else None,
                 is_manager=is_manager,
                 is_nursing=is_nursing,
@@ -487,6 +508,8 @@ def import_employees_xlsx():
             admin_module.db.session.flush()
         else:
             employee.name = name
+            if card_idx >= 0:
+                employee.card_no = card_no or None
             employee.dept_id = department.id if department else None
             employee.is_manager = is_manager
             employee.is_nursing = is_nursing
@@ -508,6 +531,7 @@ def download_employees_template():
         [
             "人员编号",
             "人员姓名",
+            "卡号",
             "部门名称",
             "班次编号",
             "是否管理人员",
@@ -520,6 +544,7 @@ def download_employees_template():
         [
             "1001001",
             "张三",
+            "K0001",
             "生产中心",
             "A00001",
             "否",
@@ -532,6 +557,7 @@ def download_employees_template():
         [
             "1001002",
             "李四",
+            "K0002",
             "行政部",
             "A00002",
             "是",
@@ -603,6 +629,7 @@ def export_employees_xlsx():
             or_(
                 func.lower(admin_module.Employee.emp_no).contains(keyword),
                 func.lower(admin_module.Employee.name).contains(keyword),
+                func.lower(admin_module.Employee.card_no).contains(keyword),
             )
         )
 
@@ -613,6 +640,7 @@ def export_employees_xlsx():
         [
             "人员编号",
             "人员姓名",
+            "卡号",
             "部门名称",
             "班次编号",
             "是否管理人员",
@@ -629,6 +657,7 @@ def export_employees_xlsx():
             [
                 employee.emp_no or "",
                 employee.name or "",
+                employee.card_no or "",
                 employee.department.dept_name if employee.department else "",
                 shift.shift_no if shift else "",
                 "是" if employee.is_manager else "否",

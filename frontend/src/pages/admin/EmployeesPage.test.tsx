@@ -6,6 +6,8 @@ const mockFetchDepartments = vi.hoisted(() => vi.fn());
 const mockFetchShifts = vi.hoisted(() => vi.fn());
 const mockResign = vi.hoisted(() => vi.fn());
 const mockReinstate = vi.hoisted(() => vi.fn());
+const mockCreateEmployee = vi.hoisted(() => vi.fn());
+const mockUpdateEmployee = vi.hoisted(() => vi.fn());
 const mockConfirm = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/admin", () => ({
@@ -14,8 +16,8 @@ vi.mock("../../api/admin", () => ({
   fetchAdminShifts: mockFetchShifts,
   resignAdminEmployee: mockResign,
   reinstateAdminEmployee: mockReinstate,
-  createAdminEmployee: vi.fn(),
-  updateAdminEmployee: vi.fn(),
+  createAdminEmployee: mockCreateEmployee,
+  updateAdminEmployee: mockUpdateEmployee,
   deleteAdminEmployee: vi.fn(),
   batchAdminEmployees: vi.fn(),
   importAdminEmployees: vi.fn(),
@@ -30,10 +32,10 @@ vi.mock("../../components/feedback/ConfirmDialog", () => ({
 import EmployeesPage from "./EmployeesPage";
 
 const employees = [
-  { id: 1, emp_no: "E100", name: "在职员工", dept_name: "行政部", is_manager: false, resigned_at: null },
-  { id: 2, emp_no: "E200", name: "已离职员工", dept_name: "行政部", is_manager: false, resigned_at: "2026-08-31" },
-  { id: 3, emp_no: "E300", name: "重名员工", dept_name: "财务部", is_manager: false, resigned_at: null },
-  { id: 4, emp_no: "E400", name: "重名员工", dept_name: "人事部", is_manager: false, resigned_at: null },
+  { id: 1, emp_no: "E100", name: "在职员工", card_no: "K100", dept_name: "行政部", is_manager: false, resigned_at: null },
+  { id: 2, emp_no: "E200", name: "已离职员工", card_no: null, dept_name: "行政部", is_manager: false, resigned_at: "2026-08-31" },
+  { id: 3, emp_no: "E300", name: "重名员工", card_no: "K300", dept_name: "财务部", is_manager: false, resigned_at: null },
+  { id: 4, emp_no: "E400", name: "重名员工", card_no: null, dept_name: "人事部", is_manager: false, resigned_at: null },
 ];
 
 afterEach(() => {
@@ -198,5 +200,78 @@ describe("EmployeesPage 离职功能", () => {
     fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
 
     expect(mockResign).not.toHaveBeenCalled();
+  });
+});
+
+describe("EmployeesPage 卡号功能", () => {
+  beforeEach(() => {
+    mockFetchEmployees.mockResolvedValue(employees);
+    mockFetchDepartments.mockResolvedValue([]);
+    mockFetchShifts.mockResolvedValue([]);
+    mockConfirm.mockResolvedValue(true);
+  });
+
+  it("员工表格显示卡号列", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    expect(screen.getAllByText("卡号").length).toBeGreaterThan(0);
+    expect(screen.getByText("K100")).toBeTruthy();
+  });
+
+  it("新建员工表单支持填写卡号并随 payload 提交", async () => {
+    mockCreateEmployee.mockResolvedValue({ status: "ok", employee: employees[0] });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getByRole("button", { name: /新建员工/ }));
+    fireEvent.change(await screen.findByLabelText("人员编号"), { target: { value: "E900" } });
+    fireEvent.change(screen.getByLabelText("人员姓名"), { target: { value: "新员工" } });
+    fireEvent.change(screen.getByLabelText("卡号"), { target: { value: "K900" } });
+    fireEvent.click(screen.getByRole("button", { name: "创建员工" }));
+
+    await waitFor(() =>
+      expect(mockCreateEmployee).toHaveBeenCalledWith(
+        expect.objectContaining({ emp_no: "E900", name: "新员工", card_no: "K900" }),
+      ),
+    );
+  });
+
+  it("编辑员工回填卡号并随更新提交", async () => {
+    mockUpdateEmployee.mockResolvedValue({ status: "ok", employee: employees[0] });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    // 新建表单常驻 DOM 也带卡号输入框，取已回填 K100 的那个（编辑弹窗内）
+    const editCardInput = (await screen.findAllByLabelText("卡号")).find(
+      (el): el is HTMLInputElement => el instanceof HTMLInputElement && el.value === "K100",
+    );
+    expect(editCardInput).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() =>
+      expect(mockUpdateEmployee).toHaveBeenCalledWith(1, expect.objectContaining({ card_no: "K100" })),
+    );
+  });
+
+  it("关键词搜索覆盖卡号", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.change(screen.getByLabelText("关键词"), { target: { value: "K100" } });
+
+    expect(screen.getByText("在职员工")).toBeTruthy();
+    expect(screen.queryByText("重名员工")).toBeNull();
+  });
+
+  it("导入弹窗的模板列要求说明包含卡号", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getByRole("button", { name: /导入\/导出员工/ }));
+
+    expect(await screen.findByText(/人员编号、人员姓名、卡号（选填/)).toBeTruthy();
+    expect(screen.getByText(/留空将清空已有卡号/)).toBeTruthy();
   });
 });

@@ -322,6 +322,7 @@ def _serialize_employee(employee: Employee) -> dict:
         "id": employee.id,
         "emp_no": employee.emp_no,
         "name": employee.name,
+        "card_no": employee.card_no or None,
         "is_manager": bool(employee.is_manager),
         "is_nursing": bool(employee.is_nursing),
         "employee_stats_attendance_source": employee.employee_stats_attendance_source or ATTENDANCE_SOURCE_EMPLOYEE,
@@ -2334,10 +2335,20 @@ def _build_departments_workbook(
     return wb
 
 
+def _card_no_conflict(card_no: str, exclude_employee_id: int | None = None) -> bool:
+    if not card_no:
+        return False
+    query = Employee.query.filter_by(card_no=card_no)
+    if exclude_employee_id is not None:
+        query = query.filter(Employee.id != exclude_employee_id)
+    return query.first() is not None
+
+
 def create_employee():
     data = request.json or {}
     emp_no = (data.get("emp_no") or "").strip()
     name = (data.get("name") or "").strip()
+    card_no = (data.get("card_no") or "").strip() or None
     dept_name = (data.get("dept_name") or "").strip()
     shift_no = (data.get("shift_no") or "").strip()
     is_manager = bool(data.get("is_manager"))
@@ -2353,11 +2364,14 @@ def create_employee():
         return jsonify({"error": "emp_no and name are required"}), 400
     if Employee.query.filter_by(emp_no=emp_no).first():
         return jsonify({"error": "emp_no already exists"}), 400
+    if _card_no_conflict(card_no):
+        return jsonify({"error": "card_no already exists"}), 400
 
     department = _resolve_department(dept_name) if dept_name else None
     employee = Employee(
         emp_no=emp_no,
         name=name,
+        card_no=card_no,
         dept_id=department.id if department else None,
         is_manager=is_manager,
         is_nursing=is_nursing,
@@ -2375,6 +2389,7 @@ def update_employee(employee_id: int):
     data = request.json or {}
     emp_no = (data.get("emp_no") or "").strip()
     name = (data.get("name") or "").strip()
+    card_no = (data.get("card_no") or "").strip() or None
     dept_name = (data.get("dept_name") or "").strip()
     shift_no = (data.get("shift_no") or "").strip()
     is_manager = bool(data.get("is_manager"))
@@ -2392,9 +2407,12 @@ def update_employee(employee_id: int):
     duplicate = Employee.query.filter(Employee.emp_no == emp_no, Employee.id != employee_id).first()
     if duplicate:
         return jsonify({"error": "emp_no already exists"}), 400
+    if _card_no_conflict(card_no, exclude_employee_id=employee_id):
+        return jsonify({"error": "card_no already exists"}), 400
 
     employee.emp_no = emp_no
     employee.name = name
+    employee.card_no = card_no
     employee.is_manager = is_manager
     if is_nursing is not None:
         employee.is_nursing = is_nursing
