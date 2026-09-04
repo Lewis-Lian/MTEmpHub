@@ -145,15 +145,15 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         return res.get_json()["rows"][0]
 
-    # ---------------------------------------------------- 系统口径变更：晚加 0.5
+    # ------------------------------------------- 系统口径变更：晚加顶班 0.5
 
-    def test_evening_overtime_record_counts_half_day(self) -> None:
-        """有晚加班条的日期，不论刷卡工时长短，考勤天数一律 0.5（原口径 8h 刷卡算 1 天）。"""
+    def test_evening_overtime_record_adds_half_day_on_day_shift(self) -> None:
+        """有晚加班条的日期：白班出勤按正常 1 天叠加顶班 0.5 = 1.5（原口径一律记 0.5）。"""
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
         self._add_evening_overtime(date(2026, 5, 6), hours=3.0)
 
         automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 0.5)
+        self.assertEqual(automatic["attendance_days"], 1.5)
 
     def test_evening_overtime_flag_forces_half_day(self) -> None:
         """手工勾选晚上加班的日期，考勤天数固定 0.5（原刷卡口径 1 天）。"""

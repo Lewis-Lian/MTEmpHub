@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import calendar
 import math
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 from typing import Callable
@@ -20,6 +21,7 @@ from services.attendance_source_service import (
     selected_monthly_report_raw,
 )
 from services.daily_override_service import (
+    EVENING_OVERTIME_START,
     daily_override_maps,
     evening_overtime_dates_by_emp,
     status_attendance_days,
@@ -233,6 +235,7 @@ def _overtime_rows_by_employee(employee_ids: list[int], month: str) -> dict[int,
     rows = (
         OvertimeRecord.query.filter(OvertimeRecord.emp_id.in_(employee_ids))
         .filter(OvertimeRecord.start_time >= start_dt, OvertimeRecord.start_time < end_dt)
+        .filter((OvertimeRecord.approval_status.is_(None)) | (OvertimeRecord.approval_status != "已拒绝"))
         .all()
     )
     rows_by_employee = {employee_id: [] for employee_id in employee_ids}
@@ -444,25 +447,42 @@ def _has_manager_punch_record(record) -> bool:
     return any(str(raw.get(key) or "").strip() for key in _MANAGER_PUNCH_TIME_KEYS)
 
 
+def _manager_daytime_punch_exists(record) -> bool:
+    """晚加班条日判断白班是否出勤：任一打卡时刻早于 17:00（晚加班起点）。"""
+    raw = record.raw_data if isinstance(record.raw_data, dict) else {}
+    nested_raw = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
+    tokens = [str(raw.get("刷卡时间数据") or nested_raw.get("刷卡时间数据") or "")]
+    tokens += [str(raw.get(key) or nested_raw.get(key) or "") for key in _MANAGER_PUNCH_TIME_KEYS]
+    tokens += [str(x) for x in (getattr(record, "check_in_times", None) or [])]
+    tokens += [str(x) for x in (getattr(record, "check_out_times", None) or [])]
+    for token in tokens:
+        for m in re.finditer(r"(\d{1,2}):(\d{2})", token):
+            if time(int(m.group(1)), int(m.group(2))) < EVENING_OVERTIME_START:
+                return True
+    return False
+
+
 def _manager_attendance_days_from_views(
     rows: list[object],
     daily_overrides: dict | None = None,
     evening_dates: set | None = None,
 ) -> float:
-    """刷卡兜底出勤天数（effective 口径，与员工侧一致）：
-    勾选晚加 → 0.5；状态修正 → 按状态映射；当日有晚加班条 → 0.5；否则有刷卡记 1 天。
-    修正表有记录但无 DailyRecord 的日期也计入。
+    """刷卡兜底出勤天数（effective 口径，与员工侧同规则；但白班基值无半勤粒度，恒 1 天）：
+    勾选晚加 → 0.5；状态修正 → 按状态映射；当日有晚加班条 → 白班出勤按 1 天叠加 0.5，
+    纯晚顶班记 0.5；否则有刷卡记 1 天。修正表有记录但无 DailyRecord 的日期也计入。
     """
     daily_overrides = daily_overrides or {}
     evening_dates = evening_dates or set()
 
-    def day_value(day, override, has_punch: bool) -> float:
+    def day_value(day, override, has_punch: bool, has_daytime_punch: bool) -> float:
         if override is not None:
             if override.is_evening_overtime:
                 return 0.5
             if override.status:
                 return status_attendance_days(override.status)
         if day in evening_dates:
+            if has_daytime_punch:
+                return (1.0 if has_punch else 0.0) + 0.5
             return 0.5
         return 1.0 if has_punch else 0.0
 
@@ -470,12 +490,17 @@ def _manager_attendance_days_from_views(
     seen: set = set()
     for row in rows:
         day = getattr(row, "record_date", None)
-        total += day_value(day, daily_overrides.get(day) if day else None, _has_manager_punch_record(row))
+        total += day_value(
+            day,
+            daily_overrides.get(day) if day else None,
+            _has_manager_punch_record(row),
+            day in evening_dates and _manager_daytime_punch_exists(row),
+        )
         if day:
             seen.add(day)
     for day, override in daily_overrides.items():
         if day not in seen:
-            total += day_value(day, override, False)
+            total += day_value(day, override, False, False)
     return _round2(total)
 
 
@@ -601,7 +626,29 @@ def build_manager_rows(
                 half_leave_days += 0.5
             elif bucket == "time_off" and _has_half_day_component(days):
                 half_time_off_days += 0.5
+        records_by_date = {r.record_date: r for r in attendance_rows if getattr(r, "record_date", None)}
+        evening_topup_days = 0.0
+        # 晚加班条按日合并时长后统一折算，避免同日多条逐条叠加
+        evening_hours_by_date: dict[date, float] = {}
+        daytime_overtimes = []
         for overtime in overtime_rows_by_employee.get(employee.id, []):
+            ot_start = getattr(overtime, "start_time", None)
+            if ot_start is not None and ot_start.time() >= EVENING_OVERTIME_START:
+                evening_hours_by_date[ot_start.date()] = (
+                    evening_hours_by_date.get(ot_start.date(), 0.0) + float(overtime.effective_hours or 0)
+                )
+            else:
+                daytime_overtimes.append(overtime)
+        for ot_date, total_hours in evening_hours_by_date.items():
+            days = normalize_days(total_hours)
+            record = records_by_date.get(ot_date)
+            if record is not None and _manager_daytime_punch_exists(record):
+                # 白班出勤日 + 晚加班顶班：顶班折算值叠加（白天 1 天 + 晚加班 0.5 = 1.5）
+                evening_topup_days += days
+            elif _has_half_day_component(days):
+                # 纯晚顶班：考勤机月报已按 1 天记出勤，按折算扣减修正
+                half_overtime_days += 0.5
+        for overtime in daytime_overtimes:
             days = normalize_days(overtime.effective_hours)
             if _has_half_day_component(days):
                 half_overtime_days += 0.5
@@ -617,19 +664,22 @@ def build_manager_rows(
             elif status == "丧假":
                 funeral_days += 1.0
 
-        base_attendance_days = (
-            raw_attendance_days
-            if raw_attendance_days is not None
-            else _manager_attendance_days_from_views(
+        base_attendance_days = raw_attendance_days
+        if base_attendance_days is None:
+            base_attendance_days = _manager_attendance_days_from_views(
                 attendance_rows,
                 daily_overrides,
                 evening_dates_by_emp.get(employee.id, set()),
             )
-        )
+            # 兜底口径按日构建时已计入晚加班顶班（白班+顶班 1.5 / 纯顶班 0.5），
+            # 加班相关的加减修正仅月报口径需要，避免重复计。
+            half_overtime_days = 0.0
+            evening_topup_days = 0.0
 
-        # 实际出勤天数 = 月报出勤天数(失败时按刷卡天数兜底) - 请假半天的天数 - 调休半天的天数 - 加班半天的天数
+        # 实际出勤天数 = 月报出勤天数(失败时按刷卡天数兜底) - 请假半天的天数 - 调休半天的天数
+        #                - 纯晚顶班加班折半天的天数 + 白班晚加班顶班折算天数
         actual_attendance_days = _round2(
-            base_attendance_days - half_leave_days - half_time_off_days - half_overtime_days
+            base_attendance_days - half_leave_days - half_time_off_days - half_overtime_days + evening_topup_days
         )
         # 出勤天数 = 实际出勤天数 + 出差 + 婚假 + 丧假
         attendance_days = _round2(

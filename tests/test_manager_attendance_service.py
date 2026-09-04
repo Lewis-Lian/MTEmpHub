@@ -625,5 +625,270 @@ class ManagerInjuryDeductionTests(unittest.TestCase):
         self.assertEqual(rows[0]["personal_sick_days"], 22.0)
 
 
+class ManagerEveningOvertimeTopupTests(unittest.TestCase):
+    """晚加班顶班口径：
+    - 白班出勤日 + 晚加班条：出勤 = 白班 1 天 + 顶班折算值（2~5 小时 = 0.5 天）
+    - 纯晚顶班日（白天无打卡）：考勤机月报已记 1 天，按折算扣减修正（维持原行为）
+    """
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-evening-topup.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="行政部")
+            db.session.add(dept)
+            db.session.flush()
+            manager = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            db.session.add(manager)
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def test_day_shift_plus_evening_overtime_adds_topup_days(self) -> None:
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-08",
+                        raw_data={"出勤天数": 21},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 31),
+                        actual_hours=695,
+                        raw_data={
+                            "出勤天数": "1",
+                            "工作时长": "695",
+                            "上班1打卡时间": "07:54",
+                            "下班2打卡时间": "17:02",
+                            "上班3打卡时间": "17:02",
+                            "下班3打卡时间": "20:08",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-EVE-1",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 17, 0),
+                        end_time=datetime(2026, 8, 31, 20, 0),
+                        effective_hours=0.125,
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 21.5)
+        self.assertEqual(rows[0]["actual_attendance_days"], 21.5)
+
+    def test_pure_evening_topup_keeps_half_day_deduction(self) -> None:
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-07",
+                        raw_data={"出勤天数": 24},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 7, 31),
+                        actual_hours=231,
+                        raw_data={
+                            "出勤天数": "1",
+                            "工作时长": "231",
+                            "上班1打卡结果": "缺卡",
+                            "上班2打卡结果": "缺卡",
+                            "下班1打卡结果": "缺卡",
+                            "下班2打卡结果": "缺卡",
+                            "上班3打卡时间": "17:55",
+                            "上班3打卡结果": "正常",
+                            "下班3打卡时间": "21:46",
+                            "下班3打卡结果": "正常",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-EVE-2",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 7, 31, 17, 55),
+                        end_time=datetime(2026, 7, 31, 21, 46),
+                        effective_hours=0.1667,
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-07"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.5)
+
+    def test_fallback_day_view_adds_topup_for_worked_day_shift(self) -> None:
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 4, 1),
+                        actual_hours=480,
+                        raw_data={"刷卡时间数据": "07:55,17:02"},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 4, 2),
+                        actual_hours=695,
+                        raw_data={"刷卡时间数据": "07:54,17:02,20:08"},
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-EVE-3",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 4, 2, 17, 0),
+                        end_time=datetime(2026, 4, 2, 20, 0),
+                        effective_hours=0.125,
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-04"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 2.5)
+
+    def test_manager_payload_nested_punch_still_counts_day_shift(self) -> None:
+        """生产结构：管理端打卡位于 manager_payload.raw_data 嵌套层。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-08",
+                        raw_data={"出勤天数": 21},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 31),
+                        actual_hours=695,
+                        manager_payload={
+                            "actual_hours": 695,
+                            "raw_data": {
+                                "上班1打卡时间": "07:54",
+                                "下班2打卡时间": "17:02",
+                                "上班3打卡时间": "17:02",
+                                "下班3打卡时间": "20:08",
+                            },
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-NEST-1",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 17, 0),
+                        end_time=datetime(2026, 8, 31, 20, 0),
+                        effective_hours=0.125,
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 21.5)
+
+    def test_same_day_multiple_evening_overtimes_merge_hours(self) -> None:
+        """同日多条晚加班条按合并时长折算（0.125+0.125=0.25 天 → 折 1.0），不逐条叠加。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-08",
+                        raw_data={"出勤天数": 21},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 31),
+                        actual_hours=695,
+                        raw_data={
+                            "上班1打卡时间": "07:54",
+                            "下班2打卡时间": "17:02",
+                            "上班3打卡时间": "17:02",
+                            "下班3打卡时间": "20:08",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-MERGE-1",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 17, 0),
+                        end_time=datetime(2026, 8, 31, 18, 30),
+                        effective_hours=0.125,
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-MERGE-2",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 18, 30),
+                        end_time=datetime(2026, 8, 31, 20, 0),
+                        effective_hours=0.125,
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 22.0)
+
+    def test_rejected_evening_overtime_ignored(self) -> None:
+        """已拒绝的晚加班条不参与顶班叠加与扣减。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id,
+                        report_month="2026-08",
+                        raw_data={"出勤天数": 21},
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 31),
+                        actual_hours=695,
+                        raw_data={
+                            "上班1打卡时间": "07:54",
+                            "下班2打卡时间": "17:02",
+                            "上班3打卡时间": "17:02",
+                            "下班3打卡时间": "20:08",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-REJ-1",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 17, 0),
+                        end_time=datetime(2026, 8, 31, 20, 0),
+                        effective_hours=0.125,
+                        approval_status="已拒绝",
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 21.0)
+
+
 if __name__ == "__main__":
     unittest.main()
