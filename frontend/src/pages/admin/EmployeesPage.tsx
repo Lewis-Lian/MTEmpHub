@@ -65,6 +65,15 @@ function todayLocalDate(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+function cardNoMatches(cardNo: string | null | undefined, lookup: string): boolean {
+  if (!cardNo || !lookup) {
+    return false;
+  }
+  // 全零卡号去零后为空串，保留原值避免与空值互相误匹配
+  const stripLeadingZeros = (value: string) => value.replace(/^0+/, "") || value;
+  return stripLeadingZeros(cardNo) === stripLeadingZeros(lookup);
+}
+
 function employeeToForm(row: AdminEmployee): EmployeeFormState {
   return {
     emp_no: row.emp_no,
@@ -260,7 +269,7 @@ export default function EmployeesPage() {
       notification.warning("请选择离职日期");
       return;
     }
-    const matches = rows.filter((row) => row.emp_no === lookupValue || row.name === lookupValue || row.card_no === lookupValue);
+    const matches = rows.filter((row) => row.emp_no === lookupValue || row.name === lookupValue || cardNoMatches(row.card_no, lookupValue));
     if (matches.length > 1) {
       notification.warning("该姓名对应多名员工，请输入人员编号精确办理");
       return;
@@ -538,7 +547,7 @@ export default function EmployeesPage() {
 
   const resignLookupValue = resignEmpNo.trim();
   const resignMatches = resignLookupValue
-    ? rows.filter((row) => row.emp_no === resignLookupValue || row.name === resignLookupValue || row.card_no === resignLookupValue)
+    ? rows.filter((row) => row.emp_no === resignLookupValue || row.name === resignLookupValue || cardNoMatches(row.card_no, resignLookupValue))
     : [];
 
   function renderRowActions(row: AdminEmployee) {
