@@ -286,7 +286,6 @@ export default function EmployeesPage() {
     try {
       const result = await resignAdminEmployee({ emp_no: empNo, resigned_at: resignDate });
       notification.success(`员工 ${result.employee.name} 已办理离职`);
-      setShowResignModal(false);
       await loadRows();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "办理离职失败";
