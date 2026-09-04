@@ -340,6 +340,7 @@ class ImportService:
         scanned = 0
         skipped_no_key = 0
         skipped_unknown_employee = 0
+        skipped_locked = 0
 
         # Bulk Select 批量预查请假记录
         leave_col_idx = ImportService._find_col(header_map, "请假单号")
@@ -411,6 +412,10 @@ class ImportService:
 
             record = existing_records.get(leave_no)
             is_new = record is None
+            if not is_new and (record.is_revoked or record.is_manual_edited):
+                # 作废单不复活、手工编辑单不被源表覆盖，均不参与 upsert 与调休余额联动
+                skipped_locked += 1
+                continue
             old_duration = 0.0
             old_year = None
             old_is_time_off = False
@@ -461,6 +466,7 @@ class ImportService:
             "skipped": scanned - imported,
             "skipped_no_key": skipped_no_key,
             "skipped_unknown_employee": skipped_unknown_employee,
+            "skipped_locked": skipped_locked,
         }
 
     @staticmethod

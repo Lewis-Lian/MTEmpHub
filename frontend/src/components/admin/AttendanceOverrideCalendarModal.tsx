@@ -3,7 +3,10 @@ import { createPortal } from "react-dom";
 
 import {
   clearAdminDailyOverride,
+  editLeaveRecord,
   fetchAdminDailyOverrideCalendar,
+  restoreLeaveRecord,
+  revokeLeaveRecord,
   saveAdminDailyOverride,
   saveAdminDailyOverrideBatch,
   type DailyOverrideBatchPayload,
@@ -13,7 +16,11 @@ import AttendanceCalendarGrid from "../attendance/AttendanceCalendarGrid";
 import ErrorState from "../feedback/ErrorState";
 import LoadingState from "../feedback/LoadingState";
 import { useNotification } from "../feedback/Notification";
-import type { AttendanceCalendarData, DailyAttendanceOverrideValues } from "../../types/query";
+import type {
+  AttendanceCalendarData,
+  AttendanceCalendarLeave,
+  DailyAttendanceOverrideValues,
+} from "../../types/query";
 
 // 状态枚举与后端 services/daily_override_service.py 保持一致
 // 出勤类状态通过点击格子循环切换（ATTENDANCE_CYCLE），假种在下方面板选择
@@ -94,6 +101,23 @@ const EMPTY_FORM: DetailFormState = {
   remark: "",
 };
 
+// 请假单编辑表单：datetime-local 输入值（YYYY-MM-DDTHH:mm）
+interface LeaveEditFormState {
+  recordId: number;
+  start: string;
+  end: string;
+  leaveType: string;
+}
+
+// "2026-07-15 13:00" <-> "2026-07-15T13:00"（datetime-local 控件格式）
+function toDateTimeInput(value: string | undefined): string {
+  return (value ?? "").replace(" ", "T").slice(0, 16);
+}
+
+function fromDateTimeInput(value: string): string {
+  return value.replace("T", " ");
+}
+
 export default function AttendanceOverrideCalendarModal({
   editTitle,
   employee,
@@ -115,6 +139,7 @@ export default function AttendanceOverrideCalendarModal({
   const [multiSelectedDates, setMultiSelectedDates] = useState<string[]>([]);
   const [batchStatus, setBatchStatus] = useState("");
   const [batchActual, setBatchActual] = useState<BatchActualChoice>("keep");
+  const [leaveEditForm, setLeaveEditForm] = useState<LeaveEditFormState | null>(null);
 
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const batchStatusOptions = isManager ? MANAGER_DAILY_STATUS_OPTIONS : EMPLOYEE_DAILY_STATUS_OPTIONS;
@@ -126,6 +151,10 @@ export default function AttendanceOverrideCalendarModal({
     [calendar, selectedDate],
   );
   const currentOverride = selectedDay?.override ?? null;
+  const selectedDayLeaves = useMemo(
+    () => (calendar?.leaves ?? []).filter((item) => item.date === selectedDate),
+    [calendar, selectedDate],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -254,6 +283,68 @@ export default function AttendanceOverrideCalendarModal({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 请假单作废/恢复/编辑共用：成功用响应中的日历整体刷新（含作废标记）；返回是否成功
+  async function runLeaveOperation(
+    operation: () => Promise<{ calendar: AttendanceCalendarData }>,
+    successText: string,
+  ): Promise<boolean> {
+    setIsSaving(true);
+    try {
+      const response = await operation();
+      setCalendar(response.calendar);
+      notification.success(successText);
+      return true;
+    } catch (caughtError: unknown) {
+      notification.error(caughtError instanceof Error ? caughtError.message : "操作失败");
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function handleLeaveRevoke(recordId: number) {
+    void runLeaveOperation(() => revokeLeaveRecord(recordId, month), "已作废请假单");
+  }
+
+  function handleLeaveRestore(recordId: number) {
+    void runLeaveOperation(() => restoreLeaveRecord(recordId, month), "已恢复请假单");
+  }
+
+  function openLeaveEdit(leave: AttendanceCalendarLeave) {
+    setLeaveEditForm({
+      recordId: leave.id as number,
+      start: toDateTimeInput(leave.start_time),
+      end: toDateTimeInput(leave.end_time),
+      leaveType: leave.leave_type,
+    });
+  }
+
+  function handleLeaveEditSave() {
+    const formState = leaveEditForm;
+    if (!formState) {
+      return;
+    }
+    void runLeaveOperation(
+      () =>
+        editLeaveRecord(formState.recordId, {
+          month,
+          start_time: fromDateTimeInput(formState.start),
+          end_time: fromDateTimeInput(formState.end),
+          leave_type: formState.leaveType,
+        }),
+      "已保存请假单",
+    ).then((succeeded) => {
+      if (succeeded) {
+        setLeaveEditForm(null);
+      }
+    });
+  }
+
+  // 切换选中日时丢弃未提交的请假单编辑表单
+  useEffect(() => {
+    setLeaveEditForm(null);
+  }, [selectedDate]);
 
   // 点击 1 天为单选（右侧当天面板），单选下再点不同格子连同原选中一起进入多选；
   // 多选中点击格子做勾选/取消，取消到剩 1 天自动回单选；
@@ -553,6 +644,125 @@ export default function AttendanceOverrideCalendarModal({
             )}
           </div>
         </div>
+
+        {selectedDayLeaves.length > 0 ? (
+          <div className="daypanel-section daypanel-leaves">
+            <div className="daypanel-title">
+              <span>当日请假单</span>
+              <span className="daypanel-title-hint">作废后不参与考勤与扣薪口径</span>
+            </div>
+            {selectedDayLeaves.map((leave) => (
+              <div
+                className={`daypanel-leave-item${leave.is_revoked ? " is-revoked" : ""}`}
+                key={leave.leave_no ?? `${leave.date}-${leave.start_time ?? ""}`}
+              >
+                <div className="daypanel-leave-row">
+                  <span className="daypanel-leave-type" data-testid="daypanel-leave-type">
+                    {leave.leave_type}
+                  </span>
+                  {leave.is_revoked ? <span className="daypanel-leave-badge">已撤销</span> : null}
+                  <span className="daypanel-leave-range">{`${(leave.start_time ?? "").slice(5, 16)} ~ ${(leave.end_time ?? "").slice(5, 16)}`}</span>
+                  {leave.leave_no ? <span className="daypanel-leave-no">{leave.leave_no}</span> : null}
+                </div>
+                {leave.reason ? <div className="daypanel-leave-reason">{leave.reason}</div> : null}
+                {leave.id != null ? (
+                  <div className="daypanel-leave-actions">
+                    {leave.is_revoked ? (
+                      <button
+                        className="account-action-button"
+                        disabled={isLocked || isSaving}
+                        onClick={() => handleLeaveRestore(leave.id as number)}
+                        type="button"
+                      >
+                        恢复
+                      </button>
+                    ) : (
+                      <button
+                        className="account-action-button"
+                        disabled={isLocked || isSaving}
+                        onClick={() => handleLeaveRevoke(leave.id as number)}
+                        type="button"
+                      >
+                        作废
+                      </button>
+                    )}
+                    <button
+                      className="account-action-button"
+                      disabled={isLocked || isSaving || leave.is_revoked}
+                      onClick={() => openLeaveEdit(leave)}
+                      type="button"
+                    >
+                      编辑
+                    </button>
+                  </div>
+                ) : null}
+                {leaveEditForm && leaveEditForm.recordId === leave.id ? (
+                  <div className="daypanel-leave-edit" data-testid="daypanel-leave-edit">
+                    <label className="daypanel-field">
+                      <span className="daypanel-field-label">假种</span>
+                      <select
+                        disabled={isLocked || isSaving}
+                        onChange={(event) =>
+                          setLeaveEditForm((current) => (current ? { ...current, leaveType: event.target.value } : current))
+                        }
+                        value={leaveEditForm.leaveType}
+                      >
+                        {(leaveStatuses.includes(leaveEditForm.leaveType)
+                          ? leaveStatuses
+                          : [leaveEditForm.leaveType, ...leaveStatuses]
+                        ).map((status) => (
+                          <option key={status} value={status}>
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="daypanel-field">
+                      <span className="daypanel-field-label">开始时间</span>
+                      <input
+                        disabled={isLocked || isSaving}
+                        onChange={(event) =>
+                          setLeaveEditForm((current) => (current ? { ...current, start: event.target.value } : current))
+                        }
+                        type="datetime-local"
+                        value={leaveEditForm.start}
+                      />
+                    </label>
+                    <label className="daypanel-field">
+                      <span className="daypanel-field-label">结束时间</span>
+                      <input
+                        disabled={isLocked || isSaving}
+                        onChange={(event) =>
+                          setLeaveEditForm((current) => (current ? { ...current, end: event.target.value } : current))
+                        }
+                        type="datetime-local"
+                        value={leaveEditForm.end}
+                      />
+                    </label>
+                    <div className="daypanel-actions">
+                      <button
+                        className="account-action-button account-action-button--primary"
+                        disabled={isLocked || isSaving}
+                        onClick={handleLeaveEditSave}
+                        type="button"
+                      >
+                        保存请假单
+                      </button>
+                      <button
+                        className="account-action-button"
+                        disabled={isLocked || isSaving}
+                        onClick={() => setLeaveEditForm(null)}
+                        type="button"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className="daypanel-section daypanel-status">
           <div className="daypanel-title">

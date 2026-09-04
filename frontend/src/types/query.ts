@@ -125,6 +125,10 @@ export interface AttendanceCalendarLeave {
   end_time?: string;
   reason?: string;
   approval_status?: string;
+  /** 请假单记录 id（作废/恢复/编辑的操作句柄；旧数据可能缺失） */
+  id?: number;
+  /** 作废单不参与任何口径，仅置灰展示 */
+  is_revoked?: boolean;
 }
 
 export interface AttendanceCalendarSummary {

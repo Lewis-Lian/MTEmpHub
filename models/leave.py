@@ -19,5 +19,9 @@ class LeaveRecord(db.Model):
     reason = db.Column(db.Text, nullable=True)
     approval_status = db.Column(db.String(50), nullable=True)
     approval_comment = db.Column(db.Text, nullable=True)
+    # 作废单不参与任何考勤/扣薪口径，仅在修正弹窗中置灰展示（可恢复）
+    is_revoked = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    # 手工编辑过的单在请假导入 upsert 时保留编辑值，不被源表覆盖
+    is_manual_edited = db.Column(db.Boolean, default=False, nullable=False)
 
     employee = db.relationship("Employee", back_populates="leave_records")

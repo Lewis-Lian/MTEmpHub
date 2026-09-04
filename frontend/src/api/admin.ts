@@ -412,6 +412,51 @@ export function clearAdminDailyOverride<TRow>(empId: number, date: string): Prom
   );
 }
 
+export interface LeaveRecordPayload {
+  month: string;
+  start_time: string;
+  end_time: string;
+  leave_type: string;
+}
+
+export interface LeaveRecordOperationResponse {
+  leave: {
+    id: number;
+    leave_no: string;
+    leave_type: string;
+    start_time: string;
+    end_time: string;
+    duration: number;
+    is_revoked: boolean;
+    is_manual_edited: boolean;
+  };
+  calendar: AttendanceCalendarData;
+}
+
+/** 作废请假单（软删：不参与任何口径，可恢复；补休单回退调休余额） */
+export function revokeLeaveRecord(recordId: number, month: string): Promise<LeaveRecordOperationResponse> {
+  const query = new URLSearchParams({ month });
+  return apiRequest<LeaveRecordOperationResponse>(
+    `/api/admin/leave-records/${recordId}?${query.toString()}`,
+    { method: "DELETE" },
+  );
+}
+
+/** 恢复已作废的请假单 */
+export function restoreLeaveRecord(recordId: number, month: string): Promise<LeaveRecordOperationResponse> {
+  return apiRequest<LeaveRecordOperationResponse>(`/api/admin/leave-records/${recordId}/restore?month=${month}`, {
+    method: "POST",
+  });
+}
+
+/** 编辑请假单时段/假种（duration 按纯时段差重算，补休类联动调休余额） */
+export function editLeaveRecord(recordId: number, payload: LeaveRecordPayload): Promise<LeaveRecordOperationResponse> {
+  return apiRequest<LeaveRecordOperationResponse>(`/api/admin/leave-records/${recordId}`, {
+    body: payload,
+    method: "PUT",
+  });
+}
+
 export interface LateOffsetLeaveRow {
   leave_no: string;
   leave_type: string;

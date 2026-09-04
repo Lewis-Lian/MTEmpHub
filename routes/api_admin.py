@@ -80,6 +80,9 @@ from routes.admin_attendance_overrides import (
     delete_daily_attendance_override_record_api,
     save_daily_attendance_override_batch_api,
     save_daily_attendance_override_record_api,
+    revoke_leave_record_api,
+    restore_leave_record_api,
+    edit_leave_record_api,
     late_offset_candidates_api,
     late_offset_clear_api,
     late_offset_confirm_api,
@@ -580,6 +583,24 @@ def daily_attendance_override_batch_put():
 @admin_required
 def daily_attendance_override_record_delete():
     return delete_daily_attendance_override_record_api()
+
+
+@api_admin_bp.route("/leave-records/<int:record_id>", methods=["DELETE"])
+@admin_required
+def leave_record_revoke(record_id: int):
+    return revoke_leave_record_api(record_id)
+
+
+@api_admin_bp.post("/leave-records/<int:record_id>/restore")
+@admin_required
+def leave_record_restore(record_id: int):
+    return restore_leave_record_api(record_id)
+
+
+@api_admin_bp.route("/leave-records/<int:record_id>", methods=["PUT"])
+@admin_required
+def leave_record_edit(record_id: int):
+    return edit_leave_record_api(record_id)
 
 
 @api_admin_bp.get("/late-offset/candidates")
