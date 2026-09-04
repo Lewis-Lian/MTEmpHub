@@ -12,6 +12,7 @@ from models import db
 from models.account_set import AccountSet, AccountSetFactoryRestDay
 from models.annual_leave import AnnualLeave
 from models.attendance_override_history import AttendanceOverrideHistory
+from models.daily_attendance_override import DailyAttendanceOverride
 from models.daily_record import DailyRecord
 from models.department import Department
 from models.employee import Employee
@@ -888,6 +889,285 @@ class ManagerEveningOvertimeTopupTests(unittest.TestCase):
             rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
 
         self.assertEqual(rows[0]["attendance_days"], 21.0)
+
+
+class ManagerDailyStatusOverrideTests(unittest.TestCase):
+    """月报口径下单日状态修正传导：出勤基值按「扣掉该日月报出勤值 + 按状态映射加回」调整。
+    假种状态（工伤/出差/婚假/丧假）仍走假种列，不参与该调整。
+    """
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-daily-status-override.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="行政部")
+            db.session.add(dept)
+            db.session.flush()
+            manager = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            db.session.add(manager)
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def _seed_reported_day(self, day, reported_days):
+        raw = {"工作时长": "240"}
+        if reported_days is not None:
+            raw["出勤天数"] = reported_days
+        db.session.add(
+            DailyRecord(emp_id=self.manager_id, record_date=day, actual_hours=240, raw_data=raw)
+        )
+
+    def test_half_day_status_override_reduces_report_attendance_days(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            self._seed_reported_day(date(2026, 8, 31), "1")
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 31), status="上午出勤"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.5)
+        self.assertEqual(rows[0]["actual_attendance_days"], 23.5)
+
+    def test_absent_status_override_deducts_report_day(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            self._seed_reported_day(date(2026, 8, 20), "1")
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 20), status="缺勤"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.0)
+
+    def test_full_status_override_on_unreported_day_adds_day(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            self._seed_reported_day(date(2026, 8, 8), None)
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 8), status="全勤"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 25.0)
+
+    def test_leave_status_still_routes_to_leave_buckets(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            self._seed_reported_day(date(2026, 8, 12), None)
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 12), status="出差"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["business_trip_days"], 1.0)
+        self.assertEqual(rows[0]["attendance_days"], 25.0)
+
+    def test_override_without_daily_record_adds_half_day(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 15), status="下午出勤"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 24.5)
+
+    def test_pure_evening_topup_with_status_override_uses_status_only(self) -> None:
+        """纯晚顶班日 + 状态修正：该日月报值已按状态替换，顶班折算扣减不再叠加（避免重复扣）。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id, report_month="2026-07", raw_data={"出勤天数": 24}
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 7, 31),
+                        actual_hours=231,
+                        raw_data={
+                            "出勤天数": "1",
+                            "工作时长": "231",
+                            "上班3打卡时间": "17:55",
+                            "下班3打卡时间": "21:46",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-STATUS-1",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 7, 31, 17, 55),
+                        end_time=datetime(2026, 7, 31, 21, 46),
+                        effective_hours=0.1667,
+                    ),
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 7, 31), status="缺勤"
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-07"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.0)
+
+    def test_day_shift_evening_topup_with_status_override_uses_status_only(self) -> None:
+        """白班+晚顶班日 + 状态修正：与兜底口径一致，状态裁定当天，顶班叠加不再执行。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 31),
+                        actual_hours=695,
+                        raw_data={
+                            "出勤天数": "1",
+                            "工作时长": "695",
+                            "上班1打卡时间": "07:54",
+                            "下班2打卡时间": "17:02",
+                            "上班3打卡时间": "17:02",
+                            "下班3打卡时间": "20:08",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-STATUS-2",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 31, 17, 0),
+                        end_time=datetime(2026, 8, 31, 20, 0),
+                        effective_hours=0.125,
+                    ),
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 8, 31), status="上午出勤"
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.5)
+
+    def test_daytime_overtime_with_status_override_uses_status_only(self) -> None:
+        """白天顶班条日 + 状态修正：状态裁定当天，白天顶班折算扣减不再叠加。"""
+        with self.app.app_context():
+            db.session.add_all(
+                [
+                    MonthlyReport(
+                        emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}
+                    ),
+                    DailyRecord(
+                        emp_id=self.manager_id,
+                        record_date=date(2026, 8, 30),
+                        actual_hours=240,
+                        raw_data={
+                            "出勤天数": "1",
+                            "工作时长": "240",
+                            "上班1打卡时间": "07:57",
+                            "下班1打卡时间": "12:00",
+                        },
+                    ),
+                    OvertimeRecord(
+                        overtime_no="OT-STATUS-3",
+                        emp_id=self.manager_id,
+                        start_time=datetime(2026, 8, 30, 8, 0),
+                        end_time=datetime(2026, 8, 30, 12, 0),
+                        effective_hours=0.1667,
+                    ),
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 8, 30), status="上午出勤"
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.5)
+
+    def test_nested_manager_payload_reported_days_reduce_base(self) -> None:
+        """生产结构：管理端出勤天数位于 manager_payload.raw_data 嵌套层。"""
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            db.session.add(
+                DailyRecord(
+                    emp_id=self.manager_id,
+                    record_date=date(2026, 8, 31),
+                    actual_hours=257,
+                    manager_payload={
+                        "actual_hours": 257,
+                        "raw_data": {"出勤天数": "1", "工作时长": "257"},
+                    },
+                )
+            )
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id, record_date=date(2026, 8, 31), status="上午出勤"
+                )
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 23.5)
+
+    def test_monthly_override_still_takes_precedence_over_daily_status(self) -> None:
+        with self.app.app_context():
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", raw_data={"出勤天数": 24}))
+            self._seed_reported_day(date(2026, 8, 31), "1")
+            db.session.add_all(
+                [
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 8, 31), status="上午出勤"
+                    ),
+                    ManagerAttendanceOverride(
+                        emp_id=self.manager_id, month="2026-08", attendance_days=21.0
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["attendance_days"], 21.0)
+        self.assertEqual(rows[0]["actual_attendance_days"], 21.0)
 
 
 if __name__ == "__main__":

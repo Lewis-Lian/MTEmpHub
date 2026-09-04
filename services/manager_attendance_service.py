@@ -22,6 +22,7 @@ from services.attendance_source_service import (
 )
 from services.daily_override_service import (
     EVENING_OVERTIME_START,
+    MANAGER_LEAVE_FIELD_BY_STATUS,
     daily_override_maps,
     evening_overtime_dates_by_emp,
     status_attendance_days,
@@ -168,6 +169,14 @@ def normalize_days(value: float | int | None) -> float:
 
 def _has_half_day_component(days: float) -> bool:
     return days > 0 and abs(days % 1 - 0.5) < 1e-9
+
+
+def _is_day_status_override(override) -> bool:
+    """该日是否存在非假种状态修正（全勤/半勤/缺勤）：此类修正终裁当日考勤天数。"""
+    if override is None:
+        return False
+    status = override.status or ""
+    return bool(status) and status not in MANAGER_LEAVE_FIELD_BY_STATUS
 
 
 def _leave_bucket(value: str | None) -> str:
@@ -642,6 +651,9 @@ def build_manager_rows(
         for ot_date, total_hours in evening_hours_by_date.items():
             days = normalize_days(total_hours)
             record = records_by_date.get(ot_date)
+            if _is_day_status_override(daily_overrides.get(ot_date)):
+                # 单日状态修正日：该日出勤以状态映射为准（基值传导已替换月报值），顶班折算不再叠加/扣减
+                continue
             if record is not None and _manager_daytime_punch_exists(record):
                 # 白班出勤日 + 晚加班顶班：顶班折算值叠加（白天 1 天 + 晚加班 0.5 = 1.5）
                 evening_topup_days += days
@@ -650,6 +662,10 @@ def build_manager_rows(
                 half_overtime_days += 0.5
         for overtime in daytime_overtimes:
             days = normalize_days(overtime.effective_hours)
+            ot_date = overtime.start_time.date() if getattr(overtime, "start_time", None) else None
+            if _is_day_status_override(daily_overrides.get(ot_date) if ot_date else None):
+                # 同上：状态修正日不再叠加白天顶班折算扣减
+                continue
             if _has_half_day_component(days):
                 half_overtime_days += 0.5
         # 逐日修正的假种状态并入对应字段（每天按 1 天计）
@@ -675,6 +691,21 @@ def build_manager_rows(
             # 加班相关的加减修正仅月报口径需要，避免重复计。
             half_overtime_days = 0.0
             evening_topup_days = 0.0
+        else:
+            # 月报口径下传导单日状态修正（全勤/半勤/缺勤）：
+            # 从月报基值中扣掉该日的月报出勤值，按状态映射加回；假种状态仍走假种列。
+            for day, override in sorted(daily_overrides.items()):
+                status = override.status or ""
+                if not status or status in MANAGER_LEAVE_FIELD_BY_STATUS:
+                    continue
+                record = records_by_date.get(day)
+                reported = 0.0
+                if record is not None:
+                    raw = record.raw_data if isinstance(record.raw_data, dict) else {}
+                    nested = raw.get("raw_data") if isinstance(raw.get("raw_data"), dict) else {}
+                    top = _raw_float(raw, "出勤天数")
+                    reported = top if top is not None else (_raw_float(nested, "出勤天数") or 0.0)
+                base_attendance_days += status_attendance_days(status) - reported
 
         # 实际出勤天数 = 月报出勤天数(失败时按刷卡天数兜底) - 请假半天的天数 - 调休半天的天数
         #                - 纯晚顶班加班折半天的天数 + 白班晚加班顶班折算天数
