@@ -19,6 +19,7 @@ export interface AdminEmployee {
   id: number;
   emp_no: string;
   name: string;
+  card_no?: string | null;
   dept_id?: number | null;
   dept_name?: string;
   shift_no?: string;

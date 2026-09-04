@@ -30,6 +30,7 @@ import type { DepartmentOption, QueryEmployee } from "../../types/query";
 type EmployeeFormState = {
   emp_no: string;
   name: string;
+  card_no: string;
   dept_name: string;
   shift_no: string;
   is_manager: boolean;
@@ -41,6 +42,7 @@ type EmployeeFormState = {
 const emptyEmployeeForm: EmployeeFormState = {
   emp_no: "",
   name: "",
+  card_no: "",
   dept_name: "",
   shift_no: "",
   is_manager: false,
@@ -67,6 +69,7 @@ function employeeToForm(row: AdminEmployee): EmployeeFormState {
   return {
     emp_no: row.emp_no,
     name: row.name,
+    card_no: row.card_no ?? "",
     dept_name: row.dept_name ?? "",
     shift_no: row.shift_no ?? "",
     is_manager: Boolean(row.is_manager),
@@ -149,7 +152,7 @@ export default function EmployeesPage() {
       return false;
     }
     const normalizedKeyword = keyword.trim().toLowerCase();
-    if (normalizedKeyword && !`${row.emp_no} ${row.name}`.toLowerCase().includes(normalizedKeyword)) {
+    if (normalizedKeyword && !`${row.emp_no} ${row.name} ${row.card_no ?? ""}`.toLowerCase().includes(normalizedKeyword)) {
       return false;
     }
     if (employmentFilter === "active" && row.resigned_at) {
@@ -521,6 +524,7 @@ export default function EmployeesPage() {
     "ID",
     "人员编号",
     "人员姓名",
+    "卡号",
     "人员类型",
     "在职状态",
     "哺乳假",
@@ -610,6 +614,7 @@ export default function EmployeesPage() {
         row.id,
         row.emp_no,
         row.name,
+        row.card_no || "-",
         row.is_manager ? "管理人员" : "普通员工",
         employmentLabel(row),
         row.is_nursing ? "是" : "否",
@@ -626,6 +631,7 @@ export default function EmployeesPage() {
         row.id,
         row.emp_no,
         row.name,
+        row.card_no || "-",
         row.is_manager ? "管理人员" : "普通员工",
         employmentLabel(row),
         row.is_nursing ? "是" : "否",
@@ -696,6 +702,10 @@ export default function EmployeesPage() {
             <label className="account-field" style={{ margin: 0 }}>
               <span className="account-field-label">人员姓名</span>
               <input className="account-input" onChange={(event) => onChange({ ...state, name: event.target.value })} required value={state.name} placeholder="请输入人员姓名" />
+            </label>
+            <label className="account-field" style={{ margin: 0 }}>
+              <span className="account-field-label">卡号</span>
+              <input className="account-input" onChange={(event) => onChange({ ...state, card_no: event.target.value })} value={state.card_no} placeholder="选填，员工唯一" />
             </label>
             <label className="account-field admin-form-grid-wide">
               <span className="account-field-label">部门名称</span>
@@ -1263,7 +1273,7 @@ export default function EmployeesPage() {
 
             <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "#fffbeb", borderRadius: "8px", color: "#92400e", fontSize: "13px", border: "1px solid #fde68a", lineHeight: "1.6" }}>
               <strong style={{ color: "#78350f" }}>模板列要求：</strong><br/>
-              人员编号、人员姓名、部门名称、班次编号、是否管理人员、是否哺乳假、员工考勤统计来源、管理人员考勤统计来源。
+              人员编号、人员姓名、卡号（选填；文件包含此列时留空将清空已有卡号）、部门名称、班次编号、是否管理人员、是否哺乳假、员工考勤统计来源、管理人员考勤统计来源。
             </div>
           </div>
         </div>

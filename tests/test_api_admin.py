@@ -281,6 +281,7 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual(rows[0], (
             "人员编号",
             "人员姓名",
+            "卡号",
             "部门名称",
             "班次编号",
             "是否管理人员",
@@ -290,8 +291,175 @@ class ApiAdminTests(unittest.TestCase):
         ))
         self.assertEqual(
             rows[1:],
-            [("E002", "筛选目标", "生产部", None, "否", "是", "自动回退", "员工考勤源文件取值")],
+            [("E002", "筛选目标", None, "生产部", None, "否", "是", "自动回退", "员工考勤源文件取值")],
         )
+
+    def test_employee_crud_supports_card_no(self) -> None:
+        self._login()
+
+        create_response = self.client.post(
+            "/api/admin/employees",
+            json={"emp_no": "E100", "name": "卡号员工", "card_no": "C001"},
+        )
+        self.assertEqual(create_response.status_code, 200)
+        self.assertEqual(create_response.get_json()["employee"]["card_no"], "C001")
+
+        create_blank = self.client.post(
+            "/api/admin/employees",
+            json={"emp_no": "E101", "name": "无卡员工", "card_no": "  "},
+        )
+        self.assertEqual(create_blank.status_code, 200)
+        self.assertIsNone(create_blank.get_json()["employee"]["card_no"])
+
+        duplicate = self.client.post(
+            "/api/admin/employees",
+            json={"emp_no": "E102", "name": "重复卡", "card_no": "C001"},
+        )
+        self.assertEqual(duplicate.status_code, 400)
+        self.assertEqual(duplicate.get_json()["error"], "card_no already exists")
+
+        update_response = self.client.put(
+            f"/api/admin/employees/{self.employee_id}",
+            json={"emp_no": "E001", "name": "员工甲", "card_no": "C002"},
+        )
+        self.assertEqual(update_response.status_code, 200)
+        self.assertEqual(update_response.get_json()["employee"]["card_no"], "C002")
+
+        same_card_retry = self.client.put(
+            f"/api/admin/employees/{self.employee_id}",
+            json={"emp_no": "E001", "name": "员工甲", "card_no": "C002"},
+        )
+        self.assertEqual(same_card_retry.status_code, 200)
+
+        conflict = self.client.put(
+            f"/api/admin/employees/{self.employee_id}",
+            json={"emp_no": "E001", "name": "员工甲", "card_no": "C001"},
+        )
+        self.assertEqual(conflict.status_code, 400)
+        self.assertEqual(conflict.get_json()["error"], "card_no already exists")
+
+        employees_payload = self.client.get("/api/admin/employees").get_json()
+        card_by_emp_no = {row["emp_no"]: row["card_no"] for row in employees_payload}
+        self.assertEqual(card_by_emp_no["E001"], "C002")
+        self.assertEqual(card_by_emp_no["E100"], "C001")
+
+    def test_employee_import_supports_card_no_column(self) -> None:
+        self._login()
+
+        employee_file = self._xlsx_file(
+            [
+                ["人员编号", "人员姓名", "部门名称", "班次编号", "卡号"],
+                ["E010", "员工乙", "行政部", "S001", "C100"],
+                ["E001", "员工甲", "行政部", "", "C101"],
+            ],
+            "employees.xlsx",
+        )
+        response = self.client.post(
+            "/api/admin/employees/import",
+            data={"file": (employee_file, "employees.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["imported"], 2)
+        with self.app.app_context():
+            created = Employee.query.filter_by(emp_no="E010").first()
+            updated = Employee.query.filter_by(emp_no="E001").first()
+            self.assertEqual(created.card_no, "C100")
+            self.assertEqual(updated.card_no, "C101")
+
+    def test_employee_import_rejects_duplicate_card_no(self) -> None:
+        self._login()
+
+        conflict_file = self._xlsx_file(
+            [
+                ["人员编号", "人员姓名", "卡号"],
+                ["E011", "员工丙", "C999"],
+                ["E012", "员工丁", "C999"],
+            ],
+            "employees.xlsx",
+        )
+        response = self.client.post(
+            "/api/admin/employees/import",
+            data={"file": (conflict_file, "employees.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("C999", response.get_json()["error"])
+        with self.app.app_context():
+            self.assertIsNone(Employee.query.filter_by(emp_no="E011").first())
+            self.assertIsNone(Employee.query.filter_by(emp_no="E012").first())
+
+    def test_employee_import_rejects_card_no_held_by_existing_employee(self) -> None:
+        self._login()
+        with self.app.app_context():
+            Employee.query.filter_by(emp_no="E001").first().card_no = "C300"
+            db.session.commit()
+
+        conflict_file = self._xlsx_file(
+            [
+                ["人员编号", "人员姓名", "卡号"],
+                ["E020", "员工戊", "C300"],
+            ],
+            "employees.xlsx",
+        )
+        response = self.client.post(
+            "/api/admin/employees/import",
+            data={"file": (conflict_file, "employees.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("C300", response.get_json()["error"])
+        self.assertIn("E001", response.get_json()["error"])
+        with self.app.app_context():
+            self.assertIsNone(Employee.query.filter_by(emp_no="E020").first())
+
+    def test_employee_import_without_card_no_column_keeps_existing_card_no(self) -> None:
+        self._login()
+        with self.app.app_context():
+            Employee.query.filter_by(emp_no="E001").first().card_no = "C200"
+            db.session.commit()
+
+        legacy_file = self._xlsx_file(
+            [
+                ["人员编号", "人员姓名", "部门名称"],
+                ["E001", "员工甲", "行政部"],
+            ],
+            "employees.xlsx",
+        )
+        response = self.client.post(
+            "/api/admin/employees/import",
+            data={"file": (legacy_file, "employees.xlsx")},
+            content_type="multipart/form-data",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        with self.app.app_context():
+            self.assertEqual(Employee.query.filter_by(emp_no="E001").first().card_no, "C200")
+
+    def test_employees_template_includes_card_no_column(self) -> None:
+        self._login()
+
+        response = self.client.get("/api/admin/employees/template")
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(openpyxl.load_workbook(BytesIO(response.data)).active.iter_rows(values_only=True))
+        self.assertEqual(rows[0][2], "卡号")
+        self.assertTrue(all(str(row[2]).strip() for row in rows[1:]))
+
+    def test_employees_export_filters_by_card_no_keyword(self) -> None:
+        self._login()
+        with self.app.app_context():
+            Employee.query.filter_by(emp_no="E001").first().card_no = "KC-0001"
+            db.session.commit()
+
+        response = self.client.get("/api/admin/employees/export?keyword=KC-0001")
+
+        self.assertEqual(response.status_code, 200)
+        rows = list(openpyxl.load_workbook(BytesIO(response.data)).active.iter_rows(values_only=True))
+        self.assertEqual([row[0] for row in rows[1:]], ["E001"])
 
     def test_manager_month_stat_record_endpoints_match_collection_payloads(self) -> None:
         self._login()

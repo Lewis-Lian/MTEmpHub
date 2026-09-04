@@ -101,6 +101,10 @@ def ensure_schema_compatibility() -> None:
             except OperationalError:
                 # 索引可能已存在（旧库迁移重复执行），幂等跳过
                 db.session.rollback()
+        # SQLite 的 ADD COLUMN 不支持 UNIQUE 约束，唯一性由应用层查重兜底（完整约束见 Alembic 迁移）
+        if "card_no" not in employee_columns:
+            db.session.execute(text("ALTER TABLE employees ADD COLUMN card_no VARCHAR(50)"))
+            db.session.commit()
 
     account_set_columns = _get_column_names(inspector, "account_sets")
     if account_set_columns is not None:
