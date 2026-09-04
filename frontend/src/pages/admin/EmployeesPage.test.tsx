@@ -77,7 +77,7 @@ describe("EmployeesPage 离职功能", () => {
 
     // 顶部"办理离职"按钮与行内按钮同名，取第一个（顶部主入口）
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "E100" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "E100" } });
     fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
 
     await waitFor(() =>
@@ -108,7 +108,7 @@ describe("EmployeesPage 离职功能", () => {
     const resignButtons = screen.getAllByRole("button", { name: "办理离职" });
     fireEvent.click(resignButtons[resignButtons.length - 1]);
 
-    expect(await screen.findByLabelText("离职人员编号/姓名")).toHaveValue("E100");
+    expect(await screen.findByLabelText("离职人员编号/姓名/卡号")).toHaveValue("E100");
   });
 
   it("办理离职输入在职员工工号后回显灰色只读信息供核对", async () => {
@@ -116,7 +116,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "E100" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "E100" } });
 
     const preview = await screen.findByTestId("resign-employee-preview");
     expect(within(preview).getByText("在职员工")).toBeTruthy();
@@ -130,7 +130,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "E999" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "E999" } });
 
     const preview = await screen.findByTestId("resign-employee-preview");
     expect(within(preview).getByText(/未找到/)).toBeTruthy();
@@ -141,7 +141,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "E200" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "E200" } });
 
     const preview = await screen.findByTestId("resign-employee-preview");
     expect(within(preview).getByText("已离职员工")).toBeTruthy();
@@ -153,7 +153,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "在职员工" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "在职员工" } });
 
     const preview = await screen.findByTestId("resign-employee-preview");
     expect(within(preview).getByText("E100")).toBeTruthy();
@@ -167,12 +167,41 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "重名员工" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "重名员工" } });
 
     const preview = await screen.findByTestId("resign-employee-preview");
     expect(preview.textContent).toContain("该姓名对应 2 名员工，请输入人员编号精确办理");
     expect(within(preview).getByText("E300")).toBeTruthy();
     expect(within(preview).getByText("E400")).toBeTruthy();
+  });
+
+  it("办理离职输入卡号后回显匹配员工信息", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "K100" } });
+
+    const preview = await screen.findByTestId("resign-employee-preview");
+    expect(within(preview).getByText("E100")).toBeTruthy();
+    expect(within(preview).getByText("在职员工")).toBeTruthy();
+    expect(within(preview).getByText("在职")).toBeTruthy();
+  });
+
+  it("办理离职输入卡号提交时按解析出的工号调用接口", async () => {
+    mockResign.mockResolvedValue({ status: "ok", employee: employees[0] });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "K100" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
+
+    await waitFor(() =>
+      expect(mockResign).toHaveBeenCalledWith(
+        expect.objectContaining({ emp_no: "E100", resigned_at: expect.any(String) }),
+      ),
+    );
   });
 
   it("办理离职输入姓名提交时按解析出的工号调用接口", async () => {
@@ -181,7 +210,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "在职员工" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "在职员工" } });
     fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
 
     await waitFor(() =>
@@ -196,7 +225,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
-    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名"), { target: { value: "重名员工" } });
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "重名员工" } });
     fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
 
     expect(mockResign).not.toHaveBeenCalled();
