@@ -36,6 +36,7 @@ const employees = [
   { id: 2, emp_no: "E200", name: "已离职员工", card_no: null, dept_name: "行政部", is_manager: false, resigned_at: "2026-08-31" },
   { id: 3, emp_no: "E300", name: "重名员工", card_no: "K300", dept_name: "财务部", is_manager: false, resigned_at: null },
   { id: 4, emp_no: "E400", name: "重名员工", card_no: null, dept_name: "人事部", is_manager: false, resigned_at: null },
+  { id: 5, emp_no: "E500", name: "卡号员工", card_no: "7891", dept_name: "行政部", is_manager: false, resigned_at: null },
 ];
 
 afterEach(() => {
@@ -188,6 +189,19 @@ describe("EmployeesPage 离职功能", () => {
     expect(within(preview).getByText("在职")).toBeTruthy();
   });
 
+  it("办理离职输入带前导零的卡号仍可匹配员工", async () => {
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "0007891" } });
+
+    const preview = await screen.findByTestId("resign-employee-preview");
+    expect(within(preview).getByText("E500")).toBeTruthy();
+    expect(within(preview).getByText("卡号员工")).toBeTruthy();
+    expect(within(preview).getByText("在职")).toBeTruthy();
+  });
+
   it("办理离职输入卡号提交时按解析出的工号调用接口", async () => {
     mockResign.mockResolvedValue({ status: "ok", employee: employees[0] });
     render(<EmployeesPage />);
@@ -200,6 +214,22 @@ describe("EmployeesPage 离职功能", () => {
     await waitFor(() =>
       expect(mockResign).toHaveBeenCalledWith(
         expect.objectContaining({ emp_no: "E100", resigned_at: expect.any(String) }),
+      ),
+    );
+  });
+
+  it("办理离职输入带前导零的卡号提交时按解析出的工号调用接口", async () => {
+    mockResign.mockResolvedValue({ status: "ok", employee: employees[4] });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "0007891" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
+
+    await waitFor(() =>
+      expect(mockResign).toHaveBeenCalledWith(
+        expect.objectContaining({ emp_no: "E500", resigned_at: expect.any(String) }),
       ),
     );
   });
