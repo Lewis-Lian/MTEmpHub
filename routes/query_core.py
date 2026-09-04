@@ -28,6 +28,7 @@ from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_K
 from services.attendance_service import AttendanceService
 from services.daily_override_service import (
     EMPLOYEE_LEAVE_BUCKETS,
+    EVENING_OVERTIME_START,
     HALF_DAY_STATUSES,
     daily_override_maps,
     effective_early_leave_minutes,
@@ -298,9 +299,28 @@ def _effective_actual_attendance_day_value(record, override) -> float:
     return _actual_attendance_day_value(record)
 
 
+def _has_daytime_punch(record) -> bool:
+    """晚加班条日判断白班是否出勤：任一打卡时刻早于 17:00（晚加班起点）。"""
+    tokens = _punch_events(record)
+    tokens |= {
+        token
+        for token in (
+            _normalize_punch_token(tok)
+            for tok in re.findall(r"(\d{1,2}:\d{2})", _extract_raw_punch_data(record))
+        )
+        if token
+    }
+    for token in tokens:
+        hh, mm = token.split(":")
+        if time(int(hh), int(mm)) < EVENING_OVERTIME_START:
+            return True
+    return False
+
+
 def _effective_attendance_day_value(record, override, is_evening_overtime: bool) -> float:
     """当日考勤天数（含逐日修正与晚加班条口径）：
-    勾选晚上加班 → 固定 0.5；状态修正 → 按状态映射；当日有晚加班条 → 固定 0.5；
+    勾选晚上加班 → 固定 0.5；状态修正 → 按状态映射；当日有晚加班条 →
+    白班出勤按正常口径叠加顶班 0.5（白天 1 天 + 晚加班 0.5 = 1.5），纯晚顶班记 0.5；
     其余按系统原始口径（刷卡推断）。
     """
     if override is not None:
@@ -309,6 +329,8 @@ def _effective_attendance_day_value(record, override, is_evening_overtime: bool)
         if override.status:
             return status_attendance_days(override.status)
     if is_evening_overtime:
+        if record is not None and _has_daytime_punch(record):
+            return round(_attendance_day_value(record) + 0.5, 2)
         return 0.5
     if record is None:
         return 0.0

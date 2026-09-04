@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime
 from datetime import timedelta
 from datetime import date
+from types import SimpleNamespace
 
 import openpyxl
 from flask import Flask
@@ -18,6 +19,7 @@ from models.manager_month_stat import ManagerMonthStat
 from models.user import User, UserEmployeeAssignment
 from routes import register_routes
 from routes.auth_helpers import issue_slider_verified_token
+from routes.query_core import _effective_attendance_day_value
 from tests.csrf_helper import attach_origin
 
 
@@ -631,6 +633,48 @@ class ApiQueryTests(unittest.TestCase):
         # 不带开关：该列不存在
         res2 = self.client.get("/api/query/employee-dashboard?month=2026-05")
         self.assertNotIn("实际出勤天数", res2.get_json()["headers"])
+
+
+class EffectiveAttendanceDayValueTests(unittest.TestCase):
+    """晚加班条日的单日考勤值：白班出勤 + 晚加班顶班记 1.5 天；纯晚顶班记 0.5 天。"""
+
+    def test_day_shift_with_evening_overtime_counts_one_and_half(self) -> None:
+        record = SimpleNamespace(
+            check_in_times=["07:54", "12:58"],
+            check_out_times=["12:19", "20:08"],
+            raw_data={},
+            record_date=date(2026, 8, 31),
+            employee=None,
+            shift=None,
+        )
+        self.assertEqual(_effective_attendance_day_value(record, None, True), 1.5)
+
+    def test_pure_evening_topup_counts_half_day(self) -> None:
+        record = SimpleNamespace(
+            check_in_times=["17:55"],
+            check_out_times=["21:46"],
+            raw_data={},
+            record_date=date(2026, 7, 31),
+            employee=None,
+            shift=None,
+        )
+        self.assertEqual(_effective_attendance_day_value(record, None, True), 0.5)
+
+    def test_manager_raw_punch_day_shift_with_evening_overtime(self) -> None:
+        record = SimpleNamespace(
+            check_in_times=[],
+            check_out_times=[],
+            raw_data={
+                "上班1打卡时间": "07:54",
+                "下班2打卡时间": "17:02",
+                "上班3打卡时间": "17:02",
+                "下班3打卡时间": "20:08",
+            },
+            record_date=date(2026, 8, 31),
+            employee=None,
+            shift=None,
+        )
+        self.assertEqual(_effective_attendance_day_value(record, None, True), 1.5)
 
 
 if __name__ == "__main__":
