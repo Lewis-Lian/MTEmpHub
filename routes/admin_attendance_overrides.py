@@ -942,3 +942,165 @@ def import_employee_attendance_overrides():
             success_count, skipped_count, failed_count, changed_count, errors
         )
     )
+
+
+# ---------------------------------------------------------------- 请假单作废/恢复/编辑
+# 数据随账套导入（按单号 upsert），此处提供修正页的人工干预：
+# 作废单不参与任何口径；手工编辑单在导入 upsert 时保留编辑值。
+
+
+def _serialize_leave_record(row) -> dict[str, object]:
+    return {
+        "id": row.id,
+        "leave_no": row.leave_no or "",
+        "leave_type": row.leave_type or "",
+        "start_time": row.start_time.strftime("%Y-%m-%d %H:%M") if row.start_time else "",
+        "end_time": row.end_time.strftime("%Y-%m-%d %H:%M") if row.end_time else "",
+        "duration": float(row.duration or 0),
+        "reason": row.reason or "",
+        "approval_status": row.approval_status or "",
+        "is_revoked": bool(row.is_revoked),
+        "is_manual_edited": bool(row.is_manual_edited),
+    }
+
+
+def _leave_record_response(row, month: str):
+    from routes import admin_core as admin_module
+    from routes.query_core import _build_attendance_calendar_payload
+
+    employee = admin_module.db.session.get(admin_module.Employee, row.emp_id)
+    return jsonify(
+        {
+            "leave": _serialize_leave_record(row),
+            "calendar": _build_attendance_calendar_payload(employee, month) if employee else {},
+        }
+    )
+
+
+def _time_off_days(row) -> float:
+    text = row.leave_type or ""
+    return float(row.duration or 0) / 8 if ("补休" in text or "调休" in text) else 0.0
+
+
+def _adjust_time_off_balance(emp_id: int, year: int, delta_days: float) -> None:
+    """按差值调整调休已用余额（与导入的 duration/8 口径对称）。"""
+    from models.annual_leave import AnnualLeave
+
+    balance = AnnualLeave.query.filter_by(emp_id=emp_id, year=year).first()
+    if balance is None:
+        if delta_days <= 0:
+            return
+        balance = AnnualLeave(emp_id=emp_id, year=year, total_days=0, used_days=0, remaining_days=0)
+        from routes import admin_core as admin_module
+
+        admin_module.db.session.add(balance)
+    balance.used_days = max(round((balance.used_days or 0) + delta_days, 4), 0.0)
+    balance.remaining_days = (balance.total_days or 0) - balance.used_days
+
+
+def _load_leave_record_for_update(record_id: int, month: str, action_label: str):
+    from routes import admin_core as admin_module
+    from models.leave import LeaveRecord
+
+    if not month:
+        return None, (jsonify({"error": "请选择有效月份"}), 400)
+    locked_error = admin_module._ensure_account_set_unlocked(
+        admin_module._account_set_for_month(month), action_label
+    )
+    if locked_error:
+        return None, locked_error
+    row = admin_module.db.session.get(LeaveRecord, record_id)
+    if not row:
+        return None, (jsonify({"error": "请假单不存在"}), 404)
+    return row, None
+
+
+def revoke_leave_record_api(record_id: int):
+    from routes import admin_core as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    row, error = _load_leave_record_for_update(record_id, month, "作废请假单")
+    if error:
+        return error
+    if row.is_revoked:
+        return jsonify({"error": "该请假单已作废"}), 400
+
+    before = _serialize_leave_record(row)
+    row.is_revoked = True
+    if row.apply_date:
+        _adjust_time_off_balance(row.emp_id, row.apply_date.year, -_time_off_days(row))
+    admin_module._record_override_history(
+        "leave_record", row.emp_id, month, "revoke", before, _serialize_leave_record(row)
+    )
+    admin_module.db.session.commit()
+    return _leave_record_response(row, month)
+
+
+def restore_leave_record_api(record_id: int):
+    from routes import admin_core as admin_module
+
+    month = admin_module._validate_month(request.args.get("month"))
+    row, error = _load_leave_record_for_update(record_id, month, "恢复请假单")
+    if error:
+        return error
+    if not row.is_revoked:
+        return jsonify({"error": "该请假单未作废，无需恢复"}), 400
+
+    before = _serialize_leave_record(row)
+    row.is_revoked = False
+    if row.apply_date:
+        _adjust_time_off_balance(row.emp_id, row.apply_date.year, _time_off_days(row))
+    admin_module._record_override_history(
+        "leave_record", row.emp_id, month, "restore", before, _serialize_leave_record(row)
+    )
+    admin_module.db.session.commit()
+    return _leave_record_response(row, month)
+
+
+def _parse_leave_datetime(text: str, field: str):
+    from routes import admin_core as admin_module
+
+    for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt), None
+        except ValueError:
+            continue
+    return None, (jsonify({"error": f"无效的{field}时间，格式应为 YYYY-MM-DD HH:MM"}), 400)
+
+
+def edit_leave_record_api(record_id: int):
+    from routes import admin_core as admin_module
+
+    data = request.json or {}
+    month = admin_module._validate_month(data.get("month"))
+    row, error = _load_leave_record_for_update(record_id, month, "编辑请假单")
+    if error:
+        return error
+
+    start_dt, error = _parse_leave_datetime(str(data.get("start_time") or "").strip(), "开始")
+    if error:
+        return error
+    end_dt, error = _parse_leave_datetime(str(data.get("end_time") or "").strip(), "结束")
+    if error:
+        return error
+    if end_dt <= start_dt:
+        return jsonify({"error": "结束时间必须晚于开始时间"}), 400
+    leave_type = str(data.get("leave_type") or "").strip()
+    if not leave_type:
+        return jsonify({"error": "请选择请假类型"}), 400
+
+    before = _serialize_leave_record(row)
+    old_time_off = _time_off_days(row)
+    row.start_time = start_dt
+    row.end_time = end_dt
+    row.leave_type = leave_type
+    row.duration = round((end_dt - start_dt).total_seconds() / 3600, 2)
+    row.is_manual_edited = True
+    if row.apply_date:
+        year = row.apply_date.year
+        _adjust_time_off_balance(row.emp_id, year, _time_off_days(row) - old_time_off)
+    admin_module._record_override_history(
+        "leave_record", row.emp_id, month, "manual_edit", before, _serialize_leave_record(row)
+    )
+    admin_module.db.session.commit()
+    return _leave_record_response(row, month)

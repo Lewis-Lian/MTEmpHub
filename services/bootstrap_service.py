@@ -185,6 +185,15 @@ def ensure_schema_compatibility() -> None:
             db.session.execute(text("ALTER TABLE daily_attendance_overrides ADD COLUMN is_actual_attendance BOOLEAN"))
             db.session.commit()
 
+    leave_record_columns = _get_column_names(inspector, "leave_records")
+    if leave_record_columns is not None:
+        if "is_revoked" not in leave_record_columns:
+            db.session.execute(text("ALTER TABLE leave_records ADD COLUMN is_revoked BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
+        if "is_manual_edited" not in leave_record_columns:
+            db.session.execute(text("ALTER TABLE leave_records ADD COLUMN is_manual_edited BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
+
     # 性能复合索引（模型层与 Alembic 迁移 b2c3d4e5f6a7 同名同列）：
     # 旧库升级路径（upgrade-legacy-schema）不跑 Alembic，这里幂等补建
     _performance_indexes = (

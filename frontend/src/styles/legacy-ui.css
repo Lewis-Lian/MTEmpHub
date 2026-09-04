@@ -4698,16 +4698,39 @@ input[type="checkbox"] {
 .daypanel-detail { background: #f0f6ff; border: 1px solid #dbeafe; }
 .daypanel-status { background: #f6f3fd; border: 1px solid #e6dffa; }
 .daypanel-extra { background: #ffffff; border: 1px solid #e6ebf2; }
+.daypanel-leaves { background: #f2faf5; border: 1px solid #d4ecdd; }
 .daypanel-title {
   display: flex; align-items: center; gap: 8px;
   font-weight: 600; color: #2c3650; font-size: 13.5px;
 }
 .daypanel-detail > .daypanel-title::before,
-.daypanel-status > .daypanel-title::before {
+.daypanel-status > .daypanel-title::before,
+.daypanel-leaves > .daypanel-title::before {
   content: ""; width: 3px; height: 14px; border-radius: 2px;
   background: #1a56b0; flex: none;
 }
 .daypanel-status > .daypanel-title::before { background: #7c4dbe; }
+.daypanel-leaves > .daypanel-title::before { background: #17954c; }
+
+/* 当日请假单条目：作废单整条置灰 */
+.daypanel-leave-item {
+  display: flex; flex-direction: column; gap: 5px;
+  border: 1px solid #e2eee7; border-radius: 8px; padding: 7px 9px; background: #ffffff;
+}
+.daypanel-leave-item.is-revoked { opacity: 0.55; background: #f4f6f5; }
+.daypanel-leave-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 13px; }
+.daypanel-leave-type { font-weight: 600; color: #1f6b3f; }
+.daypanel-leave-range, .daypanel-leave-no { color: #55607a; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.daypanel-leave-badge {
+  font-size: 11.5px; font-weight: 600; color: #a14646;
+  background: #f7e9e9; border: 1px solid #ecd2d2; border-radius: 9px; padding: 1px 8px;
+}
+.daypanel-leave-reason { font-size: 12.5px; color: #6b7686; }
+.daypanel-leave-actions { display: flex; gap: 6px; }
+.daypanel-leave-edit {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;
+  border-top: 1px dashed #d4e3da; padding-top: 8px; margin-top: 2px;
+}
 .daypanel-title-hint { font-weight: 400; font-size: 12px; color: #6b7686; }
 .daypanel-rows { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 3px 14px; }
 .daypanel-rows .daydetail-row { display: flex; gap: 8px; font-size: 13px; }

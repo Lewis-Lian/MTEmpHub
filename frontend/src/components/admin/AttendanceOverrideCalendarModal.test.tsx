@@ -5,12 +5,18 @@ const mockFetchCalendar = vi.hoisted(() => vi.fn());
 const mockSave = vi.hoisted(() => vi.fn());
 const mockClear = vi.hoisted(() => vi.fn());
 const mockSaveBatch = vi.hoisted(() => vi.fn());
+const mockRevokeLeave = vi.hoisted(() => vi.fn());
+const mockRestoreLeave = vi.hoisted(() => vi.fn());
+const mockEditLeave = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/admin", () => ({
   fetchAdminDailyOverrideCalendar: mockFetchCalendar,
   saveAdminDailyOverride: mockSave,
   clearAdminDailyOverride: mockClear,
   saveAdminDailyOverrideBatch: mockSaveBatch,
+  revokeLeaveRecord: mockRevokeLeave,
+  restoreLeaveRecord: mockRestoreLeave,
+  editLeaveRecord: mockEditLeave,
 }));
 
 import AttendanceOverrideCalendarModal from "./AttendanceOverrideCalendarModal";
@@ -19,7 +25,10 @@ import type { AttendanceCalendarData } from "../../types/query";
 
 const EMPLOYEE = { id: 7, emp_no: "E001", name: "员工甲" };
 
-function calendarData(overrides: Record<string, unknown> = {}): AttendanceCalendarData {
+function calendarData(
+  overrides: Record<string, unknown> = {},
+  leaves: AttendanceCalendarData["leaves"] = [],
+): AttendanceCalendarData {
   return {
     employee: { ...EMPLOYEE, dept_name: "制造一部" },
     month: "2026-07",
@@ -52,7 +61,7 @@ function calendarData(overrides: Record<string, unknown> = {}): AttendanceCalend
       },
     ],
     overtimes: [],
-    leaves: [],
+    leaves,
     summary: {
       attendance_days: 1,
       half_days: 0,
@@ -529,5 +538,92 @@ describe("AttendanceOverrideCalendarModal", () => {
     const nextPanel = screen.getByTestId("daily-override-panel");
     expect(within(nextPanel).getByText("2026-07-15")).toBeInTheDocument();
     expect(mockSave).not.toHaveBeenCalled();
+  });
+
+  // ---------------------------------------------------------------- 请假单区块
+
+  const LEAVE_ENTRY = {
+    date: "2026-07-15",
+    leave_type: "事假",
+    duration: 0.5,
+    leave_no: "QY2026071501",
+    start_time: "2026-07-15 13:00",
+    end_time: "2026-07-15 17:00",
+    reason: "家里有事",
+    approval_status: "已审批",
+    id: 3,
+    is_revoked: false,
+  };
+
+  function revokedCalendar(): AttendanceCalendarData {
+    return calendarData({}, [{ ...LEAVE_ENTRY, is_revoked: true }]);
+  }
+
+  it("单日面板展示当日请假单，作废后置灰并以响应日历刷新", async () => {
+    mockFetchCalendar.mockResolvedValue(calendarData({}, [LEAVE_ENTRY]));
+    mockRevokeLeave.mockResolvedValue({ leave: { ...LEAVE_ENTRY, is_revoked: true }, calendar: revokedCalendar() });
+    renderModal();
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByTestId("daypanel-leave-type")).toHaveTextContent("事假");
+    expect(within(panel).getByText(/QY2026071501/)).toBeInTheDocument();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "作废" }));
+    await waitFor(() => expect(mockRevokeLeave).toHaveBeenCalledWith(3, "2026-07"));
+    await screen.findByText("已撤销");
+    expect(within(panel).getByRole("button", { name: "恢复" })).toBeInTheDocument();
+  });
+
+  it("已作废请假单点恢复，调用恢复接口并刷新", async () => {
+    mockFetchCalendar.mockResolvedValue(revokedCalendar());
+    mockRestoreLeave.mockResolvedValue({ leave: LEAVE_ENTRY, calendar: calendarData({}, [LEAVE_ENTRY]) });
+    renderModal();
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(screen.getByText("已撤销")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "恢复" }));
+    await waitFor(() => expect(mockRestoreLeave).toHaveBeenCalledWith(3, "2026-07"));
+    await waitFor(() => expect(screen.queryByText("已撤销")).toBeNull());
+    expect(within(panel).getByRole("button", { name: "作废" })).toBeInTheDocument();
+  });
+
+  it("编辑请假单提交时段与假种", async () => {
+    mockFetchCalendar.mockResolvedValue(calendarData({}, [LEAVE_ENTRY]));
+    mockEditLeave.mockResolvedValue({
+      leave: { ...LEAVE_ENTRY, leave_type: "补休（调休）", is_manual_edited: true },
+      calendar: calendarData({}, [{ ...LEAVE_ENTRY, leave_type: "补休（调休）" }]),
+    });
+    renderModal();
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+
+    const panel = screen.getByTestId("daily-override-panel");
+    fireEvent.click(within(panel).getByRole("button", { name: "编辑" }));
+    fireEvent.change(within(panel).getByLabelText("假种"), { target: { value: "补休（调休）" } });
+    fireEvent.click(within(panel).getByRole("button", { name: "保存请假单" }));
+
+    await waitFor(() =>
+      expect(mockEditLeave).toHaveBeenCalledWith(3, {
+        month: "2026-07",
+        start_time: "2026-07-15 13:00",
+        end_time: "2026-07-15 17:00",
+        leave_type: "补休（调休）",
+      }),
+    );
+  });
+
+  it("账套锁定时请假单操作按钮禁用", async () => {
+    mockFetchCalendar.mockResolvedValue(calendarData({}, [LEAVE_ENTRY]));
+    renderModal({ isLocked: true });
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByRole("button", { name: "作废" })).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: "编辑" })).toBeDisabled();
   });
 });

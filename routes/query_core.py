@@ -1022,6 +1022,7 @@ def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = 
         leave_records = (
             LeaveRecord.query.filter(LeaveRecord.emp_id.in_(emp_ids))
             .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+            .filter(LeaveRecord.is_revoked.is_(False))
             .all()
         )
         for record in leave_records:
@@ -1147,6 +1148,7 @@ def _build_leave_detail_rows(month: str, emp_ids: list[int], leave_type: str | N
     leave_records = (
         LeaveRecord.query.filter(LeaveRecord.emp_id.in_(emp_ids))
         .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+        .filter(LeaveRecord.is_revoked.is_(False))
         .order_by(LeaveRecord.start_time.asc(), LeaveRecord.id.asc())
         .all()
     )
@@ -1672,6 +1674,7 @@ def manager_leave_records_api():
     leave_records = (
         LeaveRecord.query.filter(LeaveRecord.emp_id.in_(emp_ids))
         .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+        .filter(LeaveRecord.is_revoked.is_(False))
         .order_by(LeaveRecord.start_time.asc(), LeaveRecord.id.asc())
         .all()
     )
@@ -1840,14 +1843,17 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
     leave_entries: list[dict] = []
     for record in leave_rows:
         leave_type = (record.leave_type or "").strip() or "请假"
+        is_revoked = bool(record.is_revoked)
         day = max(record.start_time.date(), month_start)
         while day < month_end and day <= record.end_time.date():
             day_start = datetime.combine(day, time.min)
             day_next = datetime.combine(day + timedelta(days=1), time.min)
             day_hours = overlap_duration_days(record.start_time, record.end_time, day_start, day_next)
             if day_hours > 0:
-                slot = leave_by_date.setdefault(day.isoformat(), {})
-                slot[leave_type] = round(slot.get(leave_type, 0.0) + day_hours, 2)
+                # 作废单不参与口径聚合（格子角标/汇总），仅在弹层明细中置灰展示
+                if not is_revoked:
+                    slot = leave_by_date.setdefault(day.isoformat(), {})
+                    slot[leave_type] = round(slot.get(leave_type, 0.0) + day_hours, 2)
                 # leaves 为单据级明细（每张 OA 单每天一条），弹层据此展示单据信息
                 leave_entries.append(
                     {
@@ -1859,6 +1865,8 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
                         "end_time": record.end_time.strftime("%Y-%m-%d %H:%M"),
                         "reason": (record.reason or "").strip(),
                         "approval_status": record.approval_status or "",
+                        "id": record.id,
+                        "is_revoked": is_revoked,
                     }
                 )
             day += timedelta(days=1)

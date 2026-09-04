@@ -226,6 +226,7 @@ def _leave_rows_by_employee(employee_ids: list[int], month: str) -> dict[int, li
     rows = (
         LeaveRecord.query.filter(LeaveRecord.emp_id.in_(employee_ids))
         .filter(LeaveRecord.start_time < end_dt, LeaveRecord.end_time > start_dt)
+        .filter(LeaveRecord.is_revoked.is_(False))
         .all()
     )
     rows_by_employee = {employee_id: [] for employee_id in employee_ids}
