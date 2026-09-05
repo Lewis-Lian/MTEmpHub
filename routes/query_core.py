@@ -75,7 +75,7 @@ FINAL_HEADERS = [
     "人员编号",
     "人员名称",
     "考勤天数",
-    "实际出勤天数",
+    "打卡天数",
     "病假（次数）",
     "工伤（次数）",
     "丧假（次数）",
@@ -111,7 +111,7 @@ LEAVE_DURATION_HEADERS = {
     "婚假（天）",
 }
 
-ACTUAL_ATTENDANCE_DAYS_HEADER = "实际出勤天数"
+ACTUAL_ATTENDANCE_DAYS_HEADER = "打卡天数"
 
 
 def _filter_final_columns(headers: list[str], rows: list[list[object]]) -> tuple[list[str], list[list[object]]]:
@@ -921,7 +921,7 @@ def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = 
             daily_override_by_emp.get(employee.id, {}),
             evening_dates_by_emp.get(employee.id, set()),
         )
-        # 实际出勤天数（effective 口径）：实际打卡修正优先，未设置按刷卡口径；
+        # 打卡天数（effective 口径）：实际打卡修正优先，未设置按刷卡口径；
         # 覆盖「有 DailyRecord 的日期」∪「逐日修正表有记录的日期」（无记录日也可修正）
         employee_daily_overrides = daily_override_by_emp.get(employee.id, {})
         records_by_date = {r.record_date: r for r in daily_rows if r.record_date}

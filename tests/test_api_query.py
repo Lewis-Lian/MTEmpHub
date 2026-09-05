@@ -638,7 +638,7 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(emp_row[attendance_days_idx], 0.5)
 
     def test_employee_dashboard_actual_attendance_days_uses_punch_count(self) -> None:
-        # 实际出勤天数口径：当日真实刷卡 >= 2 记 1 天，仅 1 次记 0 天。
+        # 打卡天数口径：当日真实刷卡 >= 2 记 1 天，仅 1 次记 0 天。
         # setUp 未给 E001 建 5 月打卡记录，故本测试两天即全部聚合值。
         with self.app.app_context():
             employee = Employee.query.filter_by(emp_no="E001").first()
@@ -665,17 +665,17 @@ class ApiQueryTests(unittest.TestCase):
             db.session.commit()
 
         self._login("viewer", "viewer123")
-        # 带开关：实际出勤天数列存在，聚合 = 1（全勤）+ 0（单刷）
+        # 带开关：打卡天数列存在，聚合 = 1（全勤）+ 0（单刷）
         res = self.client.get("/api/query/employee-dashboard?month=2026-05&show_actual_attendance_days=1")
         self.assertEqual(res.status_code, 200)
         payload = res.get_json()
-        actual_idx = payload["headers"].index("实际出勤天数")
+        actual_idx = payload["headers"].index("打卡天数")
         emp_row = next(row for row in payload["rows"] if row[1] == "E001")
         self.assertEqual(emp_row[actual_idx], 1.0)
 
         # 不带开关：该列不存在
         res2 = self.client.get("/api/query/employee-dashboard?month=2026-05")
-        self.assertNotIn("实际出勤天数", res2.get_json()["headers"])
+        self.assertNotIn("打卡天数", res2.get_json()["headers"])
 
 
 class EffectiveAttendanceDayValueTests(unittest.TestCase):
