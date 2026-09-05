@@ -256,7 +256,7 @@ export default function EmployeeDashboardPage() {
               options={[
                 { key: "show_leave_counts", label: "请假次数" },
                 { key: "show_leave_durations", label: "请假时长" },
-                { key: "show_actual_attendance_days", label: "实际出勤天数" },
+                { key: "show_actual_attendance_days", label: "打卡天数" },
               ]}
               value={{
                 show_leave_counts: showLeaveCounts,
