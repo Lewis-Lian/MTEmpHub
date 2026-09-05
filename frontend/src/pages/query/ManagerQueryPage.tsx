@@ -212,10 +212,12 @@ export default function ManagerQueryPage() {
       options={[
         { key: "show_emp_no", label: "显示员工编号", value: "1" },
         { key: "show_actual_attendance_days", label: "显示实际出勤天数", value: "1" },
+        { key: "show_punch_days", label: "显示打卡天数", value: "1" },
       ]}
       prepareQuery={(query, state) => {
         query.set("show_emp_no", state.selectedOptions.show_emp_no ? "1" : "0");
         query.set("show_actual_attendance_days", state.selectedOptions.show_actual_attendance_days ? "1" : "0");
+        query.set("show_punch_days", state.selectedOptions.show_punch_days ? "1" : "0");
       }}
       templateExportPath="/api/query/manager-attendance/export-template"
       title="管理人员考勤数据查询"

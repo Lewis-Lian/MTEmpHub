@@ -26,7 +26,13 @@ from models.overtime import OvertimeRecord
 from models.shift import Shift
 from models.user import User
 from models.user import UserDepartmentAssignment, UserEmployeeAssignment
-from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows, normalize_days
+from services.manager_attendance_service import (
+    ManagerAttendanceOptions,
+    build_manager_rows,
+    manager_headers,
+    normalize_days,
+    rows_as_table,
+)
 from utils.helpers import overlap_duration_days
 
 
@@ -1168,6 +1174,101 @@ class ManagerDailyStatusOverrideTests(unittest.TestCase):
 
         self.assertEqual(rows[0]["attendance_days"], 21.0)
         self.assertEqual(rows[0]["actual_attendance_days"], 21.0)
+
+
+class ManagerPunchDaysTests(unittest.TestCase):
+    """打卡天数（员工侧实际出勤口径）：单日「实际打卡」修正优先，否则真实刷卡 ≥2 次记 1 天。"""
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.db_path = os.path.join(self.tmpdir.name, "manager-punch-days.db")
+
+        app = Flask(__name__)
+        app.config.update(
+            TESTING=True,
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.db_path}",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        )
+        db.init_app(app)
+        self.app = app
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="行政部")
+            db.session.add(dept)
+            db.session.flush()
+            manager = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            db.session.add(manager)
+            db.session.flush()
+            db.session.add(
+                MonthlyReport(emp_id=manager.id, report_month="2026-08", raw_data={"出勤天数": 24})
+            )
+            db.session.commit()
+            self.manager_id = manager.id
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+        self.tmpdir.cleanup()
+
+    def _seed_punch_day(self, day, punch_times: dict) -> None:
+        db.session.add(
+            DailyRecord(
+                emp_id=self.manager_id,
+                record_date=day,
+                manager_payload={"raw_data": dict(punch_times)},
+            )
+        )
+
+    def test_punch_days_requires_two_swipes_per_day(self) -> None:
+        with self.app.app_context():
+            self._seed_punch_day(date(2026, 8, 10), {"上班1打卡时间": "07:58", "下班1打卡时间": "17:32"})
+            self._seed_punch_day(date(2026, 8, 11), {"上班1打卡时间": "07:58"})
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["punch_days"], 1.0)
+
+    def test_punch_days_actual_attendance_override_takes_priority(self) -> None:
+        with self.app.app_context():
+            self._seed_punch_day(date(2026, 8, 10), {"上班1打卡时间": "07:58", "下班1打卡时间": "17:32"})
+            self._seed_punch_day(date(2026, 8, 11), {"上班1打卡时间": "07:58", "下班1打卡时间": "17:32"})
+            db.session.add_all(
+                [
+                    # 双卡日勾「不算」→ 0 天
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 8, 10), is_actual_attendance=False
+                    ),
+                    # 无打卡记录日勾「算」→ 1 天
+                    DailyAttendanceOverride(
+                        emp_id=self.manager_id, record_date=date(2026, 8, 12), is_actual_attendance=True
+                    ),
+                ]
+            )
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+
+        self.assertEqual(rows[0]["punch_days"], 2.0)
+
+    def test_headers_and_rows_toggle_punch_days_column(self) -> None:
+        with self.app.app_context():
+            self._seed_punch_day(date(2026, 8, 10), {"上班1打卡时间": "07:58", "下班1打卡时间": "17:32"})
+            db.session.commit()
+
+            rows = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), [self.manager_id])
+            hidden = rows_as_table(rows)
+            shown = rows_as_table(rows, include_punch_days=True)
+
+        self.assertNotIn("打卡天数", manager_headers())
+        headers = manager_headers(include_punch_days=True)
+        self.assertIn("打卡天数", headers)
+        self.assertEqual(headers.index("打卡天数"), headers.index("实际出勤天数") + 1)
+        self.assertEqual(len(shown[0]), len(hidden[0]) + 1)
+        self.assertIn(1.0, shown[0])
+        self.assertNotIn(1.0, hidden[0])
 
 
 if __name__ == "__main__":

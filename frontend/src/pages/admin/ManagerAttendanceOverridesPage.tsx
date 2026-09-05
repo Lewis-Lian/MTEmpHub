@@ -2,6 +2,7 @@ import AttendanceOverridesPage from "../../components/admin/AttendanceOverridesP
 
 const MANAGER_FIELDS = [
   { key: "attendance_days", label: "出勤天数", inputMode: "decimal" as const },
+  { key: "punch_days", label: "打卡天数", inputMode: "decimal" as const },
   { key: "injury_days", label: "工伤", inputMode: "decimal" as const },
   { key: "business_trip_days", label: "出差", inputMode: "decimal" as const },
   { key: "marriage_days", label: "婚假", inputMode: "decimal" as const },

@@ -40,6 +40,12 @@ from services.daily_override_service import (
 from services.attendance_source_service import (
     EMPLOYEE_STATS_CONTEXT,
     MANAGER_STATS_CONTEXT,
+    _actual_attendance_day_value,
+    _effective_actual_attendance_day_value,
+    _extract_raw_punch_data,
+    _normalize_punch_token,
+    _punch_round_count,
+    _raw_punch_count,
     attendance_views_by_employee,
 )
 from services.manager_attendance_service import (
@@ -285,20 +291,6 @@ def _attendance_day_value(record) -> float:
     return 0.5 if _is_half_day_record(record) else 1.0
 
 
-def _actual_attendance_day_value(record) -> float:
-    # 实际出勤天数（刷卡口径）：当日真实刷卡 >= 2 次记 1 天，否则 0 天。
-    return 1.0 if _raw_punch_count(record) >= 2 else 0.0
-
-
-def _effective_actual_attendance_day_value(record, override) -> float:
-    """当日实际出勤天数：实际打卡修正优先（勾选算→1、明确不算→0），否则按刷卡口径。"""
-    if override is not None and override.is_actual_attendance is not None:
-        return 1.0 if override.is_actual_attendance else 0.0
-    if record is None:
-        return 0.0
-    return _actual_attendance_day_value(record)
-
-
 def _has_daytime_punch(record) -> bool:
     """晚加班条日判断白班是否出勤：任一打卡时刻早于 17:00（晚加班起点）。"""
     tokens = _punch_events(record)
@@ -387,17 +379,6 @@ def _effective_daily_aggregate(
     return round(attendance_days, 2), half_days, round(work_hours_total, 2)
 
 
-def _normalize_punch_token(value: object) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    m = re.search(r"(\d{1,2}:\d{2})", text)
-    if not m:
-        return text
-    hh, mm = m.group(1).split(":")
-    return f"{int(hh):02d}:{mm}"
-
-
 def _punch_events(record) -> set[str]:
     events: set[str] = set()
     for raw in (record.check_in_times or []):
@@ -457,41 +438,6 @@ def _punch_count(record) -> int:
     return 0
 
 
-def _punch_round_count(record) -> int:
-    raw = record.raw_data or {}
-    if not isinstance(raw, dict):
-        raw = {}
-    if isinstance(raw.get("raw_data"), dict):
-        raw = raw.get("raw_data") or {}
-
-    in_events = {_normalize_punch_token(x) for x in (record.check_in_times or [])}
-    in_events = {x for x in in_events if x}
-    out_events = {_normalize_punch_token(x) for x in (record.check_out_times or [])}
-    out_events = {x for x in out_events if x}
-
-    overlap = in_events & out_events
-    if overlap:
-        in_events -= overlap
-        out_events -= overlap
-
-    # Query page shows "打卡轮次" (e.g. 上午+下午 = 2), not raw swipe points.
-    rounds = max(len(in_events), len(out_events))
-    if rounds:
-        return rounds
-
-    manager_pairs = (
-        ("上班1打卡时间", "下班1打卡时间"),
-        ("上班2打卡时间", "下班2打卡时间"),
-        ("上班3打卡时间", "下班3打卡时间"),
-        ("上班4打卡时间", "下班4打卡时间"),
-    )
-    manager_rounds = 0
-    for in_key, out_key in manager_pairs:
-        if str(raw.get(in_key) or "").strip() or str(raw.get(out_key) or "").strip():
-            manager_rounds += 1
-    return manager_rounds
-
-
 def _format_punch_times(values: list[object] | None) -> str:
     normalized: list[str] = []
     seen: set[str] = set()
@@ -502,81 +448,6 @@ def _format_punch_times(values: list[object] | None) -> str:
         seen.add(token)
         normalized.append(token)
     return " / ".join(normalized)
-
-
-def _repair_mojibake(text: str) -> str:
-    try:
-        return text.encode("latin1").decode("gbk")
-    except Exception:
-        return text
-
-
-def _stringify_raw_punch_value(value: object) -> str:
-    if isinstance(value, list):
-        normalized = [str(item).strip() for item in value if str(item).strip()]
-        return ",".join(normalized)
-    return str(value).strip()
-
-
-def _extract_raw_punch_data_from_dict(raw: dict) -> str:
-    if not isinstance(raw, dict):
-        return ""
-
-    direct_keys = {"刷卡时间数据", "原始刷卡数据", "刷卡时间", "打卡记录"}
-    for key in direct_keys:
-        value = raw.get(key)
-        if value is not None and _stringify_raw_punch_value(value):
-            return _stringify_raw_punch_value(value)
-
-    for key, value in raw.items():
-        if value is None or not _stringify_raw_punch_value(value):
-            continue
-        repaired = _repair_mojibake(str(key))
-        if ("刷卡" in repaired and "时间" in repaired) or ("打卡" in repaired and "记录" in repaired):
-            return _stringify_raw_punch_value(value)
-
-    manager_time_keys = (
-        "上班1打卡时间",
-        "下班1打卡时间",
-        "上班2打卡时间",
-        "下班2打卡时间",
-        "上班3打卡时间",
-        "下班3打卡时间",
-        "上班4打卡时间",
-        "下班4打卡时间",
-    )
-    manager_times: list[str] = []
-    for key in manager_time_keys:
-        token = _normalize_punch_token(raw.get(key))
-        if token:
-            manager_times.append(token)
-    if manager_times:
-        return ",".join(manager_times)
-
-    return ""
-
-
-def _extract_raw_punch_data(record) -> str:
-    raw = record.raw_data or {}
-    if not isinstance(raw, dict):
-        raw = {}
-    fallback_raw = raw.get("fallback_raw_data") if isinstance(raw.get("fallback_raw_data"), dict) else {}
-    if isinstance(raw.get("raw_data"), dict):
-        raw = raw.get("raw_data") or {}
-
-    primary_value = _extract_raw_punch_data_from_dict(raw)
-    if primary_value:
-        return primary_value
-    return _extract_raw_punch_data_from_dict(fallback_raw)
-
-
-def _raw_punch_count(record) -> int:
-    raw = _extract_raw_punch_data(record)
-    if raw:
-        tokens = re.findall(r"(\d{1,2}:\d{2})", raw)
-        if tokens:
-            return len(tokens)
-    return _punch_round_count(record)
 
 
 def _parse_punch_dt(value: object, record_date) -> datetime | None:
@@ -2238,11 +2109,12 @@ def manager_attendance_api():
 
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
     include_emp_no = request.args.get("show_emp_no") == "1"
+    include_punch_days = request.args.get("show_punch_days") == "1"
 
     return jsonify(
         {
-            "headers": manager_headers(include_actual_attendance_days, include_emp_no),
-            "rows": rows_as_table(rows, include_actual_attendance_days, include_emp_no),
+            "headers": manager_headers(include_actual_attendance_days, include_emp_no, include_punch_days),
+            "rows": rows_as_table(rows, include_actual_attendance_days, include_emp_no, include_punch_days),
             "month": options.month,
             "factory_rest_days": options.factory_rest_days,
             "monthly_benefit_days": options.monthly_benefit_days,
@@ -2622,12 +2494,13 @@ def manager_attendance_export_api():
     rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, emp_ids))
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
     include_emp_no = request.args.get("show_emp_no") == "1"
+    include_punch_days = request.args.get("show_punch_days") == "1"
 
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "管理人员查询"
-    ws.append(manager_headers(include_actual_attendance_days, include_emp_no))
-    for row in rows_as_table(rows, include_actual_attendance_days, include_emp_no):
+    ws.append(manager_headers(include_actual_attendance_days, include_emp_no, include_punch_days))
+    for row in rows_as_table(rows, include_actual_attendance_days, include_emp_no, include_punch_days):
         ws.append(row)
 
     output = BytesIO()
