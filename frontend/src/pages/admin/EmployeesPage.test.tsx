@@ -248,6 +248,25 @@ describe("EmployeesPage 离职功能", () => {
     expect(screen.getByRole("button", { name: "确认离职" })).toBeTruthy();
   });
 
+  it("办理离职成功后清空输入框并聚焦以便继续办理", async () => {
+    mockResign.mockResolvedValue({ status: "ok", employee: employees[0] });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "办理离职" })[0]);
+    fireEvent.change(await screen.findByLabelText("离职人员编号/姓名/卡号"), { target: { value: "E100" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认离职" }));
+
+    await waitFor(() => expect(mockResign).toHaveBeenCalledTimes(1));
+    const input = await waitFor(() => {
+      const el = screen.getByLabelText("离职人员编号/姓名/卡号");
+      expect(el).toHaveValue("");
+      expect(document.activeElement).toBe(el);
+      return el;
+    });
+    expect(input).toBeTruthy();
+  });
+
   it("办理离职输入姓名提交时按解析出的工号调用接口", async () => {
     mockResign.mockResolvedValue({ status: "ok", employee: employees[0] });
     render(<EmployeesPage />);

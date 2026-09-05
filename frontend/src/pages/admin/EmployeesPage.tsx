@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { buildApiUrl } from "../../api/client";
 import { useNotification } from "../../components/feedback/Notification";
@@ -113,6 +113,7 @@ export default function EmployeesPage() {
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
   const [showResignModal, setShowResignModal] = useState(false);
   const [resignEmpNo, setResignEmpNo] = useState("");
+  const resignEmpNoInputRef = useRef<HTMLInputElement>(null);
   const [resignDate, setResignDate] = useState(() => todayLocalDate());
   const [isResigning, setIsResigning] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
@@ -286,6 +287,8 @@ export default function EmployeesPage() {
     try {
       const result = await resignAdminEmployee({ emp_no: empNo, resigned_at: resignDate });
       notification.success(`员工 ${result.employee.name} 已办理离职`);
+      setResignEmpNo("");
+      resignEmpNoInputRef.current?.focus();
       await loadRows();
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : "办理离职失败";
@@ -1319,6 +1322,7 @@ export default function EmployeesPage() {
                   id="resignEmpNo"
                   onChange={(event) => setResignEmpNo(event.target.value)}
                   placeholder="请输入人员编号、姓名或卡号"
+                  ref={resignEmpNoInputRef}
                   required
                   value={resignEmpNo}
                 />
