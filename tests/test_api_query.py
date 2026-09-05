@@ -307,6 +307,49 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(overtime_payload["rows"][0]["remaining"], 0)
         self.assertEqual(annual_leave_payload["rows"][0]["remaining"], 0)
 
+    def test_manager_attendance_api_toggles_punch_days_column(self) -> None:
+        with self.app.app_context():
+            manager = Employee.query.filter_by(emp_no="M001").first()
+            db.session.add(
+                DailyRecord(
+                    emp_id=manager.id,
+                    record_date=date(2026, 5, 1),
+                    manager_payload={
+                        "raw_data": {"上班1打卡时间": "08:00", "下班1打卡时间": "17:30"}
+                    },
+                )
+            )
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        hidden_response = self.client.get(
+            "/api/query/manager-attendance?month=2026-05&show_actual_attendance_days=1"
+        )
+        shown_response = self.client.get(
+            "/api/query/manager-attendance?month=2026-05&show_actual_attendance_days=1&show_punch_days=1"
+        )
+
+        self.assertEqual(hidden_response.status_code, 200)
+        self.assertEqual(shown_response.status_code, 200)
+        hidden = hidden_response.get_json()
+        shown = shown_response.get_json()
+        self.assertNotIn("打卡天数", hidden["headers"])
+        self.assertIn("打卡天数", shown["headers"])
+        self.assertEqual(shown["headers"].index("打卡天数"), shown["headers"].index("实际出勤天数") + 1)
+        self.assertEqual(len(shown["rows"][0]), len(hidden["rows"][0]) + 1)
+        punch_index = shown["headers"].index("打卡天数")
+        self.assertEqual(shown["rows"][0][punch_index], 1.0)
+
+    def test_manager_attendance_export_toggles_punch_days_column(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.get("/api/query/manager-attendance/export?month=2026-05&show_punch_days=1")
+
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        header_row = [cell.value for cell in wb["管理人员查询"][1]]
+        self.assertIn("打卡天数", header_row)
+
     def test_manager_punch_records_returns_manager_attendance_rows(self) -> None:
         with self.app.app_context():
             manager = Employee.query.filter_by(emp_no="M001").first()

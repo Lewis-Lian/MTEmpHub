@@ -17,6 +17,7 @@ from models.manager_month_stat import ManagerMonthStat
 from models.overtime import OvertimeRecord
 from services.attendance_source_service import (
     MANAGER_STATS_CONTEXT,
+    _effective_actual_attendance_day_value,
     attendance_views_by_employee,
     selected_monthly_report_raw,
 )
@@ -37,6 +38,7 @@ MANAGER_HEADERS = [
     "姓名",
     "出勤天数",
     "实际出勤天数",
+    "打卡天数",
     "事/病假",
     "工伤",
     "出差",
@@ -50,10 +52,16 @@ MANAGER_HEADERS = [
 ]
 
 
-def manager_headers(include_actual_attendance_days: bool = True, include_emp_no: bool = False) -> list[str]:
+def manager_headers(
+    include_actual_attendance_days: bool = True,
+    include_emp_no: bool = False,
+    include_punch_days: bool = False,
+) -> list[str]:
     headers = list(MANAGER_HEADERS)
     if not include_actual_attendance_days:
         headers = [h for h in headers if h != "实际出勤天数"]
+    if not include_punch_days:
+        headers = [h for h in headers if h != "打卡天数"]
     if not include_emp_no:
         headers = [h for h in headers if h != "员工编号"]
     return headers
@@ -637,6 +645,14 @@ def build_manager_rows(
             elif bucket == "time_off" and _has_half_day_component(days):
                 half_time_off_days += 0.5
         records_by_date = {r.record_date: r for r in attendance_rows if getattr(r, "record_date", None)}
+        # 打卡天数（员工侧实际出勤口径）：单日「实际打卡」修正优先，否则真实刷卡 ≥2 次记 1 天；
+        # 覆盖「有考勤记录的日期」∪「逐日修正表有记录的日期」。
+        punch_days = _round2(
+            sum(
+                _effective_actual_attendance_day_value(records_by_date.get(day), daily_overrides.get(day))
+                for day in set(records_by_date) | set(daily_overrides)
+            )
+        )
         evening_topup_days = 0.0
         # 晚加班条按日合并时长后统一折算，避免同日多条逐条叠加
         evening_hours_by_date: dict[date, float] = {}
@@ -810,6 +826,7 @@ def build_manager_rows(
                 "name": employee.name,
                 "attendance_days": attendance_days,
                 "actual_attendance_days": actual_attendance_days,
+                "punch_days": punch_days,
                 "personal_sick_days": personal_sick_days,
                 "injury_days": _round2(injury_days),
                 "business_trip_days": _round2(business_trip_days),
@@ -826,7 +843,12 @@ def build_manager_rows(
     return rows
 
 
-def rows_as_table(rows: list[dict[str, object]], include_actual_attendance_days: bool = True, include_emp_no: bool = False) -> list[list[object]]:
+def rows_as_table(
+    rows: list[dict[str, object]],
+    include_actual_attendance_days: bool = True,
+    include_emp_no: bool = False,
+    include_punch_days: bool = False,
+) -> list[list[object]]:
     table_rows = []
     for row in rows:
         item = [row.get("dept_name", "")]
@@ -836,6 +858,8 @@ def rows_as_table(rows: list[dict[str, object]], include_actual_attendance_days:
         item.append(row.get("attendance_days", 0))
         if include_actual_attendance_days:
             item.append(row.get("actual_attendance_days", 0))
+        if include_punch_days:
+            item.append(row.get("punch_days", 0))
         item.extend([
             row.get("personal_sick_days", 0),
             row.get("injury_days", 0),

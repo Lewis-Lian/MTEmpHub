@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -219,3 +220,143 @@ def selected_monthly_report_raw(employee: Employee, month: str, context: str) ->
         if isinstance(raw, dict) and raw:
             candidates.append(raw)
     return candidates[0] if candidates else {}
+
+
+# ---- 实际出勤（打卡口径）共享函数 -------------------------------------------
+# 员工侧与管理人员侧共用同一实现：当日真实刷卡 ≥2 次记 1 天，
+# 单日「实际打卡」修正（is_actual_attendance）优先：算 → 1、不算 → 0。
+
+
+def _repair_mojibake(text: str) -> str:
+    try:
+        return text.encode("latin1").decode("gbk")
+    except Exception:
+        return text
+
+
+def _stringify_raw_punch_value(value: object) -> str:
+    if isinstance(value, list):
+        normalized = [str(item).strip() for item in value if str(item).strip()]
+        return ",".join(normalized)
+    return str(value).strip()
+
+
+def _normalize_punch_token(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    m = re.search(r"(\d{1,2}:\d{2})", text)
+    if not m:
+        return text
+    hh, mm = m.group(1).split(":")
+    return f"{int(hh):02d}:{mm}"
+
+
+def _extract_raw_punch_data_from_dict(raw: dict) -> str:
+    if not isinstance(raw, dict):
+        return ""
+
+    direct_keys = {"刷卡时间数据", "原始刷卡数据", "刷卡时间", "打卡记录"}
+    for key in direct_keys:
+        value = raw.get(key)
+        if value is not None and _stringify_raw_punch_value(value):
+            return _stringify_raw_punch_value(value)
+
+    for key, value in raw.items():
+        if value is None or not _stringify_raw_punch_value(value):
+            continue
+        repaired = _repair_mojibake(str(key))
+        if ("刷卡" in repaired and "时间" in repaired) or ("打卡" in repaired and "记录" in repaired):
+            return _stringify_raw_punch_value(value)
+
+    manager_time_keys = (
+        "上班1打卡时间",
+        "下班1打卡时间",
+        "上班2打卡时间",
+        "下班2打卡时间",
+        "上班3打卡时间",
+        "下班3打卡时间",
+        "上班4打卡时间",
+        "下班4打卡时间",
+    )
+    manager_times: list[str] = []
+    for key in manager_time_keys:
+        token = _normalize_punch_token(raw.get(key))
+        if token:
+            manager_times.append(token)
+    if manager_times:
+        return ",".join(manager_times)
+
+    return ""
+
+
+def _extract_raw_punch_data(record) -> str:
+    raw = record.raw_data or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    fallback_raw = raw.get("fallback_raw_data") if isinstance(raw.get("fallback_raw_data"), dict) else {}
+    if isinstance(raw.get("raw_data"), dict):
+        raw = raw.get("raw_data") or {}
+
+    primary_value = _extract_raw_punch_data_from_dict(raw)
+    if primary_value:
+        return primary_value
+    return _extract_raw_punch_data_from_dict(fallback_raw)
+
+
+def _punch_round_count(record) -> int:
+    raw = record.raw_data or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    if isinstance(raw.get("raw_data"), dict):
+        raw = raw.get("raw_data") or {}
+
+    in_events = {_normalize_punch_token(x) for x in (record.check_in_times or [])}
+    in_events = {x for x in in_events if x}
+    out_events = {_normalize_punch_token(x) for x in (record.check_out_times or [])}
+    out_events = {x for x in out_events if x}
+
+    overlap = in_events & out_events
+    if overlap:
+        in_events -= overlap
+        out_events -= overlap
+
+    # Query page shows "打卡轮次" (e.g. 上午+下午 = 2), not raw swipe points.
+    rounds = max(len(in_events), len(out_events))
+    if rounds:
+        return rounds
+
+    manager_pairs = (
+        ("上班1打卡时间", "下班1打卡时间"),
+        ("上班2打卡时间", "下班2打卡时间"),
+        ("上班3打卡时间", "下班3打卡时间"),
+        ("上班4打卡时间", "下班4打卡时间"),
+    )
+    manager_rounds = 0
+    for in_key, out_key in manager_pairs:
+        if str(raw.get(in_key) or "").strip() or str(raw.get(out_key) or "").strip():
+            manager_rounds += 1
+    return manager_rounds
+
+
+def _raw_punch_count(record) -> int:
+    raw = _extract_raw_punch_data(record)
+    if raw:
+        tokens = re.findall(r"(\d{1,2}:\d{2})", raw)
+        if tokens:
+            return len(tokens)
+    return _punch_round_count(record)
+
+
+def _actual_attendance_day_value(record) -> float:
+    # 实际出勤天数（刷卡口径）：当日真实刷卡 >= 2 次记 1 天，否则 0 天。
+    return 1.0 if _raw_punch_count(record) >= 2 else 0.0
+
+
+def _effective_actual_attendance_day_value(record, override) -> float:
+    """当日实际出勤天数：实际打卡修正优先（勾选算→1、明确不算→0），否则按刷卡口径。"""
+    if override is not None and override.is_actual_attendance is not None:
+        return 1.0 if override.is_actual_attendance else 0.0
+    if record is None:
+        return 0.0
+    return _actual_attendance_day_value(record)
