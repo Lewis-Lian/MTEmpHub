@@ -11,6 +11,8 @@ from sqlalchemy import func, or_
 
 from routes.auth_helpers import admin_required
 from models.system_setting import SystemSetting
+from services.card_attendance_sync_service import sync_card_attendance
+from services.card_db_client import CardDBClient, card_db_config_from_settings
 from services.dingtalk_client import DingTalkClient
 from services.dingtalk_manager_attendance_service import sync_dingtalk_manager_attendance
 
@@ -240,6 +242,35 @@ def sync_manager_attendance(account_set_id: int):
 
     result = sync_dingtalk_manager_attendance(account_set.id, account_set.month, DingTalkClient())
     response = admin_module._dingtalk_sync_response(result)
+    return jsonify(response), 502 if response["status"] == "failed" else 200
+
+
+@admin_required
+def sync_employee_attendance(account_set_id: int):
+    from routes import admin_core as admin_module
+
+    account_set = admin_module._require_model(admin_module.AccountSet, account_set_id)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "同步员工考勤")
+    if locked_error:
+        return locked_error
+    source = SystemSetting.get_value("employee_attendance_source", "local")
+    if source != "card_db":
+        return jsonify(
+            {
+                "status": "error",
+                "read_count": 0,
+                "imported_count": 0,
+                "unmatched_count": 0,
+                "unmatched": [],
+                "sync_run_id": None,
+                "message": "员工考勤来源为本地上传，请使用文件上传接口",
+            }
+        ), 409
+
+    result = sync_card_attendance(
+        account_set.id, account_set.month, CardDBClient(card_db_config_from_settings())
+    )
+    response = admin_module._card_sync_response(result)
     return jsonify(response), 502 if response["status"] == "failed" else 200
 
 

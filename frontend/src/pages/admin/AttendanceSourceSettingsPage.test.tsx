@@ -10,6 +10,10 @@ const { apiMock, notificationMock, authMock } = vi.hoisted(() => ({
     managerAttendanceUnmatchedCsvUrl: vi.fn((id: number) => `https://api.example.test/api/admin/manager-attendance/sync-runs/${id}/unmatched.csv`),
     testAttendanceConnection: vi.fn(),
     fetchManagerAttendanceSyncHistory: vi.fn(async () => []),
+    testCardDbConnection: vi.fn(),
+    syncEmployeeAttendance: vi.fn(),
+    fetchEmployeeAttendanceSyncHistory: vi.fn(async () => []),
+    cardAttendanceUnmatchedCsvUrl: vi.fn((id: number) => `https://api.example.test/api/admin/employee-attendance/sync-runs/${id}/unmatched.csv`),
   },
   notificationMock: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
   authMock: { fetchMe: vi.fn(async () => ({ id: 1, username: "admin", role: "admin" })) },
@@ -32,11 +36,19 @@ describe("AttendanceSourceSettingsPage", () => {
 
   function setup(configure?: () => void) {
     authMock.fetchMe.mockResolvedValue({ id: 1, username: "admin", role: "admin" });
-    apiMock.fetchAttendanceSettings.mockResolvedValue({ manager_attendance_source: "local", dingtalk_configured: true });
+    apiMock.fetchAttendanceSettings.mockResolvedValue({
+      manager_attendance_source: "local",
+      dingtalk_configured: true,
+      employee_attendance_source: "local",
+      card_db: {},
+      card_db_configured: false,
+    });
     apiMock.fetchAccountSets.mockResolvedValue([{ id: 7, month: "2026-08", name: "2026年08月", is_active: true }, { id: 8, month: "2026-09", name: "2026年09月", is_active: false }]);
-    apiMock.saveAttendanceSettings.mockResolvedValue({ manager_attendance_source: "dingtalk", dingtalk_configured: true });
+    apiMock.saveAttendanceSettings.mockResolvedValue({ manager_attendance_source: "dingtalk", dingtalk_configured: true, employee_attendance_source: "local", card_db: {}, card_db_configured: false });
     apiMock.testAttendanceConnection.mockResolvedValue({ ok: true, message: "钉钉连接成功", dingtalk_configured: true });
+    apiMock.testCardDbConnection.mockResolvedValue({ ok: true, message: "考勤机数据库连接成功：SQL Server 2012" });
     apiMock.syncManagerAttendance.mockResolvedValue({ status: "partial", read_count: 10, imported_count: 8, unmatched_count: 2, unmatched: [{ emp_no: "X1", name: "未匹配", record_date: "2026-08-01" }], sync_run_id: 9, message: "存在未匹配记录" });
+    apiMock.syncEmployeeAttendance.mockResolvedValue({ status: "partial", read_count: 20, imported_count: 18, unmatched_count: 2, unmatched: [{ emp_no: "C1", name: "外部人员", record_date: "2026-08-02" }], sync_run_id: 11, message: "存在未匹配记录" });
     configure?.();
     render(<AttendanceSourceSettingsPage />);
   }
@@ -55,7 +67,7 @@ describe("AttendanceSourceSettingsPage", () => {
 
   it("syncs selected account set and renders partial unmatched records", async () => {
     setup();
-    await screen.findByText("2026年08月");
+    await screen.findAllByText("2026年08月");
     fireEvent.click(screen.getByRole("button", { name: "钉钉" }));
     await waitFor(() => expect(apiMock.saveAttendanceSettings).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "同步管理人员考勤" }));
@@ -180,5 +192,98 @@ describe("AttendanceSourceSettingsPage", () => {
   it("shows a zero-account state", async () => {
     setup(() => apiMock.fetchAccountSets.mockResolvedValue([]));
     await waitFor(() => expect(screen.getByText("暂无可用账套。")).toBeInTheDocument());
+  });
+
+  it("renders the employee panel above the manager panel and switches the employee source", async () => {
+    setup();
+    await screen.findByText("钉钉凭证已配置");
+    const employeeKicker = screen.getByText("员工考勤");
+    const managerKicker = screen.getByText("管理人员考勤");
+    expect(employeeKicker.compareDocumentPosition(managerKicker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "数据库同步" }));
+    await waitFor(() =>
+      expect(apiMock.saveAttendanceSettings).toHaveBeenCalledWith("local", { employee_attendance_source: "card_db" }),
+    );
+    expect(notificationMock.success).toHaveBeenCalledWith("员工考勤数据源已保存");
+  });
+
+  it("saves the card database form and tests the connection with the typed values", async () => {
+    setup();
+    await screen.findByText("考勤机数据库未配置");
+    fireEvent.change(screen.getByLabelText("考勤机地址"), { target: { value: "192.0.2.10" } });
+    fireEvent.change(screen.getByLabelText("考勤机端口"), { target: { value: "1433" } });
+    fireEvent.change(screen.getByLabelText("考勤机库名"), { target: { value: "STCard_Test" } });
+    fireEvent.change(screen.getByLabelText("考勤机账号"), { target: { value: "card_user" } });
+    fireEvent.change(screen.getByLabelText("考勤机密码"), { target: { value: "card-pass-123" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存连接参数" }));
+    await waitFor(() =>
+      expect(apiMock.saveAttendanceSettings).toHaveBeenCalledWith("local", {
+        card_db: { host: "192.0.2.10", port: "1433", database: "STCard_Test", user: "card_user", password: "card-pass-123" },
+      }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "考勤机连接测试" }));
+    await waitFor(() =>
+      expect(apiMock.testCardDbConnection).toHaveBeenCalledWith({
+        host: "192.0.2.10", port: "1433", database: "STCard_Test", user: "card_user", password: "card-pass-123",
+      }),
+    );
+    await waitFor(() => expect(notificationMock.success).toHaveBeenCalled());
+  });
+
+  it("surfaces the server failure reason instead of the raw 502 status text", async () => {
+    setup(() =>
+      apiMock.fetchAttendanceSettings.mockResolvedValue({
+        manager_attendance_source: "local",
+        dingtalk_configured: true,
+        employee_attendance_source: "card_db",
+        card_db: {},
+        card_db_configured: true,
+      }),
+    );
+    await screen.findByText("考勤机数据库已配置");
+
+    apiMock.testCardDbConnection.mockRejectedValue(Object.assign(new Error("Bad Gateway"), {
+      status: 502,
+      details: { ok: false, message: "考勤机数据库连接失败，请检查网络和数据库配置后重试" },
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "考勤机连接测试" }));
+    await waitFor(() =>
+      expect(notificationMock.error).toHaveBeenCalledWith("考勤机数据库连接失败，请检查网络和数据库配置后重试"),
+    );
+    expect(notificationMock.error).not.toHaveBeenCalledWith("Bad Gateway");
+
+    apiMock.syncEmployeeAttendance.mockRejectedValue(Object.assign(new Error("Bad Gateway"), {
+      status: 502,
+      details: { status: "failed", message: "考勤机数据库未配置，请先在更多设置中填写连接参数" },
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "同步员工考勤" }));
+    await waitFor(() =>
+      expect(notificationMock.error).toHaveBeenCalledWith("考勤机数据库未配置，请先在更多设置中填写连接参数"),
+    );
+    expect(notificationMock.error).not.toHaveBeenCalledWith("Bad Gateway");
+  });
+
+  it("syncs employee attendance for the selected account set and renders unmatched records", async () => {
+    setup(() =>
+      apiMock.fetchAttendanceSettings.mockResolvedValue({
+        manager_attendance_source: "local",
+        dingtalk_configured: true,
+        employee_attendance_source: "card_db",
+        card_db: { host: "192.0.2.10" },
+        card_db_configured: true,
+      }),
+    );
+    await screen.findByText("考勤机数据库已配置");
+    fireEvent.click(screen.getByRole("button", { name: "同步员工考勤" }));
+    expect(await screen.findByText("同步完成，但有 2 条未匹配记录")).toBeInTheDocument();
+    expect(screen.getByText(/C1 外部人员 2026-08-02/)).toBeInTheDocument();
+    expect(apiMock.syncEmployeeAttendance).toHaveBeenCalledWith(7);
+    expect(screen.getByRole("link", { name: "下载未匹配 CSV" })).toHaveAttribute(
+      "href",
+      "https://api.example.test/api/admin/employee-attendance/sync-runs/11/unmatched.csv",
+    );
   });
 });

@@ -12,15 +12,33 @@ import type {
 } from "../types/admin";
 import type { AttendanceCalendarData } from "../types/query";
 
+export interface CardDbConfig {
+  host?: string;
+  port?: number | string;
+  database?: string;
+  user?: string;
+  password?: string;
+}
+
 export interface AdminAttendanceSettings {
   manager_attendance_source: "local" | "dingtalk";
   dingtalk_configured: boolean;
+  employee_attendance_source: "local" | "card_db";
+  card_db: Omit<CardDbConfig, "password">;
+  card_db_configured: boolean;
 }
 
 export interface AttendanceConnectionTestResult { ok: boolean; message: string; dingtalk_configured?: boolean }
 
 export function testAttendanceConnection(): Promise<AttendanceConnectionTestResult> {
   return apiRequest<AttendanceConnectionTestResult>("/api/admin/attendance-settings/test", { method: "POST" });
+}
+
+export function testCardDbConnection(cardDb?: CardDbConfig): Promise<{ ok: boolean; message: string }> {
+  return apiRequest<{ ok: boolean; message: string }>("/api/admin/attendance-settings/card-test", {
+    method: "POST",
+    body: cardDb ? { card_db: cardDb } : {},
+  });
 }
 
 export interface ManagerAttendanceSyncResult {
@@ -45,16 +63,36 @@ export function managerAttendanceUnmatchedCsvUrl(syncRunId: number): string {
   return buildApiUrl(`/api/admin/manager-attendance/sync-runs/${syncRunId}/unmatched.csv`);
 }
 
+export function syncEmployeeAttendance(accountSetId: number): Promise<ManagerAttendanceSyncResult> {
+  return apiRequest<ManagerAttendanceSyncResult>(`/api/admin/account-sets/${accountSetId}/employee-attendance/sync`, { method: "POST" });
+}
+
+export function fetchEmployeeAttendanceSyncHistory(accountSetId: number): Promise<ManagerAttendanceSyncResult[]> {
+  return apiRequest<ManagerAttendanceSyncResult[]>(`/api/admin/account-sets/${accountSetId}/employee-attendance/sync-history`);
+}
+
+export function cardAttendanceUnmatchedCsvUrl(syncRunId: number): string {
+  return buildApiUrl(`/api/admin/employee-attendance/sync-runs/${syncRunId}/unmatched.csv`);
+}
+
 export function fetchAttendanceSettings(): Promise<AdminAttendanceSettings> {
   return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings");
 }
 
 export function saveAttendanceSettings(
   source: AdminAttendanceSettings["manager_attendance_source"],
+  options?: {
+    employee_attendance_source?: AdminAttendanceSettings["employee_attendance_source"];
+    card_db?: CardDbConfig;
+  },
 ): Promise<AdminAttendanceSettings> {
   return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", {
     method: "PUT",
-    body: { manager_attendance_source: source },
+    body: {
+      manager_attendance_source: source,
+      ...(options?.employee_attendance_source ? { employee_attendance_source: options.employee_attendance_source } : {}),
+      ...(options?.card_db ? { card_db: options.card_db } : {}),
+    },
   });
 }
 
