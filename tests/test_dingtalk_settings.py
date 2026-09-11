@@ -64,11 +64,14 @@ class DingTalkSettingsTests(unittest.TestCase):
         )
 
     def test_settings_default_and_valid_updates_are_persisted(self):
+        with patch.dict(os.environ, {"DINGTALK_CLIENT_ID": "", "DINGTALK_CLIENT_SECRET": "", "DINGTALK_CORP_ID": ""}):
+            response = self.client.get("/api/admin/attendance-settings")
+            self.assertEqual(response.status_code, 401)
+
         self._login()
-        headers = {"X-Setup-Password": "testpass"}
 
         with patch.dict(os.environ, {"DINGTALK_CLIENT_ID": "", "DINGTALK_CLIENT_SECRET": "", "DINGTALK_CORP_ID": ""}):
-            response = self.client.get("/api/admin/attendance-settings", headers=headers)
+            response = self.client.get("/api/admin/attendance-settings")
             self.assertEqual(response.status_code, 200)
             payload = response.get_json()
             self.assertEqual(payload["manager_attendance_source"], "local")
@@ -78,14 +81,14 @@ class DingTalkSettingsTests(unittest.TestCase):
 
         with patch.dict(os.environ, {"DINGTALK_CLIENT_ID": "", "DINGTALK_CLIENT_SECRET": "", "DINGTALK_CORP_ID": ""}):
             response = self.client.put(
-                "/api/admin/attendance-settings", headers=headers, json={"manager_attendance_source": "dingtalk"}
+                "/api/admin/attendance-settings", json={"manager_attendance_source": "dingtalk"}
             )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.get_json()["manager_attendance_source"], "dingtalk")
             self.assertFalse(response.get_json()["dingtalk_configured"])
 
         response = self.client.put(
-            "/api/admin/attendance-settings", headers=headers, json={"manager_attendance_source": "local"}
+            "/api/admin/attendance-settings", json={"manager_attendance_source": "local"}
         )
         self.assertEqual(response.status_code, 200)
         with self.app.app_context():
@@ -93,10 +96,9 @@ class DingTalkSettingsTests(unittest.TestCase):
 
     def test_invalid_source_is_rejected_and_employee_mapping_is_nullable_and_non_secret(self):
         self._login()
-        headers = {"X-Setup-Password": "testpass"}
         with patch.dict(os.environ, {"DINGTALK_CLIENT_ID": "", "DINGTALK_CLIENT_SECRET": "", "DINGTALK_CORP_ID": ""}):
             response = self.client.put(
-                "/api/admin/attendance-settings", headers=headers, json={"manager_attendance_source": "remote"}
+                "/api/admin/attendance-settings", json={"manager_attendance_source": "remote"}
             )
             self.assertEqual(response.status_code, 400)
 
@@ -112,21 +114,20 @@ class DingTalkSettingsTests(unittest.TestCase):
 
     def test_attendance_connection_test_returns_sanitized_success_or_actionable_failure(self):
         self._login()
-        headers = {"X-Setup-Password": "testpass"}
         with patch("services.dingtalk_client.DingTalkClient.test_connection", return_value=True):
-            response = self.client.post("/api/admin/attendance-settings/test", headers=headers)
+            response = self.client.post("/api/admin/attendance-settings/test")
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["ok"])
         self.assertNotIn("secret", str(response.get_json()).lower())
 
         with patch("services.dingtalk_client.DingTalkClient.test_connection", side_effect=DingTalkClientError("钉钉考勤接口无访问权限，请检查应用权限")):
-            response = self.client.post("/api/admin/attendance-settings/test", headers=headers)
+            response = self.client.post("/api/admin/attendance-settings/test")
         self.assertEqual(response.status_code, 502)
         self.assertIn("访问权限", response.get_json()["message"])
         self.assertNotIn("secret", str(response.get_json()).lower())
 
         with patch("services.dingtalk_client.DingTalkClient.test_connection", side_effect=DingTalkClientError("DingTalk token request returned an error")):
-            response = self.client.post("/api/admin/attendance-settings/test", headers=headers)
+            response = self.client.post("/api/admin/attendance-settings/test")
         self.assertEqual(response.status_code, 502)
         self.assertIn("钉钉认证失败", response.get_json()["message"])
         self.assertNotIn("DingTalk token request", str(response.get_json()))

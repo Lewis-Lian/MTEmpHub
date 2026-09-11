@@ -19,9 +19,8 @@ export interface AdminAttendanceSettings {
 
 export interface AttendanceConnectionTestResult { ok: boolean; message: string; dingtalk_configured?: boolean }
 
-export function testAttendanceConnection(setupPassword?: string): Promise<AttendanceConnectionTestResult> {
-  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
-  return apiRequest<AttendanceConnectionTestResult>("/api/admin/attendance-settings/test", { method: "POST", headers });
+export function testAttendanceConnection(): Promise<AttendanceConnectionTestResult> {
+  return apiRequest<AttendanceConnectionTestResult>("/api/admin/attendance-settings/test", { method: "POST" });
 }
 
 export interface ManagerAttendanceSyncResult {
@@ -46,19 +45,15 @@ export function managerAttendanceUnmatchedCsvUrl(syncRunId: number): string {
   return buildApiUrl(`/api/admin/manager-attendance/sync-runs/${syncRunId}/unmatched.csv`);
 }
 
-export function fetchAttendanceSettings(setupPassword?: string): Promise<AdminAttendanceSettings> {
-  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
-  return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", { headers });
+export function fetchAttendanceSettings(): Promise<AdminAttendanceSettings> {
+  return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings");
 }
 
 export function saveAttendanceSettings(
   source: AdminAttendanceSettings["manager_attendance_source"],
-  setupPassword?: string,
 ): Promise<AdminAttendanceSettings> {
-  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
   return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", {
     method: "PUT",
-    headers,
     body: { manager_attendance_source: source },
   });
 }

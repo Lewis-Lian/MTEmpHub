@@ -138,7 +138,7 @@ def _dingtalk_credentials_configured() -> bool:
 
 
 @api_admin_bp.get("/attendance-settings")
-@setup_required
+@admin_required
 def attendance_settings():
     return jsonify({
         "manager_attendance_source": SystemSetting.get_value("manager_attendance_source", "local"),
@@ -147,7 +147,7 @@ def attendance_settings():
 
 
 @api_admin_bp.put("/attendance-settings")
-@setup_required
+@admin_required
 def save_attendance_settings():
     data = request.get_json(silent=True) or {}
     source = str(data.get("manager_attendance_source", "")).strip()
@@ -163,7 +163,7 @@ def save_attendance_settings():
 
 
 @api_admin_bp.post("/attendance-settings/test")
-@setup_required
+@admin_required
 def test_attendance_settings():
     """Validate DingTalk credentials without exposing them."""
     from services.dingtalk_client import DingTalkClient, DingTalkClientError

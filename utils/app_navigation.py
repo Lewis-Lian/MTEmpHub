@@ -220,6 +220,13 @@ MODULES: list[dict[str, Any]] = [
                 "admin_only": True,
                 "description": "查看被限制登录的账号并手动解锁。",
             },
+            {
+                "key": "attendance_source",
+                "label": "更多设置",
+                "href": "/admin/attendance-source",
+                "admin_only": True,
+                "description": "选择管理人员考勤数据来源并执行钉钉同步。",
+            },
         ],
     },
 ]
