@@ -251,4 +251,25 @@ describe("QueryHomePage 首页考勤日历", () => {
     });
     expect(screen.getByText("请假与外勤类型占比")).toBeInTheDocument();
   });
+
+  it("首页日历不显示手工修正角点，仅呈现修正后状态", async () => {
+    mockCalendar.mockResolvedValue({
+      ...calendarPayload,
+      month: "2026-05",
+      days: [
+        {
+          date: "2026-05-06", check_in_times: [], check_out_times: [], punch_count: 0,
+          actual_hours: 0, late_minutes: 0, early_leave_minutes: 0, is_half_day: false,
+          actual_attendance_days: 1, exception_reason: "", override: { status: "全勤" },
+        },
+      ],
+    });
+    render(<QueryHomePage />);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "2026-05-06" })).toHaveClass("is-bg-attendance");
+    });
+    expect(screen.queryByTitle("手工修正")).toBeNull();
+    expect(screen.queryByText("手工修正")).toBeNull();
+  });
 });

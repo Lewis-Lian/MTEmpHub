@@ -238,7 +238,7 @@ export default function QueryHomePage() {
               {calendarError ? (
                 <p className="qh-editorial-error">{calendarError}</p>
               ) : calendarData ? (
-                <AttendanceCalendarGrid data={calendarData} />
+                <AttendanceCalendarGrid data={calendarData} showOverrideDot={false} />
               ) : (
                 <LoadingState message="正在加载考勤日历..." variant="calendar" />
               )}

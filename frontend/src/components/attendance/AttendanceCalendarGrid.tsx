@@ -27,9 +27,11 @@ interface AttendanceCalendarGridProps {
   multiSelectedDates?: string[];
   /** 提供时点击格子走外部回调，不弹内部明细弹层 */
   onCellSelect?: (date: string) => void;
+  /** 是否渲染手工修正角点与图例项；首页等只呈现修正后状态的场景传 false */
+  showOverrideDot?: boolean;
 }
 
-export default function AttendanceCalendarGrid({ data, selectedDate, multiSelectedDates, onCellSelect }: AttendanceCalendarGridProps) {
+export default function AttendanceCalendarGrid({ data, selectedDate, multiSelectedDates, onCellSelect, showOverrideDot = true }: AttendanceCalendarGridProps) {
   const [internalSelectedDate, setInternalSelectedDate] = useState<string | null>(null);
   const cells = useMemo(() => buildCells(data), [data]);
   // selectedDate 传入（含 null）即由外部控制高亮；未传时组件内部自管理
@@ -91,7 +93,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
             >
               <div className="cal-day-number">{cell.dayOfMonth}</div>
               {/* 角点为纯视觉标记；格子的 aria-label 保持纯日期（弹窗测试按精确名称定位），修正值在选中后的面板中完整可读 */}
-              {override && <span aria-hidden="true" className="cal-override-dot" title="手工修正" />}
+              {showOverrideDot && override && <span aria-hidden="true" className="cal-override-dot" title="手工修正" />}
               {/* 红点为派生口径：当日未计入实际出勤天数（无刷卡或「不算」修正）即标记；修正「算」后消失 */}
               {cell.day?.actual_attendance_days === 0 && (
                 <span aria-hidden="true" className="cal-actual-off-dot" title="未计实勤" />
@@ -111,10 +113,12 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
         <span className="cal-badge cal-badge-evening">晚加班</span>
         <span className="cal-badge is-bg-attendance">出勤</span>
         <span className="cal-badge is-bg-absent">缺勤</span>
-        <span className="cal-badge">
-          <span aria-hidden="true" className="cal-override-dot cal-override-dot--static" />
-          手工修正
-        </span>
+        {showOverrideDot && (
+          <span className="cal-badge">
+            <span aria-hidden="true" className="cal-override-dot cal-override-dot--static" />
+            手工修正
+          </span>
+        )}
         <span className="cal-badge">
           <span aria-hidden="true" className="cal-actual-off-dot cal-actual-off-dot--static" />
           未计实勤
