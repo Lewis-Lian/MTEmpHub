@@ -20,6 +20,7 @@ export interface AdminEmployee {
   emp_no: string;
   name: string;
   card_no?: string | null;
+  dingtalk_user_id?: string | null;
   dept_id?: number | null;
   dept_name?: string;
   shift_no?: string;

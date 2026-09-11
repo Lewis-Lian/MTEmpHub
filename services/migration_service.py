@@ -15,10 +15,12 @@ MIGRATION_ORDER = [
     "users",
     "shifts",
     "employees",
+    "system_settings",
     "user_employee_assignments",
     "user_department_assignments",
     "employee_shift_assignments",
     "account_sets",
+    "dingtalk_sync_runs",
     "account_set_imports",
     "account_set_factory_rest_days",
     "daily_records",
@@ -90,9 +92,10 @@ def migrate_sqlite_to_mysql(sqlite_url: str, mysql_url: str) -> list[dict]:
                 continue
 
             columns = list(rows[0].keys())
-            col_names = ", ".join(columns)
+            quote = write_db.engine.dialect.identifier_preparer.quote
+            col_names = ", ".join(quote(column) for column in columns)
             placeholders = ", ".join([f":{c}" for c in columns])
-            insert_sql = text(f"INSERT INTO {table_name} ({col_names}) VALUES ({placeholders})")
+            insert_sql = text(f"INSERT INTO {quote(table_name)} ({col_names}) VALUES ({placeholders})")
 
             for i in range(0, len(rows), BATCH_SIZE):
                 batch = rows[i : i + BATCH_SIZE]
@@ -206,4 +209,3 @@ def migrate_mysql_to_sqlite(mysql_url: str, sqlite_url: str) -> list[dict]:
         write_db.session.commit()
 
     return results
-

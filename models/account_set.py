@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from . import db
+from .dingtalk_sync_run import DingTalkSyncRun
 
 
 class AccountSet(db.Model):
@@ -21,6 +22,11 @@ class AccountSet(db.Model):
     imports = db.relationship("AccountSetImport", back_populates="account_set", cascade="all, delete-orphan")
     factory_rest_entries = db.relationship(
         "AccountSetFactoryRestDay",
+        back_populates="account_set",
+        cascade="all, delete-orphan",
+    )
+    dingtalk_sync_runs = db.relationship(
+        "DingTalkSyncRun",
         back_populates="account_set",
         cascade="all, delete-orphan",
     )
