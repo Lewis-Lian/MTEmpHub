@@ -41,6 +41,18 @@ def ensure_schema_compatibility() -> None:
     inspector = inspect(db.engine)
     table_names = set(inspector.get_table_names())
 
+    # The legacy upgrade command intentionally does not depend on Alembic. Keep
+    # the DingTalk additions available to installations upgrading an older
+    # SQLite database in place.
+    if "system_settings" not in table_names:
+        from models.system_setting import SystemSetting
+
+        SystemSetting.__table__.create(bind=db.engine, checkfirst=True)
+    if "dingtalk_sync_runs" not in table_names and "account_sets" in table_names:
+        from models.dingtalk_sync_run import DingTalkSyncRun
+
+        DingTalkSyncRun.__table__.create(bind=db.engine, checkfirst=True)
+
     if "account_set_factory_rest_days" not in table_names:
         from models.account_set import AccountSetFactoryRestDay
 
@@ -105,6 +117,14 @@ def ensure_schema_compatibility() -> None:
         if "card_no" not in employee_columns:
             db.session.execute(text("ALTER TABLE employees ADD COLUMN card_no VARCHAR(50)"))
             db.session.commit()
+        if "dingtalk_user_id" not in employee_columns:
+            db.session.execute(text("ALTER TABLE employees ADD COLUMN dingtalk_user_id VARCHAR(100)"))
+            db.session.commit()
+            try:
+                db.session.execute(text("CREATE INDEX ix_employees_dingtalk_user_id ON employees(dingtalk_user_id)"))
+                db.session.commit()
+            except OperationalError:
+                db.session.rollback()
 
     account_set_columns = _get_column_names(inspector, "account_sets")
     if account_set_columns is not None:

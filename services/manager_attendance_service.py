@@ -9,12 +9,14 @@ from typing import Callable
 
 from models import db
 from models.account_set import AccountSet
+from models.dingtalk_sync_run import DingTalkSyncRun
 from models.employee import Employee
 from models.leave import LeaveRecord
 from models.manager_attendance_override import ManagerAttendanceOverride
 from models.monthly_report import MonthlyReport
 from models.manager_month_stat import ManagerMonthStat
 from models.overtime import OvertimeRecord
+from models.system_setting import SystemSetting
 from services.attendance_source_service import (
     MANAGER_STATS_CONTEXT,
     _effective_actual_attendance_day_value,
@@ -678,6 +680,15 @@ def build_manager_rows(
     month_days = _month_days(options.month)
     employee_ids = [employee.id for employee in employees]
     attendance_rows_by_employee = attendance_views_by_employee(options.month, employees, MANAGER_STATS_CONTEXT)
+    # DingTalk returns punch dates, so a completed sync need not cover every
+    # calendar day to replace the Excel monthly summary.
+    use_dingtalk_daily = (
+        SystemSetting.get_value("manager_attendance_source", "local") == "dingtalk"
+        and DingTalkSyncRun.query.filter(
+            DingTalkSyncRun.month == options.month,
+            DingTalkSyncRun.status.in_(["success", "partial"]),
+        ).first() is not None
+    )
     leave_rows_by_employee = _leave_rows_by_employee(employee_ids, options.month)
     overtime_rows_by_employee = _overtime_rows_by_employee(employee_ids, options.month)
     override_rows_by_employee = _override_rows_by_employee(employee_ids, options.month) if include_overrides else {}
@@ -694,12 +705,12 @@ def build_manager_rows(
     for emp_idx, employee in enumerate(employees):
         if progress_cb is not None:
             progress_cb(emp_idx + 1, total_employees)
-        raw = _monthly_report_raw(employee, options.month)
+        raw = {} if use_dingtalk_daily else _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
         attendance_rows = attendance_rows_by_employee.get(employee.id, [])
         daily_overrides = daily_override_by_emp.get(employee.id, {})
         leave_rows = leave_rows_by_employee.get(employee.id, [])
-        use_daily_attendance = manager_daily_data_complete(options.month, attendance_rows)
+        use_daily_attendance = use_dingtalk_daily or manager_daily_data_complete(options.month, attendance_rows)
         daily_attendance_values = manager_daily_attendance_values(
             options.month,
             attendance_rows,

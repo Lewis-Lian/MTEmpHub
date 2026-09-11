@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import csv
 import logging
 import os
+import re
 import subprocess
 from collections import defaultdict
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import date, datetime
 from typing import Any
 
@@ -27,6 +29,7 @@ from models.employee_shift import EmployeeShiftAssignment
 from models.shift import Shift
 from models.daily_record import DailyRecord
 from models.account_set import AccountSet, AccountSetFactoryRestDay, AccountSetImport
+from models.dingtalk_sync_run import DingTalkSyncRun
 from models.overtime import OvertimeRecord
 from models.annual_leave import AnnualLeave
 from models.manager_month_stat import ManagerMonthStat
@@ -46,6 +49,7 @@ from models.user import (
 from services.import_service import ImportService
 from services.calculation_progress_service import get_calc_progress, update_calc_progress
 from services.manager_attendance_service import ManagerAttendanceOptions, build_manager_rows
+from services.dingtalk_manager_attendance_service import sanitize_dingtalk_error
 from utils.helpers import parse_bool_zh
 
 
@@ -323,6 +327,7 @@ def _serialize_employee(employee: Employee) -> dict:
         "emp_no": employee.emp_no,
         "name": employee.name,
         "card_no": employee.card_no or None,
+        "dingtalk_user_id": employee.dingtalk_user_id or None,
         "is_manager": bool(employee.is_manager),
         "is_nursing": bool(employee.is_nursing),
         "employee_stats_attendance_source": employee.employee_stats_attendance_source or ATTENDANCE_SOURCE_EMPLOYEE,
@@ -614,6 +619,71 @@ def _ensure_account_set_unlocked(account_set: AccountSet | None, action_label: s
     if account_set and account_set.is_locked:
         return _locked_account_set_error(account_set, action_label)
     return None
+
+
+def _dingtalk_sync_response(result: dict | DingTalkSyncRun) -> dict:
+    if isinstance(result, DingTalkSyncRun):
+        payload = result.to_dict()
+    else:
+        payload = result
+    status = str(payload.get("status") or "failed")
+    messages = {
+        "success": "钉钉考勤同步成功",
+        "partial": "钉钉考勤同步完成，存在未匹配记录",
+        "failed": "钉钉考勤同步失败",
+    }
+    message = payload.get("message") or messages.get(status, messages["failed"])
+    if status == "failed":
+        error = payload.get("error")
+        message = sanitize_dingtalk_error(error) if error else str(message)
+    return {
+        "status": status,
+        "read_count": int(payload.get("read_count") or 0),
+        "imported_count": int(payload.get("imported_count") or 0),
+        "unmatched_count": int(payload.get("unmatched_count") or 0),
+        "unmatched": list(payload.get("unmatched") or []),
+        "sync_run_id": payload.get("sync_run_id"),
+        "message": str(message),
+    }
+
+
+def list_dingtalk_sync_history(account_set_id: int):
+    row = _require_model(AccountSet, account_set_id)
+    runs = (
+        DingTalkSyncRun.query.filter_by(account_set_id=row.id)
+        .order_by(DingTalkSyncRun.id.desc())
+        .all()
+    )
+    return jsonify([_dingtalk_sync_response(run) for run in runs])
+
+
+def download_dingtalk_unmatched_csv(sync_run_id: int):
+    run = _require_model(DingTalkSyncRun, sync_run_id)
+    text = StringIO(newline="")
+    writer = csv.writer(text)
+    writer.writerow(["钉钉工号", "姓名", "考勤日期"])
+    for item in run.unmatched or []:
+        writer.writerow([
+            _neutralize_csv_formula(item.get("emp_no", "")),
+            _neutralize_csv_formula(item.get("name", "")),
+            _neutralize_csv_formula(item.get("record_date", "")),
+        ])
+    output = BytesIO(("\ufeff" + text.getvalue()).encode("utf-8"))
+    return send_file(
+        output,
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=f"dingtalk-unmatched-{run.id}.csv",
+    )
+
+
+def _neutralize_csv_formula(value) -> str:
+    text = "" if value is None else str(value)
+    match = re.match(r"^(\s*)([=+\-@])", text)
+    if match:
+        prefix = match.group(1)
+        text = f"{prefix}'{text[len(prefix):]}"
+    return text
 
 
 def _user_display_name(user: User | None) -> str:
@@ -1030,14 +1100,38 @@ def calculate_account_set(account_set_id: int):
     if locked_error:
         return locked_error
     mode = (request.args.get("mode") or "all").strip()
+    from models.system_setting import SystemSetting
+
+    uses_dingtalk_manager_attendance = (
+        mode in {"manager", "all"}
+        and SystemSetting.get_value("manager_attendance_source", "local") == "dingtalk"
+    )
+    dingtalk_sync = None
+    if uses_dingtalk_manager_attendance:
+        from services.dingtalk_client import DingTalkClient
+        from services.dingtalk_manager_attendance_service import sync_dingtalk_manager_attendance
+
+        dingtalk_sync = _dingtalk_sync_response(
+            sync_dingtalk_manager_attendance(row.id, row.month, DingTalkClient())
+        )
+        if dingtalk_sync["status"] == "failed":
+            return jsonify(dingtalk_sync), 502
+
     records_query = AccountSetImport.query.filter_by(account_set_id=row.id)
     if mode == "employee":
         records_query = records_query.filter(AccountSetImport.file_type.in_(["leave", "overtime", "monthly", "daily"]))
     elif mode == "manager":
-        records_query = records_query.filter(AccountSetImport.file_type.in_(["leave", "overtime", "manager_monthly", "manager_daily"]))
+        file_types = ["leave", "overtime"]
+        if not uses_dingtalk_manager_attendance:
+            file_types.extend(["manager_monthly", "manager_daily"])
+        records_query = records_query.filter(AccountSetImport.file_type.in_(file_types))
+    elif uses_dingtalk_manager_attendance:
+        records_query = records_query.filter(
+            ~AccountSetImport.file_type.in_(["manager_monthly", "manager_daily"])
+        )
     records = records_query.order_by(AccountSetImport.id.asc()).all()
 
-    if not records:
+    if not records and not uses_dingtalk_manager_attendance:
         return jsonify({"status": "error", "message": "该账套暂无可计算文件", "mode": mode}), 400
 
     success = 0
@@ -1045,7 +1139,8 @@ def calculate_account_set(account_set_id: int):
     results = []
 
     # ---- 计算进度（写入进度文件，前端轮询）----
-    stage_count = len(records) + (1 if mode == "manager" else 0)
+    sync_manager_stats = mode == "manager" or (mode == "all" and uses_dingtalk_manager_attendance)
+    stage_count = len(records) + (1 if sync_manager_stats else 0)
     last_percent = -100
 
     def _report(stage_index: int, done: int, total: int, stage: str) -> None:
@@ -1102,7 +1197,7 @@ def calculate_account_set(account_set_id: int):
         db.session.commit()
 
     manager_stats_sync = None
-    if mode == "manager" and failed == 0:
+    if sync_manager_stats and failed == 0:
         try:
             manager_options = ManagerAttendanceOptions(
                 month=row.month,
@@ -1137,6 +1232,7 @@ def calculate_account_set(account_set_id: int):
             "total": len(records),
             "success": success,
             "failed": failed,
+            "dingtalk_sync": dingtalk_sync,
             "manager_stats_sync": manager_stats_sync,
             "results": results,
         }
@@ -2681,4 +2777,3 @@ def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[di
             }
         )
     return {"rows": rows, "month": month}, 200
-

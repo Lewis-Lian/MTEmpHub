@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, buildApiUrl } from "./client";
 import { ApiError, apiUploadRequest } from "./client";
 import type {
   AdminAccountSet,
@@ -11,6 +11,57 @@ import type {
   AdminShift,
 } from "../types/admin";
 import type { AttendanceCalendarData } from "../types/query";
+
+export interface AdminAttendanceSettings {
+  manager_attendance_source: "local" | "dingtalk";
+  dingtalk_configured: boolean;
+}
+
+export interface AttendanceConnectionTestResult { ok: boolean; message: string; dingtalk_configured?: boolean }
+
+export function testAttendanceConnection(setupPassword?: string): Promise<AttendanceConnectionTestResult> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<AttendanceConnectionTestResult>("/api/admin/attendance-settings/test", { method: "POST", headers });
+}
+
+export interface ManagerAttendanceSyncResult {
+  status: "success" | "partial" | "failed";
+  read_count: number;
+  imported_count: number;
+  unmatched_count: number;
+  unmatched: Array<{ emp_no?: string; name?: string; record_date?: string }>;
+  sync_run_id: number | null;
+  message: string;
+}
+
+export function syncManagerAttendance(accountSetId: number): Promise<ManagerAttendanceSyncResult> {
+  return apiRequest<ManagerAttendanceSyncResult>(`/api/admin/account-sets/${accountSetId}/manager-attendance/sync`, { method: "POST" });
+}
+
+export function fetchManagerAttendanceSyncHistory(accountSetId: number): Promise<ManagerAttendanceSyncResult[]> {
+  return apiRequest<ManagerAttendanceSyncResult[]>(`/api/admin/account-sets/${accountSetId}/manager-attendance/sync-history`);
+}
+
+export function managerAttendanceUnmatchedCsvUrl(syncRunId: number): string {
+  return buildApiUrl(`/api/admin/manager-attendance/sync-runs/${syncRunId}/unmatched.csv`);
+}
+
+export function fetchAttendanceSettings(setupPassword?: string): Promise<AdminAttendanceSettings> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", { headers });
+}
+
+export function saveAttendanceSettings(
+  source: AdminAttendanceSettings["manager_attendance_source"],
+  setupPassword?: string,
+): Promise<AdminAttendanceSettings> {
+  const headers = setupPassword ? { "X-Setup-Password": setupPassword } : undefined;
+  return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", {
+    method: "PUT",
+    headers,
+    body: { manager_attendance_source: source },
+  });
+}
 
 let adminBootstrapPromise: Promise<AdminBootstrap> | null = null;
 

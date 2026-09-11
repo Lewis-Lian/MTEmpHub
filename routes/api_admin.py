@@ -15,6 +15,7 @@ from routes.admin_core import (
     _accessible_dept_ids_set,
     activate_account_set,
     calculate_account_set,
+    download_dingtalk_unmatched_csv,
     batch_operate_departments,
     batch_operate_employees,
     create_department,
@@ -30,6 +31,7 @@ from routes.admin_core import (
     employees_list,
     get_account_set_calc_progress,
     list_account_sets,
+    list_dingtalk_sync_history,
     list_shifts,
     lock_account_set,
     reinstate_employee,
@@ -58,6 +60,7 @@ from routes.admin_imports import (
     export_manager_annual_leave,
     export_manager_overtime,
     import_raw_files as admin_import_raw_files,
+    sync_manager_attendance as admin_sync_manager_attendance,
 )
 from routes.admin_accounts import (
     disabled_users_list_api,
@@ -95,6 +98,7 @@ from routes.admin_attendance_overrides import (
     import_manager_attendance_overrides,
 )
 from routes.auth_helpers import admin_required
+from models.system_setting import SystemSetting
 
 
 api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
@@ -121,6 +125,59 @@ def setup_required(f):
             
         return f(*args, **kwargs)
     return decorated_function
+
+
+def _dingtalk_credentials_configured() -> bool:
+    from utils.env_utils import read_env
+
+    env_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env")
+    env_data = read_env(env_path)
+    return all((os.getenv(name) or env_data.get(name, "")).strip() for name in (
+        "DINGTALK_CLIENT_ID", "DINGTALK_CLIENT_SECRET", "DINGTALK_CORP_ID"
+    ))
+
+
+@api_admin_bp.get("/attendance-settings")
+@setup_required
+def attendance_settings():
+    return jsonify({
+        "manager_attendance_source": SystemSetting.get_value("manager_attendance_source", "local"),
+        "dingtalk_configured": _dingtalk_credentials_configured(),
+    })
+
+
+@api_admin_bp.put("/attendance-settings")
+@setup_required
+def save_attendance_settings():
+    data = request.get_json(silent=True) or {}
+    source = str(data.get("manager_attendance_source", "")).strip()
+    if source not in {"local", "dingtalk"}:
+        return jsonify({"error": "manager_attendance_source 必须是 local 或 dingtalk"}), 400
+    SystemSetting.set_value("manager_attendance_source", source)
+    from models import db
+    db.session.commit()
+    return jsonify({
+        "manager_attendance_source": source,
+        "dingtalk_configured": _dingtalk_credentials_configured(),
+    })
+
+
+@api_admin_bp.post("/attendance-settings/test")
+@setup_required
+def test_attendance_settings():
+    """Validate DingTalk credentials without exposing them."""
+    from services.dingtalk_client import DingTalkClient, DingTalkClientError
+    from services.dingtalk_manager_attendance_service import sanitize_dingtalk_error
+
+    try:
+        DingTalkClient().test_connection()
+    except DingTalkClientError as exc:
+        if str(exc) == "DingTalk configuration is missing":
+            message = "未配置钉钉凭证，请先配置 DINGTALK_CLIENT_ID、DINGTALK_CLIENT_SECRET 与 DINGTALK_CORP_ID"
+        else:
+            message = sanitize_dingtalk_error(exc)
+        return jsonify({"ok": False, "message": message}), 502
+    return jsonify({"ok": True, "message": "钉钉连接成功", "dingtalk_configured": True})
 
 
 @api_admin_bp.get("/bootstrap")
@@ -793,6 +850,24 @@ def account_sets_delete(account_set_id: int):
 @admin_required
 def account_sets_calculate(account_set_id: int):
     return calculate_account_set(account_set_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/manager-attendance/sync")
+@admin_required
+def account_set_manager_attendance_sync(account_set_id: int):
+    return admin_sync_manager_attendance(account_set_id)
+
+
+@api_admin_bp.get("/account-sets/<int:account_set_id>/manager-attendance/sync-history")
+@admin_required
+def account_set_manager_attendance_sync_history(account_set_id: int):
+    return list_dingtalk_sync_history(account_set_id)
+
+
+@api_admin_bp.get("/manager-attendance/sync-runs/<int:sync_run_id>/unmatched.csv")
+@admin_required
+def manager_attendance_sync_unmatched_csv(sync_run_id: int):
+    return download_dingtalk_unmatched_csv(sync_run_id)
 
 
 @api_admin_bp.post("/account-sets/<int:account_set_id>/reset-imported")

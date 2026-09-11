@@ -10,6 +10,9 @@ from flask import current_app, jsonify, request, send_file
 from sqlalchemy import func, or_
 
 from routes.auth_helpers import admin_required
+from models.system_setting import SystemSetting
+from services.dingtalk_client import DingTalkClient
+from services.dingtalk_manager_attendance_service import sync_dingtalk_manager_attendance
 
 logger = logging.getLogger(__name__)
 
@@ -211,6 +214,33 @@ def import_raw_files():
             "results": results,
         }
     )
+
+
+@admin_required
+def sync_manager_attendance(account_set_id: int):
+    from routes import admin_core as admin_module
+
+    account_set = admin_module._require_model(admin_module.AccountSet, account_set_id)
+    locked_error = admin_module._ensure_account_set_unlocked(account_set, "同步管理人员考勤")
+    if locked_error:
+        return locked_error
+    source = SystemSetting.get_value("manager_attendance_source", "local")
+    if source != "dingtalk":
+        return jsonify(
+            {
+                "status": "error",
+                "read_count": 0,
+                "imported_count": 0,
+                "unmatched_count": 0,
+                "unmatched": [],
+                "sync_run_id": None,
+                "message": "管理人员考勤来源为本地导入，请使用文件上传接口",
+            }
+        ), 409
+
+    result = sync_dingtalk_manager_attendance(account_set.id, account_set.month, DingTalkClient())
+    response = admin_module._dingtalk_sync_response(result)
+    return jsonify(response), 502 if response["status"] == "failed" else 200
 
 
 @admin_required
