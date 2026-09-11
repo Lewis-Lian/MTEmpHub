@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   getDatabaseSettings,
@@ -9,15 +9,6 @@ import {
   switchToSqlite,
   switchToMysql,
   type DatabaseSettings,
-  fetchAttendanceSettings,
-  testAttendanceConnection,
-  saveAttendanceSettings,
-  fetchAccountSets,
-  syncManagerAttendance,
-  fetchManagerAttendanceSyncHistory,
-  managerAttendanceUnmatchedCsvUrl,
-  type AdminAttendanceSettings,
-  type ManagerAttendanceSyncResult,
 } from "../../api/admin";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
@@ -25,7 +16,6 @@ import QueryTable from "../../components/query/QueryTable";
 import { useNotification } from "../../components/feedback/Notification";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { Link } from "react-router-dom";
-import { fetchMe, type AuthUser } from "../../api/auth";
 
 export default function DatabaseSettingsPage() {
   const notification = useNotification();
@@ -50,19 +40,6 @@ export default function DatabaseSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [migrating, setMigrating] = useState(false);
   const [migrationResults, setMigrationResults] = useState<Array<{ table: string; rows: number; status: string }> | null>(null);
-  const [attendanceSettings, setAttendanceSettings] = useState<AdminAttendanceSettings | null>(null);
-  const [attendanceAccounts, setAttendanceAccounts] = useState<Array<{ id: number; month: string; name: string; is_active?: boolean }>>([]);
-  const [selectedAttendanceAccount, setSelectedAttendanceAccount] = useState<number | null>(null);
-  const [attendanceLoading, setAttendanceLoading] = useState(false);
-  const [attendanceSaving, setAttendanceSaving] = useState(false);
-  const [attendanceSyncing, setAttendanceSyncing] = useState(false);
-  const [attendanceResult, setAttendanceResult] = useState<ManagerAttendanceSyncResult | null>(null);
-  const [attendanceError, setAttendanceError] = useState("");
-  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState("");
-  const requestSequence = useRef(0);
 
   async function handleUnlock() {
     if (!setupPassword) {
@@ -80,37 +57,9 @@ export default function DatabaseSettingsPage() {
       if (cfg.username) setUsername(cfg.username);
       if (cfg.password) setPassword(cfg.password);
       if (cfg.database) setDatabase(cfg.database);
-      
+
       setUnlocked(true);
       setLoadError("");
-      setAttendanceLoading(true);
-      try {
-        const attendance = await fetchAttendanceSettings(setupPassword);
-        setAttendanceSettings(attendance);
-        try {
-          const user = await fetchMe();
-          setAuthUser(user);
-          if (user.role === "admin") {
-            try {
-              const accounts = await fetchAccountSets();
-              setAttendanceAccounts(accounts);
-              setSelectedAttendanceAccount(accounts.find((account) => account.is_active)?.id ?? accounts[0]?.id ?? null);
-            } catch (err: any) {
-              if (err?.status === 401 || err?.status === 403) {
-                setAuthUser(null);
-                setAuthChecked(true);
-              }
-              setAttendanceError(err instanceof Error ? err.message : "账套加载失败");
-            }
-          }
-        } catch {
-          setAuthUser(null);
-        } finally { setAuthChecked(true); }
-      } catch (err: any) {
-        setAttendanceError(err instanceof Error ? err.message : "考勤设置加载失败");
-      } finally {
-        setAttendanceLoading(false);
-      }
     } catch (err: any) {
       if (err.status === 401 || err.status === 403) {
         setUnlockError(err.message || "密码错误");
@@ -137,82 +86,6 @@ export default function DatabaseSettingsPage() {
       notification.error(err instanceof Error ? err.message : defaultMsg);
     }
   }
-
-  async function handleAttendanceSourceChange(source: AdminAttendanceSettings["manager_attendance_source"]) {
-    if (!attendanceSettings || source === attendanceSettings.manager_attendance_source) return;
-    setAttendanceSaving(true);
-    try {
-      const result = await saveAttendanceSettings(source, setupPassword);
-      setAttendanceSettings(result);
-      notification.success("考勤数据源已保存");
-    } catch (err: any) {
-      handleApiError(err, "保存考勤数据源失败");
-    } finally {
-      setAttendanceSaving(false);
-    }
-  }
-
-  async function handleAttendanceConnectionTest() {
-    setAttendanceLoading(true);
-    try {
-      const result = await testAttendanceConnection(setupPassword);
-      notification[result.ok ? "success" : "error"](result.message || (result.ok ? "钉钉连接成功" : "连接失败"));
-    } catch (err: any) {
-      if (err?.status === 401 || err?.status === 403) {
-        handleApiError(err, "连接测试失败");
-        return;
-      }
-      const message = err instanceof Error ? err.message : "连接测试失败";
-      notification.error(/secret|token|client[_-]?id|corp[_-]?id/i.test(message) ? "连接测试失败，请检查钉钉配置" : message);
-    } finally {
-      setAttendanceLoading(false);
-    }
-  }
-
-  async function handleAttendanceSync() {
-    if (authUser?.role !== "admin" || !selectedAttendanceAccount) return;
-    setAttendanceSyncing(true);
-    setAttendanceResult(null);
-    setHistoryLoading(false);
-    setHistoryError("");
-    const sequence = ++requestSequence.current;
-    try {
-      const result = await syncManagerAttendance(selectedAttendanceAccount);
-      if (sequence !== requestSequence.current) return;
-      setAttendanceResult(result);
-      if (result.status === "success") notification.success("管理人员考勤同步成功");
-      else if (result.status === "partial") notification.warning(result.message || "同步完成，但存在未匹配记录");
-      else notification.error(result.message || "同步失败");
-    } catch (err: any) {
-      handleAdminApiError(err, "管理人员考勤同步失败");
-    } finally {
-      setAttendanceSyncing(false);
-    }
-  }
-
-  function handleAdminApiError(err: any, defaultMsg: string) {
-    if (err?.status === 401 || err?.status === 403) {
-      setAuthUser(null);
-      setAuthChecked(true);
-      notification.warning("管理员登录已过期，请重新登录后使用同步功能");
-    } else {
-      notification.error(err instanceof Error ? err.message : defaultMsg);
-    }
-  }
-
-  useEffect(() => {
-    if (authUser?.role !== "admin" || !selectedAttendanceAccount) return;
-    const sequence = ++requestSequence.current;
-    setAttendanceResult(null);
-    setHistoryLoading(true);
-    setHistoryError("");
-    let active = true;
-    fetchManagerAttendanceSyncHistory(selectedAttendanceAccount)
-      .then((history) => { if (active && sequence === requestSequence.current) setAttendanceResult(history[0] ?? null); })
-      .catch((err) => { if (active && sequence === requestSequence.current) { if (err?.status === 401 || err?.status === 403) { setAuthUser(null); setAuthChecked(true); setHistoryError(""); } else { setAttendanceResult(null); setHistoryError(err instanceof Error ? err.message : "同步历史加载失败"); } } })
-      .finally(() => { if (active && sequence === requestSequence.current) setHistoryLoading(false); });
-    return () => { active = false; };
-  }, [authUser?.role, selectedAttendanceAccount]);
 
   async function handleTest() {
     setTesting(true);
@@ -452,56 +325,7 @@ export default function DatabaseSettingsPage() {
         </div>
       </section>
 
-      {/* 区域三：考勤数据源 */}
-      <section className="legacy-surface admin-resource-panel" style={{ marginBottom: 24 }}>
-        <div className="admin-resource-panel-head">
-          <div>
-            <p className="admin-resource-panel-kicker">管理人员考勤</p>
-            <p className="admin-resource-panel-title">考勤数据源</p>
-            <p className="admin-resource-panel-description">选择本地导入或钉钉同步。系统不会在页面显示任何钉钉密钥。</p>
-          </div>
-        </div>
-        {attendanceLoading && <p style={{ padding: "0 24px" }}>正在检查连接...</p>}
-        {attendanceError && <p style={{ padding: "0 24px", color: "#dc2626" }}>{attendanceError}</p>}
-        {attendanceSettings && <div style={{ padding: "0 24px 16px" }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="admin-text-sm">数据源：</span>
-            {(["local", "dingtalk"] as const).map((source) => (
-              <button key={source} type="button" disabled={attendanceSaving} onClick={() => handleAttendanceSourceChange(source)} style={{ ...btnStyle, background: attendanceSettings.manager_attendance_source === source ? "#4f46e5" : "#fff", color: attendanceSettings.manager_attendance_source === source ? "#fff" : "#111827" }}>
-                {source === "local" ? "本地导入" : "钉钉"}
-              </button>
-            ))}
-            <button type="button" onClick={handleAttendanceConnectionTest} disabled={attendanceLoading} style={btnStyle}>连接测试</button>
-            <span style={{ color: attendanceSettings.dingtalk_configured ? "#059669" : "#b45309", fontSize: 14 }}>{attendanceSettings.dingtalk_configured ? "钉钉凭证已配置" : "未配置钉钉凭证"}</span>
-          </div>
-          {!authChecked && <p style={{ color: "#6b7280", fontSize: 14 }}>正在检查管理员权限...</p>}
-          {authChecked && authUser?.role !== "admin" && <p style={{ color: "#b45309", fontSize: 14 }}>管理人员同步需要管理员登录，请先登录后再使用同步与账套控制。</p>}
-          {authUser?.role === "admin" && <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 16, flexWrap: "wrap" }}>
-            <label className="admin-text-sm" htmlFor="attendance-account-set">账套：</label>
-            <select id="attendance-account-set" value={selectedAttendanceAccount ?? ""} onChange={(event) => setSelectedAttendanceAccount(event.target.value ? Number(event.target.value) : null)} style={inputStyle}>
-              <option value="">请选择账套</option>
-              {attendanceAccounts.map((account) => <option key={account.id} value={account.id}>{account.name || account.month}</option>)}
-            </select>
-            <button type="button" onClick={handleAttendanceSync} disabled={attendanceSyncing || !selectedAttendanceAccount || attendanceSettings.manager_attendance_source !== "dingtalk"} style={{ ...btnStyle, background: attendanceSyncing ? "#9ca3af" : "#2563eb", color: "#fff" }}>{attendanceSyncing ? "同步中..." : "同步管理人员考勤"}</button>
-          </div>}
-          {authUser?.role === "admin" && authChecked && attendanceAccounts.length === 0 && <p style={{ color: "#6b7280", fontSize: 14 }}>暂无可用账套。</p>}
-          {authUser?.role === "admin" && historyLoading && <p style={{ color: "#6b7280", fontSize: 14 }}>正在加载最近同步记录...</p>}
-          {authUser?.role === "admin" && historyError && <p style={{ color: "#dc2626", fontSize: 14 }}>{historyError}</p>}
-          {authUser?.role === "admin" && !historyLoading && !historyError && !attendanceResult && <p style={{ color: "#6b7280", fontSize: 14 }}>暂无同步记录。</p>}
-          {attendanceResult && <div style={{ marginTop: 16 }}>
-            <p style={{ margin: "0 0 8px", color: attendanceResult.status === "failed" ? "#dc2626" : attendanceResult.unmatched_count ? "#b45309" : "#059669" }}>
-              {attendanceResult.status === "partial" ? `同步完成，但有 ${attendanceResult.unmatched_count} 条未匹配记录` : attendanceResult.status === "success" ? "同步成功" : attendanceResult.message}
-            </p>
-            <p style={{ fontSize: 14, color: "#4b5563" }}>读取 {attendanceResult.read_count} 条，导入 {attendanceResult.imported_count} 条，未匹配 {attendanceResult.unmatched_count} 条</p>
-            {attendanceResult.unmatched_count > 0 && <>
-              <QueryTable headers={["钉钉工号", "姓名", "考勤日期"]} rows={attendanceResult.unmatched.map((item) => [item.emp_no || "—", item.name || "—", item.record_date || "—"])} />
-              {attendanceResult.sync_run_id && <a href={managerAttendanceUnmatchedCsvUrl(attendanceResult.sync_run_id)} download style={{ display: "inline-block", marginTop: 12, color: "#2563eb" }}>下载未匹配 CSV</a>}
-            </>}
-          </div>}
-        </div>}
-      </section>
-
-      {/* 区域四：数据迁移 */}
+      {/* 区域三：数据迁移 */}
       <section className="legacy-surface admin-resource-panel">
         <div className="admin-resource-panel-head">
           <div>

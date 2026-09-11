@@ -117,6 +117,10 @@ export const ClockCheckIcon = icon(
   "M10 3a7 7 0 107 7M10 6v4.5l3 1.5M13.5 15.5l2 2 3.5-4.5"
 );
 
+export const SlidersIcon = icon(
+  "M3 5h4.5M11.5 5H17M9 2.5v5M3 10h5.5M13.5 10H17M11 7.5v5M3 15h2.5M10.5 15H17M7 12.5v5"
+);
+
 /* ── 模块 slug → 图标映射 ── */
 
 const moduleIconMap: Record<string, React.FC<IconProps>> = {
@@ -153,6 +157,7 @@ const entryIconMap: Record<string, React.FC<IconProps>> = {
   manager_annual_leave: CalendarIcon,
   accounts: UserCogIcon,
   disabled_users: UserXIcon,
+  attendance_source: SlidersIcon,
   database_settings: DatabaseIcon,
 };
 
