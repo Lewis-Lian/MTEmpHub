@@ -686,6 +686,7 @@ def build_manager_rows(
         SystemSetting.get_value("manager_attendance_source", "local") == "dingtalk"
         and DingTalkSyncRun.query.filter(
             DingTalkSyncRun.month == options.month,
+            DingTalkSyncRun.source == "dingtalk",
             DingTalkSyncRun.status.in_(["success", "partial"]),
         ).first() is not None
     )

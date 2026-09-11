@@ -621,21 +621,22 @@ def _ensure_account_set_unlocked(account_set: AccountSet | None, action_label: s
     return None
 
 
-def _dingtalk_sync_response(result: dict | DingTalkSyncRun) -> dict:
+def _dingtalk_sync_response(result: dict | DingTalkSyncRun, *, messages=None, sanitizer=None) -> dict:
     if isinstance(result, DingTalkSyncRun):
         payload = result.to_dict()
     else:
         payload = result
     status = str(payload.get("status") or "failed")
-    messages = {
+    messages = messages or {
         "success": "钉钉考勤同步成功",
         "partial": "钉钉考勤同步完成，存在未匹配记录",
         "failed": "钉钉考勤同步失败",
     }
+    sanitizer = sanitizer or sanitize_dingtalk_error
     message = payload.get("message") or messages.get(status, messages["failed"])
     if status == "failed":
         error = payload.get("error")
-        message = sanitize_dingtalk_error(error) if error else str(message)
+        message = sanitizer(error) if error else str(message)
     return {
         "status": status,
         "read_count": int(payload.get("read_count") or 0),
@@ -647,21 +648,49 @@ def _dingtalk_sync_response(result: dict | DingTalkSyncRun) -> dict:
     }
 
 
+def _card_sync_response(result: dict | DingTalkSyncRun) -> dict:
+    from services.card_db_client import sanitize_card_error
+
+    return _dingtalk_sync_response(
+        result,
+        messages={
+            "success": "考勤机考勤同步成功",
+            "partial": "考勤机考勤同步完成，存在未匹配记录",
+            "failed": "考勤机考勤同步失败",
+        },
+        sanitizer=sanitize_card_error,
+    )
+
+
 def list_dingtalk_sync_history(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
     runs = (
-        DingTalkSyncRun.query.filter_by(account_set_id=row.id)
+        DingTalkSyncRun.query.filter_by(account_set_id=row.id, source="dingtalk")
         .order_by(DingTalkSyncRun.id.desc())
         .all()
     )
     return jsonify([_dingtalk_sync_response(run) for run in runs])
 
 
+def list_card_sync_history(account_set_id: int):
+    row = _require_model(AccountSet, account_set_id)
+    runs = (
+        DingTalkSyncRun.query.filter_by(account_set_id=row.id, source="card")
+        .order_by(DingTalkSyncRun.id.desc())
+        .all()
+    )
+    return jsonify([_card_sync_response(run) for run in runs])
+
+
 def download_dingtalk_unmatched_csv(sync_run_id: int):
     run = _require_model(DingTalkSyncRun, sync_run_id)
+    if run.source == "card":
+        emp_no_header, file_prefix = "考勤机工号", "card-unmatched"
+    else:
+        emp_no_header, file_prefix = "钉钉工号", "dingtalk-unmatched"
     text = StringIO(newline="")
     writer = csv.writer(text)
-    writer.writerow(["钉钉工号", "姓名", "考勤日期"])
+    writer.writerow([emp_no_header, "姓名", "考勤日期"])
     for item in run.unmatched or []:
         writer.writerow([
             _neutralize_csv_formula(item.get("emp_no", "")),
@@ -673,7 +702,7 @@ def download_dingtalk_unmatched_csv(sync_run_id: int):
         output,
         mimetype="text/csv",
         as_attachment=True,
-        download_name=f"dingtalk-unmatched-{run.id}.csv",
+        download_name=f"{file_prefix}-{run.id}.csv",
     )
 
 
@@ -1117,21 +1146,43 @@ def calculate_account_set(account_set_id: int):
         if dingtalk_sync["status"] == "failed":
             return jsonify(dingtalk_sync), 502
 
+    uses_card_employee_attendance = (
+        mode in {"employee", "all"}
+        and SystemSetting.get_value("employee_attendance_source", "local") == "card_db"
+    )
+    card_sync = None
+    if uses_card_employee_attendance:
+        from services.card_attendance_sync_service import sync_card_attendance
+        from services.card_db_client import CardDBClient, card_db_config_from_settings
+
+        card_sync = _card_sync_response(
+            sync_card_attendance(row.id, row.month, CardDBClient(card_db_config_from_settings()))
+        )
+        if card_sync["status"] == "failed":
+            return jsonify(card_sync), 502
+
     records_query = AccountSetImport.query.filter_by(account_set_id=row.id)
     if mode == "employee":
-        records_query = records_query.filter(AccountSetImport.file_type.in_(["leave", "overtime", "monthly", "daily"]))
+        file_types = ["leave", "overtime", "monthly"]
+        if not uses_card_employee_attendance:
+            file_types.append("daily")
+        records_query = records_query.filter(AccountSetImport.file_type.in_(file_types))
     elif mode == "manager":
         file_types = ["leave", "overtime"]
         if not uses_dingtalk_manager_attendance:
             file_types.extend(["manager_monthly", "manager_daily"])
         records_query = records_query.filter(AccountSetImport.file_type.in_(file_types))
-    elif uses_dingtalk_manager_attendance:
-        records_query = records_query.filter(
-            ~AccountSetImport.file_type.in_(["manager_monthly", "manager_daily"])
-        )
+    else:
+        excluded_types = []
+        if uses_dingtalk_manager_attendance:
+            excluded_types.extend(["manager_monthly", "manager_daily"])
+        if uses_card_employee_attendance:
+            excluded_types.append("daily")
+        if excluded_types:
+            records_query = records_query.filter(~AccountSetImport.file_type.in_(excluded_types))
     records = records_query.order_by(AccountSetImport.id.asc()).all()
 
-    if not records and not uses_dingtalk_manager_attendance:
+    if not records and not uses_dingtalk_manager_attendance and not uses_card_employee_attendance:
         return jsonify({"status": "error", "message": "该账套暂无可计算文件", "mode": mode}), 400
 
     success = 0
@@ -1233,6 +1284,7 @@ def calculate_account_set(account_set_id: int):
             "success": success,
             "failed": failed,
             "dingtalk_sync": dingtalk_sync,
+            "card_sync": card_sync,
             "manager_stats_sync": manager_stats_sync,
             "results": results,
         }

@@ -298,6 +298,25 @@ class DingTalkManagerAttendanceServiceTests(unittest.TestCase):
             self.assertEqual(result["status"], "partial")
             self.assertEqual(row["attendance_days"], 1)
 
+    def test_card_source_sync_run_does_not_enable_dingtalk_daily_stats(self):
+        # 考勤机同步复用 dingtalk_sync_runs 表（source="card"）；
+        # 管理人员统计的钉钉口径判断必须只认 source="dingtalk" 的运行记录，
+        # 否则考勤机同步成功而钉钉未同步时，会用空 daily 数据替代 Excel 月报兜底。
+        with self.app.app_context():
+            SystemSetting.set_value("manager_attendance_source", "dingtalk")
+            db.session.add(MonthlyReport(emp_id=self.manager_id, report_month="2026-08", manager_raw_data={"出勤天数": 23}))
+            db.session.add(DingTalkSyncRun(
+                account_set_id=self.account_set_id,
+                month="2026-08",
+                source="card",
+                status="success",
+            ))
+            db.session.commit()
+
+            row = build_manager_rows(ManagerAttendanceOptions(month="2026-08"), emp_ids=[self.manager_id])[0]
+
+            self.assertEqual(row["attendance_days"], 23)
+
     def test_local_source_or_failed_initial_sync_retains_excel_monthly_summary(self):
         for source, sync_error in (("local", None), ("dingtalk", DingTalkClientError("DingTalk request failed"))):
             with self.subTest(source=source), self.app.app_context():

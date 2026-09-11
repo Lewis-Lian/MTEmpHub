@@ -31,6 +31,7 @@ from routes.admin_core import (
     employees_list,
     get_account_set_calc_progress,
     list_account_sets,
+    list_card_sync_history,
     list_dingtalk_sync_history,
     list_shifts,
     lock_account_set,
@@ -61,6 +62,7 @@ from routes.admin_imports import (
     export_manager_overtime,
     import_raw_files as admin_import_raw_files,
     sync_manager_attendance as admin_sync_manager_attendance,
+    sync_employee_attendance,
 )
 from routes.admin_accounts import (
     disabled_users_list_api,
@@ -137,12 +139,29 @@ def _dingtalk_credentials_configured() -> bool:
     ))
 
 
+def _card_db_settings_payload() -> dict:
+    from services.card_db_client import CARD_DB_SETTING_KEYS, card_db_config_from_settings, card_db_configured
+
+    config = card_db_config_from_settings()
+    card_db = {
+        key: config.get(key)
+        for key in CARD_DB_SETTING_KEYS
+        if key != "password" and config.get(key) not in (None, "")
+    }
+    return {
+        "card_db": card_db,
+        "card_db_configured": card_db_configured(config),
+    }
+
+
 @api_admin_bp.get("/attendance-settings")
 @admin_required
 def attendance_settings():
     return jsonify({
         "manager_attendance_source": SystemSetting.get_value("manager_attendance_source", "local"),
         "dingtalk_configured": _dingtalk_credentials_configured(),
+        "employee_attendance_source": SystemSetting.get_value("employee_attendance_source", "local"),
+        **_card_db_settings_payload(),
     })
 
 
@@ -150,16 +169,82 @@ def attendance_settings():
 @admin_required
 def save_attendance_settings():
     data = request.get_json(silent=True) or {}
-    source = str(data.get("manager_attendance_source", "")).strip()
-    if source not in {"local", "dingtalk"}:
-        return jsonify({"error": "manager_attendance_source 必须是 local 或 dingtalk"}), 400
-    SystemSetting.set_value("manager_attendance_source", source)
+    manager_source = str(data.get("manager_attendance_source", "")).strip()
+    if manager_source:
+        if manager_source not in {"local", "dingtalk"}:
+            return jsonify({"error": "manager_attendance_source 必须是 local 或 dingtalk"}), 400
+        SystemSetting.set_value("manager_attendance_source", manager_source)
+    employee_source = str(data.get("employee_attendance_source", "")).strip()
+    if employee_source:
+        if employee_source not in {"local", "card_db"}:
+            return jsonify({"error": "employee_attendance_source 必须是 local 或 card_db"}), 400
+        SystemSetting.set_value("employee_attendance_source", employee_source)
+    card_db = data.get("card_db")
+    if isinstance(card_db, dict):
+        from services.card_db_client import CARD_DB_SETTING_KEYS
+
+        for key, setting_key in CARD_DB_SETTING_KEYS.items():
+            if key == "password":
+                # 密码只写不读：留空表示保留原值
+                if str(card_db.get("password") or "").strip():
+                    SystemSetting.set_value(setting_key, str(card_db["password"]).strip())
+                continue
+            if key in card_db and card_db[key] is not None:
+                value = card_db[key]
+                if key == "port":
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        return jsonify({"error": "card_db.port 必须是整数端口"}), 400
+                SystemSetting.set_value(setting_key, str(value).strip())
     from models import db
     db.session.commit()
     return jsonify({
-        "manager_attendance_source": source,
+        "manager_attendance_source": SystemSetting.get_value("manager_attendance_source", "local"),
         "dingtalk_configured": _dingtalk_credentials_configured(),
+        "employee_attendance_source": SystemSetting.get_value("employee_attendance_source", "local"),
+        **_card_db_settings_payload(),
     })
+
+
+@api_admin_bp.post("/attendance-settings/card-test")
+@admin_required
+def test_card_db_settings():
+    """Validate the saved card database connection without exposing the password."""
+    from services.card_db_client import (
+        CardDBClient,
+        CardDBClientError,
+        card_db_config_from_settings,
+        card_db_configured,
+        sanitize_card_error,
+    )
+
+    config = card_db_config_from_settings()
+    override = request.get_json(silent=True) or {}
+    if isinstance(override.get("card_db"), dict):
+        # 连接测试允许直接用表单当前值；密码留空则回退已保存密码
+        for key in ("host", "port", "database", "user"):
+            value = override["card_db"].get(key)
+            if value not in (None, ""):
+                if key == "port":
+                    try:
+                        value = int(value)
+                    except (TypeError, ValueError):
+                        return jsonify({"error": "card_db.port 必须是整数端口"}), 400
+                else:
+                    value = str(value).strip()
+                config[key] = value
+        password = str(override["card_db"].get("password") or "").strip()
+        if password:
+            config["password"] = password
+    if not card_db_configured(config):
+        return jsonify({"ok": False, "message": "考勤机数据库未配置，请先填写连接参数"}), 502
+    try:
+        version = CardDBClient(config).test_connection()
+    except CardDBClientError as exc:
+        return jsonify({"ok": False, "message": sanitize_card_error(exc)}), 502
+    message = f"考勤机数据库连接成功：{version}" if version else "考勤机数据库连接成功"
+    return jsonify({"ok": True, "message": message})
 
 
 @api_admin_bp.post("/attendance-settings/test")
@@ -867,6 +952,24 @@ def account_set_manager_attendance_sync_history(account_set_id: int):
 @api_admin_bp.get("/manager-attendance/sync-runs/<int:sync_run_id>/unmatched.csv")
 @admin_required
 def manager_attendance_sync_unmatched_csv(sync_run_id: int):
+    return download_dingtalk_unmatched_csv(sync_run_id)
+
+
+@api_admin_bp.post("/account-sets/<int:account_set_id>/employee-attendance/sync")
+@admin_required
+def account_set_employee_attendance_sync(account_set_id: int):
+    return sync_employee_attendance(account_set_id)
+
+
+@api_admin_bp.get("/account-sets/<int:account_set_id>/employee-attendance/sync-history")
+@admin_required
+def account_set_employee_attendance_sync_history(account_set_id: int):
+    return list_card_sync_history(account_set_id)
+
+
+@api_admin_bp.get("/employee-attendance/sync-runs/<int:sync_run_id>/unmatched.csv")
+@admin_required
+def employee_attendance_sync_unmatched_csv(sync_run_id: int):
     return download_dingtalk_unmatched_csv(sync_run_id)
 
 
