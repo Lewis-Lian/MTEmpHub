@@ -1168,7 +1168,9 @@ body {
 }
 
 .settings-card-module {
-  animation: admin-card-in 0.3s ease-out both;
+  /* backwards 而非 both：结束态与自然样式一致；both 会永久持有 transform，
+     使卡片形成层叠上下文，弹出下拉会被后续兄弟卡片盖住 */
+  animation: admin-card-in 0.3s ease-out backwards;
 }
 
 .settings-card-module:nth-child(2) { animation-delay: 50ms; }
