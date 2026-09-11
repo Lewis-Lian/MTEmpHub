@@ -482,3 +482,26 @@ describe("AttendanceCalendarGrid 修正模式（可选 props）", () => {
     expect(within(cell).getByText("出差").closest(".cal-badges")).toBe(badgesRow);
   });
 });
+
+describe("AttendanceCalendarGrid 隐藏修正角点（showOverrideDot）", () => {
+  const OVERRIDE_DATA: AttendanceCalendarData = {
+    ...DATA,
+    days: [{ ...DATA.days[0], date: "2026-07-10", override: { status: "全勤" } }],
+    overtimes: [],
+    leaves: [],
+  };
+
+  it("showOverrideDot=false 时不渲染修正角点与图例项，修正状态背景仍生效", () => {
+    const { container } = render(<AttendanceCalendarGrid data={OVERRIDE_DATA} showOverrideDot={false} />);
+    expect(getCell("2026-07-10")).toHaveClass("is-bg-attendance");
+    expect(within(getCell("2026-07-10")).queryByTitle("手工修正")).toBeNull();
+    const legend = container.querySelector(".attendance-calendar-legend");
+    expect(within(legend as HTMLElement).queryByText("手工修正")).toBeNull();
+  });
+
+  it("默认渲染修正角点与图例项（现有行为不变）", () => {
+    render(<AttendanceCalendarGrid data={OVERRIDE_DATA} />);
+    expect(within(getCell("2026-07-10")).getByTitle("手工修正")).toBeInTheDocument();
+    expect(screen.getByText("手工修正")).toBeInTheDocument(); // 图例项
+  });
+});
