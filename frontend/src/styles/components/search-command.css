@@ -1,0 +1,210 @@
+.search-command-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: min(15vh, 120px);
+  z-index: var(--z-modal, 5000);
+  animation: search-command-fade 0.15s ease-out;
+}
+
+@keyframes search-command-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.search-command-modal {
+  width: min(100% - 32px, 560px);
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg, 12px);
+  box-shadow: 0 20px 30px -10px rgba(15, 23, 42, 0.25), 0 10px 15px -5px rgba(15, 23, 42, 0.15);
+  overflow: hidden;
+  animation: search-command-scale 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes search-command-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.search-command-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ent-border-strong);
+}
+
+.search-command-icon {
+  color: var(--ent-text-tertiary);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.search-command-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 15px;
+  color: var(--ent-text);
+  font-family: inherit;
+  padding: 0;
+}
+
+.search-command-input::placeholder {
+  color: var(--ent-text-tertiary);
+}
+
+.search-command-esc-badge {
+  padding: 2px 6px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 4px;
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+
+.search-command-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 8px 6px;
+}
+
+.search-command-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--ent-text-secondary);
+  font-size: 13.5px;
+}
+
+.search-command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--ent-radius-sm, 6px);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease;
+  box-sizing: border-box;
+}
+
+.search-command-item:hover,
+.search-command-item.is-selected {
+  background: var(--ent-tertiary-bg);
+}
+
+.search-command-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.search-command-item-icon {
+  color: var(--ent-text-secondary);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.search-command-item.is-selected .search-command-item-icon {
+  color: var(--ent-blue);
+}
+
+.search-command-item-title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ent-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-command-item.is-selected .search-command-item-title {
+  color: var(--ent-blue);
+}
+
+.search-command-item-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.search-command-item-module {
+  font-size: 11.5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-secondary);
+  border: 1px solid var(--ent-border-strong);
+}
+
+.search-command-item-enter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 10px;
+}
+
+.search-command-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-top: 1px solid var(--ent-border-strong);
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-tertiary);
+  font-size: 11.5px;
+}
+
+.search-command-hints {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.search-command-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-command-hint kbd {
+  padding: 1px 4px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 3px;
+  background: var(--ent-bg);
+  font-size: 10px;
+  color: var(--ent-text-secondary);
+}

@@ -1,0 +1,518 @@
+/* ==========================================================================
+   全系统深色模式 (Dark Theme) 统一样式规范
+   支持跟随操作系统 prefers-color-scheme 及手动切换
+   ========================================================================== */
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* 企业核心色彩 Token 重设 */
+  --ent-bg: #1e293b;
+  --ent-secondary-bg: #0f172a;
+  --ent-tertiary-bg: #334155;
+
+  --ent-border: #334155;
+  --ent-border-strong: #475569;
+  --ent-border-focus: #60a5fa;
+
+  --ent-text: #f8fafc;
+  --ent-text-secondary: #94a3b8;
+  --ent-text-tertiary: #64748b;
+
+  --ent-sidebar-bg: #0f172a;
+  --ent-sidebar-text: #94a3b8;
+  --ent-sidebar-active-bg: #1e293b;
+  --ent-sidebar-active-text: #60a5fa;
+
+  --ent-blue: #3b82f6;
+  --ent-blue-hover: #60a5fa;
+
+  /* 查询中心 Token 适配 */
+  --qh-bg-page: #0f172a;
+  --qh-navy: #1e293b;
+  --qh-navy-deep: #0f172a;
+  --qh-navy-mid: #334155;
+  --qh-navy-soft: #334155;
+  --qh-navy-pale: #1e293b;
+  --qh-ink: #f8fafc;
+  --qh-muted: #94a3b8;
+  --qh-border: #334155;
+  --qh-text-main: #f8fafc;
+  --qh-text-muted: #94a3b8;
+}
+
+/* 1. 全局布局与底色 */
+[data-theme="dark"] body {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-layout {
+  background-color: #0f172a !important;
+  background-image: radial-gradient(circle at 1px 1px, #334155 1.5px, transparent 0) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-main,
+[data-theme="dark"] .app-content {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+/* 2. 侧边栏 */
+[data-theme="dark"] .app-sidebar {
+  background: #0f172a !important;
+  border-right-color: #1e293b !important;
+}
+
+[data-theme="dark"] .app-sidebar-toggle {
+  background: #1e293b;
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .app-sidebar-toggle:hover {
+  background: #334155;
+  color: #f8fafc;
+}
+
+/* 3. 顶栏 AppHeader */
+[data-theme="dark"] .app-header {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .app-header-search {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-header-search:hover {
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-header-search-badge {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-header-icon-btn:hover {
+  background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-header-user-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .app-header-user-card {
+  background: #0f172a !important;
+  border-bottom-color: #334155 !important;
+}
+
+/* 4. 页签卡片栏 AppTabs */
+[data-theme="dark"] .app-tab-bar {
+  background: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .app-tab-button {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-tab-button:hover:not(.is-active) {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .app-tab-button.is-active {
+  background: #1e293b !important;
+  color: #60a5fa !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .app-tab-more-btn {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-tab-more-btn:hover {
+  background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-tab-more-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .app-tab-menu-item:hover {
+  background: #334155 !important;
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .top-nav-logout {
+  background: #1e293b !important;
+  border-color: #475569 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .top-nav-logout:hover {
+  background: #450a0a !important;
+  border-color: #7f1d1d !important;
+  color: #f87171 !important;
+}
+
+/* 5. 查询页面外壳与筛选面板 */
+[data-theme="dark"] .employee-dashboard-page,
+[data-theme="dark"] .query-page-shell {
+  background-color: #0f172a !important;
+  background-image: radial-gradient(circle at 1px 1px, #334155 1.5px, transparent 0) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .query-filter-rail,
+[data-theme="dark"] .employee-dashboard-page .query-filter-rail {
+  background: rgba(30, 41, 59, 0.88) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .query-filter-heading h2 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .query-filter-heading p {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .query-filter-kicker {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .form-label,
+[data-theme="dark"] .query-filter-field .form-label {
+  color: #94a3b8 !important;
+}
+
+/* 6. 表单输入与选择器 (包含账套选择、员工选择输入框、下拉框) */
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .employee-dashboard-page .form-select,
+[data-theme="dark"] input[type="text"],
+[data-theme="dark"] input[type="search"],
+[data-theme="dark"] input[type="password"],
+[data-theme="dark"] input[type="number"],
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .form-control:focus,
+[data-theme="dark"] .form-select:focus,
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: #60a5fa !important;
+}
+
+/* 账套选择器 */
+[data-theme="dark"] .account-set-selector.is-compact .account-set-selector-trigger,
+[data-theme="dark"] .account-set-selector-trigger {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .account-set-selector-trigger:hover,
+[data-theme="dark"] .account-set-selector-trigger:focus-visible {
+  border-color: #60a5fa !important;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.15) !important;
+}
+
+[data-theme="dark"] .account-set-selector-trigger-content strong {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .account-set-selector-trigger-content small {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .account-set-compact-label {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .account-set-selector-menu {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .account-set-selector-option {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .account-set-selector-option:hover {
+  background: #334155 !important;
+}
+
+/* 多选下拉框 MultiSelectDropdown */
+[data-theme="dark"] .multi-select-trigger {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .multi-select-panel {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+[data-theme="dark"] .multi-select-option {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .multi-select-option:hover {
+  background: #334155 !important;
+}
+
+/* 7. 表格与结果面板 (解决白块、斑马条纹、空状态与分页器) */
+[data-theme="dark"] .query-workspace {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .query-result-panel,
+[data-theme="dark"] .card.query-result-panel {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .query-result-table {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .query-result-table .legacy-table-wrap,
+[data-theme="dark"] .legacy-table-wrap,
+[data-theme="dark"] .legacy-table-panel,
+[data-theme="dark"] .employee-dashboard-page .legacy-table-panel {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .legacy-table {
+  background: transparent !important;
+}
+
+[data-theme="dark"] .legacy-table-head-cell,
+[data-theme="dark"] .account-table th,
+[data-theme="dark"] .master-static-head {
+  background: #0f172a !important;
+  color: #94a3b8 !important;
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .legacy-table-head-button {
+  background: transparent !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .legacy-table-head-button[data-sort-direction="ascending"],
+[data-theme="dark"] .legacy-table-head-button[data-sort-direction="descending"] {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .legacy-table-sort-indicator {
+  color: #64748b !important;
+}
+
+/* 表格体单元格与暗色斑马条纹 */
+[data-theme="dark"] .legacy-table-body-cell,
+[data-theme="dark"] .account-table td {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-bottom-color: #334155 !important;
+  border-top-color: #334155 !important;
+}
+
+[data-theme="dark"] .legacy-table tbody tr:nth-child(odd) > .legacy-table-body-cell {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .legacy-table tbody tr:nth-child(even) > .legacy-table-body-cell {
+  background: #162032 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .legacy-table tbody tr:hover > .legacy-table-body-cell,
+[data-theme="dark"] .account-table tbody tr:hover td {
+  background: #253349 !important;
+}
+
+/* 空状态单元格 (请点击查询 / 暂无数据) */
+[data-theme="dark"] .legacy-table-empty-cell {
+  background: #1e293b !important;
+  color: #94a3b8 !important;
+  border-top-color: #334155 !important;
+  border-bottom-color: #334155 !important;
+}
+
+/* 分页器组件 */
+[data-theme="dark"] .table-pager {
+  background: #1e293b !important;
+  border-top-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .table-pager-total {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .table-pager .form-select,
+[data-theme="dark"] .table-pager .btn,
+[data-theme="dark"] .table-pager-page-input {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .table-pager .btn:hover:not(:disabled) {
+  background: #334155 !important;
+}
+
+/* 8. 卡片、面板与弹窗 (全局通用) */
+[data-theme="dark"] .card,
+[data-theme="dark"] .account-card,
+[data-theme="dark"] .master-filter-panel,
+[data-theme="dark"] .legacy-panel,
+[data-theme="dark"] .dashboard-metric-card,
+[data-theme="dark"] .legacy-feedback-block,
+[data-theme="dark"] .panel-note {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .account-card-header,
+[data-theme="dark"] .card-header,
+[data-theme="dark"] .master-list-header {
+  border-bottom-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .master-modal {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .master-modal-header {
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .master-modal-header h2 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .master-modal-close {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .master-modal-close:hover {
+  color: #f8fafc !important;
+}
+
+/* 员工选择弹窗 EmployeePicker */
+[data-theme="dark"] .employee-picker-modal .modal-content {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .employee-picker-modal .modal-header,
+[data-theme="dark"] .employee-picker-modal .modal-footer {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .employee-picker-modal .modal-title {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .employee-picker-modal .modal-body {
+  background: #0f172a !important;
+}
+
+[data-theme="dark"] .employee-picker-column {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .employee-picker-column-header {
+  background: #0f172a !important;
+  border-bottom-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .employee-picker-item {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .employee-picker-item:hover {
+  background: #334155 !important;
+}
+
+/* 9. 考勤日历网格 AttendanceCalendar */
+[data-theme="dark"] .attendance-calendar-cell {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .cal-day-number {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .cal-punch {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .attendance-calendar-weekday {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .cal-badge {
+  background: #334155 !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+/* 10. 汇总下载等报表卡片 */
+[data-theme="dark"] .preset-card-btn,
+[data-theme="dark"] .sheet-selection-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .preset-card-btn:hover {
+  border-color: #60a5fa !important;
+}

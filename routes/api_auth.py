@@ -142,6 +142,47 @@ def api_captcha_slider_verify():
     return jsonify({"verified_token": issue_slider_verified_token()})
 
 
+def _serialize_auth_user(user: User) -> dict:
+    from models.department import Department
+    from models.employee import Employee
+
+    emp_no = user.profile_emp_no or ""
+    emp_name = user.profile_name or ""
+    dept_name = ""
+
+    if user.profile_dept_id:
+        dept = db.session.get(Department, user.profile_dept_id)
+        if dept:
+            dept_name = dept.dept_name or ""
+
+    if (not emp_no or not emp_name or not dept_name) and user.employee_assignments:
+        first_assignment = user.employee_assignments[0]
+        if first_assignment and first_assignment.employee:
+            first_emp = first_assignment.employee
+            emp_no = emp_no or first_emp.emp_no or ""
+            emp_name = emp_name or first_emp.name or ""
+            if not dept_name and first_emp.department:
+                dept_name = first_emp.department.dept_name or ""
+
+    if emp_no and (not emp_name or not dept_name):
+        matched_emp = Employee.query.filter_by(emp_no=emp_no).first()
+        if matched_emp:
+            if not emp_name:
+                emp_name = matched_emp.name or ""
+            if not dept_name and matched_emp.department:
+                dept_name = matched_emp.department.dept_name or ""
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "role": user.role,
+        "page_permissions": user.effective_page_permissions(),
+        "profile_emp_no": emp_no,
+        "profile_name": emp_name,
+        "dept_name": dept_name,
+    }
+
+
 @api_auth_bp.post("/login")
 def api_login():
     payload = request.get_json(silent=True) or {}
@@ -177,12 +218,7 @@ def api_login():
     response = make_response(
         jsonify(
             {
-                "user": {
-                    "id": user.id,
-                    "username": user.username,
-                    "role": user.role,
-                    "page_permissions": user.effective_page_permissions(),
-                }
+                "user": _serialize_auth_user(user),
             }
         )
     )
@@ -245,11 +281,4 @@ def api_change_password():
 @api_auth_bp.get("/me")
 @login_required
 def api_me():
-    return jsonify(
-        {
-            "id": g.current_user.id,
-            "username": g.current_user.username,
-            "role": g.current_user.role,
-            "page_permissions": g.current_user.effective_page_permissions(),
-        }
-    )
+    return jsonify(_serialize_auth_user(g.current_user))
