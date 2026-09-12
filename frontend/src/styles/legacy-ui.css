@@ -4787,6 +4787,37 @@ input[type="checkbox"] {
   flex-shrink: 0 !important;
 }
 
+.month-picker-chevron {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding-right: 10px !important;
+  color: var(--ent-text-tertiary) !important;
+  cursor: pointer !important;
+  transition: transform 0.2s ease, color 0.2s ease !important;
+}
+
+.month-picker-chevron.is-open {
+  transform: rotate(180deg) !important;
+  color: var(--ent-blue) !important;
+}
+
+.query-filter-rail .month-picker-split-trigger {
+  min-height: 36px !important;
+  border: 1px solid #d7e3ef !important;
+  border-radius: 6px !important;
+  background-color: var(--ent-bg) !important;
+}
+
+.query-filter-rail .month-picker-split-trigger:hover:not(.is-disabled) {
+  border-color: #94a3b8 !important;
+}
+
+.query-filter-rail .month-picker-split-trigger.is-open {
+  border-color: var(--ent-border-focus) !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
 /* 下拉面板 */
 .month-picker-dropdown {
   position: absolute !important;
@@ -4796,7 +4827,7 @@ input[type="checkbox"] {
   width: 280px !important;
   background: var(--ent-bg) !important;
   border: 1px solid #f0f0f0 !important;
-  border-radius: 4px !important;
+  border-radius: 8px !important;
   box-shadow: 0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05) !important;
   padding: 0 !important;
   box-sizing: border-box !important;
@@ -4858,7 +4889,7 @@ input[type="checkbox"] {
 .month-picker-cell {
   background: transparent !important;
   border: 1px solid transparent !important; /* 统一使用 1px 透明边框占位，彻底消除抖动 */
-  border-radius: 2px !important;
+  border-radius: 6px !important;
   padding: 8px 0 !important;
   font-size: 13px !important;
   font-weight: 500 !important;
@@ -4895,10 +4926,10 @@ input[type="checkbox"] {
 }
 
 .month-picker-cell.is-selected {
-  background: var(--ent-tertiary-bg) !important; /* 极浅灰色背景代替蓝底 */
-  color: var(--ent-text) !important; /* 加深字色 */
-  font-weight: bold !important;
-  border: 1px solid #cbd5e1 !important;
+  background: #e0f2fe !important;
+  color: #0284c7 !important;
+  font-weight: 600 !important;
+  border: 1px solid #bae6fd !important;
 }
 
 /* 底部操作区 */

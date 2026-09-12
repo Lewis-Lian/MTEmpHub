@@ -10,6 +10,7 @@ import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import QueryProgressOverlay from "../../components/feedback/QueryProgressOverlay";
 import AccountSetSelector from "../../components/query/AccountSetSelector";
+import YearPicker from "../../components/common/YearPicker";
 import type { AccountSet, HeaderRowsResponse, QueryBootstrap } from "../../types/query";
 import "./dashboard-shared.css";
 
@@ -347,13 +348,11 @@ export default function QueryPage({
           {fields.includes("year") ? (
             <div className="query-filter-field">
               <label className="form-label">年份</label>
-              <input
-                className="form-control"
-                onChange={(event) => {
-                  setSelectedYear(event.target.value);
+              <YearPicker
+                onChange={(nextYear) => {
+                  setSelectedYear(nextYear);
                   setHasQueried(false);
                 }}
-                type="number"
                 value={selectedYear}
               />
             </div>

@@ -137,6 +137,28 @@ export default function YearPicker({
             }}
           />
         </div>
+        <span
+          className={`month-picker-chevron${isOpen ? " is-open" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (disabled) return;
+            setIsOpen((prev) => !prev);
+          }}
+          aria-hidden="true"
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m5 7.5 5 5 5-5" />
+          </svg>
+        </span>
       </div>
 
       <DropdownMotion className="month-picker-dropdown" isOpen={isOpen}>
@@ -150,7 +172,7 @@ export default function YearPicker({
             >
               «
             </button>
-            <span className="month-picker-year-label" style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>
+            <span className="month-picker-year-label">
               {panelStartYear} - {panelStartYear + 11}
             </span>
             <button
