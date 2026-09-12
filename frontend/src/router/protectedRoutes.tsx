@@ -14,7 +14,6 @@ const ManagerAttendanceOverridesPage = lazy(() => import("../pages/admin/Manager
 const ManagerOvertimeAdminPage = lazy(() => import("../pages/admin/ManagerOvertimeAdminPage"));
 const ShiftsPage = lazy(() => import("../pages/admin/ShiftsPage"));
 const AbnormalQueryPage = lazy(() => import("../pages/query/AbnormalQueryPage"));
-const AttendanceCalendarPage = lazy(() => import("../pages/query/AttendanceCalendarPage"));
 const DepartmentHoursPage = lazy(() => import("../pages/query/DepartmentHoursPage"));
 const EmployeeDashboardPage = lazy(() => import("../pages/query/EmployeeDashboardPage"));
 const ManagerAnnualLeavePage = lazy(() => import("../pages/query/ManagerAnnualLeavePage"));
@@ -49,7 +48,6 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(ManagerAnnualLeavePage), path: "/employee/manager-annual-leave-query" },
   { element: lazyPage(ManagerDepartmentHoursPage), path: "/employee/manager-department-hours-query" },
   { element: lazyPage(SummaryDownloadPage), path: "/employee/summary-download" },
-  { element: lazyPage(AttendanceCalendarPage), path: "/employee/attendance-calendar" },
   { element: lazyPage(AdminDashboardPage), path: "/admin/dashboard" },
   { element: lazyPage(AccountsPage), path: "/admin/accounts" },
   { element: lazyPage(AttendanceSourceSettingsPage), path: "/admin/attendance-source" },
