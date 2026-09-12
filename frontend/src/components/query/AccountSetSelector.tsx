@@ -8,6 +8,7 @@ interface AccountSetSelectorProps {
   onChange: (month: string) => void;
   label?: string;
   compact?: boolean;
+  hint?: string;
 }
 
 export default function AccountSetSelector({
@@ -16,6 +17,7 @@ export default function AccountSetSelector({
   onChange,
   label = "当前账套",
   compact = false,
+  hint,
 }: AccountSetSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const selectorRef = useRef<HTMLDivElement>(null);
@@ -112,6 +114,7 @@ export default function AccountSetSelector({
           </button>
           {optionsMenu}
         </div>
+        {hint ? <span className="legacy-field-hint">{hint}</span> : null}
       </div>
     );
   }
@@ -161,6 +164,7 @@ export default function AccountSetSelector({
           {optionsMenu}
         </div>
       </div>
+      {hint ? <span className="legacy-field-hint">{hint}</span> : null}
     </div>
   );
 }
