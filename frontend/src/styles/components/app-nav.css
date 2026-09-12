@@ -1,0 +1,230 @@
+/* ==========================================================================
+   侧边栏树形手风琴导航（一级目录展开二级子菜单）
+   ========================================================================== */
+
+.app-page-nav-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+.app-page-nav-shell::-webkit-scrollbar {
+  width: 4px;
+}
+
+.app-page-nav-shell::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-page-nav-shell::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 4px;
+}
+
+.app-page-nav-shell::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.45);
+}
+
+.app-accordion-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 2px 0 16px;
+}
+
+/* 导航组 (每个一级模块及其展开的二级目录) */
+.app-nav-group {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* 一级目录项按钮 */
+.app-module-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #334155 !important;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.4;
+  transition: background 0.18s ease, color 0.18s ease;
+  cursor: pointer;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.app-module-link .nav-icon {
+  width: 17px;
+  height: 17px;
+  opacity: 0.7;
+  transition: opacity 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.app-module-link-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  font-weight: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+/* 一级目录右侧箭头 */
+.app-module-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  margin-left: auto;
+  flex-shrink: 0;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease;
+}
+
+.app-module-chevron.is-expanded {
+  transform: rotate(180deg);
+  color: #0f172a;
+}
+
+/* 一级目录悬停态 */
+.app-module-link:hover:not(.is-active) {
+  background: rgba(15, 23, 42, 0.045) !important;
+  color: #0f172a !important;
+}
+
+.app-module-link:hover:not(.is-active) .nav-icon {
+  opacity: 0.95;
+}
+
+/* 一级目录当前激活模块高亮 */
+.app-module-link.is-active {
+  color: #0f172a !important;
+  font-weight: 600;
+}
+
+.app-module-link.is-active .nav-icon {
+  opacity: 1;
+  color: #183153;
+}
+
+.app-module-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+/* --------------------------------------------------------------------------
+   二级目录展开容器与子项
+   -------------------------------------------------------------------------- */
+.app-module-subnav {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 2px 0 4px 0;
+}
+
+.app-module-subnav.is-expanded {
+  display: flex;
+}
+
+/* 二级目录项：无外框、无变色、无状态条、无右箭头，明显缩进排版 */
+.app-module-subnav .app-side-link,
+.app-side-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px 7px 28px !important; /* 缩进一个图标的位置 */
+  border-radius: 6px;
+  border: none !important;
+  outline: none;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: #475569 !important;
+  text-decoration: none;
+  font-size: 13px !important;
+  font-weight: 400;
+  line-height: 1.4;
+  transition: background 0.18s ease, color 0.18s ease;
+  box-sizing: border-box;
+  min-width: 0;
+  user-select: none;
+  cursor: pointer;
+}
+
+.app-side-link .nav-icon {
+  width: 15px;
+  height: 15px;
+  opacity: 0.6;
+  transition: opacity 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.app-side-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: inherit;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  color: inherit;
+}
+
+/* 二级目录悬停态 */
+.app-side-link:hover:not(.is-active) {
+  background: rgba(15, 23, 42, 0.04) !important;
+  color: #0f172a !important;
+}
+
+.app-side-link:hover:not(.is-active) .nav-icon {
+  opacity: 0.9;
+}
+
+/* 二级目录激活态 */
+.app-side-link.is-active {
+  background: rgba(15, 23, 42, 0.07) !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.app-side-link.is-active .nav-icon {
+  opacity: 1;
+  color: #183153;
+}
+
+.app-side-link:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+
+
+/* --------------------------------------------------------------------------
+   减弱动效适配
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .app-module-link,
+  .app-side-link,
+  .app-module-chevron {
+    transition: none !important;
+    transform: none !important;
+  }
+}

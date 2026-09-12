@@ -497,7 +497,7 @@ body {
 .app-sidebar {
   grid-column: 1;
   grid-row: 1;
-  width: 212px;
+  width: 256px;
   position: sticky;
   top: 0;
   height: 100vh;
@@ -515,32 +515,19 @@ body {
 }
 
 .app-sidebar.is-collapsed {
-  width: 56px;
-  padding: 16px 8px 18px;
-  gap: 12px;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  border-right: none !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
 }
 
-.app-sidebar.is-collapsed .app-sidebar-brand p {
-  display: none;
-}
-
-.app-sidebar.is-collapsed .app-sidebar-brand h1 {
-  font-size: 18px;
-  text-align: center;
-}
-
-.app-sidebar.is-collapsed .app-module-link {
-  justify-content: center;
-  padding: 10px;
-}
-
-.app-sidebar.is-collapsed .app-side-link {
-  justify-content: center;
-  padding: 10px;
-}
-
-.app-sidebar.is-collapsed .app-page-nav-shell {
-  overflow: visible;
+.app-sidebar.is-collapsed * {
+  display: none !important;
 }
 
 .app-sidebar-brand h1 {
@@ -660,31 +647,106 @@ body {
   opacity: 1;
 }
 
-.app-sidebar-toggle {
+.app-sidebar-footer {
   margin-top: auto;
-  border: 1px solid #c9d4df;
-  border-radius: 4px;
-  padding: 8px;
-  background: var(--ent-bg);
-  color: #536578;
-  cursor: pointer;
+  padding-top: 6px;
+  display: flex;
+}
+
+.app-sidebar-collapse-btn {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: color 0.15s, background 0.15s, transform 0.15s ease;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  cursor: pointer;
+  box-shadow: none;
+  transition: all 0.18s ease;
 }
 
-.app-sidebar-toggle svg {
-  transition: transform 0.24s ease;
+.app-sidebar-collapse-btn:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: var(--ent-text);
+  box-shadow: none;
 }
 
-.app-sidebar.is-collapsed .app-sidebar-toggle svg {
-  transform: rotate(180deg);
+.app-sidebar-collapse-btn:active {
+  background: rgba(15, 23, 42, 0.08);
 }
 
-.app-sidebar-toggle:hover {
-  color: #183153;
-  background: #f0f4f7;
+.app-sidebar-collapse-btn svg {
+  transition: transform 0.2s ease, opacity 0.2s ease;
+  opacity: 0.65;
+}
+
+.app-sidebar-collapse-btn:hover svg {
+  opacity: 1;
+  transform: translateX(-2px);
+}
+
+.app-sidebar-floating-toggle {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: var(--z-dropdown);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(8px);
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: floating-toggle-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes floating-toggle-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.app-sidebar-floating-toggle:hover {
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+}
+
+.app-sidebar-floating-toggle:active {
+  transform: translateY(0);
+}
+
+.app-sidebar-floating-toggle svg {
+  transition: color 0.18s ease, opacity 0.18s ease;
+  color: var(--ent-text-secondary);
+  opacity: 0.8;
+}
+
+.app-sidebar-floating-toggle:hover svg {
+  color: var(--ent-blue);
+  opacity: 1;
 }
 
 .app-main {
@@ -3242,68 +3304,65 @@ body {
 
 .app-sidebar-caption {
   margin: 0;
-  color: var(--ent-text-secondary) !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.05em !important;
+  color: var(--ent-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
 
 .app-side-link {
-  background: transparent !important;
-  border: 1px solid transparent !important;
-  border-radius: var(--ent-radius-sm) !important;
-  color: #334155 !important;
-  transition: var(--ent-transition) !important;
-  padding: 8px 12px !important;
-  font-size: 12.5px !important;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--ent-radius-sm);
+  color: #334155;
+  transition: var(--ent-transition);
+  font-size: 12.5px;
 }
 
 .app-side-label {
-  font-weight: 500 !important;
+  font-weight: 500;
 }
 
 .app-side-link:hover {
-  background: var(--ent-tertiary-bg) !important;
-  color: var(--ent-text) !important;
+  background: var(--ent-tertiary-bg);
+  color: var(--ent-text);
   transform: translateX(2px);
 }
 
 .app-side-link small {
-  color: var(--ent-text-secondary) !important;
+  color: var(--ent-text-secondary);
 }
 
 .app-side-link.is-active {
-  background: var(--ent-sidebar-active-bg) !important;
-  color: var(--ent-sidebar-active-text) !important;
-  font-weight: 600 !important;
-  border-left: none !important;
-  border-radius: var(--ent-radius-sm) !important;
+  background: var(--ent-sidebar-active-bg);
+  color: var(--ent-sidebar-active-text);
+  font-weight: 600;
+  border-left: none;
+  border-radius: var(--ent-radius-sm);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .app-side-link.is-active small {
-  color: var(--ent-text-secondary) !important;
+  color: var(--ent-text-secondary);
 }
 
 .app-module-link {
-  background: var(--ent-secondary-bg) !important;
-  border: 1px solid var(--ent-border-strong) !important;
-  border-radius: var(--ent-radius-sm) !important;
-  color: #475569 !important;
-  transition: var(--ent-transition) !important;
+  background: transparent;
+  border: none;
+  border-radius: var(--ent-radius-sm);
+  color: #475569;
+  transition: var(--ent-transition);
 }
 
 .app-module-link:hover {
-  background: var(--ent-tertiary-bg) !important;
-  color: var(--ent-text) !important;
+  background: rgba(15, 23, 42, 0.04);
+  color: var(--ent-text);
 }
 
 .app-module-link.is-active {
-  background: var(--ent-bg) !important;
-  border-color: #cbd5e1 !important;
-  color: var(--ent-text) !important;
-  box-shadow: var(--ent-shadow-subtle) !important;
+  background: rgba(15, 23, 42, 0.07);
+  color: var(--ent-text);
 }
 
 .app-logout-button {
