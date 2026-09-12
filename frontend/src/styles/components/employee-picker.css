@@ -30,7 +30,7 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 20px;
   overflow: hidden;
-  background: #f8fbff;
+  background: var(--ent-bg);
   box-shadow: 0 28px 80px rgba(15, 35, 65, 0.28);
   animation: employee-picker-card-in 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -46,14 +46,14 @@
   gap: 12px;
   padding: 16px 22px;
   border-bottom: 1px solid #e2eaf3;
-  background: rgba(255, 255, 255, 0.94);
+  background: var(--ent-secondary-bg);
 }
 
 .employee-picker-modal .modal-footer {
   justify-content: flex-end;
   border-top: 1px solid #e2eaf3;
   border-bottom: 0;
-  background: #fff;
+  background: var(--ent-secondary-bg);
 }
 
 .employee-picker-modal .modal-title {
@@ -129,8 +129,8 @@
   box-sizing: border-box;
   border: 1px solid #c9d7e6;
   border-radius: 9px;
-  background: #fff;
-  color: #183153;
+  background: var(--ent-bg);
+  color: var(--ent-text);
   font-size: 13px;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }

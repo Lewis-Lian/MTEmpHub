@@ -5,6 +5,7 @@ import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/qu
 import { applyTheme, getStoredThemeMode, getSystemTheme, setStoredThemeMode, type ThemeMode } from "../../utils/theme";
 import { getSearchShortcutKey } from "../../utils/platform";
 import "../../styles/components/app-header.css";
+import MessageCenter from "./MessageCenter";
 
 interface AppHeaderProps {
   currentEntry: QueryNavigationEntry | null;
@@ -191,6 +192,8 @@ export default function AppHeader({
             </svg>
           )}
         </button>
+
+        <MessageCenter />
 
         <div
           className="app-header-avatar-wrap"

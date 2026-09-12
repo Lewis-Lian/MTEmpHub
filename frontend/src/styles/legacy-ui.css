@@ -1733,14 +1733,18 @@ body {
 }
 
 .employee-lookup-clear {
+  width: 34px;
   min-width: 34px;
   height: 38px;
   min-height: 38px;
-  line-height: 36px;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  line-height: 1 !important;
   box-sizing: border-box;
-  padding: 0 10px;
-  color: #667085;
-  font-size: 18px;
+  padding: 0 !important;
+  color: var(--ent-text-secondary);
+  font-size: 16px;
   border-radius: 0 !important;
 }
 
@@ -1771,7 +1775,7 @@ body {
   max-height: 320px;
   overflow: auto;
   padding: 6px;
-  border: 1px solid #cfdaea;
+  border: 1px solid var(--ent-border-strong);
   border-radius: 10px;
   background: var(--ent-bg);
   box-shadow: 0 12px 24px rgba(17, 34, 57, 0.16);
@@ -1787,19 +1791,19 @@ body {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #1f2a37;
+  color: var(--ent-text);
   font-size: 14px;
   text-align: left;
   cursor: pointer;
 }
 
 .employee-option:hover {
-  background: #f0f5fb;
+  background: var(--ent-secondary-bg);
 }
 
 .employee-option.active {
-  background: #e8f0fb;
-  color: #17365c;
+  background: #f4f8fc;
+  color: #244a70;
   font-weight: 600;
 }
 

@@ -1,0 +1,18 @@
+.message-center { position: relative; }
+.message-center-trigger { margin-left: 2px; }
+.message-center-badge { position: absolute; top: 1px; right: 0; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px; background: #ef4444; color: white; font-size: 9px; line-height: 15px; text-align: center; box-sizing: border-box; }
+.message-center-panel { position: absolute; top: calc(100% + 8px); right: 0; width: 330px; max-height: 560px; overflow: auto; background: var(--ent-bg); border: 1px solid var(--ent-border-strong); border-radius: 8px; box-shadow: 0 12px 30px rgba(15,23,42,.16); z-index: var(--z-dropdown, 1200); }
+.message-center-heading { display: flex; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--ent-border-strong); color: var(--ent-text); }
+.message-center-heading button { border: 0; background: none; font-size: 20px; color: var(--ent-text-secondary); cursor: pointer; }
+.message-center-list article { padding: 12px 14px; border-bottom: 1px solid var(--ent-border-strong); cursor: pointer; }
+.message-center-list article:hover, .message-center-list article.is-unread { background: var(--ent-secondary-bg); }
+.message-center-list article div { display: flex; align-items: center; gap: 6px; color: var(--ent-text); }
+.message-center-list article p { margin: 6px 0; color: var(--ent-text-secondary); font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.message-center-list small { color: var(--ent-text-tertiary); }
+.message-center-dot { width: 6px; height: 6px; border-radius: 50%; background: #ef4444; }
+.message-center-empty, .message-center-error { padding: 16px; color: var(--ent-text-secondary); }
+.message-center-compose { padding: 12px 14px; display: grid; gap: 8px; border-bottom: 1px solid var(--ent-border-strong); }
+.message-center-compose h2 { margin: 0 0 2px; font-size: 14px; color: var(--ent-text); }
+.message-center-compose input, .message-center-compose select, .message-center-compose textarea { width: 100%; box-sizing: border-box; padding: 7px 8px; border: 1px solid var(--ent-border-strong); border-radius: 5px; background: var(--ent-bg); color: var(--ent-text); font: inherit; }
+.message-center-compose textarea { min-height: 70px; resize: vertical; }
+.message-center-compose button { padding: 7px 10px; border: 0; border-radius: 5px; background: var(--ent-blue); color: white; cursor: pointer; }

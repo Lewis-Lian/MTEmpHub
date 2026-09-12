@@ -5,6 +5,7 @@ import { initTheme } from "./utils/theme";
 import "./styles/legacy-ui.css";
 import "./styles/admin-ui.css";
 import "./styles/dark-mode.css";
+import "./styles/components/admin-message-page.css";
 
 initTheme();
 
@@ -14,4 +15,3 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
-
