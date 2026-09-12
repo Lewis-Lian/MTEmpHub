@@ -85,6 +85,10 @@ export const DownloadIcon = icon(
   "M10 3v10M6 9l4 4 4-4M3 15v2h14v-2"
 );
 
+export const LedgerBookIcon = icon(
+  "M3.5 16v-12A2 2 0 015.5 2h11v16H5.5a2 2 0 01-2-2zM3.5 16a2 2 0 012-2h11M8 6h5M8 9.5h4"
+);
+
 export const UsersIcon = icon(
   "M6.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM13.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM3 15c0-2.5 3-3.5 3.5-3.5M11.5 11.5c.5 0 3.5 1 3.5 3.5"
 );
@@ -146,7 +150,7 @@ const entryIconMap: Record<string, React.FC<IconProps>> = {
   manager_annual_leave_query: CalendarIcon,
   manager_department_hours_query: BuildingIcon,
   summary_download: DownloadIcon,
-  account_dashboard: DatabaseIcon,
+  account_dashboard: LedgerBookIcon,
   employees: UsersIcon,
   departments: SitemapIcon,
   shifts: TimerIcon,
