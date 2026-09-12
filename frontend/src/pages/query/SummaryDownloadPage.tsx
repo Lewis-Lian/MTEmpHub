@@ -872,6 +872,7 @@ export default function SummaryDownloadPage() {
           <AccountSetSelector
             accountSets={bootstrap.account_sets}
             compact
+            hint="按所选账套月份导出考勤数据，未切换时默认当前激活账套。"
             label="账套月份"
             onChange={setSelectedMonth}
             value={selectedMonth}
