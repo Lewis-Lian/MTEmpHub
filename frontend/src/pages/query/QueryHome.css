@@ -13,9 +13,9 @@
   --qh-navy-mid: #2c4d70;
   --qh-navy-soft: #dfe8f1;
   --qh-navy-pale: #f2f6fa;
-  --qh-ink: var(--ent-text, #183153);
-  --qh-muted: var(--ent-text-secondary, #64748b);
-  --qh-border: var(--ent-border-strong, #cbd5e1);
+  --qh-ink: #183153;
+  --qh-muted: #64748b;
+  --qh-border: #cbd5e1;
   height: calc(100dvh - 92px);
   min-height: 0;
   max-height: calc(100dvh - 92px);

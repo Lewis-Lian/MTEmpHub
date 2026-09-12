@@ -206,7 +206,12 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
         {error ? <div className="app-sidebar-error">{error}</div> : null}
         {!isLoading && !error ? (
           <>
-            <AppModuleNav collapsed={sidebarCollapsed} currentModule={currentModule} modules={modules} />
+            <AppModuleNav
+              collapsed={sidebarCollapsed}
+              currentEntry={currentEntry}
+              currentModule={currentModule}
+              modules={modules}
+            />
             <AppPageNav
               collapsed={sidebarCollapsed}
               currentEntry={currentEntry}
@@ -215,20 +220,38 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
             />
           </>
         ) : null}
+        {!sidebarCollapsed && (
+          <div className="app-sidebar-footer">
+            <button
+              className="app-sidebar-toggle app-sidebar-collapse-btn"
+              onClick={() => setSidebarCollapsed(true)}
+              title="收起导航"
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="10 3 5 8 10 13" />
+              </svg>
+              <span>收起导航</span>
+            </button>
+          </div>
+        )}
+      </aside>
+      {sidebarCollapsed && (
         <button
-          className="app-sidebar-toggle"
-          onClick={() => setSidebarCollapsed((v) => !v)}
-          style={{ marginTop: 0 }}
-          title={sidebarCollapsed ? "展开侧边栏" : "收起侧边栏"}
+          className="app-sidebar-toggle app-sidebar-floating-toggle"
+          onClick={() => setSidebarCollapsed(false)}
+          title="展开导航"
+          aria-label="展开导航"
           type="button"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            {sidebarCollapsed
-              ? <path d="M6 3l5 5-5 5" />
-              : <path d="M10 3L5 8l5 5" />}
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="2" width="12" height="12" rx="2" />
+            <line x1="6" y1="2" x2="6" y2="14" />
+            <polyline points="9 6 11 8 9 10" />
           </svg>
+          <span className="floating-toggle-label">展开导航</span>
         </button>
-      </aside>
+      )}
       <div className="top-nav" style={{ display: "none" }} />
       <main className="app-main app-workspace app-workspace-frame">
         {!isLoading && !error ? (
