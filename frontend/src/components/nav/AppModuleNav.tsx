@@ -18,21 +18,18 @@ export default function AppModuleNav({
   modules,
 }: AppModuleNavProps) {
   const navigate = useNavigate();
-  const [expandedSlug, setExpandedSlug] = useState<string | null>(() => currentModule?.slug ?? null);
+  const [expandedSlug, setExpandedSlug] = useState<string | null>(() => {
+    return currentModule?.slug && currentModule.slug !== "home" ? currentModule.slug : null;
+  });
 
   useEffect(() => {
-    if (currentModule?.slug) {
+    if (currentModule?.slug && currentModule.slug !== "home") {
       setExpandedSlug(currentModule.slug);
     }
   }, [currentModule?.slug]);
 
   const handleModuleClick = (module: QueryNavigationModule) => {
-    if (collapsed) {
-      navigate(module.home_href);
-      return;
-    }
-
-    if (module.entries.length === 0) {
+    if (collapsed || module.entries.length === 0) {
       navigate(module.home_href);
       return;
     }
@@ -46,23 +43,38 @@ export default function AppModuleNav({
         {modules.map((module) => {
           const Icon = getModuleIcon(module.slug);
           const isCurrentModule = currentModule?.slug === module.slug;
-          const isExpanded = !collapsed && expandedSlug === module.slug;
-          const hasEntries = module.entries.length > 0;
+          const isDirectLink =
+            module.slug === "home" ||
+            module.entries.length === 0 ||
+            (module.entries.length === 1 && module.entries[0]?.href === module.home_href);
+          const hasEntries = !isDirectLink && module.entries.length > 0;
+          const isExpanded = !collapsed && hasEntries && expandedSlug === module.slug;
 
           return (
             <div className={`app-nav-group${isExpanded ? " is-expanded" : ""}`} key={module.slug}>
-              <button
-                type="button"
-                className={`app-module-link${isCurrentModule ? " is-active" : ""}`}
-                title={collapsed ? module.label : undefined}
-                onClick={() => handleModuleClick(module)}
-                aria-expanded={hasEntries ? isExpanded : undefined}
-              >
-                {Icon && <Icon className="nav-icon" />}
-                {!collapsed && (
-                  <>
-                    <span className="app-module-link-label">{module.label}</span>
-                    {hasEntries && (
+              {isDirectLink ? (
+                <NavLink
+                  to={module.home_href}
+                  className={({ isActive }) =>
+                    `app-module-link${isActive || isCurrentModule ? " is-active" : ""}`
+                  }
+                  title={collapsed ? module.label : undefined}
+                >
+                  {Icon && <Icon className="nav-icon" />}
+                  {!collapsed && <span className="app-module-link-label">{module.label}</span>}
+                </NavLink>
+              ) : (
+                <button
+                  type="button"
+                  className={`app-module-link${isCurrentModule ? " is-active" : ""}`}
+                  title={collapsed ? module.label : undefined}
+                  onClick={() => handleModuleClick(module)}
+                  aria-expanded={hasEntries ? isExpanded : undefined}
+                >
+                  {Icon && <Icon className="nav-icon" />}
+                  {!collapsed && (
+                    <>
+                      <span className="app-module-link-label">{module.label}</span>
                       <span className={`app-module-chevron${isExpanded ? " is-expanded" : ""}`} aria-hidden="true">
                         <svg
                           width="14"
@@ -77,10 +89,10 @@ export default function AppModuleNav({
                           <polyline points="4 6 8 10 12 6" />
                         </svg>
                       </span>
-                    )}
-                  </>
-                )}
-              </button>
+                    </>
+                  )}
+                </button>
+              )}
 
               {hasEntries && (
                 <div className={`app-module-subnav${isExpanded ? " is-expanded" : ""}`}>
