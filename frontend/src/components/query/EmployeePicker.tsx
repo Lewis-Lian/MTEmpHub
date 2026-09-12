@@ -16,6 +16,7 @@ interface EmployeePickerProps {
   selectedIds: number[];
   onChange: (ids: number[]) => void;
   singleSelect?: boolean;
+  emptyHint?: string;
 }
 
 type DepartmentFilter = number | "all";
@@ -35,6 +36,7 @@ export default function EmployeePicker({
   selectedIds,
   onChange,
   singleSelect = false,
+  emptyHint = "未选择员工时，将按当前账号可见范围查询全部员工。",
 }: EmployeePickerProps) {
   const [draftSelectedIds, setDraftSelectedIds] = useState<number[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -90,8 +92,8 @@ export default function EmployeePicker({
     filteredEmployees.length > 0 &&
     filteredEmployees.every((employee) => draftSelectedIds.includes(employee.id));
   const summaryText = selectedIds.length
-    ? summarizeSelection(selectedIds, eligibleEmployees)
-    : "未选择员工时，将按当前账号可见范围查询全部员工。";
+    ? summarizeSelection(selectedIds, eligibleEmployees, emptyHint)
+    : emptyHint;
   const inputSummary = summarizeInputValue(selectedIds, eligibleEmployees);
   const quickFilteredEmployees = useMemo(() => {
     const normalizedKeyword = normalizeEmployeeKeyword(quickKeyword);
@@ -536,7 +538,11 @@ function matchesFilterMode(
   return true;
 }
 
-function summarizeSelection(selectedIds: number[], employees: QueryEmployee[]): string {
+function summarizeSelection(
+  selectedIds: number[],
+  employees: QueryEmployee[],
+  emptyHint: string,
+): string {
   const employeeMap = new Map(employees.map((employee) => [employee.id, employee]));
   const names = selectedIds
     .map((employeeId) => employeeMap.get(employeeId))
@@ -544,7 +550,7 @@ function summarizeSelection(selectedIds: number[], employees: QueryEmployee[]): 
     .map((employee) => `${employee.emp_no} ${employee.name}`);
 
   if (!names.length) {
-    return "未选择员工时，将按当前账号可见范围查询全部员工。";
+    return emptyHint;
   }
 
   const preview = names.slice(0, 2).join("、");

@@ -105,6 +105,8 @@ export const UserCogIcon = icon(
   "M6.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM3 15c0-2.5 3-3.5 3.5-3.5M14 14l2 2M14 16l2-2"
 );
 
+export const SendIcon = icon("M17.5 2.5L2.5 9l6 2.5L11 17.5 17.5 2.5zM8.5 11.5l9-9M11 17.5l2-5 4.5-10");
+
 export const UserXIcon = icon(
   "M6.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM3 15c0-2.5 3-3.5 3.5-3.5M14 12l4 4M14 16l4-4"
 );
@@ -159,6 +161,7 @@ const entryIconMap: Record<string, React.FC<IconProps>> = {
   manager_overtime: ClockPlusIcon,
   manager_annual_leave: CalendarIcon,
   accounts: UserCogIcon,
+  messages: SendIcon,
   disabled_users: UserXIcon,
   attendance_source: SlidersIcon,
   database_settings: DatabaseIcon,

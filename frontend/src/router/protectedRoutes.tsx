@@ -3,6 +3,7 @@ import type { ComponentType, LazyExoticComponent, ReactElement } from "react";
 
 const AccountsPage = lazy(() => import("../pages/admin/AccountsPage"));
 const AdminDashboardPage = lazy(() => import("../pages/admin/AdminDashboardPage"));
+const AdminMessagesPage = lazy(() => import("../pages/admin/AdminMessagesPage"));
 const AttendanceSourceSettingsPage = lazy(() => import("../pages/admin/AttendanceSourceSettingsPage"));
 const DepartmentsPage = lazy(() => import("../pages/admin/DepartmentsPage"));
 const DisabledUsersPage = lazy(() => import("../pages/admin/DisabledUsersPage"));
@@ -50,6 +51,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(SummaryDownloadPage), path: "/employee/summary-download" },
   { element: lazyPage(AdminDashboardPage), path: "/admin/dashboard" },
   { element: lazyPage(AccountsPage), path: "/admin/accounts" },
+  { element: lazyPage(AdminMessagesPage), path: "/admin/messages" },
   { element: lazyPage(AttendanceSourceSettingsPage), path: "/admin/attendance-source" },
   { element: lazyPage(DisabledUsersPage), path: "/admin/disabled-users" },
   { element: lazyPage(EmployeesPage), path: "/admin/employees/manage" },

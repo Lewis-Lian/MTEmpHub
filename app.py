@@ -26,6 +26,7 @@ from models.attendance_override_history import AttendanceOverrideHistory
 from models.account_set import AccountSet, AccountSetImport
 from models.system_setting import SystemSetting
 from models.dingtalk_sync_run import DingTalkSyncRun
+from models.message import Message
 from routes import configure_api_cors, register_routes
 
 _compat_app: Flask | None = None

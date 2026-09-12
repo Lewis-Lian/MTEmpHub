@@ -207,6 +207,13 @@ MODULES: list[dict[str, Any]] = [
                 "description": "维护管理员和只读账号权限。",
             },
             {
+                "key": "messages",
+                "label": "发送消息",
+                "href": "/admin/messages",
+                "admin_only": True,
+                "description": "以系统管理员身份向任意账号发送站内消息。",
+            },
+            {
                 "key": "disabled_users",
                 "label": "禁用用户",
                 "href": "/admin/disabled-users",
