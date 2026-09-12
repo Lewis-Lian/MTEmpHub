@@ -125,6 +125,18 @@
   color: #183153;
 }
 
+/* 直达一级菜单激活态（如首页，与二级菜单激活态保持一致的背景高亮效果） */
+.app-module-link.is-direct-link.is-active {
+  background: rgba(15, 23, 42, 0.07) !important;
+  color: #0f172a !important;
+  font-weight: 600 !important;
+}
+
+.app-module-link.is-direct-link.is-active .nav-icon {
+  opacity: 1;
+  color: #183153;
+}
+
 .app-module-link:focus-visible {
   outline: 2px solid #2563eb;
   outline-offset: 1px;
