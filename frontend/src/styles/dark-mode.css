@@ -474,8 +474,33 @@
   color: #f8fafc !important;
 }
 
-[data-theme="dark"] .month-picker-cell:hover {
-  background: #334155 !important;
+[data-theme="dark"] .month-picker-chevron {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .month-picker-chevron.is-open {
+  color: #38bdf8 !important;
+}
+
+[data-theme="dark"] .query-filter-rail .month-picker-split-trigger {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  box-shadow: none !important;
+}
+
+[data-theme="dark"] .query-filter-rail .month-picker-split-trigger:hover:not(.is-disabled) {
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .query-filter-rail .month-picker-split-trigger.is-open {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25) !important;
+}
+
+[data-theme="dark"] .month-picker-cell.is-selected {
+  background: rgba(56, 189, 248, 0.2) !important;
+  color: #38bdf8 !important;
+  border-color: #0284c7 !important;
 }
 
 /* 多选下拉框 MultiSelectDropdown */
