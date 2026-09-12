@@ -49,7 +49,7 @@
 
 [data-theme="dark"] .app-layout {
   background-color: #0f172a !important;
-  background-image: radial-gradient(circle at 1px 1px, #334155 1.5px, transparent 0) !important;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0) !important;
   color: #f8fafc !important;
 }
 
@@ -59,21 +59,89 @@
   color: #f8fafc !important;
 }
 
-/* 2. 侧边栏 */
+/* 2. 侧边栏及树形导航 (高对比度、清晰可视) */
 [data-theme="dark"] .app-sidebar {
   background: #0f172a !important;
   border-right-color: #1e293b !important;
 }
 
+[data-theme="dark"] .app-sidebar-brand h1 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-sidebar-caption,
+[data-theme="dark"] .app-sidebar-hint,
+[data-theme="dark"] .app-sidebar-brand p,
+[data-theme="dark"] .app-sidebar-brand small {
+  color: #94a3b8 !important;
+}
+
+/* 一级目录项 */
+[data-theme="dark"] .app-module-link {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-module-link .nav-icon {
+  opacity: 0.85 !important;
+}
+
+[data-theme="dark"] .app-module-chevron {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .app-module-chevron.is-expanded {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .app-module-link:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-module-link.is-active {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .app-module-link.is-active .nav-icon {
+  color: #60a5fa !important;
+  opacity: 1 !important;
+}
+
+/* 二级目录项 */
+[data-theme="dark"] .app-module-subnav .app-side-link,
+[data-theme="dark"] .app-side-link {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-side-link .nav-icon {
+  opacity: 0.8 !important;
+}
+
+[data-theme="dark"] .app-side-link:hover:not(.is-active) {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-side-link.is-active {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #60a5fa !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="dark"] .app-side-link.is-active .nav-icon {
+  color: #60a5fa !important;
+  opacity: 1 !important;
+}
+
 [data-theme="dark"] .app-sidebar-toggle {
-  background: #1e293b;
-  border-color: #334155;
-  color: #94a3b8;
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
 }
 
 [data-theme="dark"] .app-sidebar-toggle:hover {
-  background: #334155;
-  color: #f8fafc;
+  background: #334155 !important;
+  color: #f8fafc !important;
 }
 
 /* 3. 顶栏 AppHeader */
@@ -99,8 +167,21 @@
   color: #94a3b8 !important;
 }
 
+[data-theme="dark"] .app-header-icon-btn {
+  color: #94a3b8 !important;
+}
+
 [data-theme="dark"] .app-header-icon-btn:hover {
   background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .app-header-breadcrumb-parent,
+[data-theme="dark"] .app-header-breadcrumb-separator {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .app-header-breadcrumb-current {
   color: #f8fafc !important;
 }
 
@@ -173,11 +254,44 @@
   color: #f87171 !important;
 }
 
-/* 5. 查询页面外壳与筛选面板 */
+/* 5. 首页与编辑式卡片 (解决首页考勤日历白块问题) */
+[data-theme="dark"] .query-home-container.qh-editorial-shell,
+[data-theme="dark"] .qh-editorial-page {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .qh-editorial-calendar,
+[data-theme="dark"] .qh-editorial-leave,
+[data-theme="dark"] .qh-editorial-summary {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45) !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .qh-editorial-section-heading h3,
+[data-theme="dark"] .qh-editorial-section-heading span,
+[data-theme="dark"] .qh-editorial-leave-heading h3,
+[data-theme="dark"] .qh-editorial-leave-total strong {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .qh-editorial-section-heading p,
+[data-theme="dark"] .qh-editorial-leave-heading p {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .qh-editorial-assistive-title,
+[data-theme="dark"] .qh-editorial-narrative {
+  color: #94a3b8 !important;
+}
+
+/* 6. 查询页面外壳与筛选面板 */
 [data-theme="dark"] .employee-dashboard-page,
 [data-theme="dark"] .query-page-shell {
   background-color: #0f172a !important;
-  background-image: radial-gradient(circle at 1px 1px, #334155 1.5px, transparent 0) !important;
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.08) 1.5px, transparent 0) !important;
   color: #f8fafc !important;
 }
 
@@ -208,7 +322,7 @@
   color: #94a3b8 !important;
 }
 
-/* 6. 表单输入与选择器 (包含账套选择、员工选择输入框、下拉框) */
+/* 7. 表单输入与选择器 (包含账套选择、员工选择输入框、月份选择器) */
 [data-theme="dark"] .form-control,
 [data-theme="dark"] .form-select,
 [data-theme="dark"] .employee-dashboard-page .form-select,
@@ -271,6 +385,48 @@
   background: #334155 !important;
 }
 
+/* 月份选择器 MonthPicker */
+[data-theme="dark"] .month-picker-split-trigger {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .month-picker-split-value {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .month-picker-icon {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .month-picker-dropdown,
+[data-theme="dark"] .month-picker-panel-body {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .month-picker-year-label {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .month-picker-nav-btn {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .month-picker-nav-btn:hover {
+  background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .month-picker-cell {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .month-picker-cell:hover {
+  background: #334155 !important;
+}
+
 /* 多选下拉框 MultiSelectDropdown */
 [data-theme="dark"] .multi-select-trigger {
   background: #0f172a !important;
@@ -293,7 +449,7 @@
   background: #334155 !important;
 }
 
-/* 7. 表格与结果面板 (解决白块、斑马条纹、空状态与分页器) */
+/* 8. 表格与结果面板 */
 [data-theme="dark"] .query-workspace {
   background: transparent !important;
 }
@@ -311,7 +467,8 @@
 [data-theme="dark"] .query-result-table .legacy-table-wrap,
 [data-theme="dark"] .legacy-table-wrap,
 [data-theme="dark"] .legacy-table-panel,
-[data-theme="dark"] .employee-dashboard-page .legacy-table-panel {
+[data-theme="dark"] .employee-dashboard-page .legacy-table-panel,
+[data-theme="dark"] .attendance-override-table-panel {
   background: #1e293b !important;
   border-color: #334155 !important;
 }
@@ -323,7 +480,7 @@
 [data-theme="dark"] .legacy-table-head-cell,
 [data-theme="dark"] .account-table th,
 [data-theme="dark"] .master-static-head {
-  background: #0f172a !important;
+  background: #162032 !important;
   color: #94a3b8 !important;
   border-bottom-color: #334155 !important;
 }
@@ -397,7 +554,129 @@
   background: #334155 !important;
 }
 
-/* 8. 卡片、面板与弹窗 (全局通用) */
+/* 9. 汇总下载页面 SummaryDownloadPage 深度暗黑适配 */
+[data-theme="dark"] .summary-page-container {
+  background: #0f172a !important;
+}
+
+[data-theme="dark"] .summary-step-card {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .summary-step-card h3,
+[data-theme="dark"] .summary-step-card .step-title {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .summary-step-card .step-desc,
+[data-theme="dark"] .summary-step-card .step-tip {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .summary-step-card .form-control,
+[data-theme="dark"] .summary-step-card input[type="text"],
+[data-theme="dark"] .summary-step-card .employee-lookup .form-control {
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .sheet-selection-card {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .sheet-label-text {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .sheet-badge-type {
+  background: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .sheet-selection-card.checked {
+  background: rgba(59, 130, 246, 0.15) !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .sheet-selection-card.checked .sheet-label-text {
+  color: #60a5fa !important;
+}
+
+[data-theme="dark"] .preset-card-btn {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .preset-card-btn h4 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .preset-card-btn p {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .preset-card-btn.active-preset-1 {
+  background: #1e293b !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .preset-card-btn.active-preset-2 {
+  background: #1e293b !important;
+  border-color: #10b981 !important;
+}
+
+[data-theme="dark"] .header-badge-item {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .header-badge-item:hover {
+  background: #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .header-badge-item.checked {
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: #3b82f6 !important;
+  color: #60a5fa !important;
+}
+
+/* 10. 按钮与次要控件高对比度适配 (解决文字与背景同色、泥灰色无对比等问题) */
+[data-theme="dark"] .account-panel-selector .btn-settings {
+  background: #334155 !important;
+  color: #f8fafc !important;
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .account-panel-selector .btn-settings:hover:not(:disabled) {
+  background: #475569 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .query-filter-actions .btn-outline-secondary,
+[data-theme="dark"] .btn-outline-secondary {
+  background: #334155 !important;
+  color: #f8fafc !important;
+  border: 1px solid #475569 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2) !important;
+}
+
+[data-theme="dark"] .query-filter-actions .btn-outline-secondary:hover:not(:disabled),
+[data-theme="dark"] .btn-outline-secondary:hover:not(:disabled) {
+  background: #475569 !important;
+  color: #ffffff !important;
+  border-color: #64748b !important;
+}
+
+/* 11. 卡片、面板与弹窗 (全局通用) */
 [data-theme="dark"] .card,
 [data-theme="dark"] .account-card,
 [data-theme="dark"] .master-filter-panel,
@@ -440,7 +719,7 @@
   color: #f8fafc !important;
 }
 
-/* 员工选择弹窗 EmployeePicker */
+/* 员工选择弹窗 EmployeePicker / DepartmentPicker */
 [data-theme="dark"] .employee-picker-modal .modal-content {
   background: #1e293b !important;
   border-color: #334155 !important;
@@ -480,7 +759,7 @@
   background: #334155 !important;
 }
 
-/* 9. 考勤日历网格 AttendanceCalendar */
+/* 12. 考勤日历网格 AttendanceCalendar */
 [data-theme="dark"] .attendance-calendar-cell {
   background: #1e293b !important;
   border-color: #334155 !important;
@@ -503,16 +782,4 @@
   background: #334155 !important;
   color: #f8fafc !important;
   border-color: #475569 !important;
-}
-
-/* 10. 汇总下载等报表卡片 */
-[data-theme="dark"] .preset-card-btn,
-[data-theme="dark"] .sheet-selection-card {
-  background: #1e293b !important;
-  border-color: #334155 !important;
-  color: #f8fafc !important;
-}
-
-[data-theme="dark"] .preset-card-btn:hover {
-  border-color: #60a5fa !important;
 }
