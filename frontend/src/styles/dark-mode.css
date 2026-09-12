@@ -449,6 +449,58 @@
   background: #334155 !important;
 }
 
+/* 员工/部门快速选择浮层 EmployeePicker / DepartmentPicker float list */
+[data-theme="dark"] .employee-float-list {
+  background: #1e293b !important;
+  border-color: #334155 !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .employee-option {
+  color: #f8fafc !important;
+  background: transparent !important;
+}
+
+[data-theme="dark"] .employee-option:hover {
+  background: #334155 !important;
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .employee-option.active {
+  background: rgba(59, 130, 246, 0.22) !important;
+  color: #60a5fa !important;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .quick-employee-select-all {
+  border-bottom: 1px solid #334155 !important;
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .quick-option-label {
+  color: inherit !important;
+}
+
+[data-theme="dark"] .quick-option-count {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .employee-float-list .quick-option-check,
+[data-theme="dark"] .employee-float-list .form-check-input {
+  background-color: #0f172a !important;
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .employee-float-list .quick-option-check:checked,
+[data-theme="dark"] .employee-float-list .form-check-input:checked {
+  background-color: #3b82f6 !important;
+  border-color: #3b82f6 !important;
+}
+
+[data-theme="dark"] .employee-float-list .text-muted {
+  color: #94a3b8 !important;
+}
+
 /* 8. 表格与结果面板 */
 [data-theme="dark"] .query-workspace {
   background: transparent !important;
@@ -555,39 +607,67 @@
 }
 
 /* 9. 汇总下载页面 SummaryDownloadPage 深度暗黑适配 */
-[data-theme="dark"] .summary-page-container {
+[data-theme="dark"] .summary-download-container {
   background: #0f172a !important;
+  color: #f8fafc !important;
 }
 
-[data-theme="dark"] .summary-step-card {
+[data-theme="dark"] .summary-download-container .step-card,
+[data-theme="dark"] .step-card {
   background: #1e293b !important;
   border-color: #334155 !important;
   color: #f8fafc !important;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
 }
 
-[data-theme="dark"] .summary-step-card h3,
-[data-theme="dark"] .summary-step-card .step-title {
+[data-theme="dark"] .summary-download-container .step-card:hover,
+[data-theme="dark"] .step-card:hover {
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .summary-download-container .step-header,
+[data-theme="dark"] .step-header {
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .summary-download-container .step-title,
+[data-theme="dark"] .step-title {
   color: #f8fafc !important;
 }
 
-[data-theme="dark"] .summary-step-card .step-desc,
-[data-theme="dark"] .summary-step-card .step-tip {
+[data-theme="dark"] .summary-download-container .step-desc,
+[data-theme="dark"] .step-desc {
   color: #94a3b8 !important;
 }
 
-[data-theme="dark"] .summary-step-card .form-control,
-[data-theme="dark"] .summary-step-card input[type="text"],
-[data-theme="dark"] .summary-step-card .employee-lookup .form-control {
+[data-theme="dark"] .summary-download-container .employee-lookup .form-control,
+[data-theme="dark"] .summary-download-container .form-control,
+[data-theme="dark"] .summary-download-container input[type="text"] {
   background: #0f172a !important;
   color: #f8fafc !important;
   border-color: #334155 !important;
+}
+
+[data-theme="dark"] .summary-download-container .employee-lookup .btn {
+  background: #334155 !important;
+  color: #94a3b8 !important;
+  border-color: #475569 !important;
+}
+
+[data-theme="dark"] .summary-download-container .employee-lookup .btn:hover {
+  background: #475569 !important;
+  color: #f8fafc !important;
 }
 
 [data-theme="dark"] .sheet-selection-card {
   background: #0f172a !important;
   border-color: #334155 !important;
   color: #f8fafc !important;
+}
+
+[data-theme="dark"] .sheet-selection-card:hover {
+  border-color: #475569 !important;
+  background: #162032 !important;
 }
 
 [data-theme="dark"] .sheet-label-text {
@@ -602,10 +682,16 @@
 [data-theme="dark"] .sheet-selection-card.checked {
   background: rgba(59, 130, 246, 0.15) !important;
   border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 1px #3b82f6 !important;
 }
 
 [data-theme="dark"] .sheet-selection-card.checked .sheet-label-text {
   color: #60a5fa !important;
+}
+
+[data-theme="dark"] .sheet-selection-card.checked .sheet-badge-type {
+  background: #3b82f6 !important;
+  color: #ffffff !important;
 }
 
 [data-theme="dark"] .preset-card-btn {
@@ -614,6 +700,12 @@
   color: #f8fafc !important;
 }
 
+[data-theme="dark"] .preset-card-btn:hover {
+  border-color: #475569 !important;
+  background: #162032 !important;
+}
+
+[data-theme="dark"] .preset-card-btn strong,
 [data-theme="dark"] .preset-card-btn h4 {
   color: #f8fafc !important;
 }
@@ -623,13 +715,21 @@
 }
 
 [data-theme="dark"] .preset-card-btn.active-preset-1 {
-  background: #1e293b !important;
+  background: rgba(59, 130, 246, 0.15) !important;
   border-color: #3b82f6 !important;
 }
 
+[data-theme="dark"] .preset-card-btn.active-preset-1 strong {
+  color: #60a5fa !important;
+}
+
 [data-theme="dark"] .preset-card-btn.active-preset-2 {
-  background: #1e293b !important;
+  background: rgba(16, 185, 129, 0.15) !important;
   border-color: #10b981 !important;
+}
+
+[data-theme="dark"] .preset-card-btn.active-preset-2 strong {
+  color: #34d399 !important;
 }
 
 [data-theme="dark"] .header-badge-item {
@@ -647,6 +747,18 @@
   background: rgba(59, 130, 246, 0.2) !important;
   border-color: #3b82f6 !important;
   color: #60a5fa !important;
+}
+
+[data-theme="dark"] .summary-download-checklist {
+  border-bottom-color: #334155 !important;
+}
+
+[data-theme="dark"] .summary-download-checklist .legacy-checklist-title {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .legacy-field-hint {
+  color: #94a3b8 !important;
 }
 
 /* 10. 按钮与次要控件高对比度适配 (解决文字与背景同色、泥灰色无对比等问题) */
