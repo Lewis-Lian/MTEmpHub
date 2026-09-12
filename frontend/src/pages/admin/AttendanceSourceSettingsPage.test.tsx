@@ -13,6 +13,7 @@ const { apiMock, notificationMock, authMock } = vi.hoisted(() => ({
     testCardDbConnection: vi.fn(),
     syncEmployeeAttendance: vi.fn(),
     fetchEmployeeAttendanceSyncHistory: vi.fn(async () => []),
+    fetchSyncProgress: vi.fn(async () => ({ account_set_id: 7, sync_type: "employee", status: "idle", percent: 0, stage: "" })),
     cardAttendanceUnmatchedCsvUrl: vi.fn((id: number) => `https://api.example.test/api/admin/employee-attendance/sync-runs/${id}/unmatched.csv`),
   },
   notificationMock: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() },
@@ -285,5 +286,44 @@ describe("AttendanceSourceSettingsPage", () => {
       "href",
       "https://api.example.test/api/admin/employee-attendance/sync-runs/11/unmatched.csv",
     );
+  });
+
+  it("renders a real progress bar while sync is in flight and updates with polled progress", async () => {
+    let resolveSync!: (value: any) => void;
+    const pendingSync = new Promise((resolve) => { resolveSync = resolve; });
+    apiMock.fetchSyncProgress.mockResolvedValue({
+      account_set_id: 7,
+      sync_type: "employee",
+      status: "running",
+      percent: 48,
+      stage: "正在匹配员工打卡流水 (1200 / 2500)...",
+    });
+
+    setup(() => {
+      apiMock.fetchAttendanceSettings.mockResolvedValue({
+        manager_attendance_source: "local",
+        dingtalk_configured: true,
+        employee_attendance_source: "card_db",
+        card_db: { host: "192.0.2.10" },
+        card_db_configured: true,
+      });
+      apiMock.syncEmployeeAttendance.mockReturnValue(pendingSync as never);
+    });
+    await screen.findByText("考勤机数据库已配置");
+    fireEvent.click(screen.getByRole("button", { name: "同步员工考勤" }));
+
+    // 进度条即时渲染
+    const progressBar = await screen.findByRole("progressbar", { name: "员工考勤同步进度" });
+    expect(progressBar).toBeInTheDocument();
+
+    // 轮询更新真实阶段与百分比
+    await waitFor(() => {
+      expect(screen.getByText("正在匹配员工打卡流水 (1200 / 2500)...")).toBeInTheDocument();
+      expect(screen.getByText("48%")).toBeInTheDocument();
+    });
+
+    // 同步完成响应
+    resolveSync({ status: "success", read_count: 50, imported_count: 50, unmatched_count: 0, unmatched: [], sync_run_id: 15, message: "ok" });
+    await waitFor(() => expect(screen.getByText("同步成功")).toBeInTheDocument());
   });
 });

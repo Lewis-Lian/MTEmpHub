@@ -105,9 +105,13 @@ def _failed_run(account_set_id: int, month: str, started_at: datetime, error: Ex
 
 def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
     """Fetch a month of card punches, upsert employee daily rows, and persist the run report."""
+    from services.sync_progress_service import update_sync_progress
+
     started_at = datetime.utcnow()
+    update_sync_progress(account_set_id, "employee", 5, "正在连接考勤机数据库并查询打卡记录...", "running")
     account_set = db.session.get(AccountSet, account_set_id)
     if account_set is None:
+        update_sync_progress(account_set_id, "employee", 100, "账套不存在", "failed")
         raise ValueError("Account set does not exist")
     start_date, end_date = _month_bounds(month)
 
@@ -127,12 +131,32 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
     try:
         records = list(client.attendance_records(start_date, end_date))
     except Exception as exc:
+        update_sync_progress(account_set_id, "employee", 100, f"读取考勤机打卡记录失败: {exc}", "failed")
         return _failed_run(account_set_id, month, started_at, exc)
+
+    total_records = len(records)
+    update_sync_progress(
+        account_set_id,
+        "employee",
+        20,
+        f"读取到 {total_records} 条考勤机记录，正在匹配员工工号..." if total_records > 0 else "未查询到当月打卡记录",
+        "running",
+    )
 
     grouped = defaultdict(list)
     imported_count = 0
+    step_records = max(1, total_records // 10) if total_records > 0 else 1
     try:
-        for item in records:
+        for idx, item in enumerate(records):
+            if total_records > 0 and (idx % step_records == 0 or idx == total_records - 1):
+                pct = 20 + int(45 * (idx + 1) / total_records)
+                update_sync_progress(
+                    account_set_id,
+                    "employee",
+                    pct,
+                    f"正在匹配员工工号与考勤记录 ({idx + 1}/{total_records})...",
+                    "running",
+                )
             record_date = item.get("record_date")
             if not isinstance(record_date, date):
                 continue
@@ -157,6 +181,15 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
             grouped[(employee.id, record_date)].append(item)
             imported_count += 1
 
+        total_groups = len(grouped)
+        update_sync_progress(
+            account_set_id,
+            "employee",
+            68,
+            f"正在比对已有每日考勤记录（共 {total_groups} 条日记录）...",
+            "running",
+        )
+
         existing = {}
         if grouped:
             employee_ids = {key[0] for key in grouped}
@@ -167,7 +200,18 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
             )
             existing = {(row.emp_id, row.record_date): row for row in rows}
         employees_by_id = {employee.id: employee for employee in employees}
-        for key, daily_items in grouped.items():
+
+        step_groups = max(1, total_groups // 10) if total_groups > 0 else 1
+        for g_idx, (key, daily_items) in enumerate(grouped.items()):
+            if total_groups > 0 and (g_idx % step_groups == 0 or g_idx == total_groups - 1):
+                pct = 70 + int(26 * (g_idx + 1) / total_groups)
+                update_sync_progress(
+                    account_set_id,
+                    "employee",
+                    pct,
+                    f"正在写入员工每日考勤 ({g_idx + 1}/{total_groups})...",
+                    "running",
+                )
             employee_id, record_date = key
             row = existing.get(key)
             if row is None:
@@ -207,6 +251,8 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
         )
         db.session.add(run)
         db.session.commit()
+        update_sync_progress(account_set_id, "employee", 100, "员工考勤同步完成", "finished")
         return _result(run)
     except Exception as exc:
+        update_sync_progress(account_set_id, "employee", 100, f"员工考勤同步失败: {exc}", "failed")
         return _failed_run(account_set_id, month, started_at, exc)

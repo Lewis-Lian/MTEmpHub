@@ -75,6 +75,23 @@ export function cardAttendanceUnmatchedCsvUrl(syncRunId: number): string {
   return buildApiUrl(`/api/admin/employee-attendance/sync-runs/${syncRunId}/unmatched.csv`);
 }
 
+export interface SyncProgress {
+  account_set_id: number;
+  sync_type: "employee" | "manager";
+  status: "idle" | "running" | "finished" | "failed";
+  percent: number;
+  stage: string;
+}
+
+export function fetchSyncProgress(
+  accountSetId: number,
+  type: "employee" | "manager",
+): Promise<SyncProgress> {
+  return apiRequest<SyncProgress>(
+    `/api/admin/account-sets/${accountSetId}/sync-progress?type=${encodeURIComponent(type)}`,
+  );
+}
+
 export function fetchAttendanceSettings(): Promise<AdminAttendanceSettings> {
   return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings");
 }
