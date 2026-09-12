@@ -43,10 +43,7 @@ export default function AppModuleNav({
         {modules.map((module) => {
           const Icon = getModuleIcon(module.slug);
           const isCurrentModule = currentModule?.slug === module.slug;
-          const isDirectLink =
-            module.slug === "home" ||
-            module.entries.length === 0 ||
-            (module.entries.length === 1 && module.entries[0]?.href === module.home_href);
+          const isDirectLink = module.slug === "home" || module.entries.length === 0;
           const hasEntries = !isDirectLink && module.entries.length > 0;
           const isExpanded = !collapsed && hasEntries && expandedSlug === module.slug;
 
@@ -56,7 +53,7 @@ export default function AppModuleNav({
                 <NavLink
                   to={module.home_href}
                   className={({ isActive }) =>
-                    `app-module-link${isActive || isCurrentModule ? " is-active" : ""}`
+                    `app-module-link is-direct-link${isActive || isCurrentModule ? " is-active" : ""}`
                   }
                   title={collapsed ? module.label : undefined}
                 >

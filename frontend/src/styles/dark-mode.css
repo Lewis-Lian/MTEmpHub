@@ -107,6 +107,17 @@
   opacity: 1 !important;
 }
 
+[data-theme="dark"] .app-module-link.is-direct-link.is-active {
+  background: rgba(59, 130, 246, 0.18) !important;
+  color: #60a5fa !important;
+  font-weight: 600 !important;
+}
+
+[data-theme="dark"] .app-module-link.is-direct-link.is-active .nav-icon {
+  color: #60a5fa !important;
+  opacity: 1 !important;
+}
+
 /* 二级目录项 */
 [data-theme="dark"] .app-module-subnav .app-side-link,
 [data-theme="dark"] .app-side-link {
