@@ -987,6 +987,20 @@ def account_sets_calculate_progress(account_set_id: int):
     return get_account_set_calc_progress(account_set_id)
 
 
+@api_admin_bp.get("/account-sets/<int:account_set_id>/sync-progress")
+@admin_required
+def account_set_sync_progress(account_set_id: int):
+    sync_type = (request.args.get("type") or "").strip()
+    if sync_type not in ("employee", "manager"):
+        return jsonify({"account_set_id": account_set_id, "sync_type": sync_type, "status": "idle", "percent": 0, "stage": ""})
+    from services.sync_progress_service import get_sync_progress
+
+    progress = get_sync_progress(account_set_id, sync_type)
+    if progress is None:
+        return jsonify({"account_set_id": account_set_id, "sync_type": sync_type, "status": "idle", "percent": 0, "stage": ""})
+    return jsonify(progress)
+
+
 @api_admin_bp.get("/account-sets/<int:account_set_id>/imports")
 @admin_required
 def account_set_imports(account_set_id: int):

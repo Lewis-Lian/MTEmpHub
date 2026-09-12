@@ -275,9 +275,13 @@ def _failed_run(account_set_id: int, month: str, started_at: datetime, error: Ex
 
 def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) -> dict:
     """Fetch a month of manager punches, upsert daily rows, and persist the run report."""
+    from services.sync_progress_service import update_sync_progress
+
     started_at = datetime.utcnow()
+    update_sync_progress(account_set_id, "manager", 5, "正在获取管理人员信息与钉钉绑定...", "running")
     account_set = db.session.get(AccountSet, account_set_id)
     if account_set is None:
+        update_sync_progress(account_set_id, "manager", 100, "账套不存在", "failed")
         raise ValueError("Account set does not exist")
     start_date, end_date = _month_bounds(month)
     managers = Employee.query.filter_by(is_manager=True).order_by(Employee.id).all()
@@ -292,6 +296,7 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
 
     try:
         if any(not employee.dingtalk_user_id or not str(employee.dingtalk_user_id).strip() for employee in managers):
+            update_sync_progress(account_set_id, "manager", 15, "正在比对钉钉通讯录工号绑定...", "running")
             # 匹配范围是全量员工工号：通讯录里对应本系统任意员工的条目都不是"未匹配"，
             # 否则整个组织会被灌进未匹配报告，只有无法对应任何本地员工的工号才需要提醒。
             local_emp_nos = {
@@ -320,14 +325,35 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
                 if not employee.dingtalk_user_id or not str(employee.dingtalk_user_id).strip():
                     user_ids.append(user_id)
         user_ids = list(dict.fromkeys(user_ids))
+        update_sync_progress(account_set_id, "manager", 25, f"正在从钉钉拉取 {month} 打卡流水...", "running")
         records = list(client.attendance_records(user_ids, start_date, end_date))
     except Exception as exc:
+        update_sync_progress(account_set_id, "manager", 100, f"拉取钉钉考勤失败: {exc}", "failed")
         return _failed_run(account_set_id, month, started_at, exc)
+
+    total_records = len(records)
+    update_sync_progress(
+        account_set_id,
+        "manager",
+        40,
+        f"获取到 {total_records} 条打卡记录，正在匹配考勤日记录..." if total_records > 0 else "未获取到钉钉打卡记录",
+        "running",
+    )
 
     grouped = defaultdict(list)
     imported_count = 0
+    step_records = max(1, total_records // 10) if total_records > 0 else 1
     try:
-        for raw_item in records:
+        for idx, raw_item in enumerate(records):
+            if total_records > 0 and (idx % step_records == 0 or idx == total_records - 1):
+                pct = 40 + int(30 * (idx + 1) / total_records)
+                update_sync_progress(
+                    account_set_id,
+                    "manager",
+                    pct,
+                    f"正在解析钉钉打卡流水 ({idx + 1}/{total_records})...",
+                    "running",
+                )
             item = _normalized_punches(raw_item)
             record_date = _record_date(item.get("date"))
             if not start_date <= record_date <= end_date:
@@ -348,6 +374,15 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
             grouped[(employee.id, record_date)].append(item)
             imported_count += 1
 
+        total_groups = len(grouped)
+        update_sync_progress(
+            account_set_id,
+            "manager",
+            70,
+            f"正在比对已有每日考勤记录（共 {total_groups} 条日记录）...",
+            "running",
+        )
+
         existing = {}
         if grouped:
             employee_ids = {key[0] for key in grouped}
@@ -358,7 +393,18 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
             )
             existing = {(row.emp_id, row.record_date): row for row in rows}
         managers_by_id = {employee.id: employee for employee in managers}
-        for key, daily_items in grouped.items():
+
+        step_groups = max(1, total_groups // 10) if total_groups > 0 else 1
+        for g_idx, (key, daily_items) in enumerate(grouped.items()):
+            if total_groups > 0 and (g_idx % step_groups == 0 or g_idx == total_groups - 1):
+                pct = 70 + int(28 * (g_idx + 1) / total_groups)
+                update_sync_progress(
+                    account_set_id,
+                    "manager",
+                    pct,
+                    f"正在写入管理人员考勤数据 ({g_idx + 1}/{total_groups})...",
+                    "running",
+                )
             employee_id, record_date = key
             row = existing.get(key)
             if row is None:
@@ -388,8 +434,10 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
         )
         db.session.add(run)
         db.session.commit()
+        update_sync_progress(account_set_id, "manager", 100, "管理人员考勤同步完成", "finished")
         return _result(run)
     except Exception as exc:
+        update_sync_progress(account_set_id, "manager", 100, f"管理人员考勤同步失败: {exc}", "failed")
         return _failed_run(account_set_id, month, started_at, exc)
 
 
