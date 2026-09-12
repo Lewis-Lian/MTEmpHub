@@ -5,6 +5,15 @@ export interface AuthUser {
   username: string;
   role: string;
   page_permissions?: Record<string, boolean>;
+  profile_emp_no?: string | null;
+  profile_name?: string | null;
+  profile_dept_id?: number | null;
+  profile_department?: {
+    id?: number;
+    dept_no?: string;
+    dept_name?: string;
+  } | null;
+  dept_name?: string | null;
 }
 
 interface LoginResponse {

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import type { QueryNavigationModule } from "../../types/query";
+import { getEntryIcon, getModuleIcon } from "../icons";
 
 import "../../styles/components/app-tabs.css";
 
@@ -23,28 +25,51 @@ export function reorderTabs(tabs: AppTabItem[], draggedHref: string, targetHref:
 
 interface AppTabsProps {
   currentPath: string;
-  tabs: AppTabItem[];
+  extra?: React.ReactNode;
+  modules?: QueryNavigationModule[];
+  onCloseAllTabs?: () => void;
+  onCloseLeftTabs?: (href: string) => void;
+  onCloseOtherTabs?: (href: string) => void;
+  onCloseRightTabs?: (href: string) => void;
   onCloseTab: (href: string) => void;
   onNavigate: (href: string) => void;
   onRefreshTab: (href: string) => void;
   onReorderTab: (draggedHref: string, targetHref: string) => void;
-  extra?: React.ReactNode;
+  tabs: AppTabItem[];
 }
 
 export default function AppTabs({
   currentPath,
-  tabs,
+  extra,
+  modules,
+  onCloseAllTabs,
+  onCloseLeftTabs,
+  onCloseOtherTabs,
+  onCloseRightTabs,
   onCloseTab,
   onNavigate,
   onRefreshTab,
   onReorderTab,
-  extra,
+  tabs = [],
 }: AppTabsProps) {
   const tabListRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const draggedHrefRef = useRef<string | null>(null);
-  const [refreshingHref, setRefreshingHref] = useState<string | null>(null);
   const [draggedHref, setDraggedHref] = useState<string | null>(null);
   const [dragOverHref, setDragOverHref] = useState<string | null>(null);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setIsMoreMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+    };
+  }, []);
 
   useEffect(() => {
     const el = tabListRef.current;
@@ -107,9 +132,7 @@ export default function AppTabs({
   }, []);
 
   function handleRefresh(href: string) {
-    setRefreshingHref(href);
     onRefreshTab(href);
-    window.setTimeout(() => setRefreshingHref((current) => (current === href ? null : current)), 500);
   }
 
   function handleDragStart(href: string, event: React.DragEvent<HTMLDivElement>) {
@@ -142,11 +165,29 @@ export default function AppTabs({
     setDragOverHref(null);
   }
 
+  function getTabIconComponent(href: string) {
+    if (modules) {
+      for (const mod of modules) {
+        const entry = mod.entries.find((e) => e.href === href);
+        if (entry) {
+          const EntryIcon = getEntryIcon(entry.key);
+          if (EntryIcon) return EntryIcon;
+        }
+        if (mod.home_href === href) {
+          const ModIcon = getModuleIcon(mod.slug);
+          if (ModIcon) return ModIcon;
+        }
+      }
+    }
+    return null;
+  }
+
   return (
     <section className="app-tab-bar" aria-label="已打开页面">
       <div className="app-tab-list" ref={tabListRef} role="tablist">
         {tabs.map((tab) => {
           const isActive = tab.href === currentPath;
+          const IconComp = getTabIconComponent(tab.href);
 
           return (
             <div
@@ -166,17 +207,21 @@ export default function AppTabs({
                 role="tab"
                 type="button"
               >
+                <span className="app-tab-icon" aria-hidden="true">
+                  {IconComp ? (
+                    <IconComp />
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="2" y="2" width="12" height="12" rx="2" />
+                      <line x1="5" y1="8" x2="11" y2="8" />
+                      <line x1="5" y1="5" x2="11" y2="5" />
+                      <line x1="5" y1="11" x2="9" y2="11" />
+                    </svg>
+                  )}
+                </span>
                 <span className="app-tab-label">{tab.label}</span>
               </button>
               <span className="app-tab-actions">
-                <button
-                  aria-label={`刷新${tab.label}`}
-                  className={`app-tab-refresh${refreshingHref === tab.href ? " is-refreshing" : ""}`}
-                  onClick={() => handleRefresh(tab.href)}
-                  type="button"
-                >
-                  ↻
-                </button>
                 {tabs.length > 1 ? (
                   <button
                     aria-label={`关闭${tab.label}`}
@@ -192,6 +237,95 @@ export default function AppTabs({
           );
         })}
       </div>
+
+      <div className="app-tab-more-wrap" ref={moreMenuRef}>
+        <button
+          aria-expanded={isMoreMenuOpen}
+          aria-label="页签操作菜单"
+          className="app-tab-more-btn"
+          onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+          title="页签操作"
+          type="button"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="4 6 8 10 12 6" />
+          </svg>
+        </button>
+
+        {isMoreMenuOpen && (
+          <div className="app-tab-more-menu" role="menu">
+            <button
+              className="app-tab-menu-item"
+              onClick={() => {
+                handleRefresh(currentPath);
+                setIsMoreMenuOpen(false);
+              }}
+              role="menuitem"
+              type="button"
+            >
+              <span>↻</span>
+              <span>刷新当前</span>
+            </button>
+            {onCloseOtherTabs && tabs.length > 1 && (
+              <button
+                className="app-tab-menu-item"
+                onClick={() => {
+                  onCloseOtherTabs(currentPath);
+                  setIsMoreMenuOpen(false);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <span>✕</span>
+                <span>关闭其他</span>
+              </button>
+            )}
+            {onCloseLeftTabs && (
+              <button
+                className="app-tab-menu-item"
+                onClick={() => {
+                  onCloseLeftTabs(currentPath);
+                  setIsMoreMenuOpen(false);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <span>⇤</span>
+                <span>关闭左侧</span>
+              </button>
+            )}
+            {onCloseRightTabs && (
+              <button
+                className="app-tab-menu-item"
+                onClick={() => {
+                  onCloseRightTabs(currentPath);
+                  setIsMoreMenuOpen(false);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <span>⇥</span>
+                <span>关闭右侧</span>
+              </button>
+            )}
+            {onCloseAllTabs && tabs.length > 1 && (
+              <button
+                className="app-tab-menu-item"
+                onClick={() => {
+                  onCloseAllTabs();
+                  setIsMoreMenuOpen(false);
+                }}
+                role="menuitem"
+                type="button"
+              >
+                <span>⊗</span>
+                <span>关闭全部</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {extra && <div className="app-tab-extra">{extra}</div>}
     </section>
   );

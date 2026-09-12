@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../api/client";
 import { logout, type AuthUser } from "../api/auth";
 import { clearQueryBootstrapCache, fetchNavigation } from "../api/query";
+import SearchCommandModal from "../components/common/SearchCommandModal";
+import AppHeader from "../components/nav/AppHeader";
 import AppModuleNav from "../components/nav/AppModuleNav";
 import AppPageNav from "../components/nav/AppPageNav";
 import AppTabs, { reorderTabs, type AppTabItem } from "../components/nav/AppTabs";
@@ -26,6 +28,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
   const [tabs, setTabs] = useState<AppTabItem[]>([]);
   const [tabReloadKeys, setTabReloadKeys] = useState<Record<string, number>>({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const matchedNavigation = useMemo(() => {
     for (const module of modules) {
@@ -122,6 +125,20 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     };
   }, [tabs, location.pathname]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   async function handleLogout() {
     await logout();
     clearQueryBootstrapCache();
@@ -170,9 +187,41 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
     }
   }
 
+  function handleCloseOtherTabs(currentHref: string) {
+    const nextTabs = tabs.filter((tab) => tab.href === currentHref);
+    setTabs(nextTabs);
+    setTabReloadKeys((currentKeys) => {
+      const nextKeys: Record<string, number> = {};
+      if (currentKeys[currentHref] !== undefined) {
+        nextKeys[currentHref] = currentKeys[currentHref];
+      }
+      return nextKeys;
+    });
+  }
+
+  function handleCloseLeftTabs(currentHref: string) {
+    const index = tabs.findIndex((tab) => tab.href === currentHref);
+    if (index <= 0) return;
+    const nextTabs = tabs.slice(index);
+    setTabs(nextTabs);
+  }
+
+  function handleCloseRightTabs(currentHref: string) {
+    const index = tabs.findIndex((tab) => tab.href === currentHref);
+    if (index < 0 || index >= tabs.length - 1) return;
+    const nextTabs = tabs.slice(0, index + 1);
+    setTabs(nextTabs);
+  }
+
+  function handleCloseAllTabs() {
+    const homeTab = tabs.find((t) => t.href === "/employee/home" || t.href === "/admin/accounts") ?? tabs[0];
+    if (!homeTab) return;
+    setTabs([homeTab]);
+    navigate(homeTab.href);
+  }
+
   const currentModule = matchedNavigation?.module ?? modules[0] ?? null;
   const currentEntry = matchedNavigation?.entry ?? null;
-  const roleLabel = user.role === "admin" ? "管理员" : "只读用户";
 
   return (
     <div className="app-layout app-shell-grid">
@@ -254,44 +303,30 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
       )}
       <div className="top-nav" style={{ display: "none" }} />
       <main className="app-main app-workspace app-workspace-frame">
+        <AppHeader
+          currentEntry={currentEntry}
+          currentModule={currentModule}
+          isSidebarCollapsed={sidebarCollapsed}
+          matchedLabel={matchedNavigation?.label}
+          onLogout={handleLogout}
+          onOpenSearch={() => setIsSearchOpen(true)}
+          onRefreshCurrent={() => handleRefreshTab(location.pathname)}
+          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          user={user}
+        />
         {!isLoading && !error ? (
           <AppTabs
             currentPath={location.pathname}
+            modules={modules}
+            onCloseAllTabs={handleCloseAllTabs}
+            onCloseLeftTabs={handleCloseLeftTabs}
+            onCloseOtherTabs={handleCloseOtherTabs}
+            onCloseRightTabs={handleCloseRightTabs}
             onCloseTab={handleCloseTab}
             onNavigate={handleNavigateTab}
             onRefreshTab={handleRefreshTab}
             onReorderTab={handleReorderTab}
             tabs={tabs}
-            extra={
-              <div className="top-nav-actions" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div className="top-nav-user" style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--ent-text-secondary)" }}>
-                  <span className="top-nav-user-code" style={{ fontWeight: 600, color: "var(--ent-text)" }}>{user.username}</span>
-                  <span style={{ opacity: 0.4 }}>|</span>
-                  <span className="top-nav-user-role">{roleLabel}</span>
-                </div>
-                <button
-                  className="top-nav-logout"
-                  onClick={handleLogout}
-                  style={{
-                    minHeight: "28px",
-                    height: "28px",
-                    padding: "0 10px",
-                    fontSize: "12px",
-                    display: "inline-flex",
-                    alignItems: "center",
-                    cursor: "pointer",
-                    border: "1px solid var(--ent-border-strong)",
-                    borderRadius: "var(--ent-radius-sm)",
-                    background: "#ffffff",
-                    color: "var(--ent-text-secondary)",
-                    fontWeight: 500
-                  }}
-                  type="button"
-                >
-                  退出登录
-                </button>
-              </div>
-            }
           />
         ) : null}
         <div className="app-content">
@@ -318,6 +353,12 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
             : null}
         </div>
       </main>
+      <SearchCommandModal
+        isOpen={isSearchOpen}
+        modules={modules}
+        onClose={() => setIsSearchOpen(false)}
+        onNavigate={handleNavigateTab}
+      />
     </div>
   );
 }
