@@ -709,6 +709,128 @@ export default function SummaryDownloadPage() {
         .summary-download-container .employee-picker-trigger {
           border-radius: 0 4px 4px 0 !important;
         }
+        .sheet-selection-subheading {
+          color: #475569;
+          border-top: 1px dashed #e2e8f0;
+        }
+        .summary-download-checklist {
+          border-bottom: 1px solid #f1f5f9;
+        }
+        .summary-download-checklist .legacy-checklist-title {
+          color: #334155;
+        }
+
+        /* 深色模式适配 */
+        [data-theme="dark"] .step-card {
+          background: #1e293b !important;
+          border-color: #334155 !important;
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3) !important;
+        }
+        [data-theme="dark"] .step-card:hover {
+          border-color: #475569 !important;
+        }
+        [data-theme="dark"] .step-header {
+          border-bottom-color: #334155 !important;
+        }
+        [data-theme="dark"] .step-title {
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .step-desc {
+          color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .summary-download-container .employee-lookup .form-control {
+          background: #0f172a !important;
+          color: #f8fafc !important;
+          border-color: #334155 !important;
+        }
+        [data-theme="dark"] .summary-download-container .employee-lookup .btn {
+          background: #334155 !important;
+          color: #94a3b8 !important;
+          border-color: #475569 !important;
+        }
+        [data-theme="dark"] .summary-download-container .employee-lookup .btn:hover {
+          background: #475569 !important;
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .preset-card-btn {
+          background: #0f172a !important;
+          border-color: #334155 !important;
+        }
+        [data-theme="dark"] .preset-card-btn:hover {
+          background: #162032 !important;
+          border-color: #475569 !important;
+        }
+        [data-theme="dark"] .preset-card-btn strong {
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .preset-card-btn p {
+          color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .preset-card-btn.active-preset-1 {
+          background: rgba(59, 130, 246, 0.15) !important;
+          border-color: #3b82f6 !important;
+        }
+        [data-theme="dark"] .preset-card-btn.active-preset-1 strong {
+          color: #60a5fa !important;
+        }
+        [data-theme="dark"] .preset-card-btn.active-preset-2 {
+          background: rgba(16, 185, 129, 0.15) !important;
+          border-color: #10b981 !important;
+        }
+        [data-theme="dark"] .preset-card-btn.active-preset-2 strong {
+          color: #34d399 !important;
+        }
+        [data-theme="dark"] .sheet-selection-card {
+          background: #0f172a !important;
+          border-color: #334155 !important;
+        }
+        [data-theme="dark"] .sheet-selection-card:hover {
+          background: #162032 !important;
+          border-color: #475569 !important;
+        }
+        [data-theme="dark"] .sheet-label-text {
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .sheet-selection-card.checked {
+          background: rgba(59, 130, 246, 0.15) !important;
+          border-color: #3b82f6 !important;
+          box-shadow: 0 0 0 1px #3b82f6 !important;
+        }
+        [data-theme="dark"] .sheet-selection-card.checked .sheet-label-text {
+          color: #60a5fa !important;
+        }
+        [data-theme="dark"] .sheet-badge-type {
+          background: #334155 !important;
+          color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .sheet-selection-card.checked .sheet-badge-type {
+          background: #3b82f6 !important;
+          color: #ffffff !important;
+        }
+        [data-theme="dark"] .sheet-selection-subheading {
+          color: #94a3b8 !important;
+          border-top: 1px dashed #334155 !important;
+        }
+        [data-theme="dark"] .header-badge-item {
+          background: #0f172a !important;
+          border-color: #334155 !important;
+          color: #94a3b8 !important;
+        }
+        [data-theme="dark"] .header-badge-item:hover {
+          background: #334155 !important;
+          color: #f8fafc !important;
+        }
+        [data-theme="dark"] .header-badge-item.checked {
+          background: rgba(59, 130, 246, 0.2) !important;
+          border-color: #3b82f6 !important;
+          color: #60a5fa !important;
+        }
+        [data-theme="dark"] .summary-download-checklist {
+          border-bottom-color: #334155 !important;
+        }
+        [data-theme="dark"] .summary-download-checklist .legacy-checklist-title {
+          color: #f8fafc !important;
+        }
       `}} />
 
       <header
@@ -797,7 +919,7 @@ export default function SummaryDownloadPage() {
         </div>
 
         {/* 8 个多选表格配置卡片 */}
-        <div style={{ fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "12px", borderTop: "1px dashed #e2e8f0", paddingTop: "16px" }}>
+        <div className="sheet-selection-subheading" style={{ fontSize: "13px", fontWeight: "600", marginBottom: "12px", paddingTop: "16px" }}>
           手动多选自定义要导出的表格：
         </div>
         <div className="sheet-cards-grid">
@@ -1002,9 +1124,9 @@ function HeaderChecklist({
   onToggle: (header: string) => void;
 }) {
   return (
-    <div className="legacy-checklist summary-download-checklist" style={{ padding: "16px 0", borderBottom: "1px solid #f1f5f9" }}>
+    <div className="legacy-checklist summary-download-checklist" style={{ padding: "16px 0" }}>
       <div className="summary-download-checklist-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-        <p className="legacy-checklist-title" style={{ fontSize: "13.5px", fontWeight: "600", color: "#334155", margin: 0 }}>
+        <p className="legacy-checklist-title" style={{ fontSize: "13.5px", fontWeight: "600", margin: 0 }}>
           {title}
         </p>
         <button className="legacy-btn-ghost" onClick={onToggleAll} type="button" style={{ border: "none", background: "transparent", color: "#2563eb", cursor: "pointer", fontSize: "12px", fontWeight: "500" }}>
