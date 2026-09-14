@@ -11,10 +11,11 @@ interface AppRouterProps {
   isLoading: boolean;
   onLogin: (user: AuthUser) => void;
   onLogout: (user: AuthUser | null) => void;
+  onUserUpdate?: (user: AuthUser) => void;
   user: AuthUser | null;
 }
 
-export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRouterProps) {
+export default function AppRouter({ isLoading, onLogin, onLogout, onUserUpdate, user }: AppRouterProps) {
   const landingPath = user ? defaultLandingPath(user) : "/login";
 
   return (
@@ -27,7 +28,7 @@ export default function AppRouter({ isLoading, onLogin, onLogout, user }: AppRou
         />
         <Route element={<ChangePasswordPage />} path="/change-password" />
         <Route element={<ProtectedRoute isLoading={isLoading} user={user} />}>
-          <Route element={user ? <AppShell onLogout={onLogout} user={user} /> : null}>
+          <Route element={user ? <AppShell onLogout={onLogout} onUserUpdate={onUserUpdate} user={user} /> : null}>
             {protectedRoutes.map((route) => (
               <Route element={route.element} key={route.path} path={route.path} />
             ))}

@@ -6,6 +6,8 @@ import { applyTheme, getStoredThemeMode, getSystemTheme, setStoredThemeMode, typ
 import { getSearchShortcutKey } from "../../utils/platform";
 import "../../styles/components/app-header.css";
 import MessageCenter from "./MessageCenter";
+import UserAvatar from "../common/UserAvatar";
+import AvatarChangeModal from "../common/AvatarChangeModal";
 
 interface AppHeaderProps {
   currentEntry: QueryNavigationEntry | null;
@@ -16,6 +18,7 @@ interface AppHeaderProps {
   onOpenSearch?: () => void;
   onRefreshCurrent: () => void;
   onToggleSidebar?: () => void;
+  onUserUpdate?: (user: AuthUser) => void;
   user: AuthUser;
 }
 
@@ -36,11 +39,13 @@ export default function AppHeader({
   onLogout,
   onOpenSearch,
   onRefreshCurrent,
+  onUserUpdate,
   user,
 }: AppHeaderProps) {
   const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() =>
     themeMode === "auto" ? getSystemTheme() : themeMode
@@ -228,27 +233,40 @@ export default function AppHeader({
             onClick={() => setIsUserMenuOpen((prev) => !prev)}
             type="button"
           >
-            <svg className="app-header-avatar-img" viewBox="0 0 32 32" fill="none">
-              <circle cx="16" cy="16" r="16" fill="#cbd5e1" />
-              <path d="M8 12c0-3.5 3.5-5.5 8-5.5s8 2 8 5.5l3.5 1-3.5 1.5H8z" fill="#1e293b" />
-              <circle cx="16" cy="17" r="5.5" fill="#fed7aa" />
-              <path d="M10 16c0 3.5 1.5 6 1.5 6M22 16c0 3.5-1.5 6-1.5 6" stroke="#b45309" strokeWidth="1.5" strokeLinecap="round" />
-              <path d="M5 32c0-5 5-8.5 11-8.5s11 3.5 11 8.5" fill="#475569" />
-            </svg>
+            <UserAvatar avatar={user.avatar} name={user.profile_name || user.username} size={32} />
           </button>
 
           <div className={`app-header-user-menu${isUserMenuOpen ? " is-open" : ""}`} role="menu">
             {/* 用户顶部卡片 */}
             <div className="app-header-user-card">
-              <div className="app-header-user-card-avatar">
-                <svg viewBox="0 0 32 32" fill="none" width="36" height="36">
-                  <circle cx="16" cy="16" r="16" fill="#cbd5e1" />
-                  <path d="M8 12c0-3.5 3.5-5.5 8-5.5s8 2 8 5.5l3.5 1-3.5 1.5H8z" fill="#1e293b" />
-                  <circle cx="16" cy="17" r="5.5" fill="#fed7aa" />
-                  <path d="M10 16c0 3.5 1.5 6 1.5 6M22 16c0 3.5-1.5 6-1.5 6" stroke="#b45309" strokeWidth="1.5" strokeLinecap="round" />
-                  <path d="M5 32c0-5 5-8.5 11-8.5s11 3.5 11 8.5" fill="#475569" />
-                </svg>
+              <div
+                aria-label="更换头像"
+                className="app-header-user-card-avatar"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
+                  setIsAvatarModalOpen(true);
+                }}
+                role="button"
+                tabIndex={0}
+                title="点击更换头像"
+              >
+                <UserAvatar avatar={user.avatar} name={user.profile_name || user.username} size={38} />
                 <span className="app-header-user-online-dot" title="账号在线" />
+                <div className="app-header-avatar-edit-mask">
+                  <svg
+                    fill="none"
+                    height="14"
+                    stroke="currentColor"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                    width="14"
+                  >
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </svg>
+                </div>
               </div>
               <div className="app-header-user-meta">
                 <div className="app-header-user-name">{user.username}</div>
@@ -300,6 +318,26 @@ export default function AppHeader({
                 className="app-header-action-link"
                 onClick={() => {
                   setIsUserMenuOpen(false);
+                  setIsAvatarModalOpen(true);
+                }}
+                type="button"
+              >
+                <div className="app-header-action-link-left">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="10" r="3" />
+                    <path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662" />
+                  </svg>
+                  <span>修改头像</span>
+                </div>
+                <svg className="app-header-action-arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 12l4-4-4-4" />
+                </svg>
+              </button>
+              <button
+                className="app-header-action-link"
+                onClick={() => {
+                  setIsUserMenuOpen(false);
                   navigate("/change-password");
                 }}
                 type="button"
@@ -335,6 +373,12 @@ export default function AppHeader({
           </div>
         </div>
       </div>
+      <AvatarChangeModal
+        isOpen={isAvatarModalOpen}
+        onClose={() => setIsAvatarModalOpen(false)}
+        onUserUpdate={onUserUpdate}
+        user={user}
+      />
     </header>
   );
 }

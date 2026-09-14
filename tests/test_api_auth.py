@@ -1,3 +1,5 @@
+import io
+import os
 import tempfile
 import unittest
 from datetime import timedelta
@@ -26,6 +28,7 @@ class ApiAuthTests(unittest.TestCase):
             SESSION_COOKIE_NAME="api_access_token",
             SESSION_COOKIE_SAMESITE="None",
             SESSION_COOKIE_SECURE=False,
+            UPLOAD_FOLDER=f"{self.tmpdir.name}/uploads",
         )
         db.init_app(self.app)
         register_routes(self.app)
@@ -417,6 +420,79 @@ class ApiAuthTests(unittest.TestCase):
 
         failure_response = self._login("admin", "wrong-password")
         self.assertEqual(failure_response.status_code, 401)
+
+    def test_api_update_avatar_preset(self) -> None:
+        self._login("admin", "admin123")
+
+        response = self.client.put(
+            "/api/auth/avatar",
+            json={"avatar": "default:3"},
+            headers={"Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["avatar"], "default:3")
+        self.assertEqual(payload["user"]["avatar"], "default:3")
+
+        me_response = self.client.get("/api/auth/me")
+        self.assertEqual(me_response.status_code, 200)
+        self.assertEqual(me_response.get_json()["avatar"], "default:3")
+
+    def test_api_update_avatar_upload_and_get(self) -> None:
+        self._login("admin", "admin123")
+
+        valid_png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15c4"
+        response = self.client.post(
+            "/api/auth/avatar",
+            data={"file": (io.BytesIO(valid_png), "avatar.png")},
+            content_type="multipart/form-data",
+            headers={"Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["ok"])
+        avatar_url = payload["avatar"]
+        self.assertTrue(avatar_url.startswith("/api/auth/avatar/"))
+
+        # Fetch the uploaded avatar
+        get_response = self.client.get(avatar_url)
+        self.assertEqual(get_response.status_code, 200)
+        self.assertEqual(get_response.data, valid_png)
+
+        # Switch back to preset avatar and verify file is cleaned up
+        filename = avatar_url.replace("/api/auth/avatar/", "")
+        avatar_file_path = os.path.join(self.app.config["UPLOAD_FOLDER"], "avatars", filename)
+        self.assertTrue(os.path.exists(avatar_file_path))
+
+        switch_response = self.client.put(
+            "/api/auth/avatar",
+            json={"avatar": "default:1"},
+            headers={"Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(switch_response.status_code, 200)
+        self.assertFalse(os.path.exists(avatar_file_path))
+
+    def test_api_update_avatar_invalid_file(self) -> None:
+        self._login("admin", "admin123")
+
+        # Invalid extension
+        response = self.client.post(
+            "/api/auth/avatar",
+            data={"file": (io.BytesIO(b"hello world"), "bad.txt")},
+            content_type="multipart/form-data",
+            headers={"Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+        # Invalid image bytes despite .png extension
+        response2 = self.client.post(
+            "/api/auth/avatar",
+            data={"file": (io.BytesIO(b"not a png image"), "bad.png")},
+            content_type="multipart/form-data",
+            headers={"Origin": "http://localhost:5173"},
+        )
+        self.assertEqual(response2.status_code, 400)
 
 
 if __name__ == "__main__":

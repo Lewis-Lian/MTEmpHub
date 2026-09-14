@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import os
+import uuid
 from datetime import datetime
 
-from flask import Blueprint, current_app, g, jsonify, make_response, request
+from flask import Blueprint, current_app, g, jsonify, make_response, request, send_from_directory
 
 from models import db
 from models.user import User
@@ -180,6 +182,7 @@ def _serialize_auth_user(user: User) -> dict:
         "profile_emp_no": emp_no,
         "profile_name": emp_name,
         "dept_name": dept_name,
+        "avatar": user.avatar or "",
     }
 
 
@@ -282,3 +285,106 @@ def api_change_password():
 @login_required
 def api_me():
     return jsonify(_serialize_auth_user(g.current_user))
+
+
+_ALLOWED_AVATAR_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "gif"}
+_MAX_AVATAR_SIZE = 2 * 1024 * 1024  # 2MB
+
+
+def _is_valid_image_bytes(data: bytes, ext: str) -> bool:
+    if not data:
+        return False
+    if ext == "png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext in {"jpg", "jpeg"}:
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == "gif":
+        return data.startswith(b"GIF87a") or data.startswith(b"GIF89a")
+    if ext == "webp":
+        return len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP"
+    return False
+
+
+@api_auth_bp.get("/avatar/<path:filename>")
+def api_get_avatar(filename: str):
+    avatar_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "avatars")
+    return send_from_directory(avatar_dir, filename)
+
+
+@api_auth_bp.route("/avatar", methods=["POST", "PUT"])
+@login_required
+def api_update_avatar():
+    user = g.current_user
+    avatar_dir = os.path.join(current_app.config["UPLOAD_FOLDER"], "avatars")
+    os.makedirs(avatar_dir, exist_ok=True)
+
+    # 1. 检查是否有文件上传
+    uploaded_file = request.files.get("file") or request.files.get("avatar")
+    if uploaded_file and uploaded_file.filename:
+        filename = uploaded_file.filename
+        if "." not in filename:
+            return jsonify({"error": "不支持的文件类型"}), 400
+        ext = filename.rsplit(".", 1)[1].lower()
+        if ext not in _ALLOWED_AVATAR_EXTENSIONS:
+            return jsonify({"error": f"不支持的文件类型，仅支持 {', '.join(_ALLOWED_AVATAR_EXTENSIONS)}"}), 400
+
+        file_bytes = uploaded_file.read()
+        if len(file_bytes) > _MAX_AVATAR_SIZE:
+            return jsonify({"error": "头像文件过大，请上传不超过 2MB 的图片"}), 400
+
+        if not _is_valid_image_bytes(file_bytes, ext):
+            return jsonify({"error": "图片文件内容格式无效"}), 400
+
+        # 清理旧的自定义头像文件
+        old_avatar = user.avatar or ""
+        if old_avatar.startswith("/api/auth/avatar/"):
+            old_name = old_avatar.replace("/api/auth/avatar/", "").strip()
+            if old_name and "/" not in old_name and "\\" not in old_name:
+                old_path = os.path.join(avatar_dir, old_name)
+                if os.path.isfile(old_path):
+                    try:
+                        os.remove(old_path)
+                    except OSError:
+                        pass
+
+        new_filename = f"avatar_u{user.id}_{int(datetime.utcnow().timestamp())}_{uuid.uuid4().hex[:8]}.{ext}"
+        target_path = os.path.join(avatar_dir, new_filename)
+        with open(target_path, "wb") as f:
+            f.write(file_bytes)
+
+        user.avatar = f"/api/auth/avatar/{new_filename}"
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "avatar": user.avatar,
+            "user": _serialize_auth_user(user),
+        })
+
+    # 2. 检查 JSON 变更（选择预设头像或清除）
+    payload = request.get_json(silent=True) or {}
+    if "avatar" in payload:
+        new_avatar = (payload.get("avatar") or "").strip()
+        if new_avatar and not (new_avatar.startswith("default:") or new_avatar.startswith("/api/auth/avatar/")):
+            return jsonify({"error": "无效的头像标识"}), 400
+
+        # 如果从自定义头像切换为默认头像，清理旧自定义头像文件
+        old_avatar = user.avatar or ""
+        if old_avatar.startswith("/api/auth/avatar/") and new_avatar != old_avatar:
+            old_name = old_avatar.replace("/api/auth/avatar/", "").strip()
+            if old_name and "/" not in old_name and "\\" not in old_name:
+                old_path = os.path.join(avatar_dir, old_name)
+                if os.path.isfile(old_path):
+                    try:
+                        os.remove(old_path)
+                    except OSError:
+                        pass
+
+        user.avatar = new_avatar
+        db.session.commit()
+        return jsonify({
+            "ok": True,
+            "avatar": user.avatar,
+            "user": _serialize_auth_user(user),
+        })
+
+    return jsonify({"error": "请选择预设头像或上传头像图片"}), 400
