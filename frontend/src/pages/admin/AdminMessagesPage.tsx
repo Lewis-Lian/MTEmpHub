@@ -4,6 +4,8 @@ import { fetchAdminDepartments } from "../../api/admin";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
 import EmployeePicker from "../../components/query/EmployeePicker";
+import RichTextEditor from "../../components/editor/RichTextEditor";
+import { isBlankRichText } from "../../utils/richText";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
 import "../../styles/components/admin-message-page.css";
 
@@ -26,9 +28,14 @@ export default function AdminMessagesPage() {
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setStatus("");
+    const content = isBlankRichText(form.content) ? "" : form.content;
+    if (!content.trim()) {
+      setError("消息内容不能为空");
+      return;
+    }
     try {
       const accountIds = [...new Set(selectedEmployeeIds.flatMap((id) => recipients.find((recipient) => recipient.id === id)?.account_ids ?? []))];
-      await sendMessage({ recipient_ids: accountIds, title: form.title, content: form.content });
+      await sendMessage({ recipient_ids: accountIds, title: form.title, content });
       setSelectedEmployeeIds([]);
       setForm({ title: "", content: "" });
       setStatus("消息发送成功");
@@ -56,7 +63,7 @@ export default function AdminMessagesPage() {
     <form className="admin-message-form" onSubmit={handleSubmit}>
       <div className="admin-message-section"><h3>选择收件员工</h3><EmployeePicker departments={departments} emptyHint="请选择需要接收消息的员工，可多选。" employees={pickerEmployees} label="收件员工" onChange={setSelectedEmployeeIds} selectedIds={selectedEmployeeIds} /></div>
       <label>消息标题<input aria-label="消息标题" maxLength={120} required onChange={(event) => setForm({ ...form, title: event.target.value })} value={form.title} /></label>
-      <div className="admin-message-editor"><label htmlFor="message-editor">消息内容</label><div className="editor-toolbar" role="toolbar" aria-label="文字格式"><button onMouseDown={(event) => { event.preventDefault(); document.execCommand("bold"); }} type="button"><strong>B</strong></button><button onMouseDown={(event) => { event.preventDefault(); document.execCommand("italic"); }} type="button"><em>I</em></button><button onMouseDown={(event) => { event.preventDefault(); document.execCommand("underline"); }} type="button"><u>U</u></button><button onMouseDown={(event) => { event.preventDefault(); document.execCommand("insertUnorderedList"); }} type="button">• 列表</button><button onMouseDown={(event) => { event.preventDefault(); document.execCommand("removeFormat"); }} type="button">清除格式</button></div><div aria-label="消息内容" className="message-editor-content" contentEditable id="message-editor" onInput={(event) => setForm({ ...form, content: event.currentTarget.innerHTML })} role="textbox" suppressContentEditableWarning /> </div>
+      <div className="admin-message-editor"><label htmlFor="message-editor">消息内容</label><RichTextEditor ariaLabel="消息内容" onChange={(html) => setForm({ ...form, content: html })} value={form.content} /></div>
       <button className="admin-message-submit" disabled={!selectedEmployeeIds.length} type="submit"><span aria-hidden="true">➤</span> 发送消息</button>
     </form>
   </section>;

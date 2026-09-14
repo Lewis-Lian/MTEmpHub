@@ -21,6 +21,7 @@ const ManagerAnnualLeavePage = lazy(() => import("../pages/query/ManagerAnnualLe
 const ManagerDepartmentHoursPage = lazy(() => import("../pages/query/ManagerDepartmentHoursPage"));
 const ManagerOvertimePage = lazy(() => import("../pages/query/ManagerOvertimePage"));
 const ManagerQueryPage = lazy(() => import("../pages/query/ManagerQueryPage"));
+const MessageDetailPage = lazy(() => import("../pages/query/MessageDetailPage"));
 const PunchRecordsPage = lazy(() => import("../pages/query/PunchRecordsPage"));
 const QueryHomePage = lazy(() => import("../pages/query/QueryHomePage"));
 const SummaryDownloadPage = lazy(() => import("../pages/query/SummaryDownloadPage"));
@@ -40,6 +41,7 @@ function lazyPage(Page: LazyExoticComponent<ComponentType>): ReactElement {
 
 export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(QueryHomePage), path: "/employee/home" },
+  { element: lazyPage(MessageDetailPage), path: "/employee/messages/:id" },
   { element: lazyPage(EmployeeDashboardPage), path: "/employee/dashboard" },
   { element: lazyPage(AbnormalQueryPage), path: "/employee/abnormal-query" },
   { element: lazyPage(PunchRecordsPage), path: "/employee/punch-records" },

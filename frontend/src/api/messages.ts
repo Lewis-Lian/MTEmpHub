@@ -28,6 +28,10 @@ export function fetchMessages(): Promise<MessageListResponse> {
   return apiRequest<MessageListResponse>("/api/query/messages");
 }
 
+export function fetchMessage(id: number): Promise<MessageItem> {
+  return apiRequest<{ message: MessageItem }>(`/api/query/messages/${id}`).then((payload) => payload.message);
+}
+
 export function markMessageRead(id: number): Promise<{ message: MessageItem }> {
   return apiRequest<{ message: MessageItem }>(`/api/query/messages/${id}/read`, { method: "POST" });
 }

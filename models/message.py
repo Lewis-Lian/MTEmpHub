@@ -10,6 +10,7 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     recipient_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     title = db.Column(db.String(120), nullable=False)
+    # 富文本 HTML：服务端不消毒，任何渲染端必须先经过 HTML sanitizer 处理
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
     read_at = db.Column(db.DateTime, nullable=True)

@@ -83,6 +83,31 @@ class MessagesApiTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_recipient_can_fetch_single_message(self):
+        self._login("admin", "admin123")
+        created = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_id": self.recipient_id, "title": "公告", "content": "<p>正文</p>"},
+        ).get_json()["message"]
+        self.client.post("/api/auth/logout")
+        self._login("recipient", "pass123")
+        response = self.client.get(f"/api/query/messages/{created['id']}")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()["message"]
+        self.assertEqual(payload["title"], "公告")
+        self.assertEqual(payload["content"], "<p>正文</p>")
+
+    def test_recipient_cannot_fetch_message_sent_to_others(self):
+        self._login("admin", "admin123")
+        created = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_id": self.admin_id, "title": "私信", "content": "内容"},
+        ).get_json()["message"]
+        self.client.post("/api/auth/logout")
+        self._login("recipient", "pass123")
+        response = self.client.get(f"/api/query/messages/{created['id']}")
+        self.assertEqual(response.status_code, 404)
+
     def test_recipient_can_mark_message_read(self):
         self._login("admin", "admin123")
         created = self.client.post(

@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@number-flow/react": "^0.6.2",
+    "@wangeditor/editor": "^5.1.23",
+    "@wangeditor/editor-for-react": "^1.0.6",
+    "dompurify": "^3.4.15",
     "motion": "^13.1.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
