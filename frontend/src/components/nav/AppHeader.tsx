@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AuthUser } from "../../api/auth";
 import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/query";
@@ -46,6 +46,27 @@ export default function AppHeader({
     themeMode === "auto" ? getSystemTheme() : themeMode
   );
   const [searchShortcut] = useState<string>(() => getSearchShortcutKey());
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsUserMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isUserMenuOpen]);
 
   useEffect(() => {
     const activeTheme = applyTheme(themeMode);
@@ -197,12 +218,13 @@ export default function AppHeader({
 
         <div
           className="app-header-avatar-wrap"
+          ref={userMenuRef}
           onMouseEnter={() => setIsUserMenuOpen(true)}
           onMouseLeave={() => setIsUserMenuOpen(false)}
         >
           <button
             aria-label={`用户头像：${user.username}`}
-            className="app-header-avatar-btn"
+            className={`app-header-avatar-btn${isUserMenuOpen ? " is-active" : ""}`}
             onClick={() => setIsUserMenuOpen((prev) => !prev)}
             type="button"
           >
@@ -240,15 +262,34 @@ export default function AppHeader({
             {/* 账号信息：工号、姓名、部门 */}
             <div className="app-header-user-details">
               <div className="app-header-detail-item">
-                <span className="detail-label">工号：</span>
+                <span className="detail-label">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="4" width="20" height="16" rx="2"/>
+                    <line x1="6" y1="9" x2="10" y2="9"/>
+                    <line x1="6" y1="13" x2="14" y2="13"/>
+                  </svg>
+                  工号：
+                </span>
                 <span className="detail-value">{empNo}</span>
               </div>
               <div className="app-header-detail-item">
-                <span className="detail-label">姓名：</span>
+                <span className="detail-label">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  姓名：
+                </span>
                 <span className="detail-value">{empName}</span>
               </div>
               <div className="app-header-detail-item">
-                <span className="detail-label">部门：</span>
+                <span className="detail-label">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                    <path d="M9 22v-4h6v4"/>
+                  </svg>
+                  部门：
+                </span>
                 <span className="detail-value">{deptDisplay}</span>
               </div>
             </div>
@@ -263,11 +304,16 @@ export default function AppHeader({
                 }}
                 type="button"
               >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="7" width="10" height="7" rx="1.5" />
-                  <path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7" />
+                <div className="app-header-action-link-left">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="7" width="10" height="7" rx="1.5" />
+                    <path d="M5.5 7V4.5a2.5 2.5 0 0 1 5 0V7" />
+                  </svg>
+                  <span>修改密码</span>
+                </div>
+                <svg className="app-header-action-arrow" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 12l4-4-4-4" />
                 </svg>
-                <span>修改密码</span>
               </button>
             </div>
 
@@ -278,7 +324,12 @@ export default function AppHeader({
                 onClick={onLogout}
                 type="button"
               >
-                退出登录
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                <span>退出登录</span>
               </button>
             </div>
           </div>
