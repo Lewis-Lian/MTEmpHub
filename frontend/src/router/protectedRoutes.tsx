@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import type { ComponentType, LazyExoticComponent, ReactElement } from "react";
+import { matchPath } from "react-router-dom";
 
 const AccountsPage = lazy(() => import("../pages/admin/AccountsPage"));
 const AdminDashboardPage = lazy(() => import("../pages/admin/AdminDashboardPage"));
@@ -67,5 +68,8 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
 ];
 
 export function findProtectedRoute(pathname: string): ProtectedRouteConfig | undefined {
-  return protectedRoutes.find((route) => route.path === pathname);
+  return protectedRoutes.find((route) => {
+    if (route.path === pathname) return true;
+    return matchPath({ path: route.path, end: true }, pathname) !== null;
+  });
 }

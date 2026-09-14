@@ -1,13 +1,598 @@
-.message-detail-page { max-width: 860px; }
-.message-detail-card { background: var(--ent-bg); border: 1px solid var(--ent-border-strong); border-radius: 10px; padding: 26px 32px 32px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06); }
-.message-detail-title { margin: 0 0 10px; font-size: 22px; line-height: 1.4; color: var(--ent-text); }
-.message-detail-meta { display: flex; gap: 14px; margin: 0 0 18px; padding-bottom: 14px; border-bottom: 1px solid var(--ent-border-strong); color: var(--ent-text-tertiary); font-size: 13px; }
-.message-detail-body { color: var(--ent-text); font-size: 15px; line-height: 1.8; word-break: break-word; }
-.message-detail-body h1, .message-detail-body h2, .message-detail-body h3 { margin: 18px 0 8px; color: var(--ent-text); line-height: 1.4; }
-.message-detail-body p { margin: 8px 0; }
-.message-detail-body img { max-width: 100%; }
-.message-detail-body ul, .message-detail-body ol { padding-left: 22px; margin: 8px 0; }
-.message-detail-body blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid var(--ent-blue); background: var(--ent-secondary-bg); color: var(--ent-text-secondary); }
-.message-detail-body table { border-collapse: collapse; margin: 10px 0; width: 100%; }
-.message-detail-body th, .message-detail-body td { border: 1px solid var(--ent-border-strong); padding: 6px 10px; text-align: left; }
-.message-detail-body a { color: var(--ent-blue); }
+/* ==========================================================================
+   员工消息详情页 (Message Detail Page) 企业级通栏阅读规范
+   设计语言：全面融入 MTEmpHub 统一设计系统，遵循 --ent-* Token 规范
+   ========================================================================== */
+
+/* 1. 页面通栏容器与布局矫正（解除 880px 瓶颈，充满工作台） */
+.message-detail-page {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+/* 2. 顶部综合导航与操作工具栏 */
+.message-detail-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 18px;
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg, 12px);
+  box-shadow: var(--ent-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+  flex-wrap: wrap;
+}
+
+.message-detail-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.message-detail-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 返回按钮微交互 */
+.message-detail-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm, 6px);
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ent-transition, all 0.15s ease);
+}
+
+.message-detail-back-btn:hover {
+  background: var(--ent-bg);
+  color: var(--ent-blue);
+  border-color: var(--ent-blue);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.15);
+}
+
+.message-detail-back-btn:hover .message-detail-btn-icon {
+  transform: translateX(-2px);
+}
+
+.message-detail-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.15s ease;
+}
+
+/* 面包屑导航 */
+.message-detail-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--ent-text-tertiary);
+}
+
+.message-detail-crumb {
+  color: var(--ent-text-secondary);
+}
+
+.message-detail-crumb.is-current {
+  color: var(--ent-text);
+  font-weight: 500;
+}
+
+.message-detail-separator {
+  color: var(--ent-border-strong);
+  user-select: none;
+}
+
+/* 渠道徽标 */
+.message-detail-channel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--ent-blue-light, rgba(37, 99, 235, 0.08));
+  color: var(--ent-blue);
+  border: 1px solid var(--ent-blue-focus, rgba(37, 99, 235, 0.2));
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.message-detail-badge-icon {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 状态药丸 */
+.message-detail-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.08);
+  color: #16a34a;
+  border: 1px solid rgba(22, 163, 74, 0.2);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+.message-detail-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #16a34a;
+}
+
+/* 右侧操作按钮 */
+.message-detail-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm, 6px);
+  background: var(--ent-bg);
+  color: var(--ent-text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ent-transition, all 0.15s ease);
+}
+
+.message-detail-action-btn:hover {
+  background: var(--ent-secondary-bg);
+  color: var(--ent-blue);
+  border-color: var(--ent-blue);
+}
+
+.message-detail-id-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--ent-radius-sm, 6px);
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  color: var(--ent-text-tertiary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+/* 3. 主体工作区布局：双栏自适应网格 */
+.message-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+  width: 100%;
+}
+
+/* 4. 左侧核心阅读卡片 */
+.message-detail-card {
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg, 12px);
+  box-shadow: var(--ent-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+  padding: 32px 40px 40px;
+  min-width: 0;
+}
+
+/* 卡片页头 */
+.message-detail-heading {
+  margin-bottom: 24px;
+}
+
+.message-detail-kicker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.message-detail-kicker {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ent-blue);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.message-detail-type-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  color: var(--ent-text-secondary);
+  font-size: 11px;
+}
+
+.message-detail-title {
+  margin: 0 0 14px;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.38;
+  color: var(--ent-text);
+  letter-spacing: -0.015em;
+  word-break: break-word;
+}
+
+/* 元信息条 */
+.message-detail-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 0;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ent-border);
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+}
+
+.message-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-meta-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ent-text-tertiary);
+}
+
+.message-meta-sender {
+  font-weight: 500;
+  color: var(--ent-text);
+}
+
+.message-meta-security {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ent-blue);
+}
+.message-meta-security .message-meta-icon {
+  color: var(--ent-blue);
+}
+
+/* 5. 消息正文富文本排版引擎（高可读性与现代排版） */
+.message-detail-body {
+  color: var(--ent-text);
+  font-size: 15px;
+  line-height: 1.85;
+  letter-spacing: 0.01em;
+  word-break: break-word;
+  padding: 8px 0 24px;
+}
+
+.message-detail-body h1,
+.message-detail-body h2,
+.message-detail-body h3,
+.message-detail-body h4 {
+  color: var(--ent-text);
+  line-height: 1.4;
+  margin: 28px 0 12px;
+  font-weight: 600;
+}
+
+.message-detail-body h1 { font-size: 20px; border-bottom: 1px solid var(--ent-border); padding-bottom: 8px; }
+.message-detail-body h2 { font-size: 18px; }
+.message-detail-body h3 { font-size: 16px; }
+
+.message-detail-body p {
+  margin: 14px 0;
+}
+
+.message-detail-body strong {
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.message-detail-body em {
+  font-style: italic;
+}
+
+.message-detail-body ul,
+.message-detail-body ol {
+  padding-left: 26px;
+  margin: 14px 0;
+}
+
+.message-detail-body li {
+  margin: 6px 0;
+}
+
+.message-detail-body blockquote {
+  margin: 16px 0;
+  padding: 10px 18px;
+  border-left: 4px solid var(--ent-blue);
+  border-radius: 0 var(--ent-radius-sm, 6px) var(--ent-radius-sm, 6px) 0;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 14.5px;
+}
+
+.message-detail-body table {
+  border-collapse: collapse;
+  margin: 18px 0;
+  width: 100%;
+  font-size: 13.5px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm, 6px);
+  overflow: hidden;
+}
+
+.message-detail-body th {
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text);
+  font-weight: 600;
+  padding: 10px 14px;
+  border: 1px solid var(--ent-border-strong);
+  text-align: left;
+}
+
+.message-detail-body td {
+  border: 1px solid var(--ent-border-strong);
+  padding: 9px 14px;
+  color: var(--ent-text);
+}
+
+.message-detail-body tr:nth-child(even) td {
+  background: rgba(241, 245, 249, 0.4);
+}
+
+.message-detail-body a {
+  color: var(--ent-blue);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.message-detail-body a:hover {
+  text-decoration: underline;
+  color: var(--ent-blue-hover);
+}
+
+.message-detail-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--ent-radius-sm, 6px);
+  border: 1px solid var(--ent-border);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  margin: 12px 0;
+}
+
+.message-detail-body hr {
+  border: none;
+  height: 1px;
+  background: var(--ent-border);
+  margin: 24px 0;
+}
+
+.message-detail-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  color: var(--ent-blue);
+}
+
+.message-detail-body pre {
+  padding: 14px 18px;
+  border-radius: var(--ent-radius-sm, 6px);
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border-strong);
+  overflow-x: auto;
+  margin: 16px 0;
+}
+
+.message-detail-body pre code {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ent-text);
+}
+
+/* 6. 卡片底部水印与备注 */
+.message-detail-card-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--ent-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.message-detail-footer-security {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ent-text-secondary);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+
+.message-detail-footer-icon {
+  display: inline-flex;
+  color: var(--ent-blue);
+}
+
+.message-detail-footer-note {
+  color: var(--ent-text-tertiary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 7. 右侧边栏属性卡片 */
+.message-detail-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+}
+
+.message-sidebar-card {
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg, 12px);
+  box-shadow: var(--ent-shadow-card, 0 1px 3px rgba(15, 23, 42, 0.06));
+  padding: 20px;
+}
+
+.message-sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ent-border);
+}
+
+.message-sidebar-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ent-blue);
+}
+
+.message-sidebar-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.message-sidebar-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.message-sidebar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.message-sidebar-row dt {
+  color: var(--ent-text-tertiary);
+}
+
+.message-sidebar-row dd {
+  margin: 0;
+  color: var(--ent-text);
+  font-weight: 500;
+  text-align: right;
+}
+
+.message-sidebar-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: var(--ent-blue);
+  background: var(--ent-blue-light, rgba(37, 99, 235, 0.08));
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.message-sidebar-status-ok {
+  color: #16a34a !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.message-sidebar-tip-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--ent-text-secondary);
+}
+
+.message-sidebar-tips-card {
+  background: linear-gradient(180deg, var(--ent-bg) 0%, var(--ent-secondary-bg) 100%);
+}
+
+/* 8. 响应式布局优化 */
+@media (max-width: 1024px) {
+  .message-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .message-detail-card {
+    padding: 24px 24px 32px;
+  }
+
+  .message-detail-sidebar {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .message-detail-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .message-detail-toolbar-right {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .message-detail-breadcrumbs {
+    display: none;
+  }
+
+  .message-meta-security {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+
+/* 9. 打印模式优化 */
+@media print {
+  .message-detail-toolbar,
+  .message-detail-sidebar,
+  .app-sidebar,
+  .app-header,
+  .app-tabs {
+    display: none !important;
+  }
+
+  .message-detail-page,
+  .message-detail-layout,
+  .message-detail-card {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .message-detail-body {
+    color: #000000 !important;
+  }
+}
+
+

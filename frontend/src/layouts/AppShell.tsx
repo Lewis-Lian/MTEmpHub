@@ -94,7 +94,9 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
 
     const nextTab: AppTabItem = {
       href: location.pathname,
-      label: matchedNavigation?.label ?? "当前页面",
+      label:
+        matchedNavigation?.label ??
+        (location.pathname.startsWith("/employee/messages/") ? "消息详情" : "当前页面"),
     };
 
     setTabs((currentTabs) => {
@@ -307,7 +309,10 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           currentEntry={currentEntry}
           currentModule={currentModule}
           isSidebarCollapsed={sidebarCollapsed}
-          matchedLabel={matchedNavigation?.label}
+          matchedLabel={
+            matchedNavigation?.label ??
+            (location.pathname.startsWith("/employee/messages/") ? "消息详情" : undefined)
+          }
           onLogout={handleLogout}
           onOpenSearch={() => setIsSearchOpen(true)}
           onRefreshCurrent={() => handleRefreshTab(location.pathname)}
