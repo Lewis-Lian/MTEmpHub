@@ -40,6 +40,12 @@ export function fetchMessageRecipients(): Promise<MessageRecipient[]> {
   return apiRequest<MessageRecipient[]>("/api/admin/message-recipients");
 }
 
-export function sendMessage(payload: { recipient_ids: number[]; title: string; content: string }): Promise<{ message: MessageItem; created_count: number }> {
+export type MessageRecipientScope = "all" | "managers" | "employees";
+
+export type SendMessagePayload =
+  | { recipient_ids: number[]; title: string; content: string }
+  | { recipient_scope: MessageRecipientScope; title: string; content: string };
+
+export function sendMessage(payload: SendMessagePayload): Promise<{ message: MessageItem; created_count: number }> {
   return apiRequest<{ message: MessageItem; created_count: number }>("/api/admin/messages", { method: "POST", body: payload });
 }

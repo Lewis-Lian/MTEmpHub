@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 from flask import Blueprint, g, jsonify, request
 
@@ -21,6 +22,24 @@ def _serialize_message(message: Message) -> dict[str, object]:
         "created_at": message.created_at.isoformat(),
         "unread": message.read_at is None,
     }
+
+
+def _resolve_scope_recipients(scope: str) -> Optional[list[User]]:
+    if scope not in ("all", "managers", "employees"):
+        return None
+    query = (
+        User.query.join(UserEmployeeAssignment, UserEmployeeAssignment.user_id == User.id)
+        .join(Employee, UserEmployeeAssignment.emp_id == Employee.id)
+        .filter(User.login_disabled_until_admin_unlock.is_(False))
+    )
+    if scope == "managers":
+        query = query.filter(Employee.is_manager.is_(True))
+    elif scope == "employees":
+        query = query.filter(Employee.is_manager.is_(False))
+    users: dict[int, User] = {}
+    for user in query.all():
+        users.setdefault(user.id, user)
+    return [users[key] for key in sorted(users)]
 
 
 @messages_bp.get("/api/query/messages")
@@ -60,15 +79,23 @@ def mark_message_read(message_id: int):
 @admin_required
 def send_message():
     data = request.json or {}
-    raw_recipient_ids = data.get("recipient_ids")
-    if raw_recipient_ids is None:
-        raw_recipient_ids = [data.get("recipient_id")]
-    recipient_ids = sorted({int(value) for value in raw_recipient_ids if str(value).isdigit()})
     title = (data.get("title") or "").strip()
     content = (data.get("content") or "").strip()
-    recipients = User.query.filter(User.id.in_(recipient_ids)).all() if recipient_ids else []
-    if len(recipients) != len(recipient_ids):
-        return jsonify({"error": "请选择有效的收件账号"}), 400
+    scope = data.get("recipient_scope")
+    if scope:
+        recipients = _resolve_scope_recipients(scope)
+        if recipients is None:
+            return jsonify({"error": "无效的发送范围"}), 400
+        if not recipients:
+            return jsonify({"error": "该范围内没有可发送的收件账号"}), 400
+    else:
+        raw_recipient_ids = data.get("recipient_ids")
+        if raw_recipient_ids is None:
+            raw_recipient_ids = [data.get("recipient_id")]
+        recipient_ids = sorted({int(value) for value in raw_recipient_ids if str(value).isdigit()})
+        recipients = User.query.filter(User.id.in_(recipient_ids)).all() if recipient_ids else []
+        if len(recipients) != len(recipient_ids) or not recipients:
+            return jsonify({"error": "请选择有效的收件账号"}), 400
     if not title or not content:
         return jsonify({"error": "标题和内容不能为空"}), 400
     messages = [Message(sender_id=g.current_user.id, recipient_id=recipient.id, title=title, content=content) for recipient in recipients]
