@@ -534,7 +534,7 @@ class DingTalkManagerAttendanceServiceTests(unittest.TestCase):
             self.assertEqual(rows[date(2026, 8, 4)].raw_data["上班1打卡结果"], "迟到")
             self.assertEqual(rows[date(2026, 8, 5)].raw_data["上班1打卡结果"], "严重迟到")
             self.assertEqual(rows[date(2026, 8, 6)].raw_data["下班1打卡结果"], "早退")
-            self.assertEqual(rows[date(2026, 8, 7)].raw_data["上班1打卡结果"], "旷工迟到")
+            self.assertEqual(rows[date(2026, 8, 7)].raw_data["上班1打卡结果"], "缺勤迟到")
             self.assertEqual(manager_day_late_minutes(rows[date(2026, 8, 4)]), 7)
 
     def test_deleting_account_set_cascades_its_sync_runs(self):

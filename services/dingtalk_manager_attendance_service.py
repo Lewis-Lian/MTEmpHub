@@ -21,9 +21,9 @@ _RESULT_LABELS = {
     "SeriousLate": "严重迟到",
     "Early": "早退",
     "EarlyLeave": "早退",
-    "Absenteeism": "旷工迟到",
-    "Absence": "旷工",
-    "Absent": "旷工",
+    "Absenteeism": "缺勤迟到",
+    "Absence": "缺勤",
+    "Absent": "缺勤",
     "NotSigned": "缺卡",
 }
 

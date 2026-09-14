@@ -38,6 +38,13 @@ MODULES: list[dict[str, Any]] = [
         "icon_key": "attendance",
         "entries": [
             {
+                "key": "individual_attendance",
+                "label": "单人考勤查询",
+                "href": "/employee/individual-attendance",
+                "requires_any_page_access_keys": ("employee_dashboard", "manager_query"),
+                "description": "集中查看单个员工或管理人员的月度考勤与明细。",
+            },
+            {
                 "key": "employee_dashboard",
                 "label": "员工考勤数据查询",
                 "href": "/employee/dashboard",
@@ -246,6 +253,9 @@ def can_access_entry(user: Any, entry: dict[str, Any]) -> bool:
     if entry.get("requires_any_page_access"):
         has_any_page_access = getattr(user, "has_any_page_access", None)
         return bool(has_any_page_access and has_any_page_access(QUERY_CENTER_PERMISSION_KEYS))
+    if entry.get("requires_any_page_access_keys"):
+        has_any_page_access = getattr(user, "has_any_page_access", None)
+        return bool(has_any_page_access and has_any_page_access(entry["requires_any_page_access_keys"]))
     permission_key = entry.get("permission_key")
     if permission_key:
         can_access_page = getattr(user, "can_access_page", None)

@@ -105,6 +105,10 @@ export const UserCogIcon = icon(
   "M6.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM3 15c0-2.5 3-3.5 3.5-3.5M14 14l2 2M14 16l2-2"
 );
 
+export const UserCheckIcon = icon(
+  "M16 17l2 2 4-4M6.5 8a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM3 15c0-2.5 3-3.5 3.5-3.5M10.5 13.5A3.5 3.5 0 0013 15"
+);
+
 export const SendIcon = icon("M17.5 2.5L2.5 9l6 2.5L11 17.5 17.5 2.5zM8.5 11.5l9-9M11 17.5l2-5 4.5-10");
 
 export const UserXIcon = icon(
@@ -142,6 +146,7 @@ const moduleIconMap: Record<string, React.FC<IconProps>> = {
 
 const entryIconMap: Record<string, React.FC<IconProps>> = {
   query_home: HomeIcon,
+  individual_attendance: UserCheckIcon,
   employee_dashboard: BarChartIcon,
   abnormal_query: AlertTriangleIcon,
   punch_records: ClockIcon,

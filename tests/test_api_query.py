@@ -75,6 +75,7 @@ class ApiQueryTests(unittest.TestCase):
                 username="manager-viewer",
                 role="readonly",
                 page_permissions={
+                    "manager_query": True,
                     "manager_overtime_query": True,
                     "manager_annual_leave_query": True,
                 },
@@ -123,6 +124,7 @@ class ApiQueryTests(unittest.TestCase):
                 "/api/query/leave-records/export",
                 "/api/query/department-hours",
                 "/api/query/manager-attendance",
+                "/api/query/attendance-calendar",
                 "/api/query/manager-punch-records",
                 "/api/query/manager-leave-records",
                 "/api/query/manager-overtime",
@@ -169,7 +171,19 @@ class ApiQueryTests(unittest.TestCase):
         entry_keys = {entry["key"] for entry in query_module["entries"]}
         self.assertIn("employee_dashboard", entry_keys)
         self.assertIn("summary_download", entry_keys)
+        self.assertIn("individual_attendance", entry_keys)
         self.assertTrue(all("href" in entry for entry in query_module["entries"]))
+
+    def test_manager_query_user_can_use_individual_attendance_for_bound_manager(self) -> None:
+        self._login("manager-viewer", "manager123")
+
+        bootstrap_response = self.client.get("/api/query/bootstrap")
+        self.assertEqual(bootstrap_response.status_code, 200)
+        employees = bootstrap_response.get_json()["employees"]
+        self.assertEqual([row["emp_no"] for row in employees], ["M001"])
+
+        calendar_response = self.client.get(f"/api/query/attendance-calendar?emp_id={employees[0]['id']}&month=2026-05")
+        self.assertEqual(calendar_response.status_code, 200)
 
     def test_query_navigation_api_exposes_disabled_users_in_settings(self) -> None:
         self._login("admin", "admin123")
