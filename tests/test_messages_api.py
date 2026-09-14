@@ -150,6 +150,100 @@ class MessagesApiTests(unittest.TestCase):
         self.assertEqual(len([row for row in rows if row["emp_no"] == "E1001"]), 1)
         self.assertEqual(len(rows[0]["account_ids"]), 2)
 
+    def _create_user_with_employee(self, username: str, emp_no: str, name: str, is_manager: bool, disabled: bool = False) -> int:
+        with self.app.app_context():
+            user = User(username=username, role="readonly")
+            user.set_password("pass123")
+            if disabled:
+                user.login_disabled_until_admin_unlock = True
+            employee = Employee(emp_no=emp_no, name=name, is_manager=is_manager)
+            db.session.add_all([user, employee])
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=employee.id))
+            db.session.commit()
+            return user.id
+
+    def test_scope_managers_sends_only_to_manager_accounts(self):
+        self._create_user_with_employee("mgr1", "E2001", "王经理", is_manager=True)
+        self._create_user_with_employee("staff1", "E3001", "李员工", is_manager=False)
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_scope": "managers", "title": "公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.get_json()["created_count"], 1)
+        self.client.post("/api/auth/logout")
+        self._login("mgr1", "pass123")
+        inbox = self.client.get("/api/query/messages").get_json()
+        self.assertEqual(inbox["unread_count"], 1)
+
+    def test_scope_employees_sends_only_to_non_manager_accounts(self):
+        self._create_user_with_employee("mgr1", "E2001", "王经理", is_manager=True)
+        self._create_user_with_employee("staff1", "E3001", "李员工", is_manager=False)
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_scope": "employees", "title": "公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 201)
+        # setUp 中的 recipient 与 staff1 均为非管理员工账号，管理员与王经理不收到
+        self.assertEqual(response.get_json()["created_count"], 2)
+
+    def test_scope_all_sends_to_every_bound_account_once_and_skips_disabled(self):
+        self._create_user_with_employee("mgr1", "E2001", "王经理", is_manager=True)
+        staff_id = self._create_user_with_employee("staff1", "E3001", "李员工", is_manager=False)
+        with self.app.app_context():
+            extra = Employee(emp_no="E3002", name="李员工兼职", is_manager=False)
+            db.session.add(extra)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=staff_id, emp_id=extra.id))
+            db.session.commit()
+        self._create_user_with_employee("gone1", "E4001", "已禁用", is_manager=False, disabled=True)
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_scope": "all", "title": "全员公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 201)
+        # recipient + 王经理 + staff1（绑定两个员工档案只计一次），禁用账号排除
+        self.assertEqual(response.get_json()["created_count"], 3)
+
+    def test_scope_with_empty_population_is_rejected(self):
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_scope": "managers", "title": "公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_scope_with_invalid_value_is_rejected(self):
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_scope": "everyone", "title": "公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_empty_recipient_ids_in_legacy_path_is_rejected(self):
+        self._login("admin", "admin123")
+        response = self.client.post(
+            "/api/admin/messages",
+            json={"recipient_ids": [], "title": "公告", "content": "内容"},
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_scope_managers_and_employees_also_skip_disabled_accounts(self):
+        self._create_user_with_employee("mgr1", "E2001", "王经理", is_manager=True, disabled=True)
+        self._create_user_with_employee("staff1", "E3001", "李员工", is_manager=False, disabled=True)
+        self._login("admin", "admin123")
+        managers = self.client.post("/api/admin/messages", json={"recipient_scope": "managers", "title": "公告", "content": "内容"})
+        employees = self.client.post("/api/admin/messages", json={"recipient_scope": "employees", "title": "公告", "content": "内容"})
+        # 唯一的管理人员已禁用 → 空范围 400；员工范围跳过禁用的李员工，只发给 setUp 中启用的 recipient
+        self.assertEqual(managers.status_code, 400)
+        self.assertEqual(employees.status_code, 201)
+        self.assertEqual(employees.get_json()["created_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
