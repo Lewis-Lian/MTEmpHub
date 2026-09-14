@@ -1,0 +1,13 @@
+.message-detail-page { max-width: 860px; }
+.message-detail-card { background: var(--ent-bg); border: 1px solid var(--ent-border-strong); border-radius: 10px; padding: 26px 32px 32px; box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06); }
+.message-detail-title { margin: 0 0 10px; font-size: 22px; line-height: 1.4; color: var(--ent-text); }
+.message-detail-meta { display: flex; gap: 14px; margin: 0 0 18px; padding-bottom: 14px; border-bottom: 1px solid var(--ent-border-strong); color: var(--ent-text-tertiary); font-size: 13px; }
+.message-detail-body { color: var(--ent-text); font-size: 15px; line-height: 1.8; word-break: break-word; }
+.message-detail-body h1, .message-detail-body h2, .message-detail-body h3 { margin: 18px 0 8px; color: var(--ent-text); line-height: 1.4; }
+.message-detail-body p { margin: 8px 0; }
+.message-detail-body img { max-width: 100%; }
+.message-detail-body ul, .message-detail-body ol { padding-left: 22px; margin: 8px 0; }
+.message-detail-body blockquote { margin: 10px 0; padding: 6px 14px; border-left: 3px solid var(--ent-blue); background: var(--ent-secondary-bg); color: var(--ent-text-secondary); }
+.message-detail-body table { border-collapse: collapse; margin: 10px 0; width: 100%; }
+.message-detail-body th, .message-detail-body td { border: 1px solid var(--ent-border-strong); padding: 6px 10px; text-align: left; }
+.message-detail-body a { color: var(--ent-blue); }

@@ -35,6 +35,15 @@ def list_messages():
     return jsonify({"messages": [_serialize_message(item) for item in messages], "unread_count": sum(item.read_at is None for item in messages)})
 
 
+@messages_bp.get("/api/query/messages/<int:message_id>")
+@login_required
+def get_message(message_id: int):
+    message = Message.query.filter_by(id=message_id, recipient_id=g.current_user.id).first()
+    if not message:
+        return jsonify({"error": "消息不存在"}), 404
+    return jsonify({"message": _serialize_message(message)})
+
+
 @messages_bp.post("/api/query/messages/<int:message_id>/read")
 @login_required
 def mark_message_read(message_id: int):

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfirmProvider } from "../../components/feedback/ConfirmDialog";
 
 vi.mock("../../api/messages", () => ({
@@ -9,8 +9,17 @@ vi.mock("../../api/messages", () => ({
 vi.mock("../../api/admin", () => ({
   fetchAdminDepartments: vi.fn().mockResolvedValue([{ id: 10, dept_no: "D10", dept_name: "制造部", parent_id: null }]),
 }));
+vi.mock("../../components/editor/RichTextEditor", () => ({
+  default: ({ ariaLabel, onChange }: { ariaLabel: string; onChange: (html: string) => void }) => (
+    <div aria-label={ariaLabel} contentEditable onInput={(event) => onChange(event.currentTarget.innerHTML)} suppressContentEditableWarning />
+  ),
+}));
 
 describe("AdminMessagesPage", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   it("sends a message from the system settings page", async () => {
     const { default: AdminMessagesPage } = await import("./AdminMessagesPage");
     render(<ConfirmProvider><AdminMessagesPage /></ConfirmProvider>);
@@ -26,5 +35,39 @@ describe("AdminMessagesPage", () => {
     fireEvent.input(editor);
     fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
     await waitFor(() => expect(screen.getByText("消息发送成功")).toBeInTheDocument());
+  });
+
+  it("编辑器只有空占位段落时不发送并提示内容不能为空", async () => {
+    const { default: AdminMessagesPage } = await import("./AdminMessagesPage");
+    const { sendMessage } = await import("../../api/messages");
+    render(<ConfirmProvider><AdminMessagesPage /></ConfirmProvider>);
+    await screen.findByRole("heading", { name: "发送消息" });
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/ }));
+    fireEvent.click(screen.getByLabelText("E002 - 张三"));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "选择员工" })).getByRole("button", { name: "确定" }));
+    fireEvent.change(screen.getByLabelText("消息标题"), { target: { value: "公告" } });
+    const editor = screen.getByLabelText("消息内容");
+    editor.innerHTML = "<p><br></p>";
+    fireEvent.input(editor);
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    await waitFor(() => expect(screen.getByText("消息内容不能为空")).toBeInTheDocument());
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("编辑器只有空白字符段落时同样拦截", async () => {
+    const { default: AdminMessagesPage } = await import("./AdminMessagesPage");
+    const { sendMessage } = await import("../../api/messages");
+    render(<ConfirmProvider><AdminMessagesPage /></ConfirmProvider>);
+    await screen.findByRole("heading", { name: "发送消息" });
+    fireEvent.click(screen.getByRole("button", { name: /选择员工/ }));
+    fireEvent.click(screen.getByLabelText("E002 - 张三"));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "选择员工" })).getByRole("button", { name: "确定" }));
+    fireEvent.change(screen.getByLabelText("消息标题"), { target: { value: "公告" } });
+    const editor = screen.getByLabelText("消息内容");
+    editor.innerHTML = "<p>   </p>";
+    fireEvent.input(editor);
+    fireEvent.click(screen.getByRole("button", { name: "发送消息" }));
+    await waitFor(() => expect(screen.getByText("消息内容不能为空")).toBeInTheDocument());
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
