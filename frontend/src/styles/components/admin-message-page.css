@@ -1,4 +1,4 @@
-.admin-message-page { max-width: 760px; }
+/* 页面通栏布局，与账套中心等其他管理页一致（原 760px 限宽导致右侧大片空白） */
 
 /* 页头卡片：覆盖全局 .legacy-page-header 的写死浅色渐变（深色模式下会漏白） */
 .admin-message-page .legacy-page-header {
