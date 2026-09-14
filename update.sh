@@ -51,11 +51,23 @@ pip install --default-timeout=1000 -i "$PIP_INDEX" gunicorn
 
 echo ""
 echo "=========================================="
-echo "3. 执行数据库迁移（幂等补列）..."
+echo "3. 执行数据库迁移（幂等补列 + alembic 增量升级）..."
 echo "=========================================="
 # upgrade-legacy-schema 幂等补齐旧库缺失的表/列，可安全重复执行
 # 注：不跑 init-db（它会执行全部 alembic 迁移，风险较高）
 flask --app manage.py upgrade-legacy-schema
+
+# alembic 增量迁移（补 legacy 补丁不覆盖的新表/新列，如 messages、users.avatar）。
+# 历史原因：旧库曾长期只靠 upgrade-legacy-schema 补齐，alembic_version 停在初始
+# 版本 681e8410935f，直接 upgrade 会对已存在的表/列报 Duplicate error。幂等补丁
+# 已完整覆盖到 b8c9d0e1f2a3（钉钉同步记录表）为止的对象，因此把这些旧库的版本
+# 号先对齐到该边界，再让 alembic 正常增量升级（对齐是一次性的，之后为 no-op）。
+ALEMBIC_CURRENT="$(flask --app manage.py db current 2>/dev/null | tail -n 1 || true)"
+if [ "$ALEMBIC_CURRENT" = "681e8410935f" ]; then
+    echo "检测到旧库版本号停留在初始迁移 681e8410935f，对齐到补丁覆盖边界 b8c9d0e1f2a3"
+    flask --app manage.py db stamp b8c9d0e1f2a3
+fi
+flask --app manage.py db upgrade
 
 echo ""
 echo "=========================================="
