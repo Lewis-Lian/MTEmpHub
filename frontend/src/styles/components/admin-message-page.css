@@ -1,20 +1,191 @@
 .admin-message-page { max-width: 760px; }
-.admin-message-form { display: grid; gap: 18px; padding: 24px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius-lg, 10px); background: var(--ent-bg); box-shadow: var(--ent-shadow-card, 0 4px 14px rgba(15, 23, 42, .06)); }
-.admin-message-form > label, .admin-message-editor > label { display: grid; gap: 7px; color: var(--ent-text-secondary); font-size: 13px; font-weight: 500; }
-.admin-message-form > label > input, .admin-message-form > label > select, .admin-message-form > label > textarea { padding: 9px 10px; border: 1px solid var(--ent-border-strong); border-radius: 6px; background: var(--ent-bg); color: var(--ent-text); font: inherit; }
-.admin-message-form > label > textarea { min-height: 150px; resize: vertical; }
-.admin-message-form > button { justify-self: start; padding: 9px 18px; border: 0; border-radius: 6px; background: var(--ent-blue); color: white; cursor: pointer; }
-.admin-message-status { color: #15803d; }
+
+/* 页头卡片：覆盖全局 .legacy-page-header 的写死浅色渐变（深色模式下会漏白） */
+.admin-message-page .legacy-page-header {
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  background: linear-gradient(135deg, var(--ent-secondary-bg) 0%, var(--ent-bg) 55%);
+  box-shadow: var(--ent-shadow-card);
+}
+.admin-message-title-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  margin-right: 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--ent-blue) 0%, var(--ent-blue-hover) 100%);
+  color: #fff;
+  vertical-align: -9px;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.32);
+}
+.admin-message-title-icon svg { width: 19px; height: 19px; }
+
+/* 发送结果提示条 */
+.admin-message-alert {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 11px 14px;
+  border-radius: var(--ent-radius);
+  font-size: 13.5px;
+  font-weight: 500;
+  animation: admin-message-alert-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.admin-message-alert svg { flex: none; }
+.admin-message-alert--success { border: 1px solid rgba(22, 163, 74, 0.28); background: rgba(22, 163, 74, 0.08); color: #15803d; }
+.admin-message-alert--error { border: 1px solid rgba(220, 38, 38, 0.28); background: rgba(220, 38, 38, 0.06); color: #b91c1c; }
+@keyframes admin-message-alert-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 表单卡片 */
+.admin-message-form {
+  display: grid;
+  gap: 22px;
+  padding: 26px 28px 28px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  background: var(--ent-bg);
+  box-shadow: var(--ent-shadow-card);
+}
+
+/* 区块标题 */
+.admin-message-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ent-border);
+  color: var(--ent-text);
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.admin-message-section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+}
+.admin-message-section-icon svg { width: 14px; height: 14px; }
+
+/* 发送范围：分段选择卡片 */
+.admin-message-scope { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.admin-message-scope-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 8px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-bg);
+  color: var(--ent-text-secondary);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--ent-transition);
+  user-select: none;
+}
+.admin-message-scope-option:hover { border-color: var(--ent-blue); color: var(--ent-text); background: var(--ent-blue-light); }
+.admin-message-scope-option:has(input:checked) {
+  border-color: var(--ent-blue);
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+  font-weight: 600;
+  box-shadow: 0 0 0 3px var(--ent-blue-focus);
+}
+.admin-message-scope-option:has(input:focus-visible) { outline: 2px solid var(--ent-border-focus); outline-offset: 2px; }
+/* 原生 radio 视觉隐藏，保留可访问性与测试可定位性 */
+.admin-message-scope-radio { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+.admin-message-scope-icon { display: inline-flex; }
+.admin-message-scope-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 9px 12px;
+  border-left: 3px solid var(--ent-blue);
+  border-radius: 0 var(--ent-radius-sm) var(--ent-radius-sm) 0;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+}
+
+/* 字段标签与输入框 */
+.admin-message-form > .admin-message-field,
+.admin-message-editor > label { display: grid; gap: 8px; color: var(--ent-text-secondary); font-size: 13px; font-weight: 500; }
+.admin-message-form > .admin-message-field > input {
+  padding: 10px 12px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm);
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  font: inherit;
+  transition: var(--ent-transition);
+}
+.admin-message-form > .admin-message-field > input::placeholder { color: var(--ent-text-tertiary); }
+.admin-message-form > .admin-message-field > input:hover { border-color: var(--ent-border-focus); }
+.admin-message-form > .admin-message-field > input:focus {
+  outline: none;
+  border-color: var(--ent-border-focus);
+  box-shadow: 0 0 0 3px var(--ent-blue-focus);
+}
+
 /* 富文本编辑器（wangEditor）对齐表单控件与项目配色 */
-.admin-message-editor .rich-text-editor { border: 1px solid var(--ent-border-strong); border-radius: 6px; overflow: hidden; --w-e-toolbar-bg-color: var(--ent-secondary-bg, #f8fafc); --w-e-toolbar-color: var(--ent-text-secondary, #475569); --w-e-toolbar-border-color: var(--ent-border-strong, #d7e3ef); --w-e-textarea-bg-color: var(--ent-bg, #fff); --w-e-textarea-color: var(--ent-text, #0f172a); --w-e-textarea-border-color: var(--ent-border-strong, #d7e3ef); --w-e-textarea-slight-border-color: var(--ent-border-strong, #e2e8f0); --w-e-textarea-selected-border-color: var(--ent-blue, #2563eb); }
+.admin-message-editor .rich-text-editor {
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm);
+  overflow: hidden;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  --w-e-toolbar-bg-color: var(--ent-secondary-bg, #f8fafc);
+  --w-e-toolbar-color: var(--ent-text-secondary, #475569);
+  --w-e-toolbar-border-color: var(--ent-border-strong, #d7e3ef);
+  --w-e-textarea-bg-color: var(--ent-bg, #fff);
+  --w-e-textarea-color: var(--ent-text, #0f172a);
+  --w-e-textarea-border-color: var(--ent-border-strong, #d7e3ef);
+  --w-e-textarea-slight-border-color: var(--ent-border-strong, #e2e8f0);
+  --w-e-textarea-selected-border-color: var(--ent-blue, #2563eb);
+}
+.admin-message-editor .rich-text-editor:focus-within { border-color: var(--ent-border-focus); box-shadow: 0 0 0 3px var(--ent-blue-focus); }
 .admin-message-editor .rich-text-editor-toolbar { border-bottom: 1px solid var(--ent-border-strong); }
 .admin-message-editor .rich-text-editor-body { min-height: 240px; }
-.admin-message-scope { display: flex; flex-wrap: wrap; gap: 8px 18px; }
-.admin-message-scope label { display: inline-flex; align-items: center; gap: 6px; color: var(--ent-text); font-size: 14px; cursor: pointer; }
-.admin-message-scope input { accent-color: var(--ent-blue, #2563eb); }
-.admin-message-scope-hint { margin: 0; color: var(--ent-text-tertiary); font-size: 13px; }
+
+/* 发送按钮 */
+.admin-message-submit {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 24px;
+  border: 0;
+  border-radius: var(--ent-radius);
+  background: linear-gradient(135deg, var(--ent-blue) 0%, var(--ent-blue-hover) 100%);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.32);
+  transition: var(--ent-transition);
+}
+.admin-message-submit:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 5px 14px rgba(37, 99, 235, 0.4); }
+.admin-message-submit:active:not(:disabled) { transform: translateY(0); box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3); }
+.admin-message-submit:disabled { opacity: 0.55; cursor: not-allowed; box-shadow: none; }
+
 /* 员工选择器对齐查询区控件规格（同 legacy-ui.css 中 .query-filter-rail 的处理） */
+.admin-message-section .legacy-field-label { color: var(--ent-text); }
 .admin-message-section .employee-lookup .input-group { height: 36px; }
-.admin-message-section .employee-lookup .form-control { height: 36px; min-height: 36px; border-color: #d7e3ef; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72); }
-.admin-message-section .employee-lookup .btn { height: 36px; min-height: 36px; border-color: #d7e3ef; }
+.admin-message-section .employee-lookup .form-control { height: 36px; min-height: 36px; border-color: var(--ent-border-strong); box-shadow: none; }
+.admin-message-section .employee-lookup .btn { height: 36px; min-height: 36px; border-color: var(--ent-border-strong); background: var(--ent-secondary-bg); }
 .admin-message-section .employee-lookup-clear { height: 36px; min-height: 36px; }
