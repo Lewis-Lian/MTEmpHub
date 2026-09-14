@@ -44,7 +44,7 @@ export default function AvatarChangeModal({
       setActiveTab(isCustom ? "custom" : "preset");
       setSelectedPreset(user.avatar?.startsWith("default:") ? user.avatar : "default:1");
       setCustomFile(null);
-      setCustomPreviewUrl(isCustom ? user.avatar : null);
+      setCustomPreviewUrl(isCustom ? (user.avatar ?? null) : null);
       setErrorMessage(null);
       setIsSaving(false);
     }
