@@ -10,6 +10,7 @@ type LoadingVariant =
   | "navigation"
   | "query-page"
   | "admin-page"
+  | "admin-message-page"
   | "account-page"
   | "account-list"
   | "account-center"
@@ -41,7 +42,9 @@ export default function LoadingState({
           ? " legacy-page-section summary-download-container"
           : variant === "admin-page"
             ? " legacy-page-section"
-            : variant === "database-unlock"
+          : variant === "admin-message-page"
+            ? " legacy-page-section admin-message-page"
+          : variant === "database-unlock"
               ? " database-unlock-loading"
               : "";
 
@@ -163,6 +166,44 @@ function LoadingSkeleton({
       <div aria-hidden="true" className="loading-admin-page">
         <header className="legacy-page-header"><div className="legacy-page-heading"><SkeletonLine width="86px" /><SkeletonLine height="28px" width="180px" /><SkeletonLine width="320px" /></div><div className="legacy-page-side-info"><SkeletonLine height="48px" width="96px" /><SkeletonLine height="48px" width="96px" /></div></header>
         <section className="legacy-surface admin-resource-panel"><div className="admin-resource-panel-head"><div><SkeletonLine width="76px" /><SkeletonLine height="22px" width="150px" /><SkeletonLine width="300px" /></div><SkeletonLine width="90px" /></div><TableSkeleton headers={headers} /></section>
+      </div>
+    );
+  }
+
+  if (variant === "admin-message-page") {
+    return (
+      <div aria-hidden="true" className="loading-admin-message-page">
+        <header className="legacy-page-header admin-message-header">
+          <div className="legacy-page-heading">
+            <div className="admin-message-badge-wrap"><SkeletonLine width="54px" /><SkeletonLine width="86px" /></div>
+            <SkeletonLine height="36px" width="160px" />
+            <SkeletonLine width="420px" />
+          </div>
+        </header>
+        <div className="admin-message-layout">
+          <div className="admin-message-main-col">
+            <section className="admin-message-form">
+              <div className="admin-message-section">
+                <div className="admin-message-section-title-row"><SkeletonLine height="26px" width="132px" /></div>
+                <div className="admin-message-scope">
+                  {[0, 1, 2, 3].map((item) => <div className="admin-message-scope-option" key={item}><SkeletonLine height="42px" /></div>)}
+                </div>
+                <SkeletonField />
+              </div>
+              <div className="admin-message-section">
+                <div className="admin-message-section-title-row"><SkeletonLine height="26px" width="132px" /></div>
+                <div className="admin-message-quick-tags"><SkeletonLine width="280px" /></div>
+                <SkeletonField />
+                <div className="admin-message-editor-skeleton"><SkeletonLine height="36px" width="100%" /><SkeletonLine height="220px" width="100%" /></div>
+              </div>
+              <div className="admin-message-actions-bar"><SkeletonLine height="40px" width="124px" /><SkeletonLine width="220px" /></div>
+            </section>
+          </div>
+          <aside className="admin-message-side-col">
+            <div className="admin-message-preview-card"><div className="admin-message-preview-header"><SkeletonLine width="110px" /><SkeletonLine width="120px" /></div><div className="admin-message-preview-body"><SkeletonLine height="94px" width="100%" /></div></div>
+            <div className="admin-message-insights-card"><SkeletonLine width="120px" />{[0, 1, 2, 3].map((item) => <SkeletonLine key={item} width="100%" />)}</div>
+          </aside>
+        </div>
       </div>
     );
   }

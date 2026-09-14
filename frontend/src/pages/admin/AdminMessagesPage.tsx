@@ -123,7 +123,7 @@ export default function AdminMessagesPage() {
     return { count: 0, desc: "" };
   }, [scope, selectedEmployeeIds, recipients]);
 
-  if (loading) return <LoadingState message="正在加载收件账号..." variant="admin-page" />;
+  if (loading) return <LoadingState message="正在加载收件账号..." variant="admin-message-page" />;
   if (error && !recipients.length) return <ErrorState description={error} title="消息发送页面加载失败" />;
 
   const pickerEmployees: QueryEmployee[] = recipients.map((recipient) => ({
