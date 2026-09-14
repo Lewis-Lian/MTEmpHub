@@ -92,10 +92,59 @@
 .loading-account-center,
 .loading-account-page,
 .loading-admin-page,
-.loading-summary-download {
+.loading-summary-download,
+.loading-admin-message-page {
   display: grid;
   gap: 16px;
   width: 100%;
+}
+
+.loading-admin-message-page {
+  gap: 16px;
+}
+
+.loading-admin-message-page .admin-message-header {
+  min-height: 132px;
+}
+
+.loading-admin-message-page .admin-message-layout {
+  align-items: start;
+}
+
+.loading-admin-message-page .admin-message-form,
+.loading-admin-message-page .admin-message-preview-card,
+.loading-admin-message-page .admin-message-insights-card {
+  box-sizing: border-box;
+}
+
+.loading-admin-message-page .admin-message-section {
+  gap: 14px;
+}
+
+.loading-admin-message-page .admin-message-scope-option {
+  width: 100%;
+  border-radius: var(--ent-radius, 8px);
+}
+
+.loading-admin-message-page .admin-message-editor-skeleton {
+  display: grid;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-sm, 6px);
+}
+
+.loading-admin-message-page .admin-message-editor-skeleton .skeleton-line:first-child {
+  border-radius: 0;
+}
+
+.loading-admin-message-page .admin-message-editor-skeleton .skeleton-line:last-child {
+  border-radius: 0;
+}
+
+.loading-admin-message-page .admin-message-insights-card {
+  display: grid;
+  gap: 14px;
 }
 
 .loading-account-center .account-top-control-row,

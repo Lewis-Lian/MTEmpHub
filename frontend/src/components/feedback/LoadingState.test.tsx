@@ -34,6 +34,19 @@ describe("LoadingState", () => {
     expect(within(status).getByText("考勤天数")).toBeInTheDocument();
   });
 
+  it("发送消息页加载态保留真实页面的双栏编辑结构", () => {
+    render(<LoadingState variant="admin-message-page" />);
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveClass("admin-message-page");
+    expect(status.querySelector(".admin-message-header")).toBeInTheDocument();
+    expect(status.querySelector(".admin-message-layout")).toBeInTheDocument();
+    expect(status.querySelector(".admin-message-form")).toBeInTheDocument();
+    expect(status.querySelector(".admin-message-preview-card")).toBeInTheDocument();
+    expect(status.querySelector(".admin-message-insights-card")).toBeInTheDocument();
+    expect(status.querySelector(".admin-resource-panel")).not.toBeInTheDocument();
+  });
+
   it("账套中心加载态保留顶部控制区、摘要条和记录表格", () => {
     render(<LoadingState headers={["文件名", "导入时间", "状态"]} variant="account-center" />);
 
