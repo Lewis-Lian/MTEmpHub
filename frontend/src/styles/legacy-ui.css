@@ -1059,11 +1059,12 @@ body {
   display: none;
 }
 
+/* 不设 align-items：grid 页依赖默认 stretch；flex 覆盖页（employee-dashboard-page 等）
+   若继承 start 会让列子项收缩为内容宽、右侧留白（曾迫使各页逐一打补丁） */
 .query-page-shell {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
-  align-items: start;
   min-width: 0;
   min-height: calc(100vh - 116px);
 }
