@@ -1616,8 +1616,8 @@ body {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid #d9e1e8;
-  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid var(--ent-border-strong);
+  background: var(--ent-bg);
 }
 
 .legacy-page-side-item {
