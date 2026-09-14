@@ -213,6 +213,7 @@ def _serialize_user(user: User, profile_departments_by_id: dict[int, Department]
             "dept_name": profile_department.dept_name,
         } if profile_department else None,
         "role": user.role,
+        "avatar": user.avatar or "",
         "created_at": user.created_at.isoformat() if user.created_at else None,
         "login_failed_attempts": int(user.login_failed_attempts or 0),
         "login_locked_until": user.login_locked_until.isoformat() if user.login_locked_until else None,

@@ -70,7 +70,13 @@ export default function App() {
     <MotionConfig reducedMotion="user" transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}>
       <NotificationProvider>
         <ConfirmProvider>
-          <AppRouter isLoading={isLoading} onLogin={setUser} onLogout={setUser} user={user} />
+          <AppRouter
+            isLoading={isLoading}
+            onLogin={setUser}
+            onLogout={setUser}
+            onUserUpdate={setUser}
+            user={user}
+          />
         </ConfirmProvider>
       </NotificationProvider>
     </MotionConfig>

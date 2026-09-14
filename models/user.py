@@ -57,6 +57,7 @@ class User(db.Model):
     login_locked_until = db.Column(db.DateTime, nullable=True)
     login_disabled_until_admin_unlock = db.Column(db.Boolean, nullable=False, default=False)
     login_disabled_reason = db.Column(db.String(255), nullable=True)
+    avatar = db.Column(db.String(255), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     employee_assignments = db.relationship(

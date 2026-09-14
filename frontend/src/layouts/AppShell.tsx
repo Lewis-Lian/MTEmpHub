@@ -16,10 +16,11 @@ import type { QueryNavigationModule } from "../types/query";
 
 interface AppShellProps {
   onLogout: (user: AuthUser | null) => void;
+  onUserUpdate?: (user: AuthUser) => void;
   user: AuthUser;
 }
 
-export default function AppShell({ onLogout, user }: AppShellProps) {
+export default function AppShell({ onLogout, onUserUpdate, user }: AppShellProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [modules, setModules] = useState<QueryNavigationModule[]>([]);
@@ -317,6 +318,7 @@ export default function AppShell({ onLogout, user }: AppShellProps) {
           onOpenSearch={() => setIsSearchOpen(true)}
           onRefreshCurrent={() => handleRefreshTab(location.pathname)}
           onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+          onUserUpdate={onUserUpdate}
           user={user}
         />
         {!isLoading && !error ? (

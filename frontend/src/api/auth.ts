@@ -14,6 +14,7 @@ export interface AuthUser {
     dept_name?: string;
   } | null;
   dept_name?: string | null;
+  avatar?: string | null;
 }
 
 interface LoginResponse {
@@ -90,4 +91,26 @@ export async function logout(): Promise<void> {
 
 export function fetchMe(): Promise<AuthUser> {
   return apiRequest<AuthUser>("/api/auth/me");
+}
+
+export interface AvatarUpdateResponse {
+  ok: boolean;
+  avatar: string;
+  user: AuthUser;
+}
+
+export function updateAvatar(payload: { avatar: string }): Promise<AvatarUpdateResponse> {
+  return apiRequest<AvatarUpdateResponse>("/api/auth/avatar", {
+    method: "PUT",
+    body: payload,
+  });
+}
+
+export function uploadAvatar(file: File): Promise<AvatarUpdateResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest<AvatarUpdateResponse>("/api/auth/avatar", {
+    method: "POST",
+    body: formData,
+  });
 }
