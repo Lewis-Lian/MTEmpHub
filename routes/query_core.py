@@ -1353,7 +1353,7 @@ def punch_records_api():
                 "actual_hours": _calc_record_work_hours(r)[0],
                 "late_minutes": r.late_minutes or 0,
                 "early_leave_minutes": r.early_leave_minutes or 0,
-                "exception_reason": r.exception_reason or "",
+                "exception_reason": (r.exception_reason or "").replace("旷工", "缺勤"),
             }
             for r in rows
         ]
@@ -1409,7 +1409,7 @@ def punch_records_export_api():
                 _calc_record_work_hours(r)[0],
                 r.late_minutes or 0,
                 r.early_leave_minutes or 0,
-                r.exception_reason or "",
+                (r.exception_reason or "").replace("旷工", "缺勤"),
             ]
         )
 
@@ -1793,7 +1793,7 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
             "actual_attendance_days": _calendar_actual_attendance_day_value(
                 r, daily_overrides.get(r.record_date), daily_attendance_values.get(r.record_date, 0.0)
             ),
-            "exception_reason": r.exception_reason or "",
+            "exception_reason": (r.exception_reason or "").replace("旷工", "缺勤"),
             "override": serialize_daily_override(daily_overrides.get(r.record_date)),
         }
         for r in views
@@ -1918,9 +1918,24 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
 
 def attendance_calendar_api():
     emp_id = request.args.get("emp_id", type=int)
-    if g.current_user.can_access_page("attendance_calendar") or g.current_user.can_access_page("employee_dashboard"):
+    if (
+        g.current_user.can_access_page("attendance_calendar")
+        or g.current_user.can_access_page("employee_dashboard")
+        or g.current_user.can_access_page("manager_query")
+    ):
         # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
         allowed = _accessible_emp_ids()
+        if g.current_user.can_access_page("manager_query"):
+            profile_emp_no = (g.current_user.profile_emp_no or "").strip()
+            profile_manager = (
+                Employee.query.with_entities(Employee.id)
+                .filter_by(emp_no=profile_emp_no, is_manager=True)
+                .first()
+                if profile_emp_no
+                else None
+            )
+            if profile_manager:
+                allowed = list(set(allowed) | {profile_manager.id})
     else:
         # 仅首页权限的账号只能在首页查看绑定管理人员本人的考勤日历
         profile_emp_no = (g.current_user.profile_emp_no or "").strip()
@@ -2050,7 +2065,7 @@ def summary_download_export_api():
                 _calc_record_work_hours(r)[0],
                 r.late_minutes or 0,
                 r.early_leave_minutes or 0,
-                r.exception_reason or "",
+                (r.exception_reason or "").replace("旷工", "缺勤"),
             ])
 
         punch_headers, punch_row_data = _filter_columns(punch_headers, punch_row_data, "punch_headers")

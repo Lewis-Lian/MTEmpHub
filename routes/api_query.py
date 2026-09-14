@@ -72,6 +72,17 @@ def bootstrap():
         )
     else:
         emp_ids = _accessible_emp_ids()
+        if g.current_user.can_access_page("manager_query"):
+            profile_emp_no = (g.current_user.profile_emp_no or "").strip()
+            profile_manager = (
+                Employee.query.with_entities(Employee.id)
+                .filter_by(emp_no=profile_emp_no, is_manager=True)
+                .first()
+                if profile_emp_no
+                else None
+            )
+            if profile_manager:
+                emp_ids = list(set(emp_ids) | {profile_manager.id})
         if emp_ids:
             employees = (
                 Employee.query.options(joinedload(Employee.department))

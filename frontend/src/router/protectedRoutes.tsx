@@ -22,6 +22,7 @@ const ManagerAnnualLeavePage = lazy(() => import("../pages/query/ManagerAnnualLe
 const ManagerDepartmentHoursPage = lazy(() => import("../pages/query/ManagerDepartmentHoursPage"));
 const ManagerOvertimePage = lazy(() => import("../pages/query/ManagerOvertimePage"));
 const ManagerQueryPage = lazy(() => import("../pages/query/ManagerQueryPage"));
+const IndividualAttendancePage = lazy(() => import("../pages/query/IndividualAttendancePage"));
 const MessageDetailPage = lazy(() => import("../pages/query/MessageDetailPage"));
 const PunchRecordsPage = lazy(() => import("../pages/query/PunchRecordsPage"));
 const QueryHomePage = lazy(() => import("../pages/query/QueryHomePage"));
@@ -48,6 +49,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(PunchRecordsPage), path: "/employee/punch-records" },
   { element: lazyPage(DepartmentHoursPage), path: "/employee/department-hours-query" },
   { element: lazyPage(ManagerQueryPage), path: "/employee/manager-query" },
+  { element: lazyPage(IndividualAttendancePage), path: "/employee/individual-attendance" },
   { element: lazyPage(ManagerOvertimePage), path: "/employee/manager-overtime-query" },
   { element: lazyPage(ManagerAnnualLeavePage), path: "/employee/manager-annual-leave-query" },
   { element: lazyPage(ManagerDepartmentHoursPage), path: "/employee/manager-department-hours-query" },
