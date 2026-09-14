@@ -1580,7 +1580,7 @@ body {
   align-items: start;
   padding: 16px 18px;
   border: 1px solid #ccd6df;
-  background: linear-gradient(180deg, var(--ent-secondary-bg) 0%, #eef3f7 100%);
+  background: linear-gradient(180deg, var(--ent-secondary-bg) 0%, var(--ent-bg) 100%);
 }
 
 .legacy-page-heading {
@@ -1662,7 +1662,7 @@ body {
 }
 
 .legacy-field-label {
-  color: #183153;
+  color: var(--ent-text);
   font-size: 13px;
   font-weight: 700;
 }
