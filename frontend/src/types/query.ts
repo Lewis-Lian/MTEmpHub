@@ -2,6 +2,7 @@ export interface QueryNavigationEntry {
   key: string;
   label: string;
   href: string;
+  group?: string | null;
   description?: string;
 }
 
