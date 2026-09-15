@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { NavLink } from "react-router-dom";
 import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/query";
 import { getModuleIcon, getEntryIcon } from "../icons";
@@ -35,19 +36,23 @@ export default function AppPageNav({ currentEntry, currentModule, modules }: App
           })}
         </div>
         <div className="module-bottom-sidebar">
-          {sidebarEntries.map((entry) => {
+          {sidebarEntries.map((entry, index) => {
             const Icon = getEntryIcon(entry.key);
+            const showGroupTitle = Boolean(entry.group) && sidebarEntries[index - 1]?.group !== entry.group;
+
             return (
-              <NavLink
-                className={({ isActive }) =>
-                  `app-side-link${isActive || currentEntry?.key === entry.key ? " is-active" : ""}`
-                }
-                key={`${entry.key}-bottom`}
-                to={entry.href}
-              >
-                {Icon && <Icon className="nav-icon" />}
-                <span className="app-side-label">{entry.label}</span>
-              </NavLink>
+              <Fragment key={`${entry.key}-bottom`}>
+                {showGroupTitle && <div className="app-nav-group-title">{entry.group}</div>}
+                <NavLink
+                  className={({ isActive }) =>
+                    `app-side-link${isActive || currentEntry?.key === entry.key ? " is-active" : ""}`
+                  }
+                  to={entry.href}
+                >
+                  {Icon && <Icon className="nav-icon" />}
+                  <span className="app-side-label">{entry.label}</span>
+                </NavLink>
+              </Fragment>
             );
           })}
         </div>

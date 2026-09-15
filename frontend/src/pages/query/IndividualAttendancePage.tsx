@@ -58,9 +58,9 @@ export default function IndividualAttendancePage() {
     }
   }
 
-  if (isLoading) return <LoadingState filterFields={2} message="正在准备单人考勤查询页..." variant="query-page" />;
-  if (error && !bootstrap) return <ErrorState description={error} title="单人考勤查询页初始化失败" />;
-  if (!bootstrap) return <ErrorState description="未能读取单人考勤查询页基础数据。" />;
+  if (isLoading) return <LoadingState filterFields={2} message="正在准备个人考勤查询页..." variant="query-page" />;
+  if (error && !bootstrap) return <ErrorState description={error} title="个人考勤查询页初始化失败" />;
+  if (!bootstrap) return <ErrorState description="未能读取个人考勤查询页基础数据。" />;
 
   return (
     <div className="individual-attendance-page employee-dashboard-page query-page-shell">
@@ -74,7 +74,7 @@ export default function IndividualAttendancePage() {
         <div className="individual-filter-toolbar">
           <div className="individual-filter-title-group">
             <span className="query-filter-kicker">Attendance</span>
-            <h2>单人考勤查询</h2>
+            <h2>个人考勤查询</h2>
           </div>
 
           <div className="individual-filter-controls">

@@ -156,6 +156,20 @@
   display: flex;
 }
 
+/* 二级目录分组标题：小号弱化文字，与上方条目拉开间距 */
+.app-nav-group-title {
+  margin: 8px 0 2px;
+  padding: 0 10px 0 28px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* 二级目录项：无外框、无变色、无状态条、无右箭头，明显缩进排版 */
 .app-module-subnav .app-side-link,
 .app-side-link {

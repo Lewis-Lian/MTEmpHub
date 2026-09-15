@@ -24,7 +24,13 @@ from models.monthly_report import MonthlyReport
 from models.account_set import AccountSet
 from models.manager_month_stat import ManagerMonthStat
 from models.employee_attendance_override import EmployeeAttendanceOverride
-from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS, UserEmployeeAssignment, UserDepartmentAssignment
+from models.user import (
+    COMMON_PAGE_PERMISSION_KEYS,
+    EMPLOYEE_PAGE_PERMISSION_KEYS,
+    MANAGER_PAGE_PERMISSION_KEYS,
+    UserEmployeeAssignment,
+    UserDepartmentAssignment,
+)
 from services.attendance_service import AttendanceService
 from services.daily_override_service import (
     EMPLOYEE_LEAVE_BUCKETS,
@@ -730,7 +736,7 @@ def _accessible_emp_ids() -> list[int]:
 
 def _can_access_query_center() -> bool:
     return g.current_user.role == "admin" or g.current_user.has_any_page_access(
-        (*MANAGER_PAGE_PERMISSION_KEYS, *EMPLOYEE_PAGE_PERMISSION_KEYS)
+        (*COMMON_PAGE_PERMISSION_KEYS, *MANAGER_PAGE_PERMISSION_KEYS, *EMPLOYEE_PAGE_PERMISSION_KEYS)
     )
 
 
@@ -1919,13 +1925,13 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
 def attendance_calendar_api():
     emp_id = request.args.get("emp_id", type=int)
     if (
-        g.current_user.can_access_page("attendance_calendar")
-        or g.current_user.can_access_page("employee_dashboard")
+        g.current_user.can_access_page("employee_dashboard")
         or g.current_user.can_access_page("manager_query")
+        or g.current_user.can_access_page("individual_attendance")
     ):
         # 考勤日历支持查询可见范围内的管理人员，不做非管理人员过滤。
         allowed = _accessible_emp_ids()
-        if g.current_user.can_access_page("manager_query"):
+        if g.current_user.can_access_page("manager_query") or g.current_user.can_access_page("individual_attendance"):
             profile_emp_no = (g.current_user.profile_emp_no or "").strip()
             profile_manager = (
                 Employee.query.with_entities(Employee.id)

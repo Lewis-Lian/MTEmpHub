@@ -612,9 +612,9 @@
   min-height: 0;
 }
 
-.dashboard-tab-panel .individual-table-wrap {
-  max-height: 400px;
-}
+/* 明细表不设 max-height：中部两卡片 align-items: stretch 等高，日历格为正方形导致
+   卡片远高于 400px，封顶会让明细卡片表格下方露出大片空白；表格依赖 flex 链填满卡片，
+   行数超出时由 .individual-table-wrap 自身滚动（表头已 sticky） */
 
 /* ==========================================================================
    数据表格通用样式 (Data Tables)

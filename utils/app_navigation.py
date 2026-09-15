@@ -3,11 +3,17 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
-from models.user import EMPLOYEE_PAGE_PERMISSION_KEYS, HOME_PAGE_PERMISSION_KEYS, MANAGER_PAGE_PERMISSION_KEYS
+from models.user import (
+    COMMON_PAGE_PERMISSION_KEYS,
+    EMPLOYEE_PAGE_PERMISSION_KEYS,
+    HOME_PAGE_PERMISSION_KEYS,
+    MANAGER_PAGE_PERMISSION_KEYS,
+)
 
 
 QUERY_CENTER_PERMISSION_KEYS = (
     *HOME_PAGE_PERMISSION_KEYS,
+    *COMMON_PAGE_PERMISSION_KEYS,
     *EMPLOYEE_PAGE_PERMISSION_KEYS,
     *MANAGER_PAGE_PERMISSION_KEYS,
 )
@@ -39,9 +45,10 @@ MODULES: list[dict[str, Any]] = [
         "entries": [
             {
                 "key": "individual_attendance",
-                "label": "单人考勤查询",
+                "label": "个人考勤查询",
                 "href": "/employee/individual-attendance",
-                "requires_any_page_access_keys": ("employee_dashboard", "manager_query"),
+                "permission_key": "individual_attendance",
+                "group": "通用功能",
                 "description": "集中查看单个员工或管理人员的月度考勤与明细。",
             },
             {
@@ -49,6 +56,7 @@ MODULES: list[dict[str, Any]] = [
                 "label": "员工考勤数据查询",
                 "href": "/employee/dashboard",
                 "permission_key": "employee_dashboard",
+                "group": "员工考勤",
                 "description": "按账套与员工范围查询最终考勤汇总。",
             },
             {
@@ -56,6 +64,7 @@ MODULES: list[dict[str, Any]] = [
                 "label": "员工异常查询",
                 "href": "/employee/abnormal-query",
                 "permission_key": "abnormal_query",
+                "group": "员工考勤",
                 "description": "查看员工异常考勤与需要关注的数据。",
             },
             {
@@ -63,6 +72,7 @@ MODULES: list[dict[str, Any]] = [
                 "label": "员工打卡数据查询",
                 "href": "/employee/punch-records",
                 "permission_key": "punch_records",
+                "group": "员工考勤",
                 "description": "查询原始打卡记录和明细。",
             },
             {
@@ -70,13 +80,23 @@ MODULES: list[dict[str, Any]] = [
                 "label": "员工部门工时",
                 "href": "/employee/department-hours-query",
                 "permission_key": "department_hours_query",
+                "group": "员工考勤",
                 "description": "按部门查看员工工时汇总。",
+            },
+            {
+                "key": "summary_download",
+                "label": "汇总下载",
+                "href": "/employee/summary-download",
+                "permission_key": "summary_download",
+                "group": "员工考勤",
+                "description": "下载月度考勤汇总文件。",
             },
             {
                 "key": "manager_query",
                 "label": "管理人员考勤数据查询",
                 "href": "/employee/manager-query",
                 "permission_key": "manager_query",
+                "group": "管理人员考勤",
                 "description": "查询管理人员月度考勤结果。",
             },
             {
@@ -84,6 +104,7 @@ MODULES: list[dict[str, Any]] = [
                 "label": "管理人员加班查询",
                 "href": "/employee/manager-overtime-query",
                 "permission_key": "manager_overtime_query",
+                "group": "管理人员考勤",
                 "description": "查询管理人员加班记录。",
             },
             {
@@ -91,6 +112,7 @@ MODULES: list[dict[str, Any]] = [
                 "label": "管理人员年休查询",
                 "href": "/employee/manager-annual-leave-query",
                 "permission_key": "manager_annual_leave_query",
+                "group": "管理人员考勤",
                 "description": "查询管理人员年休记录。",
             },
             {
@@ -98,14 +120,8 @@ MODULES: list[dict[str, Any]] = [
                 "label": "管理人员部门工时",
                 "href": "/employee/manager-department-hours-query",
                 "permission_key": "manager_department_hours_query",
+                "group": "管理人员考勤",
                 "description": "按部门查询管理人员工时。",
-            },
-            {
-                "key": "summary_download",
-                "label": "汇总下载",
-                "href": "/employee/summary-download",
-                "permission_key": "summary_download",
-                "description": "下载月度考勤汇总文件。",
             },
         ],
     },
@@ -214,13 +230,6 @@ MODULES: list[dict[str, Any]] = [
                 "description": "维护管理员和只读账号权限。",
             },
             {
-                "key": "messages",
-                "label": "发送消息",
-                "href": "/admin/messages",
-                "admin_only": True,
-                "description": "以系统管理员身份向任意账号发送站内消息。",
-            },
-            {
                 "key": "disabled_users",
                 "label": "禁用用户",
                 "href": "/admin/disabled-users",
@@ -228,8 +237,15 @@ MODULES: list[dict[str, Any]] = [
                 "description": "查看被限制登录的账号并手动解锁。",
             },
             {
+                "key": "messages",
+                "label": "发送消息",
+                "href": "/admin/messages",
+                "admin_only": True,
+                "description": "以系统管理员身份向任意账号发送站内消息。",
+            },
+            {
                 "key": "attendance_source",
-                "label": "更多设置",
+                "label": "数据来源与同步",
                 "href": "/admin/attendance-source",
                 "admin_only": True,
                 "description": "选择管理人员考勤数据来源并执行钉钉同步。",
@@ -340,6 +356,7 @@ def nav_payload(user: Any) -> list[dict[str, Any]]:
                         "label": entry["label"],
                         "href": entry["href"],
                         "permission_key": entry.get("permission_key"),
+                        "group": entry.get("group"),
                         "description": entry.get("description"),
                     }
                     for entry in module.get("entries", [])

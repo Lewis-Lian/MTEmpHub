@@ -6,6 +6,7 @@ from . import db
 
 PAGE_PERMISSION_LABELS = {
     "query_home": "首页",
+    "individual_attendance": "个人考勤查询",
     "manager_query": "管理人员考勤数据查询",
     "manager_overtime_query": "查询加班",
     "manager_annual_leave_query": "查询年休",
@@ -19,6 +20,10 @@ PAGE_PERMISSION_LABELS = {
 
 HOME_PAGE_PERMISSION_KEYS = ("query_home",)
 
+COMMON_PAGE_PERMISSION_KEYS = (
+    "individual_attendance",
+)
+
 MANAGER_PAGE_PERMISSION_KEYS = (
     "manager_query",
     "manager_overtime_query",
@@ -28,7 +33,6 @@ MANAGER_PAGE_PERMISSION_KEYS = (
 
 EMPLOYEE_PAGE_PERMISSION_KEYS = (
     "employee_dashboard",
-    "attendance_calendar",
     "abnormal_query",
     "punch_records",
     "department_hours_query",
@@ -37,6 +41,7 @@ EMPLOYEE_PAGE_PERMISSION_KEYS = (
 
 ALL_PAGE_PERMISSION_KEYS = (
     *HOME_PAGE_PERMISSION_KEYS,
+    *COMMON_PAGE_PERMISSION_KEYS,
     *MANAGER_PAGE_PERMISSION_KEYS,
     *EMPLOYEE_PAGE_PERMISSION_KEYS,
 )
@@ -90,6 +95,8 @@ class User(db.Model):
                 result[key] = bool(raw[key])
             elif key in HOME_PAGE_PERMISSION_KEYS:
                 result[key] = True
+            elif key == "individual_attendance":
+                result[key] = bool(raw.get("employee_dashboard") or raw.get("manager_query"))
             else:
                 result[key] = False
         return result

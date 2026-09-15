@@ -72,7 +72,7 @@ def bootstrap():
         )
     else:
         emp_ids = _accessible_emp_ids()
-        if g.current_user.can_access_page("manager_query"):
+        if g.current_user.can_access_page("manager_query") or g.current_user.can_access_page("individual_attendance"):
             profile_emp_no = (g.current_user.profile_emp_no or "").strip()
             profile_manager = (
                 Employee.query.with_entities(Employee.id)
@@ -129,7 +129,7 @@ def home_summary():
 
 
 @api_query_bp.get("/employee-dashboard")
-@page_permission_required("employee_dashboard")
+@any_page_permission_required(("employee_dashboard", "individual_attendance"))
 def employee_dashboard():
     return final_data_api()
 
@@ -171,7 +171,7 @@ def punch_records_modal_export():
 
 
 @api_query_bp.get("/attendance-calendar")
-@any_page_permission_required(("attendance_calendar", "employee_dashboard", "query_home"))
+@any_page_permission_required(("employee_dashboard", "manager_query", "query_home", "individual_attendance"))
 def attendance_calendar():
     return attendance_calendar_api()
 
@@ -201,7 +201,7 @@ def department_hours_export():
 
 
 @api_query_bp.get("/manager-attendance")
-@page_permission_required("manager_query")
+@any_page_permission_required(("manager_query", "individual_attendance"))
 def manager_attendance():
     return manager_attendance_api()
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/query";
 import { getModuleIcon, getEntryIcon } from "../icons";
@@ -93,22 +93,26 @@ export default function AppModuleNav({
 
               {hasEntries && (
                 <div className={`app-module-subnav${isExpanded ? " is-expanded" : ""}`}>
-                  {module.entries.map((entry) => {
+                  {module.entries.map((entry, index) => {
                     const EntryIcon = getEntryIcon(entry.key);
                     const isEntryActive = currentEntry?.key === entry.key;
+                    const showGroupTitle =
+                      !collapsed && Boolean(entry.group) && module.entries[index - 1]?.group !== entry.group;
 
                     return (
-                      <NavLink
-                        key={entry.key}
-                        to={entry.href}
-                        title={collapsed ? entry.label : undefined}
-                        className={({ isActive }) =>
-                          `app-side-link${isActive || isEntryActive ? " is-active" : ""}`
-                        }
-                      >
-                        {EntryIcon && <EntryIcon className="nav-icon" />}
-                        {!collapsed && <span className="app-side-label">{entry.label}</span>}
-                      </NavLink>
+                      <Fragment key={entry.key}>
+                        {showGroupTitle && <div className="app-nav-group-title">{entry.group}</div>}
+                        <NavLink
+                          to={entry.href}
+                          title={collapsed ? entry.label : undefined}
+                          className={({ isActive }) =>
+                            `app-side-link${isActive || isEntryActive ? " is-active" : ""}`
+                          }
+                        >
+                          {EntryIcon && <EntryIcon className="nav-icon" />}
+                          {!collapsed && <span className="app-side-label">{entry.label}</span>}
+                        </NavLink>
+                      </Fragment>
                     );
                   })}
                 </div>

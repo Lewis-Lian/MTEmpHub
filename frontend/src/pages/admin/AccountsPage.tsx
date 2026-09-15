@@ -34,14 +34,22 @@ interface AccountUser {
 
 const permissionCatalog = [
   { key: "query_home", label: "首页", group: "通用" },
+  { key: "individual_attendance", label: "个人考勤查询", group: "通用" },
   { key: "manager_query", label: "管理人员考勤数据查询", group: "管理人员" },
   { key: "manager_overtime_query", label: "查询加班", group: "管理人员" },
   { key: "manager_annual_leave_query", label: "查询年休", group: "管理人员" },
+  { key: "manager_department_hours_query", label: "管理人员部门工时查询", group: "管理人员" },
   { key: "employee_dashboard", label: "员工考勤数据查询", group: "员工" },
   { key: "abnormal_query", label: "员工异常查询", group: "员工" },
   { key: "punch_records", label: "员工打卡数据查询", group: "员工" },
   { key: "department_hours_query", label: "员工部门工时查询", group: "员工" },
   { key: "summary_download", label: "汇总下载", group: "员工" },
+] as const;
+
+const PERMISSION_GROUPS = [
+  { key: "通用", title: "通用功能" },
+  { key: "管理人员", title: "管理人员考勤" },
+  { key: "员工", title: "员工考勤" },
 ] as const;
 
 const allPermissionKeys = permissionCatalog.map((item) => item.key);
@@ -84,9 +92,7 @@ export default function AccountsPage() {
   const [editDeptIds, setEditDeptIds] = useState<number[]>([]);
   const [editPermissionKeys, setEditPermissionKeys] = useState<string[]>(allPermissionKeys);
 
-  const [permissionContext, setPermissionContext] = useState<null | "create" | "edit" | "batch">(null);
-  const [permissionKeyword, setPermissionKeyword] = useState("");
-  const [permissionGroup, setPermissionGroup] = useState("");
+  const [batchPermissionOpen, setBatchPermissionOpen] = useState(false);
 
   const [batchRoleOpen, setBatchRoleOpen] = useState(false);
   const [batchRole, setBatchRole] = useState<"" | "admin" | "readonly">("");
@@ -200,19 +206,6 @@ export default function AccountsPage() {
     });
   }
 
-  const filteredPermissionRows = permissionCatalog.filter((row) => {
-    if (permissionGroup) {
-      const inSelectedGroup = row.group === permissionGroup;
-      const isHome = row.key === "query_home";
-      if (!inSelectedGroup && !isHome) {
-        return false;
-      }
-    }
-    if (permissionKeyword.trim()) {
-      return `${row.label}${row.group}`.includes(permissionKeyword.trim());
-    }
-    return true;
-  });
 
   const accountTableHeaders = [
     {
@@ -310,7 +303,7 @@ export default function AccountsPage() {
           profile_dept_id: Number(createProfileDeptId),
           emp_ids: createEmpIds,
           dept_ids: createDeptIds,
-          page_permissions: permissionMap(createPermissionKeys),
+          page_permissions: permissionMap(createRole === "admin" ? allPermissionKeys : createPermissionKeys),
         },
         method: "POST",
       });
@@ -421,7 +414,7 @@ export default function AccountsPage() {
           profile_dept_id: Number(editProfileDeptId),
           emp_ids: editEmpIds,
           dept_ids: editDeptIds,
-          page_permissions: permissionMap(editPermissionKeys),
+          page_permissions: permissionMap(editRole === "admin" ? allPermissionKeys : editPermissionKeys),
         },
         method: "PUT",
       });
@@ -477,27 +470,6 @@ export default function AccountsPage() {
     }
   }
 
-  function currentPermissionKeys() {
-    if (permissionContext === "create") {
-      return createPermissionKeys;
-    }
-    if (permissionContext === "edit") {
-      return editPermissionKeys;
-    }
-    return batchPermissionKeys;
-  }
-
-  function setCurrentPermissionKeys(nextKeys: string[]) {
-    if (permissionContext === "create") {
-      setCreatePermissionKeys(nextKeys);
-      return;
-    }
-    if (permissionContext === "edit") {
-      setEditPermissionKeys(nextKeys);
-      return;
-    }
-    setBatchPermissionKeys(nextKeys);
-  }
 
   return (
     <main className="account-center-page">
@@ -586,7 +558,7 @@ export default function AccountsPage() {
               </div>
               <div className="account-batch-toolbar__group">
                 <span className="account-batch-toolbar__group-label">权限与安全</span>
-                <button className="account-action-button" onClick={() => setPermissionContext("batch")} type="button">页面权限</button>
+                <button className="account-action-button" onClick={() => setBatchPermissionOpen(true)} type="button">页面权限</button>
                 <button className="account-action-button account-action-button--warning" onClick={() => setBatchPasswordOpen(true)} type="button">重置密码</button>
               </div>
               <div className="account-batch-toolbar__group account-batch-toolbar__group--danger">
@@ -621,29 +593,91 @@ export default function AccountsPage() {
           height: "100%",
           zIndex: 1500,
           background: "rgba(15, 23, 42, 0.3)",
-          backdropFilter: "blur(8px)",
+          backdropFilter: "blur(6px)",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          overflowY: "auto",
-          padding: "40px 24px",
+          justifyContent: "center",
+          padding: "20px",
           boxSizing: "border-box",
         }}>
-          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+          <div className="master-modal-container" style={{
+            width: "100%",
+            maxWidth: "960px",
+            maxHeight: "min(90vh, 760px)",
+            background: "#ffffff",
+            borderRadius: "14px",
+            boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)",
+            display: "flex",
+            flexDirection: "column",
+            boxSizing: "border-box",
+            position: "relative",
+            overflow: "hidden",
+          }}>
+            {/* 顶部固定标题栏 */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 24px",
+              borderBottom: "1px solid #e2e8f0",
+              background: "#ffffff",
+              flexShrink: 0,
+            }}>
               <div className="admin-row-gap12">
-                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>创建账号</span>
-                <span className="page-tag">系统管理</span>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "#0f172a" }}>创建账号</span>
+                <span className="page-tag" style={{ margin: 0 }}>系统管理</span>
               </div>
-              <button className="master-modal-close" onClick={() => setCreateModalOpen(false)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
+              <button
+                className="master-modal-close"
+                onClick={() => setCreateModalOpen(false)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "4px",
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                type="button"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             
-            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
-              {/* 基础信息 */}
-              <div className="admin-stack">
-                <h4 className="admin-modal-title">基础信息</h4>
-                <div className="admin-form-grid">
-                  <label className="account-field admin-form-grid-wide">
+            {/* 中间双栏主体 */}
+            <div
+              className="master-modal-body custom-scrollbar"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "20px 24px",
+                display: "grid",
+                gridTemplateColumns: "minmax(330px, 390px) 1fr",
+                gap: "20px",
+                alignItems: "start",
+              }}
+            >
+              {/* 左栏：基础信息与数据可见范围 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#334155", borderBottom: "1px solid #f1f5f9", paddingBottom: "8px" }}>
+                    基础信息
+                  </div>
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -654,15 +688,17 @@ export default function AccountsPage() {
                       singleSelect={true}
                     />
                   </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <label className="account-field" style={{ margin: 0 }}>
+                      <span className="account-field-label">用户名</span>
+                      <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} placeholder="例如: admin01" />
+                    </label>
+                    <label className="account-field" style={{ margin: 0 }}>
+                      <span className="account-field-label">初始密码</span>
+                      <input className="account-input" type="password" onChange={(event) => setCreatePassword(event.target.value)} value={createPassword} placeholder="请输入初始密码" />
+                    </label>
+                  </div>
                   <label className="account-field" style={{ margin: 0 }}>
-                    <span className="account-field-label">用户名</span>
-                    <input className="account-input" onChange={(event) => setCreateUsername(event.target.value)} value={createUsername} placeholder="例如: admin01" />
-                  </label>
-                  <label className="account-field" style={{ margin: 0 }}>
-                    <span className="account-field-label">初始密码</span>
-                    <input className="account-input" type="password" onChange={(event) => setCreatePassword(event.target.value)} value={createPassword} placeholder="请输入初始密码" />
-                  </label>
-                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">账号角色</span>
                     <select className="account-select" onChange={(event) => setCreateRole(event.target.value as "readonly" | "admin")} value={createRole}>
                       <option value="readonly">只读权限</option>
@@ -670,13 +706,21 @@ export default function AccountsPage() {
                     </select>
                   </label>
                 </div>
-              </div>
 
-              {/* 数据与权限范围 */}
-              <div className="admin-stack">
-                <h4 className="admin-modal-title">数据与权限范围</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field admin-fill">
+                <div style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#334155", borderBottom: "1px solid #f1f5f9", paddingBottom: "8px" }}>
+                    数据可见范围
+                  </div>
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -686,7 +730,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field admin-fill">
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -695,21 +739,51 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-                  <label className="account-field admin-fill">
-                    <span className="account-field-label">功能导航权限</span>
-                    <PickerSummaryField
-                      buttonLabel="配置导航可见性"
-                      onClick={() => setPermissionContext("create")}
-                      value={summarizePermissions(createPermissionKeys)}
-                    />
-                  </label>
                 </div>
+              </div>
+
+              {/* 右栏：功能导航权限 */}
+              <div style={{
+                background: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "16px",
+                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+              }}>
+                <NavigationPermissionSection
+                  isAdmin={createRole === "admin"}
+                  onChange={setCreatePermissionKeys}
+                  selectedKeys={createPermissionKeys}
+                />
               </div>
             </div>
 
-            <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
-              <button className="account-action-button" onClick={() => setCreateModalOpen(false)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={submitCreate} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>创建账号</button>
+            {/* 底部固定操作栏 */}
+            <div style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "10px",
+              padding: "14px 24px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexShrink: 0,
+            }}>
+              <button
+                className="account-action-button"
+                onClick={() => setCreateModalOpen(false)}
+                type="button"
+                style={{ borderRadius: "8px", fontSize: "14px", padding: "7px 18px" }}
+              >
+                取消
+              </button>
+              <button
+                className="account-action-button account-action-button--primary"
+                onClick={submitCreate}
+                type="button"
+                style={{ padding: "7px 24px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}
+              >
+                创建账号
+              </button>
             </div>
           </div>
         </div>
@@ -723,29 +797,106 @@ export default function AccountsPage() {
           width: "100%",
           height: "100%",
           zIndex: 1500,
-          background: "rgba(15, 23, 42, 0.3)",
-          backdropFilter: "blur(8px)",
+          background: "rgba(15, 23, 42, 0.45)",
+          backdropFilter: "blur(6px)",
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          overflowY: "auto",
-          padding: "40px 24px",
+          justifyContent: "center",
+          padding: "20px",
           boxSizing: "border-box",
         }}>
-          <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", margin: "auto", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-              <div className="admin-row-gap12">
-                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>编辑账号</span>
-                <span className="page-tag">系统管理</span>
+          <div className="master-modal-container" style={{
+            width: "100%",
+            maxWidth: "960px",
+            maxHeight: "min(90vh, 760px)",
+            background: "#ffffff",
+            borderRadius: "14px",
+            boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)",
+            display: "flex",
+            flexDirection: "column",
+            boxSizing: "border-box",
+            position: "relative",
+            overflow: "hidden",
+          }}>
+            {/* 顶部固定标题栏 */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 24px",
+              borderBottom: "1px solid #e2e8f0",
+              background: "#ffffff",
+              flexShrink: 0,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "#0f172a" }}>编辑账号</span>
+                <span className="page-tag" style={{ margin: 0 }}>系统管理</span>
+                {editingUser && (
+                  <span style={{
+                    fontSize: "12px",
+                    color: "#2563eb",
+                    background: "#eff6ff",
+                    border: "1px solid #dbeafe",
+                    padding: "2px 8px",
+                    borderRadius: "6px",
+                    fontWeight: "500",
+                  }}>
+                    {editingUser.username}
+                  </span>
+                )}
               </div>
-              <button className="master-modal-close" onClick={() => setEditingUser(null)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
+              <button
+                className="master-modal-close"
+                onClick={() => setEditingUser(null)}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  fontSize: "22px",
+                  cursor: "pointer",
+                  color: "#94a3b8",
+                  padding: "4px",
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                type="button"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
-            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
-              {/* 基础信息 */}
-              <div className="admin-stack">
-                <h4 className="admin-modal-title">基础信息</h4>
-                <div className="admin-form-grid">
-                  <label className="account-field admin-form-grid-wide">
+
+            {/* 中间双栏主体 */}
+            <div
+              className="master-modal-body custom-scrollbar"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "20px 24px",
+                display: "grid",
+                gridTemplateColumns: "minmax(330px, 390px) 1fr",
+                gap: "20px",
+                alignItems: "start",
+              }}
+            >
+              {/* 左栏：基础信息与数据可见范围 */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* 基础信息 */}
+                <div style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#334155", borderBottom: "1px solid #f1f5f9", paddingBottom: "8px" }}>
+                    基础信息
+                  </div>
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">绑定档案人员 (自动提取工号/姓名/部门)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -756,15 +907,17 @@ export default function AccountsPage() {
                       singleSelect={true}
                     />
                   </label>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <label className="account-field" style={{ margin: 0 }}>
+                      <span className="account-field-label">用户名</span>
+                      <input className="account-input" onChange={(event) => setEditUsername(event.target.value)} value={editUsername} />
+                    </label>
+                    <label className="account-field" style={{ margin: 0 }}>
+                      <span className="account-field-label">密码 (留空则不修改)</span>
+                      <input className="account-input" type="password" onChange={(event) => setEditPassword(event.target.value)} value={editPassword} placeholder="留空则不修改" />
+                    </label>
+                  </div>
                   <label className="account-field" style={{ margin: 0 }}>
-                    <span className="account-field-label">用户名</span>
-                    <input className="account-input" onChange={(event) => setEditUsername(event.target.value)} value={editUsername} />
-                  </label>
-                  <label className="account-field" style={{ margin: 0 }}>
-                    <span className="account-field-label">密码 (留空则不修改)</span>
-                    <input className="account-input" type="password" onChange={(event) => setEditPassword(event.target.value)} value={editPassword} placeholder="留空则不修改" />
-                  </label>
-                  <label className="account-field admin-form-grid-wide">
                     <span className="account-field-label">角色</span>
                     <select className="account-select" onChange={(event) => setEditRole(event.target.value as "readonly" | "admin")} value={editRole}>
                       <option value="readonly">只读权限</option>
@@ -772,13 +925,22 @@ export default function AccountsPage() {
                     </select>
                   </label>
                 </div>
-              </div>
 
-              {/* 数据与权限范围 */}
-              <div className="admin-stack">
-                <h4 className="admin-modal-title">数据与权限范围</h4>
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="account-field admin-fill">
+                {/* 数据可见范围 */}
+                <div style={{
+                  background: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "10px",
+                  padding: "16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "12px",
+                  boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: "600", color: "#334155", borderBottom: "1px solid #f1f5f9", paddingBottom: "8px" }}>
+                    数据可见范围
+                  </div>
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">关联员工 (限定可见个人数据)</span>
                     <EmployeePicker
                       departments={pickerDepartments}
@@ -788,8 +950,7 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-
-                  <label className="account-field admin-fill">
+                  <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">关联部门 (限定可见部门数据)</span>
                     <DepartmentMultiPicker
                       departments={departments}
@@ -798,19 +959,35 @@ export default function AccountsPage() {
                       showFieldChrome={false}
                     />
                   </label>
-
-                  <label className="account-field admin-fill">
-                    <span className="account-field-label">功能导航权限</span>
-                    <PickerSummaryField
-                      buttonLabel="配置导航可见性"
-                      onClick={() => setPermissionContext("edit")}
-                      value={summarizePermissions(editPermissionKeys)}
-                    />
-                  </label>
                 </div>
               </div>
+
+              {/* 右栏：功能导航权限 */}
+              <div style={{
+                background: "#ffffff",
+                border: "1px solid #e2e8f0",
+                borderRadius: "10px",
+                padding: "16px",
+                boxShadow: "0 1px 2px rgba(0, 0, 0, 0.03)",
+              }}>
+                <NavigationPermissionSection
+                  isAdmin={editRole === "admin"}
+                  onChange={setEditPermissionKeys}
+                  selectedKeys={editPermissionKeys}
+                />
+              </div>
             </div>
-            <div style={{ marginTop: "24px", display: "flex", justifyContent: "space-between", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
+
+            {/* 底部固定操作栏 */}
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "14px 24px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexShrink: 0,
+            }}>
               <button
                 className="account-action-button account-action-button--warning"
                 onClick={() => {
@@ -818,95 +995,122 @@ export default function AccountsPage() {
                   setResetPasswordValue("");
                 }}
                 type="button"
-                style={{ borderRadius: "8px", fontSize: "14px" }}
+                style={{ borderRadius: "8px", fontSize: "13px" }}
               >
                 重置密码
               </button>
-              <div style={{ display: "flex", gap: "12px" }}>
-                <button className="account-action-button" onClick={() => setEditingUser(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
-                <button className="account-action-button account-action-button--primary" onClick={saveEdit} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>保存修改</button>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button
+                  className="account-action-button"
+                  onClick={() => setEditingUser(null)}
+                  type="button"
+                  style={{ borderRadius: "8px", fontSize: "14px", padding: "7px 18px" }}
+                >
+                  取消
+                </button>
+                <button
+                  className="account-action-button account-action-button--primary"
+                  onClick={saveEdit}
+                  type="button"
+                  style={{ padding: "7px 24px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}
+                >
+                  保存修改
+                </button>
               </div>
             </div>
           </div>
         </div>
       ) : null}
 
-      {permissionContext ? (
-        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setPermissionContext(null); }} style={{
+      {batchPermissionOpen ? (
+        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setBatchPermissionOpen(false); }} style={{
           position: "fixed",
           left: 0,
           top: 0,
           width: "100%",
           height: "100%",
           zIndex: 1500,
-          background: "rgba(15, 23, 42, 0.3)",
-          backdropFilter: "blur(8px)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
+          background: "rgba(15, 23, 42, 0.45)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "20px",
           boxSizing: "border-box",
         }}>
-          <div className="master-modal-container" style={{ width: "100%", maxWidth: "500px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
+          <div className="master-modal-container" style={{
+            width: "100%",
+            maxWidth: "680px",
+            maxHeight: "min(88vh, 720px)",
+            background: "#fff",
+            borderRadius: "14px",
+            boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.05)",
+            display: "flex",
+            flexDirection: "column",
+            boxSizing: "border-box",
+            position: "relative",
+            overflow: "hidden",
+          }}>
+            <div style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "16px 24px",
+              borderBottom: "1px solid #e2e8f0",
+              background: "#ffffff",
+              flexShrink: 0,
+            }}>
               <div className="admin-row-gap12">
-                <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>
-                  {permissionContext === "create" ? "创建账号页面权限" : permissionContext === "edit" ? "编辑页面权限" : "批量修改页面权限"}
-                </span>
-                <span className="page-tag">系统管理</span>
+                <span style={{ fontSize: "16px", fontWeight: "600", color: "#0f172a" }}>批量修改页面权限</span>
+                <span className="page-tag" style={{ margin: 0 }}>系统管理</span>
               </div>
-              <button className="master-modal-close" onClick={() => setPermissionContext(null)} style={{ border: "none", background: "transparent", fontSize: "20px", cursor: "pointer", color: "#64748b", padding: 0, lineHeight: 1 }} type="button">×</button>
+              <button
+                className="master-modal-close"
+                onClick={() => setBatchPermissionOpen(false)}
+                style={{ border: "none", background: "transparent", fontSize: "22px", cursor: "pointer", color: "#94a3b8", padding: "4px", lineHeight: 1 }}
+                type="button"
+                aria-label="关闭"
+              >
+                ×
+              </button>
             </div>
             
-            <div className="master-modal-body" style={{ display: "flex", flexDirection: "column", gap: "20px", overflow: "visible" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <label className="account-field" style={{ margin: 0 }}>
-                  <span className="account-field-label">搜索权限</span>
-                  <input className="account-input" onChange={(event) => setPermissionKeyword(event.target.value)} placeholder="搜索页面名称" value={permissionKeyword} />
-                </label>
-                <label className="account-field" style={{ margin: 0 }}>
-                  <span className="account-field-label">权限分组</span>
-                  <select className="account-select" onChange={(event) => setPermissionGroup(event.target.value)} value={permissionGroup}>
-                    <option value="">全部</option>
-                    <option value="管理人员">管理人员</option>
-                    <option value="员工">员工</option>
-                  </select>
-                </label>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "300px", overflowY: "auto", paddingRight: "8px" }} className="custom-scrollbar">
-                {filteredPermissionRows.length > 0 ? filteredPermissionRows.map((row) => (
-                  <label key={row.key} style={{
-                    display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", 
-                    background: currentPermissionKeys().includes(row.key) ? "#eff6ff" : "#f8fafc", 
-                    border: `1px solid ${currentPermissionKeys().includes(row.key) ? "#bfdbfe" : "#e2e8f0"}`, 
-                    borderRadius: "8px", cursor: "pointer", transition: "all 0.2s"
-                  }}>
-                    <input
-                      checked={currentPermissionKeys().includes(row.key)}
-                      onChange={(event) =>
-                        setCurrentPermissionKeys(
-                          event.target.checked
-                            ? Array.from(new Set([...currentPermissionKeys(), row.key]))
-                            : currentPermissionKeys().filter((key) => key !== row.key),
-                        )
-                      }
-                      type="checkbox"
-                      style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer" }}
-                    />
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontSize: "14px", fontWeight: currentPermissionKeys().includes(row.key) ? "500" : "400", color: "#1e293b" }}>{row.label}</span>
-                      <span style={{ fontSize: "12px", color: "#64748b" }}>分组: {row.group}</span>
-                    </div>
-                  </label>
-                )) : (
-                  <div style={{ padding: "20px", textAlign: "center", color: "#94a3b8", fontSize: "14px" }}>未找到匹配的权限</div>
-                )}
-              </div>
+            <div className="master-modal-body custom-scrollbar" style={{ flex: 1, overflowY: "auto", padding: "20px 24px" }}>
+              <NavigationPermissionSection
+                onChange={setBatchPermissionKeys}
+                selectedKeys={batchPermissionKeys}
+              />
             </div>
 
-            <div style={{ marginTop: "24px", display: "flex", justifyContent: "flex-end", gap: "12px", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
-              <button className="account-action-button" onClick={() => setPermissionContext(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
-              <button className="account-action-button account-action-button--primary" onClick={() => setPermissionContext(null)} type="button" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>完成配置</button>
+            <div style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: "10px",
+              padding: "14px 24px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexShrink: 0,
+            }}>
+              <button
+                className="account-action-button"
+                onClick={() => setBatchPermissionOpen(false)}
+                type="button"
+                style={{ borderRadius: "8px", fontSize: "14px", padding: "7px 18px" }}
+              >
+                取消
+              </button>
+              <button
+                className="account-action-button account-action-button--primary"
+                onClick={async () => {
+                  if (await runBatch("update_permissions", { page_permissions: permissionMap(batchPermissionKeys) })) {
+                    setBatchPermissionOpen(false);
+                  }
+                }}
+                type="button"
+                style={{ padding: "7px 24px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}
+              >
+                保存修改
+              </button>
             </div>
           </div>
         </div>
@@ -1113,41 +1317,226 @@ export default function AccountsPage() {
   );
 }
 
-function PickerSummaryField({
-  value,
-  onClick,
-  buttonLabel,
+function NavigationPermissionSection({
+  selectedKeys,
+  onChange,
+  isAdmin = false,
 }: {
-  value: string;
-  onClick: () => void;
-  buttonLabel: string;
+  selectedKeys: string[];
+  onChange: (keys: string[]) => void;
+  isAdmin?: boolean;
 }) {
+  const activeKeys = isAdmin ? allPermissionKeys : selectedKeys;
+  const isAllSelected = allPermissionKeys.every((key) => activeKeys.includes(key));
+  const isNoneSelected = activeKeys.length === 0;
+
+  const handleSelectAll = () => {
+    onChange([...allPermissionKeys]);
+  };
+
+  const handleClearAll = () => {
+    onChange([]);
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    const groupItemKeys: string[] = permissionCatalog
+      .filter((item) => item.group === groupKey)
+      .map((item) => item.key);
+    const allGroupSelected = groupItemKeys.every((k) => activeKeys.includes(k));
+    if (allGroupSelected) {
+      onChange(activeKeys.filter((k) => !groupItemKeys.includes(k)));
+    } else {
+      onChange(Array.from(new Set([...activeKeys, ...groupItemKeys])));
+    }
+  };
+
+  const toggleSingle = (key: string) => {
+    if (activeKeys.includes(key)) {
+      onChange(activeKeys.filter((k) => k !== key));
+    } else {
+      onChange([...activeKeys, key]);
+    }
+  };
+
   return (
-    <div 
-      className="account-picker-summary" 
-      onClick={onClick} 
-      style={{ 
-        display: "grid", 
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        alignItems: "center", 
-        gap: "12px",
-        width: "100%",
-        boxSizing: "border-box",
-        padding: "8px 14px", 
-        background: "#f8fafc", 
-        border: "1px solid #cbd5e1", 
-        borderRadius: "8px", 
-        cursor: "pointer",
-        transition: "all 0.2s ease"
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#94a3b8"; e.currentTarget.style.background = "#f1f5f9"; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#cbd5e1"; e.currentTarget.style.background = "#f8fafc"; }}
-    >
-      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: value === "未选择页面权限" ? "#94a3b8" : "#334155", fontSize: "14px" }}>
-        {value}
+    <div className="account-permission-section" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span className="account-field-label" style={{ margin: 0, fontWeight: "600", fontSize: "13px", color: "var(--ent-text, #1e293b)" }}>
+            功能导航权限
+          </span>
+          <span style={{
+            fontSize: "12px",
+            padding: "2px 8px",
+            borderRadius: "10px",
+            background: isAdmin ? "#dbeafe" : activeKeys.length > 0 ? "#eff6ff" : "#f1f5f9",
+            color: isAdmin ? "#1d4ed8" : activeKeys.length > 0 ? "#2563eb" : "#64748b",
+            fontWeight: "500",
+          }}>
+            {isAdmin ? "全部权限 (管理员)" : `已选 ${activeKeys.length} / ${allPermissionKeys.length} 项`}
+          </span>
+        </div>
+
+        {!isAdmin && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              disabled={isAllSelected}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: isAllSelected ? "#94a3b8" : "#2563eb",
+                fontSize: "12px",
+                cursor: isAllSelected ? "not-allowed" : "pointer",
+                padding: "2px 6px",
+                fontWeight: "500",
+              }}
+            >
+              全部勾选
+            </button>
+            <span style={{ color: "#cbd5e1" }}>|</span>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              disabled={isNoneSelected}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: isNoneSelected ? "#94a3b8" : "#64748b",
+                fontSize: "12px",
+                cursor: isNoneSelected ? "not-allowed" : "pointer",
+                padding: "2px 6px",
+                fontWeight: "500",
+              }}
+            >
+              全部清空
+            </button>
+          </div>
+        )}
       </div>
-      <div style={{ color: "#2563eb", fontSize: "13px", fontWeight: "500" }}>
-        {buttonLabel} &rarr;
+
+      {isAdmin ? (
+        <div style={{
+          padding: "10px 14px",
+          borderRadius: "8px",
+          background: "#f0f9ff",
+          border: "1px solid #bae6fd",
+          color: "#0369a1",
+          fontSize: "13px",
+          lineHeight: "1.5",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}>
+          <span style={{ fontSize: "16px" }}>ℹ️</span>
+          <span>系统管理员账号默认拥有系统所有页面的访问和管理权限，无需单独配置。</span>
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {PERMISSION_GROUPS.map((group) => {
+          const groupItems = permissionCatalog.filter((item) => item.group === group.key);
+          const groupItemKeys: string[] = groupItems.map((item) => item.key);
+          const selectedInGroup = groupItemKeys.filter((k) => activeKeys.includes(k)).length;
+          const isGroupAllSelected = selectedInGroup === groupItems.length;
+
+          return (
+            <div
+              key={group.key}
+              style={{
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                background: "#ffffff",
+                padding: "10px 12px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: "600", color: "#334155" }}>
+                    {group.title}
+                  </span>
+                  <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                    ({selectedInGroup}/{groupItems.length})
+                  </span>
+                </div>
+
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group.key)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#3b82f6",
+                      fontSize: "11px",
+                      cursor: "pointer",
+                      padding: "0 4px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    {isGroupAllSelected ? "取消全选" : "本组全选"}
+                  </button>
+                )}
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                  gap: "6px",
+                }}
+              >
+                {groupItems.map((item) => {
+                  const isChecked = activeKeys.includes(item.key);
+                  return (
+                    <label
+                      key={item.key}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        padding: "6px 10px",
+                        borderRadius: "6px",
+                        background: isChecked ? "#eff6ff" : "#f8fafc",
+                        border: `1px solid ${isChecked ? "#bfdbfe" : "#e2e8f0"}`,
+                        cursor: isAdmin ? "default" : "pointer",
+                        userSelect: "none",
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        disabled={isAdmin}
+                        onChange={() => toggleSingle(item.key)}
+                        style={{
+                          width: "14px",
+                          height: "14px",
+                          accentColor: "#2563eb",
+                          cursor: isAdmin ? "default" : "pointer",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize: "12.5px",
+                          color: isChecked ? "#1e40af" : "#475569",
+                          fontWeight: isChecked ? "500" : "400",
+                          lineHeight: "1.3",
+                        }}
+                      >
+                        {item.label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

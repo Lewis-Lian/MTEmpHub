@@ -185,6 +185,49 @@ class ApiQueryTests(unittest.TestCase):
         calendar_response = self.client.get(f"/api/query/attendance-calendar?emp_id={employees[0]['id']}&month=2026-05")
         self.assertEqual(calendar_response.status_code, 200)
 
+    def test_individual_attendance_explicit_permission_control(self) -> None:
+        with self.app.app_context():
+            employee = Employee.query.filter_by(emp_no="E001").first()
+            user_without_ia = User(
+                username="no-ia-user",
+                role="readonly",
+                page_permissions={"individual_attendance": False},
+            )
+            user_without_ia.set_password("pass123")
+            user_with_ia = User(
+                username="ia-user",
+                role="readonly",
+                page_permissions={"individual_attendance": True},
+            )
+            user_with_ia.set_password("pass123")
+            db.session.add_all([user_without_ia, user_with_ia])
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user_with_ia.id, emp_id=employee.id))
+            db.session.add(UserEmployeeAssignment(user_id=user_without_ia.id, emp_id=employee.id))
+            db.session.commit()
+            emp_id = employee.id
+
+        # Check user without individual attendance
+        self._login("no-ia-user", "pass123")
+        res = self.client.get("/api/query/navigation")
+        modules = res.get_json()["modules"]
+        query_module = next((m for m in modules if m["slug"] == "query"), None)
+        if query_module:
+            entry_keys = {entry["key"] for entry in query_module["entries"]}
+            self.assertNotIn("individual_attendance", entry_keys)
+        self.assertEqual(self.client.get(f"/api/query/attendance-calendar?emp_id={emp_id}&month=2026-05").status_code, 400)
+        self.assertEqual(self.client.get(f"/api/query/employee-dashboard?month=2026-05&emp_ids={emp_id}").status_code, 403)
+
+        # Check user with individual attendance
+        self._login("ia-user", "pass123")
+        res2 = self.client.get("/api/query/navigation")
+        modules2 = res2.get_json()["modules"]
+        query_module2 = next(m for m in modules2 if m["slug"] == "query")
+        entry_keys2 = {entry["key"] for entry in query_module2["entries"]}
+        self.assertIn("individual_attendance", entry_keys2)
+        self.assertEqual(self.client.get(f"/api/query/attendance-calendar?emp_id={emp_id}&month=2026-05").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/query/employee-dashboard?month=2026-05&emp_ids={emp_id}").status_code, 200)
+
     def test_query_navigation_api_exposes_disabled_users_in_settings(self) -> None:
         self._login("admin", "admin123")
 

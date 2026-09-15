@@ -47,8 +47,8 @@ class AttendanceCalendarApiTests(unittest.TestCase):
             db.session.add_all([emp, manager])
             db.session.flush()
             # 登录与权限授予方式与 test_api_query.py 一致：
-            # page_permissions 授予 attendance_calendar + UserEmployeeAssignment 绑定可见员工。
-            viewer = User(username="viewer", role="readonly", page_permissions={"attendance_calendar": True})
+            # page_permissions 授予 employee_dashboard + UserEmployeeAssignment 绑定可见员工。
+            viewer = User(username="viewer", role="readonly", page_permissions={"employee_dashboard": True})
             viewer.set_password("viewer123")
             db.session.add(viewer)
             db.session.flush()
@@ -671,6 +671,91 @@ class AttendanceCalendarApiTests(unittest.TestCase):
     def test_manager_employee_allowed(self):
         """考勤日历可查询管理人员（可见范围内不再被非管理人员过滤拦截）。"""
         resp = self._get(f"?emp_id={self.manager_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
+
+
+class ManagerOnlyUserCalendarApiTests(unittest.TestCase):
+    """仅 manager_query 权限的用户可以打开单人考勤页，日历接口应放行并限定可见范围。"""
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmpdir.cleanup)
+        self.app = Flask(__name__)
+        self.app.config.update(
+            TESTING=True,
+            SECRET_KEY="test-secret",
+            SQLALCHEMY_DATABASE_URI=f"sqlite:///{self.tmpdir.name}/cal_manager_only.db",
+            SQLALCHEMY_TRACK_MODIFICATIONS=False,
+            JWT_EXPIRES_DELTA=timedelta(hours=12),
+            FRONTEND_ORIGIN="http://localhost:5173",
+            SESSION_COOKIE_NAME="api_access_token",
+            SESSION_COOKIE_SAMESITE="None",
+            SESSION_COOKIE_SECURE=False,
+        )
+        db.init_app(self.app)
+        register_routes(self.app)
+
+        with self.app.app_context():
+            db.create_all()
+            dept = Department(dept_no="D001", dept_name="制造一部")
+            db.session.add(dept)
+            db.session.flush()
+            emp = Employee(emp_no="E001", name="员工甲", dept_id=dept.id, is_manager=False)
+            mgr = Employee(emp_no="M001", name="经理甲", dept_id=dept.id, is_manager=True)
+            stranger = Employee(emp_no="E002", name="员工乙", dept_id=dept.id, is_manager=False)
+            db.session.add_all([emp, mgr, stranger])
+            db.session.flush()
+            manager_user = User(
+                username="manageruser",
+                role="readonly",
+                page_permissions={"manager_query": True},
+            )
+            manager_user.set_password("manager123")
+            db.session.add(manager_user)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=manager_user.id, emp_id=emp.id))
+            db.session.add(UserEmployeeAssignment(user_id=manager_user.id, emp_id=mgr.id))
+            db.session.commit()
+            self.emp_id = emp.id
+            self.mgr_id = mgr.id
+            self.stranger_id = stranger.id
+
+        self.client = attach_origin(self.app.test_client())
+        with self.app.app_context():
+            captcha_token = issue_slider_verified_token()
+        self.client.post(
+            "/api/auth/login",
+            json={"username": "manageruser", "password": "manager123", "captcha_token": captcha_token},
+        )
+
+    def tearDown(self) -> None:
+        with self.app.app_context():
+            db.session.remove()
+            db.drop_all()
+
+    def _get(self, query: str):
+        return self.client.get(f"/api/query/attendance-calendar{query}")
+
+    def test_manager_query_only_user_views_assigned_manager_calendar(self):
+        """仅 manager_query 权限的账号可查看已绑定管理人员的考勤日历（不被 403 拦截）。"""
+        resp = self._get(f"?emp_id={self.mgr_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
+
+    def test_manager_query_only_user_cannot_view_unassigned_employee(self):
+        """仅 manager_query 权限的账号不能查看未绑定员工的考勤日历。"""
+        resp = self._get(f"?emp_id={self.stranger_id}&month=2026-07")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_manager_query_user_with_home_permission_revoked_still_allowed(self):
+        """管理员显式关闭「首页」权限后，manager_query 用户不应因装饰器缺键被 403。"""
+        with self.app.app_context():
+            manager_user = User.query.filter_by(username="manageruser").first()
+            manager_user.page_permissions = {"manager_query": True, "query_home": False}
+            db.session.commit()
+
+        resp = self._get(f"?emp_id={self.mgr_id}&month=2026-07")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.get_json()["employee"]["emp_no"], "M001")
 
