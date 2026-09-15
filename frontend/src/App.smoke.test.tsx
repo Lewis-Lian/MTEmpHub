@@ -1080,7 +1080,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("heading", { name: "查询条件" })).toBeInTheDocument();
     expect(container.querySelector(".legacy-page-header")).toBeNull();
     expect(screen.getByText("查询管理人员月度考勤结果，并支持模板导出。")).toBeInTheDocument();
-    expect(container.querySelector(".legacy-table-wrap")).not.toBeNull();
+    expect(container.querySelector(".query-empty-state")).not.toBeNull();
     await waitFor(() => expect(window.location.pathname).toBe("/employee/manager-query"));
   });
 

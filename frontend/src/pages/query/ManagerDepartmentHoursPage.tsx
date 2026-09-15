@@ -1,3 +1,4 @@
+import { ManagerDepartmentHoursIcon } from "../../components/query/QueryEmptyState";
 import QueryPage from "./QueryPage";
 
 export default function ManagerDepartmentHoursPage() {
@@ -9,6 +10,11 @@ export default function ManagerDepartmentHoursPage() {
         { key: "member_count", label: "部门人数" },
       ]}
       description="按账套统计管理人员部门维度工时。"
+      emptyState={{
+        title: "请选择账套后点击查询",
+        description: "在上方选择对应账套月份，即可开启管理部门工时与人员分布统计。",
+        icon: <ManagerDepartmentHoursIcon />,
+      }}
       endpoint="/api/query/manager-department-hours"
       exportPath="/api/query/manager-department-hours/export"
       fields={["month"]}

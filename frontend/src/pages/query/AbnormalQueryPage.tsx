@@ -4,6 +4,7 @@ import { buildDownloadUrl, fetchObjectRows, fetchQueryBootstrap } from "../../ap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import QueryEmptyState, { AbnormalAlertIcon } from "../../components/query/QueryEmptyState";
 import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
@@ -269,34 +270,42 @@ export default function AbnormalQueryPage() {
 
       <section className="query-workspace">
         <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
-        <QueryResultPanel>
-          <QueryTable
-            cellModal={{
-              getModal: ({ headerLabel, rowMeta }) => {
-                const meta = rowMeta as AbnormalRowMeta | undefined;
-                if (headerLabel !== "异常考勤次数" || !meta?.employeeId || !meta.month) {
-                  return null;
-                }
-                return {
-                  title: `${meta.employeeName} ${meta.month} 异常打卡时间`,
-                  triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的异常打卡时间`,
-                  loadContent: async () => {
-                    const query = new URLSearchParams();
-                    query.set("month", meta.month);
-                    query.append("emp_ids", String(meta.employeeId));
-                    const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
-                    return renderAbnormalPunchModal(rows);
-                  },
-                };
-              },
-            }}
-            emptyText={queryTableEmptyText}
-            headers={tableHeaders}
-            isRefreshing={isQuerying}
-            rowMeta={tableRowMeta}
-            rows={tableRows}
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              cellModal={{
+                getModal: ({ headerLabel, rowMeta }) => {
+                  const meta = rowMeta as AbnormalRowMeta | undefined;
+                  if (headerLabel !== "异常考勤次数" || !meta?.employeeId || !meta.month) {
+                    return null;
+                  }
+                  return {
+                    title: `${meta.employeeName} ${meta.month} 异常打卡时间`,
+                    triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的异常打卡时间`,
+                    loadContent: async () => {
+                      const query = new URLSearchParams();
+                      query.set("month", meta.month);
+                      query.append("emp_ids", String(meta.employeeId));
+                      const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
+                      return renderAbnormalPunchModal(rows);
+                    },
+                  };
+                },
+              }}
+              emptyText={queryTableEmptyText}
+              headers={tableHeaders}
+              isRefreshing={isQuerying}
+              rowMeta={tableRowMeta}
+              rows={tableRows}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            description="在上方选择员工范围及对应账套，即可开启考勤异常统计与打卡明细分析。"
+            icon={<AbnormalAlertIcon />}
+            title="请选择员工范围后点击查询"
           />
-        </QueryResultPanel>
+        )}
       </section>
     </div>
   );

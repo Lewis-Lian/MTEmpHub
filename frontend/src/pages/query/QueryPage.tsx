@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap } from "../../api/query";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import QueryEmptyState from "../../components/query/QueryEmptyState";
 import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import type { QueryTableCellModalConfig } from "../../components/query/QueryTable";
 import ErrorState from "../../components/feedback/ErrorState";
@@ -29,6 +31,12 @@ interface QueryColumn {
   format?: (value: unknown, row: Record<string, unknown>) => string | number;
 }
 
+export interface QueryPageEmptyStateConfig {
+  title?: string;
+  description?: string;
+  icon?: ReactNode;
+}
+
 interface QueryPageProps {
   title: string;
   description: string;
@@ -47,6 +55,7 @@ interface QueryPageProps {
   transformObjectRows?: (rows: Record<string, unknown>[], state: QueryState) => Record<string, unknown>[];
   buildHeaderRowMeta?: (payload: HeaderRowsResponse, state: QueryState, bootstrap: QueryBootstrap) => unknown[];
   cellModal?: QueryTableCellModalConfig;
+  emptyState?: QueryPageEmptyStateConfig;
 }
 
 interface QueryState {
@@ -74,6 +83,7 @@ export default function QueryPage({
   transformObjectRows,
   buildHeaderRowMeta,
   cellModal,
+  emptyState,
 }: QueryPageProps) {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -391,16 +401,24 @@ export default function QueryPage({
 
       <section className="query-workspace">
         <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
-        <QueryResultPanel>
-          <QueryTable
-            cellModal={cellModal}
-            emptyText={queryTableEmptyText}
-            headers={tableHeaders}
-            isRefreshing={isQuerying}
-            rowMeta={tableRowMeta}
-            rows={tableRows}
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              cellModal={cellModal}
+              emptyText={queryTableEmptyText}
+              headers={tableHeaders}
+              isRefreshing={isQuerying}
+              rowMeta={tableRowMeta}
+              rows={tableRows}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            description={emptyState?.description ?? "在上方选择查询条件并点击查询，即可开启数据分析。"}
+            icon={emptyState?.icon}
+            title={emptyState?.title ?? (fields.includes("employees") ? "请选择人员后点击查询" : "请选择查询条件后点击查询")}
           />
-        </QueryResultPanel>
+        )}
       </section>
     </div>
   );
