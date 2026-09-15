@@ -5,6 +5,7 @@ import { buildDownloadUrl, fetchHeaderRows, fetchObjectRows, fetchQueryBootstrap
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
+import QueryEmptyState, { TeamDashboardIcon } from "../../components/query/QueryEmptyState";
 import MultiSelectDropdown from "../../components/common/MultiSelectDropdown";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
@@ -240,7 +241,10 @@ export default function EmployeeDashboardPage() {
               accountSets={bootstrap.account_sets}
               compact
               label="账套"
-              onChange={setSelectedMonth}
+              onChange={(nextMonth) => {
+                setSelectedMonth(nextMonth);
+                setHasQueried(false);
+              }}
               value={selectedMonth}
             />
           </div>
@@ -281,53 +285,61 @@ export default function EmployeeDashboardPage() {
 
       <section className="query-workspace">
         <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
-        <QueryResultPanel>
-          <QueryTable
-            isRefreshing={isQuerying}
-            cellModal={{
-              getModal: ({ headerLabel, rowMeta }) => {
-                const meta = rowMeta as DashboardRowMeta | undefined;
-                if (!meta?.employeeId || !meta.month) {
-                  return null;
-                }
-                if (headerLabel === "考勤天数") {
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              isRefreshing={isQuerying}
+              cellModal={{
+                getModal: ({ headerLabel, rowMeta }) => {
+                  const meta = rowMeta as DashboardRowMeta | undefined;
+                  if (!meta?.employeeId || !meta.month) {
+                    return null;
+                  }
+                  if (headerLabel === "考勤天数") {
+                    return {
+                      title: `${meta.employeeName} ${meta.month} 原始刷卡记录`,
+                      triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的原始刷卡记录`,
+                      loadContent: async () => {
+                        const query = new URLSearchParams();
+                        query.set("month", meta.month);
+                        query.append("emp_ids", String(meta.employeeId));
+                        const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
+                        return renderPunchRecordModal(rows, meta.employeeId, meta.month);
+                      },
+                    };
+                  }
+
+                  const leaveType = LEAVE_MODAL_HEADER_MAP[headerLabel];
+                  if (!leaveType) {
+                    return null;
+                  }
                   return {
-                    title: `${meta.employeeName} ${meta.month} 原始刷卡记录`,
-                    triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的原始刷卡记录`,
+                    title: `${meta.employeeName} ${meta.month} ${leaveType}明细`,
+                    triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的${leaveType}明细`,
                     loadContent: async () => {
                       const query = new URLSearchParams();
                       query.set("month", meta.month);
+                      query.set("leave_type", leaveType);
                       query.append("emp_ids", String(meta.employeeId));
-                      const rows = await fetchObjectRows<PunchRecordRow>("/api/query/punch-records", query);
-                      return renderPunchRecordModal(rows, meta.employeeId, meta.month);
+                      const rows = await fetchObjectRows<LeaveRecordRow>("/api/query/leave-records", query);
+                      return renderLeaveRecordModal(rows, meta.employeeId, meta.month, leaveType);
                     },
                   };
-                }
-
-                const leaveType = LEAVE_MODAL_HEADER_MAP[headerLabel];
-                if (!leaveType) {
-                  return null;
-                }
-                return {
-                  title: `${meta.employeeName} ${meta.month} ${leaveType}明细`,
-                  triggerLabel: `查看${meta.employeeName}在 ${meta.month} 的${leaveType}明细`,
-                  loadContent: async () => {
-                    const query = new URLSearchParams();
-                    query.set("month", meta.month);
-                    query.set("leave_type", leaveType);
-                    query.append("emp_ids", String(meta.employeeId));
-                    const rows = await fetchObjectRows<LeaveRecordRow>("/api/query/leave-records", query);
-                    return renderLeaveRecordModal(rows, meta.employeeId, meta.month, leaveType);
-                  },
-                };
-              },
-            }}
-            emptyText={queryTableEmptyText}
-            headers={tableHeaders}
-            rowMeta={tableRowMeta}
-            rows={tableRows}
+                },
+              }}
+              emptyText={queryTableEmptyText}
+              headers={tableHeaders}
+              rowMeta={tableRowMeta}
+              rows={tableRows}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            description="在上方选择员工范围及对应账套，即可开启全员多维考勤数据看板分析。"
+            icon={<TeamDashboardIcon />}
+            title="请选择员工范围后点击查询"
           />
-        </QueryResultPanel>
+        )}
       </section>
     </div>
   );

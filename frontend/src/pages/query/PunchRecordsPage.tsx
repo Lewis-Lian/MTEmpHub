@@ -1,3 +1,4 @@
+import { PunchRecordIcon } from "../../components/query/QueryEmptyState";
 import QueryPage from "./QueryPage";
 
 export default function PunchRecordsPage() {
@@ -7,6 +8,11 @@ export default function PunchRecordsPage() {
       defaultSelectedOptions={{ show_in_out_punch: false, show_raw_punch: true }}
       description="查询员工逐日打卡明细，并支持直接导出 Excel。"
       employeeFilterMode="employee"
+      emptyState={{
+        title: "请选择人员后点击查询",
+        description: "在上方选择人员及对应账套，即可查询原始打卡流水与出勤明细。",
+        icon: <PunchRecordIcon />,
+      }}
       endpoint="/api/query/punch-records"
       exportPath="/api/query/punch-records/export"
       fields={["month", "employees"]}

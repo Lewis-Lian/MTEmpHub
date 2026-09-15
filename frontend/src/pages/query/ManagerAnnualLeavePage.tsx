@@ -1,3 +1,4 @@
+import { ManagerAnnualLeaveIcon } from "../../components/query/QueryEmptyState";
 import QueryPage from "./QueryPage";
 
 export default function ManagerAnnualLeavePage() {
@@ -5,6 +6,11 @@ export default function ManagerAnnualLeavePage() {
     <QueryPage
       description="按年份查询管理人员月度年休统计。"
       employeeFilterMode="manager"
+      emptyState={{
+        title: "请选择管理人员与年份后点击查询",
+        description: "在上方选择管理人员及对应年份，即可开启管理人员全年年休假分析。",
+        icon: <ManagerAnnualLeaveIcon />,
+      }}
       endpoint="/api/query/manager-annual-leave"
       exportPath="/api/query/manager-annual-leave/export"
       fields={["year", "employees"]}

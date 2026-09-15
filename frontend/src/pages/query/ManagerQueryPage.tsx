@@ -1,3 +1,4 @@
+import { ManagerQueryIcon } from "../../components/query/QueryEmptyState";
 import QueryPage from "./QueryPage";
 import type { QueryBootstrap, HeaderRowsResponse } from "../../types/query";
 import { fetchObjectRows } from "../../api/query";
@@ -205,6 +206,11 @@ export default function ManagerQueryPage() {
       cellModal={managerCellModal}
       description="查询管理人员月度考勤结果，并支持模板导出。"
       employeeFilterMode="manager"
+      emptyState={{
+        title: "请选择管理人员后点击查询",
+        description: "在上方选择管理人员及对应账套，即可开启管理人员多维考勤数据看板分析。",
+        icon: <ManagerQueryIcon />,
+      }}
       endpoint="/api/query/manager-attendance"
       exportPath="/api/query/manager-attendance/export"
       fields={["month", "employees"]}

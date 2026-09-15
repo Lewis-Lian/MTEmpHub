@@ -1,3 +1,4 @@
+import { ManagerOvertimeIcon } from "../../components/query/QueryEmptyState";
 import QueryPage from "./QueryPage";
 
 export default function ManagerOvertimePage() {
@@ -5,6 +6,11 @@ export default function ManagerOvertimePage() {
     <QueryPage
       description="按年份查询管理人员月度加班统计。"
       employeeFilterMode="manager"
+      emptyState={{
+        title: "请选择管理人员与年份后点击查询",
+        description: "在上方选择管理人员及对应年份，即可开启管理人员全年加班与调休分析。",
+        icon: <ManagerOvertimeIcon />,
+      }}
       endpoint="/api/query/manager-overtime"
       exportPath="/api/query/manager-overtime/export"
       fields={["year", "employees"]}

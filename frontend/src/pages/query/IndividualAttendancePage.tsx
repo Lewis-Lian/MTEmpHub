@@ -6,6 +6,7 @@ import AccountSetSelector from "../../components/query/AccountSetSelector";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
+import QueryEmptyState, { IndividualAttendanceIcon } from "../../components/query/QueryEmptyState";
 import type { AttendanceCalendarData, HeaderRowsResponse, QueryBootstrap, QueryEmployee } from "../../types/query";
 import "./individual-attendance.css";
 
@@ -119,19 +120,12 @@ export default function IndividualAttendancePage() {
         {selectedEmployee && summary && calendar ? (
           <AttendanceResult employee={selectedEmployee} summary={summary} calendar={calendar} />
         ) : (
-          <div className="individual-attendance-empty">
-            <div className="empty-visual-badge">
-              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-                <rect x="15" y="4" width="7" height="6" rx="1" />
-              </svg>
-            </div>
-            <div className="empty-text-wrap">
-              <div className="empty-title">请选择人员后点击查询</div>
-              <div className="empty-desc">在上方右侧选择人员及对应账套，即可开启多维考勤数据看板分析。</div>
-            </div>
-          </div>
+          <QueryEmptyState
+            className="individual-attendance-empty"
+            description="在上方右侧选择人员及对应账套，即可开启多维考勤数据看板分析。"
+            icon={<IndividualAttendanceIcon />}
+            title="请选择人员后点击查询"
+          />
         )}
       </main>
     </div>
