@@ -344,6 +344,13 @@
   min-height: 480px;
 }
 
+/* 明细卡片不参与中部行高计算（size 收容使其内在高度贡献归零）：
+   行高始终由正方形格子的日历卡片决定，明细卡片拉伸填满行高、表格内部滚动，
+   避免明细表行数偏多时把日历卡片下方撑出大片空白（≤1200px 单列布局时还原） */
+.individual-details-card {
+  contain: size;
+}
+
 .dashboard-card-top {
   display: flex;
   align-items: center;
@@ -614,8 +621,8 @@
   min-height: 0;
 }
 
-/* 明细表不设 max-height：中部两卡片 align-items: stretch 等高，日历格为正方形导致
-   卡片远高于 400px，封顶会让明细卡片表格下方露出大片空白；表格依赖 flex 链填满卡片，
+/* 明细表不设 max-height：中部行高由日历卡片（正方形格子）决定，明细卡片经 contain: size
+   不参与行高计算、随 align-items: stretch 填满行高；表格依赖 flex 链填满卡片，
    行数超出时由 .individual-table-wrap 自身滚动（表头已 sticky） */
 
 /* ==========================================================================
@@ -777,6 +784,11 @@
 
   .individual-dashboard-middle {
     grid-template-columns: 1fr;
+  }
+
+  /* 单列布局下明细卡片恢复按内容自高，否则 size 收容会把卡片压扁 */
+  .individual-details-card {
+    contain: none;
   }
 }
 
