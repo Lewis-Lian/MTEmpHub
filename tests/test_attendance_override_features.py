@@ -84,56 +84,48 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             db.drop_all()
         self.tmpdir.cleanup()
 
-    def test_employee_manual_save_creates_history_once(self) -> None:
-        payload = {
-            "month": "2026-05",
-            "emp_id": self.employee_id,
-            "attendance_days": "3",
-            "work_hours": "21.5",
-            "half_days": "1",
-            "late_early_minutes": "10",
-            "remark": "手工修正",
-        }
+    def test_employee_override_history_endpoint_returns_seeded_rows(self) -> None:
+        """月度修正已冻结为只读：历史接口仅读取存量记录（写入入口已下线）。"""
+        with self.app.app_context():
+            from models.attendance_override_history import AttendanceOverrideHistory
 
-        first = self.client.put("/api/admin/employee-attendance-overrides/record", json=payload)
-        self.assertEqual(first.status_code, 200)
+            db.session.add(
+                AttendanceOverrideHistory(
+                    override_type="employee",
+                    emp_id=self.employee_id,
+                    month="2026-05",
+                    action_type="manual_save",
+                    changed_fields_json=["attendance_days"],
+                    before_values_json={},
+                    after_values_json={"attendance_days": 3},
+                    operator_user_id=1,
+                )
+            )
+            db.session.commit()
 
         history = self.client.get(
             f"/api/admin/employee-attendance-overrides/history?emp_id={self.employee_id}&month=2026-05"
         )
         self.assertEqual(history.status_code, 200)
-        first_rows = history.get_json()["rows"]
-        self.assertEqual(len(first_rows), 1)
-        self.assertEqual(first_rows[0]["action_type"], "manual_save")
-
-        second = self.client.put("/api/admin/employee-attendance-overrides/record", json=payload)
-        self.assertEqual(second.status_code, 200)
-        history_again = self.client.get(
-            f"/api/admin/employee-attendance-overrides/history?emp_id={self.employee_id}&month=2026-05"
-        )
-        self.assertEqual(len(history_again.get_json()["rows"]), 1)
+        rows = history.get_json()["rows"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["action_type"], "manual_save")
 
     def test_employee_override_list_returns_selected_employees(self) -> None:
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "attendance_days": "2",
-                "work_hours": "15.5",
-                "remark": "员工甲修正",
-            },
-        )
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_b_id,
-                "attendance_days": "4",
-                "half_days": "1",
-                "remark": "员工乙修正",
-            },
-        )
+        with self.app.app_context():
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
+            db.session.add_all(
+                [
+                    EmployeeAttendanceOverride(
+                        emp_id=self.employee_id, month="2026-05", attendance_days=2.0, work_hours=15.5, remark="员工甲修正"
+                    ),
+                    EmployeeAttendanceOverride(
+                        emp_id=self.employee_b_id, month="2026-05", attendance_days=4.0, half_days=1, remark="员工乙修正"
+                    ),
+                ]
+            )
+            db.session.commit()
 
         res = self.client.get(
             f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id},{self.employee_b_id}"
@@ -207,16 +199,15 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(automatic_by_emp["E002"]["late_early_minutes"], 40)
 
     def test_manager_override_list_returns_selected_employees(self) -> None:
-        self.client.put(
-            "/api/admin/manager-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.manager_id,
-                "attendance_days": "20",
-                "injury_days": "1",
-                "remark": "经理修正",
-            },
-        )
+        with self.app.app_context():
+            from models.manager_attendance_override import ManagerAttendanceOverride
+
+            db.session.add(
+                ManagerAttendanceOverride(
+                    emp_id=self.manager_id, month="2026-05", attendance_days=20.0, injury_days=1.0, remark="经理修正"
+                )
+            )
+            db.session.commit()
 
         res = self.client.get(f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}")
         self.assertEqual(res.status_code, 200)
@@ -294,15 +285,15 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             )
             db.session.commit()
 
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "attendance_days": "3",
-                "remark": "查询修正",
-            },
-        )
+        with self.app.app_context():
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
+            db.session.add(
+                EmployeeAttendanceOverride(
+                    emp_id=self.employee_id, month="2026-05", attendance_days=3.0, remark="查询修正"
+                )
+            )
+            db.session.commit()
 
         res = self.client.get(f"/api/query/employee-dashboard?month=2026-05&emp_ids={self.employee_id}")
         self.assertEqual(res.status_code, 200)
@@ -340,15 +331,15 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             )
             db.session.commit()
 
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "work_hours": "5.5",
-                "remark": "部门工时修正",
-            },
-        )
+        with self.app.app_context():
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
+            db.session.add(
+                EmployeeAttendanceOverride(
+                    emp_id=self.employee_id, month="2026-05", work_hours=5.5, remark="部门工时修正"
+                )
+            )
+            db.session.commit()
 
         res = self.client.get("/api/query/department-hours?month=2026-05")
         self.assertEqual(res.status_code, 200)
@@ -580,88 +571,6 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.assertIsNotNone(fetched)
             self.assertEqual(fetched.actual_attendance_days, 12.0)
 
-    def test_manager_override_save_syncs_overtime_stats(self) -> None:
-        """保存管理人员考勤修正后，加班统计表（加班查询页数据源）应同步重算。
-
-        场景：2026-05 共 31 天，账套厂休 5 天。修正出勤天数为 27 天，
-        27 + 5 = 32 > 31，缺口 -1 天 → 本月加班 1 天。
-        保存修正前 stats.m5=0；保存后应变为 1.0（与考勤查询页一致）。
-        """
-        with self.app.app_context():
-            account_set = AccountSet.query.filter_by(month="2026-05").first()
-            for rest_day in (date(2026, 5, 2), date(2026, 5, 9), date(2026, 5, 16),
-                             date(2026, 5, 23), date(2026, 5, 30)):
-                db.session.add(AccountSetFactoryRestDay(
-                    account_set_id=account_set.id,
-                    rest_date=rest_day,
-                    rest_period="full",
-                ))
-            db.session.commit()
-            self.manager_id_local = self.manager_id
-
-        # 保存前：加班 stats 应为空（m5=0 或无记录）
-        res = self.client.put(
-            "/api/admin/manager-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.manager_id,
-                "attendance_days": "27",
-                "remark": "产生加班的修正",
-            },
-        )
-        self.assertEqual(res.status_code, 200)
-
-        with self.app.app_context():
-            stat = (
-                db.session.query(ManagerMonthStat)
-                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
-                .first()
-            )
-            self.assertIsNotNone(stat, "保存修正后应存在加班统计记录")
-            self.assertEqual(stat.m5, 1.0, "加班查询页 m5 应同步为 1.0 天")
-
-    def test_manager_override_delete_syncs_overtime_stats(self) -> None:
-        """删除管理人员考勤修正后，加班统计表也应同步重算（加班归零）。"""
-        with self.app.app_context():
-            account_set = AccountSet.query.filter_by(month="2026-05").first()
-            for rest_day in (date(2026, 5, 2), date(2026, 5, 9), date(2026, 5, 16),
-                             date(2026, 5, 23), date(2026, 5, 30)):
-                db.session.add(AccountSetFactoryRestDay(
-                    account_set_id=account_set.id,
-                    rest_date=rest_day,
-                    rest_period="full",
-                ))
-            db.session.commit()
-
-        # 先保存产生加班
-        self.client.put(
-            "/api/admin/manager-attendance-overrides/record",
-            json={"month": "2026-05", "emp_id": self.manager_id, "attendance_days": "27"},
-        )
-        with self.app.app_context():
-            stat = (
-                db.session.query(ManagerMonthStat)
-                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
-                .first()
-            )
-            self.assertEqual(stat.m5, 1.0)
-
-        # 删除修正 → 出勤天数恢复为月报值（无月报则按打卡兜底，本测试无数据→0），
-        # 缺口为正（缺勤），加班归零
-        res = self.client.delete(
-            f"/api/admin/manager-attendance-overrides/record?emp_id={self.manager_id}&month=2026-05"
-        )
-        self.assertEqual(res.status_code, 200)
-
-        with self.app.app_context():
-            stat = (
-                db.session.query(ManagerMonthStat)
-                .filter_by(emp_id=self.manager_id, year=2026, stat_type="overtime")
-                .first()
-            )
-            self.assertIsNotNone(stat)
-            self.assertEqual(stat.m5, 0.0, "删除修正后加班应同步归零")
-
     def test_product_navigation_filters_readonly_permissions(self) -> None:
         readonly_user = SimpleNamespace(
             username="reader",
@@ -698,8 +607,10 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
             self.assertEqual(fetched.actual_attendance_days, 18.5)
 
     def test_employee_override_actual_attendance_days_round_trip(self) -> None:
-        # 先建一条全勤打卡记录，使系统自动值非 0
+        # 先建一条全勤打卡记录，使系统自动值非 0；月度修正以存量数据直接落库（写入入口已下线）
         with self.app.app_context():
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
             db.session.add(DailyRecord(
                 emp_id=self.employee_id, record_date=date(2026, 5, 10),
                 check_in_times=["08:00"], check_out_times=["17:00"],
@@ -709,20 +620,14 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
                     "raw_data": {"刷卡时间数据": "08:00,17:00"},
                 },
             ))
+            db.session.add(
+                EmployeeAttendanceOverride(
+                    emp_id=self.employee_id, month="2026-05", actual_attendance_days=15.0, remark="手工修正实际出勤"
+                )
+            )
             db.session.commit()
 
-        # 保存修正
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "actual_attendance_days": "15",
-                "remark": "手工修正实际出勤",
-            },
-        )
-
-        # 查询修正记录：override 与 applied 应反映修正值，automatic 为系统计算值（当月至少 1 天全勤）
+        # 查询修正记录：override 与 applied 应反映修正值，automatic 为纯系统计算值（当月至少 1 天全勤）
         res = self.client.get(
             f"/api/admin/employee-attendance-overrides/record?emp_id={self.employee_id}&month=2026-05"
         )
@@ -731,32 +636,6 @@ class AttendanceOverrideFeatureTests(unittest.TestCase):
         self.assertEqual(payload["override"]["actual_attendance_days"], 15.0)
         self.assertEqual(payload["applied"]["actual_attendance_days"], 15.0)
         self.assertGreaterEqual(payload["automatic"]["actual_attendance_days"], 1)
-
-    def test_import_employee_override_with_actual_attendance_days(self) -> None:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.append(["月份", "工号", "姓名", "考勤天数", "实际出勤天数", "工时", "半勤天数", "迟到早退", "备注"])
-        ws.append(["2026-05", "E001", "员工甲", "", "12", "", "", "", "导入实际出勤"])
-        buf = io.BytesIO()
-        wb.save(buf)
-        buf.seek(0)
-
-        res = self.client.post(
-            "/api/admin/employee-attendance-overrides/import",
-            data={"month": "2026-05", "file": (buf, "imp.xlsx")},
-            content_type="multipart/form-data",
-        )
-        self.assertEqual(res.status_code, 200)
-        body = res.get_json()
-        self.assertGreater(body.get("changed_count", 0), 0)
-
-        # 验证落库
-        record_res = self.client.get(
-            f"/api/admin/employee-attendance-overrides/record?emp_id={self.employee_id}&month=2026-05"
-        )
-        self.assertEqual(
-            record_res.get_json()["override"]["actual_attendance_days"], 12.0
-        )
 
 
 if __name__ == "__main__":

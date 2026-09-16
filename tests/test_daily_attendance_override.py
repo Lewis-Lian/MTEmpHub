@@ -131,12 +131,13 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
     def _put_daily(self, body: dict):
         return self.client.put(DAILY_ENDPOINT, json=body)
 
-    def _employee_automatic(self) -> dict:
+    def _employee_applied(self) -> dict:
+        """无月度修正时 applied = 系统+逐日修正的生效口径（列表 automatic 列为纯系统口径）。"""
         res = self.client.get(
             f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id}"
         )
         self.assertEqual(res.status_code, 200)
-        return res.get_json()["rows"][0]["automatic"]
+        return res.get_json()["rows"][0]["applied"]
 
     def _employee_row(self) -> dict:
         res = self.client.get(
@@ -152,8 +153,8 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
         self._add_evening_overtime(date(2026, 5, 6), hours=3.0)
 
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 1.5)
+        applied = self._employee_applied()
+        self.assertEqual(applied["attendance_days"], 1.5)
 
     def test_evening_overtime_flag_forces_half_day(self) -> None:
         """手工勾选晚上加班的日期，考勤天数固定 0.5（原刷卡口径 1 天）。"""
@@ -163,22 +164,22 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
 
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 0.5)
+        applied = self._employee_applied()
+        self.assertEqual(applied["attendance_days"], 0.5)
 
     # ------------------------------------------------------------ 状态修正聚合
 
     def test_full_status_on_absent_day_adds_one_day(self) -> None:
         """无任何记录的缺勤日标「全勤」→ 考勤天数 +1。"""
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
-        self.assertEqual(self._employee_automatic()["attendance_days"], 1.0)
+        self.assertEqual(self._employee_applied()["attendance_days"], 1.0)
 
         res = self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-12", "status": "全勤"}
         )
         self.assertEqual(res.status_code, 200)
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 2.0)
+        applied = self._employee_applied()
+        self.assertEqual(applied["attendance_days"], 2.0)
 
     def test_half_day_status_adds_half_day_and_half_days(self) -> None:
         """标「上午出勤」→ 考勤天数 +0.5、半勤天数 +1。"""
@@ -189,9 +190,9 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
 
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 1.5)
-        self.assertEqual(automatic["half_days"], 1)
+        applied = self._employee_applied()
+        self.assertEqual(applied["attendance_days"], 1.5)
+        self.assertEqual(applied["half_days"], 1)
 
     def test_leave_status_adds_leave_days_without_attendance(self) -> None:
         """标「事假」→ 考勤天数不变、查询页事假天数 +1。"""
@@ -202,8 +203,8 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
 
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["attendance_days"], 1.0)
+        applied = self._employee_applied()
+        self.assertEqual(applied["attendance_days"], 1.0)
 
         res = self.client.get(
             f"/api/query/employee-dashboard?month=2026-05&emp_ids={self.employee_id}&show_leave_durations=1"
@@ -230,41 +231,45 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
 
-        automatic = self._employee_automatic()
-        self.assertEqual(automatic["work_hours"], 8.0)
-        self.assertEqual(automatic["late_early_minutes"], 0)
+        applied = self._employee_applied()
+        self.assertEqual(applied["work_hours"], 8.0)
+        self.assertEqual(applied["late_early_minutes"], 0)
 
     # ------------------------------------------------------ 与月度修正的共存
 
     def test_monthly_override_still_wins(self) -> None:
-        """逐日修正改变 automatic，月度修正覆盖 applied（月度优先级最高）。"""
+        """系统值=纯系统口径（不含逐日修正），月度修正覆盖最终应用值（月度优先级最高）。"""
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
         self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-12", "status": "全勤"}
         )
-        monthly = self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={"month": "2026-05", "emp_id": self.employee_id, "attendance_days": "5"},
-        )
-        self.assertEqual(monthly.status_code, 200)
+        with self.app.app_context():
+            from models.employee_attendance_override import EmployeeAttendanceOverride
+
+            db.session.add(
+                EmployeeAttendanceOverride(
+                    emp_id=self.employee_id, month="2026-05", attendance_days=5.0
+                )
+            )
+            db.session.commit()
 
         row = self._employee_row()
-        self.assertEqual(row["automatic"]["attendance_days"], 2.0)
+        self.assertEqual(row["automatic"]["attendance_days"], 1.0)
         self.assertEqual(row["applied"]["attendance_days"], 5.0)
 
     def test_delete_daily_override_restores_automatic(self) -> None:
-        """清除逐日修正 → automatic 回到系统口径。"""
+        """清除逐日修正 → 生效口径（applied）回到系统值。"""
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
         self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-12", "status": "全勤"}
         )
-        self.assertEqual(self._employee_automatic()["attendance_days"], 2.0)
+        self.assertEqual(self._employee_applied()["attendance_days"], 2.0)
 
         res = self.client.delete(
             f"{DAILY_ENDPOINT}?emp_id={self.employee_id}&date=2026-05-12"
         )
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(self._employee_automatic()["attendance_days"], 1.0)
+        self.assertEqual(self._employee_applied()["attendance_days"], 1.0)
 
     # ------------------------------------------------------------ 端点校验
 
@@ -368,28 +373,28 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         """勾"算实际打卡"的天计 1 天实际出勤；明确取消的按 0 天；未设置走刷卡口径。"""
         # 6 日刷卡 2 次（刷卡口径 1 天），12 日无任何记录（0 天）
         self._add_daily(date(2026, 5, 6), "08:00", "17:00")
-        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 1.0)
+        self.assertEqual(self._employee_applied()["actual_attendance_days"], 1.0)
 
         # 无打卡记录日勾"算实际打卡" → 实际出勤 +1
         res = self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-12", "is_actual_attendance": True}
         )
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 2.0)
+        self.assertEqual(self._employee_applied()["actual_attendance_days"], 2.0)
 
         # 有刷卡记录日明确"不算" → 实际出勤按 0 天计
         res = self._put_daily(
             {"month": "2026-05", "emp_id": self.employee_id, "date": "2026-05-06", "is_actual_attendance": False}
         )
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 1.0)
+        self.assertEqual(self._employee_applied()["actual_attendance_days"], 1.0)
 
         # 清除修正 → 恢复刷卡口径
         res = self.client.delete(
             f"{DAILY_ENDPOINT}?emp_id={self.employee_id}&date=2026-05-06"
         )
         self.assertEqual(res.status_code, 200)
-        self.assertEqual(self._employee_automatic()["actual_attendance_days"], 2.0)
+        self.assertEqual(self._employee_applied()["actual_attendance_days"], 2.0)
 
     def test_batch_mark_actual_attendance_keeps_other_fields(self) -> None:
         """批量端点只改实际打卡位，保留同日已有其他修正字段。"""
@@ -462,7 +467,7 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         override = self._calendar_override("2026-05-06")
         self.assertEqual(override["status"], "事假")
         self.assertIs(override["is_actual_attendance"], False)
-        self.assertEqual(self._employee_automatic()["attendance_days"], 0.0)
+        self.assertEqual(self._employee_applied()["attendance_days"], 0.0)
 
     def test_batch_clear_status(self) -> None:
         """批量端点 status 传空串 → 清除状态，恢复跟随系统。"""
@@ -527,7 +532,7 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
     # ------------------------------------------------------------ 管理人员侧
 
     def test_manager_leave_status_updates_manager_fields(self) -> None:
-        """管理人员标「工伤」→ 管理人员列表工伤天数 +1。"""
+        """管理人员标「工伤」→ 最终应用工伤天数 +1（系统值列保持纯系统口径）。"""
         res = self._put_daily(
             {"month": "2026-05", "emp_id": self.manager_id, "date": "2026-05-12", "status": "工伤"}
         )
@@ -538,10 +543,11 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
         row = res.get_json()["rows"][0]
-        self.assertEqual(row["automatic"]["injury_days"], 1.0)
+        self.assertEqual(row["automatic"]["injury_days"], 0.0)
+        self.assertEqual(row["applied"]["injury_days"], 1.0)
 
     def test_manager_batch_status_updates_manager_fields(self) -> None:
-        """管理人员批量标「工伤」→ 管理人员列表工伤天数按勾选天数累计。"""
+        """管理人员批量标「工伤」→ 最终应用工伤天数按勾选天数累计。"""
         res = self.client.put(
             BATCH_ENDPOINT,
             json={
@@ -558,7 +564,8 @@ class DailyAttendanceOverrideTests(unittest.TestCase):
         )
         self.assertEqual(res.status_code, 200)
         row = res.get_json()["rows"][0]
-        self.assertEqual(row["automatic"]["injury_days"], 2.0)
+        self.assertEqual(row["automatic"]["injury_days"], 0.0)
+        self.assertEqual(row["applied"]["injury_days"], 2.0)
 
     def test_manager_full_status_syncs_overtime_stats(self) -> None:
         """管理人员逐日修正后加班统计表同步重算。

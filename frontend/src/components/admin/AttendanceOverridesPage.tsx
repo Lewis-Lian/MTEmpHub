@@ -1,6 +1,6 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { apiRequest, buildApiUrl } from "../../api/client";
+import { apiRequest } from "../../api/client";
 import { useNotification } from "../feedback/Notification";
 import { fetchQueryBootstrap } from "../../api/query";
 import ErrorState from "../feedback/ErrorState";
@@ -27,11 +27,20 @@ interface OverrideValues {
   [key: string]: unknown;
 }
 
+interface DailyOverrideSummary {
+  corrected_days: number;
+  status_counts: Record<string, number>;
+  updated_at?: string;
+  updated_by_name?: string;
+  remark?: string;
+}
+
 interface AttendanceOverrideRow {
   employee: OverrideEmployee;
   automatic: OverrideValues | null;
   override: OverrideValues | null;
   applied: OverrideValues | null;
+  daily?: DailyOverrideSummary | null;
 }
 
 interface AttendanceOverrideResponse {
@@ -66,7 +75,6 @@ export default function AttendanceOverridesPage({
   filterMode,
   fields,
 }: AttendanceOverridesPageProps) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isQuerying, setIsQuerying] = useState(false);
@@ -76,7 +84,6 @@ export default function AttendanceOverridesPage({
   const [rows, setRows] = useState<AttendanceOverrideRow[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
   const [editingRow, setEditingRow] = useState<AttendanceOverrideRow | null>(null);
-  const [showActionsModal, setShowActionsModal] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
@@ -134,10 +141,10 @@ export default function AttendanceOverridesPage({
     row.employee.name || "-",
     row.employee.dept_name || "-",
     summarizeValues(row.automatic, fields),
-    summarizeValues(row.override, fields),
+    summarizeCorrections(row, fields),
     summarizeValues(row.applied, fields),
-    String(row.override?.remark ?? "-"),
-    formatDateTime(row.override?.updated_at),
+    latestRemark(row),
+    latestUpdateCell(row),
     (
       <button
         className="account-action-button"
@@ -213,75 +220,6 @@ export default function AttendanceOverridesPage({
     setEditingRow((current) => (current && current.employee.id === typedRow.employee.id ? typedRow : current));
   }
 
-  function handleDownload(kind: "template" | "export") {
-    if (!selectedMonth) {
-      notification.error("请选择月份");
-      return;
-    }
-    window.location.assign(buildApiUrl(`${endpointBase}/${kind}?month=${encodeURIComponent(selectedMonth)}`));
-  }
-
-  async function handleImportFile(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) {
-      return;
-    }
-    if (!selectedMonth) {
-      notification.error("请选择月份");
-      event.target.value = "";
-      return;
-    }
-    try {
-      setProgressVisible(true);
-      setProgress(0);
-      setLoadingText("正在上传并处理导入，请稍候...");
-      let current = 0;
-      const interval = setInterval(() => {
-        current += Math.floor(Math.random() * 15) + 5;
-        if (current >= 95) current = 95;
-        setProgress(current);
-      }, 150);
-
-      const form = new FormData();
-      form.append("month", selectedMonth);
-      form.append("file", file);
-      const result = await apiRequest<{
-        success_count: number;
-        skipped_count: number;
-        failed_count: number;
-        changed_count: number;
-        errors?: string[];
-      }>(`${endpointBase}/import`, {
-        body: form,
-        method: "POST",
-      });
-      clearInterval(interval);
-      setProgress(100);
-      setLoadingText("导入处理完成！");
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const summary = [
-        `成功 ${result.success_count} 条`,
-        `跳过 ${result.skipped_count} 条`,
-        `失败 ${result.failed_count} 条`,
-        `实际变更 ${result.changed_count} 条`,
-      ];
-      if (Array.isArray(result.errors) && result.errors.length) {
-        summary.push("", result.errors.join("\n"));
-      }
-      const hasFailures = result.failed_count > 0 || (Array.isArray(result.errors) && result.errors.length > 0);
-      // 导入结果含多行汇总与可能的错误明细，给更长的展示时间方便阅读
-      (hasFailures ? notification.warning : notification.success)(summary.join("\n"), 20000);
-      if (selectedIds.length) {
-        await handleQuery();
-      }
-    } catch (caughtError) {
-      notification.error(caughtError instanceof Error ? caughtError.message : "导入失败");
-    } finally {
-      setTimeout(() => setProgressVisible(false), 500);
-      event.target.value = "";
-    }
-  }
-
   if (isLoading) {
     return <LoadingState filterFields={3} headers={tableHeaders.map((header) => typeof header === "string" ? header : typeof header.label === "string" ? header.label : "")} message={`正在准备${title}页面...`} variant="query-page" />;
   }
@@ -320,14 +258,6 @@ export default function AttendanceOverridesPage({
               <button className="btn btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
                 {isQuerying ? "查询中..." : "查询"}
               </button>
-              <button
-                className="btn btn-outline-secondary"
-                onClick={() => setShowActionsModal(true)}
-                type="button"
-              >
-                导入导出
-              </button>
-              <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" style={{ display: "none" }} onChange={handleImportFile} type="file" />
             </div>
             {lockNotice ? (
               <div className={`account-lock-notice${isLocked ? " is-locked" : ""}`} style={{ marginTop: "4px" }}>{lockNotice}</div>
@@ -361,51 +291,6 @@ export default function AttendanceOverridesPage({
           onRowRefresh={handleRowRefresh}
         />
       ) : null}
-
-      {showActionsModal ? (
-        <div aria-label="导入导出" aria-modal="true" className="master-modal-backdrop attendance-override-actions-backdrop" role="dialog">
-          <div className="master-modal attendance-override-actions-modal">
-            <div className="master-modal-header">
-              <div>
-                <h2>导入导出</h2>
-                <div className="attendance-override-edit-meta">选择需要执行的数据导出或导入操作</div>
-              </div>
-              <button aria-label="关闭" className="master-modal-close" onClick={() => setShowActionsModal(false)} type="button">
-                ×
-              </button>
-            </div>
-            <div className="master-modal-body attendance-override-actions-body">
-              <button
-                className="account-action-button account-action-button--primary attendance-override-actions-button"
-                onClick={() => { handleDownload("export"); setShowActionsModal(false); }}
-                type="button"
-              >
-                导出
-              </button>
-              <button
-                className="account-action-button account-action-button--success attendance-override-actions-button"
-                disabled={isLocked}
-                onClick={() => { fileInputRef.current?.click(); setShowActionsModal(false); }}
-                type="button"
-              >
-                导入
-              </button>
-              <button
-                className="account-action-button attendance-override-actions-button"
-                onClick={() => { handleDownload("template"); setShowActionsModal(false); }}
-                type="button"
-              >
-                示例下载
-              </button>
-            </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setShowActionsModal(false)} type="button">
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }
@@ -428,6 +313,49 @@ function summarizeValues(values: OverrideValues | null, fields: FieldConfig[]): 
     })
     .filter((item): item is string => Boolean(item));
   return parts.join("；") || "-";
+}
+
+// 手工修正列：逐日修正汇总 + 历史月度修正（只读），无修正时显示 "-"
+function summarizeCorrections(row: AttendanceOverrideRow, fields: FieldConfig[]): string {
+  const parts: string[] = [];
+  const daily = row.daily;
+  if (daily && daily.corrected_days > 0) {
+    const statusText = Object.entries(daily.status_counts ?? {})
+      .map(([status, count]) => `${status}×${count}`)
+      .join("、");
+    parts.push(
+      statusText ? `逐日修正 ${daily.corrected_days} 天（${statusText}）` : `逐日修正 ${daily.corrected_days} 天`,
+    );
+  }
+  const monthly = row.override ? summarizeValues(row.override, fields) : "-";
+  if (monthly !== "-") {
+    parts.push(`月度修正（历史）：${monthly}`);
+  }
+  return parts.join("；") || "-";
+}
+
+// 备注列：优先最近一次逐日修正的备注，否则历史月度修正备注
+function latestRemark(row: AttendanceOverrideRow): string {
+  const dailyRemark = (row.daily?.remark ?? "").trim();
+  if (dailyRemark) {
+    return dailyRemark;
+  }
+  const monthlyRemark = String(row.override?.remark ?? "").trim();
+  return monthlyRemark || "-";
+}
+
+// 更新时间列：取逐日/月度两层中最近的一次，附操作人
+function latestUpdateCell(row: AttendanceOverrideRow): string {
+  const candidates = [
+    { at: row.daily?.updated_at ?? "", by: (row.daily?.updated_by_name ?? "").trim() },
+    { at: row.override?.updated_at ?? "", by: String(row.override?.updated_by_name ?? "").trim() },
+  ].filter((candidate) => candidate.at);
+  if (!candidates.length) {
+    return "-";
+  }
+  const latest = candidates.reduce((left, right) => (left.at > right.at ? left : right));
+  const time = formatDateTime(latest.at);
+  return latest.by ? `${time}（${latest.by}）` : time;
 }
 
 function formatDateTime(value: unknown): string {

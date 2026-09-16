@@ -870,7 +870,12 @@ def _resolve_query_month() -> str:
     return request.args.get("month") or (active_set.month if active_set else datetime.now().strftime("%Y-%m"))
 
 
-def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = True) -> list[list[object]]:
+def _build_final_rows(
+    month: str,
+    emp_ids: list[int],
+    include_overrides: bool = True,
+    include_daily_overrides: bool = True,
+) -> list[list[object]]:
     employees = (
         Employee.query.options(joinedload(Employee.department))
         .filter(Employee.id.in_(emp_ids))
@@ -893,7 +898,8 @@ def _build_final_rows(month: str, emp_ids: list[int], include_overrides: bool = 
     )
 
     daily_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT) if date_range else {}
-    daily_override_by_emp = daily_override_maps(month, emp_ids)
+    # include_daily_overrides=False 即纯系统口径：逐日修正与月度修正层都不参与
+    daily_override_by_emp = daily_override_maps(month, emp_ids) if include_daily_overrides else {}
     evening_dates_by_emp = evening_overtime_dates_by_emp(month, emp_ids)
 
     leave_by_emp: dict[int, list[LeaveRecord]] = defaultdict(list)
