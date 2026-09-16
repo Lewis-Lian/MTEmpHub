@@ -207,4 +207,44 @@ describe("IndividualAttendancePage", () => {
     expect(screen.getByText("缺勤")).toBeInTheDocument();
     expect(screen.queryByText("旷工")).toBeNull();
   });
+
+  it("考勤明细表格滚动区域支持鼠标拖动浏览", async () => {
+    selectedEmployeeId.value = 7;
+    mockBootstrap.mockResolvedValue({
+      employees: [{ id: 7, emp_no: "E007", name: "张三", dept_id: 1, dept_name: "研发部", is_manager: false }],
+      account_sets: [{ id: 1, month: "2026-05", name: "2026年5月", is_active: true }],
+      departments: [],
+    });
+    mockHeaderRows.mockResolvedValue({ headers: ["人员名称"], rows: [["张三"]] });
+    mockCalendar.mockResolvedValue({
+      employee: { id: 7, emp_no: "E007", name: "张三", dept_name: "研发部" },
+      month: "2026-05",
+      days: [
+        { date: "2026-05-04", punch_count: 2, check_in_times: ["08:55"], check_out_times: ["18:05"], late_minutes: 0, early_leave_minutes: 0 },
+      ],
+      overtimes: [],
+      leaves: [],
+      summary: { attendance_days: 1, half_days: 0, leave_by_type: [], evening_overtime_hours: 0, other_overtime_hours: 0, late_minutes_total: 0, early_leave_minutes_total: 0 },
+    });
+
+    const { default: IndividualAttendancePage } = await import("./IndividualAttendancePage");
+    render(<IndividualAttendancePage />);
+    fireEvent.click(await screen.findByText("选择张三"));
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+
+    await waitFor(() => expect(screen.getByText("打卡数据")).toBeInTheDocument());
+
+    const tableWrap = document.querySelector(".individual-details-card .legacy-table-wrap") as HTMLDivElement;
+    expect(tableWrap).not.toBeNull();
+
+    fireEvent.mouseDown(tableWrap, { clientX: 100, clientY: 100 });
+    expect(tableWrap.classList.contains("is-dragging")).toBe(true);
+
+    fireEvent.mouseMove(window, { clientX: 60, clientY: 70 });
+    expect(tableWrap.scrollLeft).toBe(40);
+    expect(tableWrap.scrollTop).toBe(30);
+
+    fireEvent.mouseUp(window);
+    expect(tableWrap.classList.contains("is-dragging")).toBe(false);
+  });
 });

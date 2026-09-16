@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAttendanceCalendar, fetchHeaderRows, fetchQueryBootstrap } from "../../api/query";
 import AttendanceCalendarGrid from "../../components/attendance/AttendanceCalendarGrid";
@@ -460,9 +460,69 @@ function DetailTable({
   rows: Array<Array<string | number>>;
   type?: "summary" | "punch" | "leave" | "overtime" | "default";
 }) {
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+
+  // 与 QueryTable 一致：按住表格空白处拖动即可浏览溢出内容（复用 .is-dragging 光标样式）
+  useEffect(() => {
+    const tableWrap = tableWrapRef.current;
+    if (!tableWrap) {
+      return undefined;
+    }
+    const container = tableWrap;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let scrollTop = 0;
+
+    function handleMouseDown(event: MouseEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName.toLowerCase() ?? "";
+      if (["input", "select", "button", "a", "label", "textarea"].includes(tagName)) {
+        return;
+      }
+
+      isDragging = true;
+      startX = event.clientX;
+      startY = event.clientY;
+      scrollLeft = container.scrollLeft;
+      scrollTop = container.scrollTop;
+      container.classList.add("is-dragging");
+    }
+
+    function handleMouseMove(event: MouseEvent) {
+      if (!isDragging) {
+        return;
+      }
+
+      container.scrollLeft = scrollLeft - (event.clientX - startX);
+      container.scrollTop = scrollTop - (event.clientY - startY);
+    }
+
+    function handleMouseUp() {
+      if (!isDragging) {
+        return;
+      }
+
+      isDragging = false;
+      container.classList.remove("is-dragging");
+    }
+
+    container.addEventListener("mousedown", handleMouseDown);
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      container.removeEventListener("mousedown", handleMouseDown);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, []);
+
   return (
     <div className={`individual-attendance-detail-table detail-table-${type}`}>
-      <div className="legacy-table-wrap individual-table-wrap">
+      <div className="legacy-table-wrap individual-table-wrap" ref={tableWrapRef}>
         <table className="legacy-table individual-table">
           <thead>
             <tr>
