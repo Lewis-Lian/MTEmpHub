@@ -8,11 +8,13 @@ import {
   fetchAccountSetCalculationProgress,
   fetchAccountSetImports,
   fetchAccountSets,
+  fetchAttendanceSettings,
   lockAccountSet,
   resetAccountSetImported,
   unlockAccountSet,
   updateAccountSet,
   uploadAccountSetRawFiles,
+  type AdminAttendanceSettings,
 } from "../../api/admin";
 import { clearQueryBootstrapCache } from "../../api/query";
 import ErrorState from "../../components/feedback/ErrorState";
@@ -35,6 +37,39 @@ const FILE_INPUT_LABELS = [
   "6. 管理人员基础数据",
 ];
 
+// 上传槽位对应的后端文件类型（与 FILE_INPUT_LABELS 一一对应）
+const FILE_INPUT_TYPES = [
+  "leave",
+  "overtime",
+  "monthly",
+  "daily",
+  "manager_monthly",
+  "manager_daily",
+] as const;
+
+type FileInputType = (typeof FILE_INPUT_TYPES)[number];
+
+// 自动获取打卡数据时后端计算会跳过对应文件（与 calculate 流程口径一致），
+// 相应上传槽位应禁用并提示原因
+function slotDisabledReason(
+  type: FileInputType,
+  settings: AdminAttendanceSettings | null,
+): string | null {
+  if (!settings) {
+    return null;
+  }
+  if (type === "daily" && settings.employee_attendance_source === "card_db") {
+    return "员工考勤已切换为考勤机数据库同步，无需上传";
+  }
+  if (
+    (type === "manager_monthly" || type === "manager_daily") &&
+    settings.manager_attendance_source === "dingtalk"
+  ) {
+    return "管理人员考勤已切换为钉钉同步，无需上传";
+  }
+  return null;
+}
+
 type FactoryRestPeriod = "none" | "full" | "am" | "pm";
 
 export default function AdminDashboardPage() {
@@ -50,6 +85,7 @@ export default function AdminDashboardPage() {
   const [isFactoryRestDirty, setIsFactoryRestDirty] = useState(false);
   const [uploadFiles, setUploadFiles] = useState<Array<File | null>>(() => Array.from({ length: 6 }, () => null));
   const [dragOverIndex, setDragOverIndex] = useState<Array<boolean>>(() => Array.from({ length: 6 }, () => false));
+  const [attendanceSettings, setAttendanceSettings] = useState<AdminAttendanceSettings | null>(null);
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
@@ -84,6 +120,38 @@ export default function AdminDashboardPage() {
     () => buildFactoryRestCalendar(selectedAccountSet?.month ?? "", factoryRestEntries),
     [factoryRestEntries, selectedAccountSet?.month],
   );
+  // 槽位禁用原因：来源切为自动获取打卡数据时对应文件无需上传（获取失败时不禁用，页面照常可用）
+  const slotDisabledReasons = useMemo(
+    () => FILE_INPUT_TYPES.map((type) => slotDisabledReason(type, attendanceSettings)),
+    [attendanceSettings],
+  );
+
+  // 已选文件落在禁用槽位时自动清除，避免提交无效文件
+  useEffect(() => {
+    setUploadFiles((current) =>
+      current.map((file, index) => (slotDisabledReasons[index] ? null : file)),
+    );
+  }, [slotDisabledReasons]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadAttendanceSettings() {
+      try {
+        const settings = await fetchAttendanceSettings();
+        if (mounted) {
+          setAttendanceSettings(settings);
+        }
+      } catch {
+        // 设置加载失败时不禁用任何槽位，不阻塞账套中心
+      }
+    }
+
+    void loadAttendanceSettings();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const tableHeaders = ["时间", "文件名", "类型", "结果", "条数", "错误"];
   const tableRows = useMemo(() => {
@@ -981,26 +1049,41 @@ export default function AdminDashboardPage() {
                       const file = uploadFiles[index];
                       const isDragOver = dragOverIndex[index];
                       const fileInputId = `file-input-${index}`;
+                      const disabledReason = slotDisabledReasons[index];
+                      const isSlotDisabled = Boolean(disabledReason);
                       return (
                         <div
-                          className={`upload-slot-card ${file ? "has-file" : ""} ${isDragOver ? "is-dragover" : ""}`}
+                          className={`upload-slot-card ${file ? "has-file" : ""} ${isDragOver ? "is-dragover" : ""} ${isSlotDisabled ? "is-disabled" : ""}`}
                           key={label}
+                          title={disabledReason ?? undefined}
                           onClick={() => {
+                            if (isSlotDisabled) {
+                              return;
+                            }
                             document.getElementById(fileInputId)?.click();
                           }}
                           onDragLeave={(e) => {
+                            if (isSlotDisabled) {
+                              return;
+                            }
                             e.preventDefault();
                             const nextDrag = [...dragOverIndex];
                             nextDrag[index] = false;
                             setDragOverIndex(nextDrag);
                           }}
                           onDragOver={(e) => {
+                            if (isSlotDisabled) {
+                              return;
+                            }
                             e.preventDefault();
                             const nextDrag = [...dragOverIndex];
                             nextDrag[index] = true;
                             setDragOverIndex(nextDrag);
                           }}
                           onDrop={(e) => {
+                            if (isSlotDisabled) {
+                              return;
+                            }
                             e.preventDefault();
                             const nextDrag = [...dragOverIndex];
                             nextDrag[index] = false;
@@ -1016,6 +1099,7 @@ export default function AdminDashboardPage() {
                         >
                           <input
                             id={fileInputId}
+                            disabled={isSlotDisabled}
                             style={{ display: "none" }}
                             onChange={(event) => {
                               const nextFiles = [...uploadFiles];
@@ -1073,7 +1157,7 @@ export default function AdminDashboardPage() {
                            </div>
                           <div className="upload-slot-title">{label}</div>
                           <div className="upload-slot-status">
-                            {file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "点击选择或拖拽文件"}
+                            {disabledReason ?? (file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "点击选择或拖拽文件")}
                           </div>
                         </div>
                       );
@@ -1089,7 +1173,10 @@ export default function AdminDashboardPage() {
                           if (!selectedAccountSet) {
                             return;
                           }
-                          const files = uploadFiles.filter((file): file is File => Boolean(file));
+                          // 双保险：禁用槽位的文件不提交（与后端 calculate 跳过逻辑一致）
+                          const files = uploadFiles.filter(
+                            (file, index) => file && !slotDisabledReasons[index],
+                          ) as File[];
                           if (!files.length) {
                             notification.warning("请至少选择一个要上传的源文件");
                             return;

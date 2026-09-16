@@ -74,13 +74,9 @@ from routes.admin_attendance_overrides import (
     employee_attendance_override_history_api,
     employee_attendance_override_list_api,
     employee_attendance_override_record_api,
-    delete_employee_attendance_override_record_api,
-    save_employee_attendance_override_record_api,
     manager_attendance_override_history_api,
     manager_attendance_override_list_api,
     manager_attendance_override_record_api,
-    delete_manager_attendance_override_record_api,
-    save_manager_attendance_override_record_api,
     daily_attendance_override_calendar_api,
     delete_daily_attendance_override_record_api,
     save_daily_attendance_override_batch_api,
@@ -92,12 +88,6 @@ from routes.admin_attendance_overrides import (
     late_offset_clear_api,
     late_offset_confirm_api,
     late_offset_leaves_api,
-    download_employee_attendance_override_template,
-    export_employee_attendance_overrides,
-    import_employee_attendance_overrides,
-    download_manager_attendance_override_template,
-    export_manager_attendance_overrides,
-    import_manager_attendance_overrides,
 )
 from routes.auth_helpers import admin_required
 from models.system_setting import SystemSetting
@@ -661,46 +651,16 @@ def employee_attendance_overrides():
     return employee_attendance_override_list_api()
 
 
-@api_admin_bp.get("/employee-attendance-overrides/history")
-@admin_required
-def employee_attendance_override_history():
-    return employee_attendance_override_history_api()
-
-
 @api_admin_bp.get("/employee-attendance-overrides/record")
 @admin_required
 def employee_attendance_override_record_get():
     return employee_attendance_override_record_api()
 
 
-@api_admin_bp.put("/employee-attendance-overrides/record")
+@api_admin_bp.get("/employee-attendance-overrides/history")
 @admin_required
-def employee_attendance_override_record_put():
-    return save_employee_attendance_override_record_api()
-
-
-@api_admin_bp.delete("/employee-attendance-overrides/record")
-@admin_required
-def employee_attendance_override_record_delete():
-    return delete_employee_attendance_override_record_api()
-
-
-@api_admin_bp.get("/employee-attendance-overrides/template")
-@admin_required
-def employee_attendance_override_template():
-    return download_employee_attendance_override_template()
-
-
-@api_admin_bp.get("/employee-attendance-overrides/export")
-@admin_required
-def employee_attendance_override_export():
-    return export_employee_attendance_overrides()
-
-
-@api_admin_bp.post("/employee-attendance-overrides/import")
-@admin_required
-def employee_attendance_override_import():
-    return import_employee_attendance_overrides()
+def employee_attendance_override_history():
+    return employee_attendance_override_history_api()
 
 
 @api_admin_bp.get("/attendance-override-daily/calendar")
@@ -775,46 +735,16 @@ def manager_attendance_overrides():
     return manager_attendance_override_list_api()
 
 
-@api_admin_bp.get("/manager-attendance-overrides/history")
-@admin_required
-def manager_attendance_override_history():
-    return manager_attendance_override_history_api()
-
-
 @api_admin_bp.get("/manager-attendance-overrides/record")
 @admin_required
 def manager_attendance_override_record_get():
     return manager_attendance_override_record_api()
 
 
-@api_admin_bp.put("/manager-attendance-overrides/record")
+@api_admin_bp.get("/manager-attendance-overrides/history")
 @admin_required
-def manager_attendance_override_record_put():
-    return save_manager_attendance_override_record_api()
-
-
-@api_admin_bp.delete("/manager-attendance-overrides/record")
-@admin_required
-def manager_attendance_override_record_delete():
-    return delete_manager_attendance_override_record_api()
-
-
-@api_admin_bp.get("/manager-attendance-overrides/template")
-@admin_required
-def manager_attendance_override_template():
-    return download_manager_attendance_override_template()
-
-
-@api_admin_bp.get("/manager-attendance-overrides/export")
-@admin_required
-def manager_attendance_override_export():
-    return export_manager_attendance_overrides()
-
-
-@api_admin_bp.post("/manager-attendance-overrides/import")
-@admin_required
-def manager_attendance_override_import():
-    return import_manager_attendance_overrides()
+def manager_attendance_override_history():
+    return manager_attendance_override_history_api()
 
 
 @api_admin_bp.get("/manager-overtime")

@@ -476,7 +476,7 @@ export default function AttendanceOverrideCalendarModal({
           <div className="master-modal-body attendance-override-calendar-body">
             {hasMonthlyOverride ? (
               <div className="attendance-override-calendar-notice">
-                该月存在月度手工修正（Excel 导入），最终应用值以月度修正为准
+                该月存在历史月度修正（只读），最终应用值以月度修正为准
               </div>
             ) : null}
             {isLocked ? (

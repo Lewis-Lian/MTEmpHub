@@ -115,15 +115,9 @@ class ApiAdminTests(unittest.TestCase):
                 "/api/admin/employee-attendance-overrides",
                 "/api/admin/employee-attendance-overrides/history",
                 "/api/admin/employee-attendance-overrides/record",
-                "/api/admin/employee-attendance-overrides/template",
-                "/api/admin/employee-attendance-overrides/export",
-                "/api/admin/employee-attendance-overrides/import",
                 "/api/admin/manager-attendance-overrides",
                 "/api/admin/manager-attendance-overrides/history",
                 "/api/admin/manager-attendance-overrides/record",
-                "/api/admin/manager-attendance-overrides/template",
-                "/api/admin/manager-attendance-overrides/export",
-                "/api/admin/manager-attendance-overrides/import",
                 "/api/admin/manager-overtime",
                 "/api/admin/manager-overtime/records",
                 "/api/admin/manager-overtime/template",
@@ -575,58 +569,181 @@ class ApiAdminTests(unittest.TestCase):
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
-    def test_admin_record_wrappers_reuse_existing_write_behavior(self) -> None:
+    def test_monthly_override_write_endpoints_are_offline(self) -> None:
+        """月度修正已冻结为只读：保存/删除/导入/模板/导出入口全部下线。"""
         self._login()
 
-        employee_response = self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "attendance_days": "3",
-                "work_hours": "21.5",
-                "half_days": "1",
-                "late_early_minutes": "10",
-                "remark": "员工修正",
-            },
+        # record 路由仅保留 GET，写入方法返回 405
+        self.assertEqual(
+            self.client.put(
+                "/api/admin/employee-attendance-overrides/record",
+                json={"month": "2026-05", "emp_id": self.employee_id},
+            ).status_code,
+            405,
         )
-        manager_response = self.client.put(
-            "/api/admin/manager-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.manager_id,
-                "attendance_days": "20",
-                "injury_days": "1",
-                "business_trip_days": "2",
-                "marriage_days": "0",
-                "funeral_days": "0",
-                "late_early_minutes": "5",
-                "remark": "经理修正",
-            },
+        self.assertEqual(
+            self.client.delete(
+                f"/api/admin/employee-attendance-overrides/record?month=2026-05&emp_id={self.employee_id}"
+            ).status_code,
+            405,
+        )
+        self.assertEqual(
+            self.client.put(
+                "/api/admin/manager-attendance-overrides/record",
+                json={"month": "2026-05", "emp_id": self.manager_id},
+            ).status_code,
+            405,
+        )
+        self.assertEqual(
+            self.client.delete(
+                f"/api/admin/manager-attendance-overrides/record?month=2026-05&emp_id={self.manager_id}"
+            ).status_code,
+            405,
+        )
+        self.assertEqual(
+            self.client.get("/api/admin/employee-attendance-overrides/template?month=2026-05").status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get("/api/admin/employee-attendance-overrides/export?month=2026-05").status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get("/api/admin/manager-attendance-overrides/template?month=2026-05").status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get("/api/admin/manager-attendance-overrides/export?month=2026-05").status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/admin/employee-attendance-overrides/import",
+                data={"month": "2026-05"},
+                content_type="multipart/form-data",
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(
+                "/api/admin/manager-attendance-overrides/import",
+                data={"month": "2026-05"},
+                content_type="multipart/form-data",
+            ).status_code,
+            404,
         )
 
-        self.assertEqual(employee_response.status_code, 200)
-        self.assertEqual(manager_response.status_code, 200)
+    def test_override_record_read_exposes_pure_automatic_and_daily_summary(self) -> None:
+        """修正详情：系统值=纯系统口径（不含逐日/月度修正），applied=系统+逐日+月度。"""
+        self._login()
 
-        employee_record = self.client.get(
-            f"/api/admin/employee-attendance-overrides?month=2026-05&emp_ids={self.employee_id}"
-        ).get_json()["rows"][0]
-        manager_record = self.client.get(
-            f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}"
-        ).get_json()["rows"][0]
-        employee_history = self.client.get(
-            "/api/admin/employee-attendance-overrides/history?month=2026-05"
-        ).get_json()["rows"]
-        manager_history = self.client.get(
-            "/api/admin/manager-attendance-overrides/history?month=2026-05"
-        ).get_json()["rows"]
+        with self.app.app_context():
+            from datetime import date
 
-        self.assertEqual(employee_record["override"]["attendance_days"], 3.0)
-        self.assertEqual(employee_record["override"]["remark"], "员工修正")
-        self.assertEqual(manager_record["override"]["attendance_days"], 20.0)
-        self.assertEqual(manager_record["override"]["remark"], "经理修正")
-        self.assertEqual(employee_history[0]["action_type"], "manual_save")
-        self.assertEqual(manager_history[0]["action_type"], "manual_save")
+            from models.daily_attendance_override import DailyAttendanceOverride
+            from models.daily_record import DailyRecord
+
+            db.session.add(
+                DailyRecord(
+                    emp_id=self.employee_id,
+                    record_date=date(2026, 5, 12),
+                    check_in_times=["09:40"],
+                    check_out_times=["18:30"],
+                    late_minutes=40,
+                    employee_payload={
+                        "check_in_times": ["09:40"],
+                        "check_out_times": ["18:30"],
+                        "late_minutes": 40,
+                    },
+                )
+            )
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.employee_id,
+                    record_date=date(2026, 5, 12),
+                    late_minutes=5,
+                    remark="忘打卡修正",
+                    updated_by=1,
+                )
+            )
+            db.session.add(
+                EmployeeAttendanceOverride(
+                    emp_id=self.employee_id,
+                    month="2026-05",
+                    work_hours=200.0,
+                    remark="历史月度修正",
+                    updated_by=1,
+                )
+            )
+            db.session.commit()
+
+        employee_get = self.client.get(
+            f"/api/admin/employee-attendance-overrides/record?month=2026-05&emp_id={self.employee_id}"
+        )
+        manager_get = self.client.get(
+            f"/api/admin/manager-attendance-overrides/record?month=2026-05&emp_id={self.manager_id}"
+        )
+
+        self.assertEqual(employee_get.status_code, 200)
+        payload = employee_get.get_json()
+        self.assertEqual(payload["automatic"]["late_early_minutes"], 40)
+        self.assertEqual(payload["applied"]["late_early_minutes"], 5)
+        self.assertEqual(payload["applied"]["work_hours"], 200.0)
+        self.assertEqual(payload["override"]["remark"], "历史月度修正")
+        self.assertEqual(payload["daily"]["corrected_days"], 1)
+        self.assertEqual(payload["daily"]["remark"], "忘打卡修正")
+        self.assertTrue(payload["daily"]["updated_at"])
+
+        self.assertEqual(manager_get.status_code, 200)
+        self.assertIsNone(manager_get.get_json()["daily"])
+
+    def test_manager_override_list_separates_pure_automatic_from_applied(self) -> None:
+        """列表接口：系统值不含逐日/月度修正，最终应用包含全部口径，daily 为逐日汇总。"""
+        self._login()
+
+        with self.app.app_context():
+            from datetime import date
+
+            from models.daily_attendance_override import DailyAttendanceOverride
+            from models.monthly_report import MonthlyReport
+
+            db.session.add(
+                MonthlyReport(
+                    emp_id=self.manager_id,
+                    report_month="2026-05",
+                    manager_raw_data={"出勤天数": 20, "工作时长": 160},
+                )
+            )
+            db.session.add(
+                DailyAttendanceOverride(
+                    emp_id=self.manager_id,
+                    record_date=date(2026, 5, 12),
+                    status="工伤",
+                    updated_by=1,
+                )
+            )
+            db.session.add(
+                ManagerAttendanceOverride(
+                    emp_id=self.manager_id,
+                    month="2026-05",
+                    attendance_days=26.5,
+                    remark="历史月度修正",
+                    updated_by=1,
+                )
+            )
+            db.session.commit()
+
+        res = self.client.get(f"/api/admin/manager-attendance-overrides?month=2026-05&emp_ids={self.manager_id}")
+        self.assertEqual(res.status_code, 200)
+        row = res.get_json()["rows"][0]
+
+        self.assertEqual(row["automatic"]["attendance_days"], 20.0)
+        self.assertEqual(row["automatic"]["injury_days"], 0)
+        self.assertEqual(row["applied"]["injury_days"], 1.0)
+        self.assertEqual(row["applied"]["attendance_days"], 26.5)
+        self.assertEqual(row["override"]["remark"], "历史月度修正")
+        self.assertEqual(row["daily"]["corrected_days"], 1)
+        self.assertEqual(row["daily"]["status_counts"], {"工伤": 1})
 
     def test_admin_import_wrappers_apply_department_and_employee_xlsx_files(self) -> None:
         self._login()
@@ -685,107 +802,6 @@ class ApiAdminTests(unittest.TestCase):
             self.assertTrue(employee.is_nursing)
             self.assertEqual(employee.employee_stats_attendance_source, "auto_fallback")
             self.assertEqual(employee.manager_stats_attendance_source, "employee")
-
-    def test_admin_record_wrappers_support_read_and_delete_behavior(self) -> None:
-        self._login()
-
-        self.client.put(
-            "/api/admin/employee-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.employee_id,
-                "attendance_days": "3",
-                "work_hours": "21.5",
-                "remark": "员工修正",
-            },
-        )
-        self.client.put(
-            "/api/admin/manager-attendance-overrides/record",
-            json={
-                "month": "2026-05",
-                "emp_id": self.manager_id,
-                "attendance_days": "20",
-                "injury_days": "1",
-                "remark": "经理修正",
-            },
-        )
-
-        employee_get = self.client.get(
-            f"/api/admin/employee-attendance-overrides/record?month=2026-05&emp_id={self.employee_id}"
-        )
-        manager_get = self.client.get(
-            f"/api/admin/manager-attendance-overrides/record?month=2026-05&emp_id={self.manager_id}"
-        )
-        employee_delete = self.client.delete(
-            f"/api/admin/employee-attendance-overrides/record?month=2026-05&emp_id={self.employee_id}"
-        )
-        manager_delete = self.client.delete(
-            f"/api/admin/manager-attendance-overrides/record?month=2026-05&emp_id={self.manager_id}"
-        )
-
-        self.assertEqual(employee_get.status_code, 200)
-        self.assertEqual(employee_get.get_json()["override"]["attendance_days"], 3.0)
-        self.assertEqual(manager_get.status_code, 200)
-        self.assertEqual(manager_get.get_json()["override"]["injury_days"], 1.0)
-        self.assertEqual(employee_delete.status_code, 200)
-        self.assertEqual(manager_delete.status_code, 200)
-        with self.app.app_context():
-            self.assertIsNone(EmployeeAttendanceOverride.query.filter_by(emp_id=self.employee_id).first())
-            self.assertIsNone(ManagerAttendanceOverride.query.filter_by(emp_id=self.manager_id).first())
-        employee_history = self.client.get(
-            "/api/admin/employee-attendance-overrides/history?month=2026-05"
-        ).get_json()["rows"]
-        manager_history = self.client.get(
-            "/api/admin/manager-attendance-overrides/history?month=2026-05"
-        ).get_json()["rows"]
-        self.assertEqual([row["action_type"] for row in employee_history], ["clear", "manual_save"])
-        self.assertEqual([row["action_type"] for row in manager_history], ["clear", "manual_save"])
-
-    def test_admin_attendance_override_import_wrappers_apply_xlsx_files(self) -> None:
-        self._login()
-
-        employee_file = self._xlsx_file(
-            [
-                ["月份", "工号", "姓名", "考勤天数", "工时", "半勤天数", "迟到早退", "备注"],
-                ["2026-05", "E001", "员工甲", 3, 21.5, 1, 10, "员工导入"],
-            ],
-            "employee-overrides.xlsx",
-        )
-        manager_file = self._xlsx_file(
-            [
-                ["月份", "工号", "姓名", "出勤天数", "工伤", "出差", "婚假", "丧假", "迟到早退", "备注"],
-                ["2026-05", "M001", "经理甲", 20, 1, 2, 0, 0, 5, "经理导入"],
-            ],
-            "manager-overrides.xlsx",
-        )
-
-        employee_response = self.client.post(
-            "/api/admin/employee-attendance-overrides/import",
-            data={"month": "2026-05", "file": (employee_file, "employee-overrides.xlsx")},
-            content_type="multipart/form-data",
-        )
-        manager_response = self.client.post(
-            "/api/admin/manager-attendance-overrides/import",
-            data={"month": "2026-05", "file": (manager_file, "manager-overrides.xlsx")},
-            content_type="multipart/form-data",
-        )
-
-        self.assertEqual(employee_response.status_code, 200)
-        self.assertEqual(employee_response.get_json()["changed_count"], 1)
-        self.assertEqual(manager_response.status_code, 200)
-        self.assertEqual(manager_response.get_json()["changed_count"], 1)
-        with self.app.app_context():
-            employee_override = EmployeeAttendanceOverride.query.filter_by(emp_id=self.employee_id).first()
-            manager_override = ManagerAttendanceOverride.query.filter_by(emp_id=self.manager_id).first()
-
-            self.assertEqual(employee_override.attendance_days, 3.0)
-            self.assertEqual(employee_override.work_hours, 21.5)
-            self.assertEqual(employee_override.half_days, 1)
-            self.assertEqual(employee_override.remark, "员工导入")
-            self.assertEqual(manager_override.attendance_days, 20.0)
-            self.assertEqual(manager_override.business_trip_days, 2.0)
-            self.assertEqual(manager_override.late_early_minutes, 5)
-            self.assertEqual(manager_override.remark, "经理导入")
 
     def test_legacy_admin_dashboard_route_is_not_available(self) -> None:
         self._login()

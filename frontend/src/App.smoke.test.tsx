@@ -457,6 +457,38 @@ describe("App smoke regression", () => {
     await waitFor(() => expect(window.location.pathname).toBe("/admin/dashboard"));
   });
 
+  it("账套中心在考勤来源切换为自动同步时禁用对应上传槽位", async () => {
+    window.history.replaceState({}, "", "/admin/dashboard");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/attendance-settings") {
+        return Promise.resolve(
+          jsonResponse({
+            manager_attendance_source: "dingtalk",
+            dingtalk_configured: true,
+            employee_attendance_source: "card_db",
+            card_db_configured: true,
+            card_db: {},
+          }),
+        );
+      }
+      return mockAdminAppResponse(path);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    expect(await screen.findByRole("button", { name: /上传原始文档/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /上传原始文档/ }));
+    expect(await screen.findByText("导入考勤原始表")).toBeInTheDocument();
+
+    // 员工卡机同步 → 员工打卡数据槽位禁用；钉钉同步 → 管理人员两个槽位禁用
+    expect(await screen.findByText("员工考勤已切换为考勤机数据库同步，无需上传")).toBeInTheDocument();
+    expect(screen.getAllByText("管理人员考勤已切换为钉钉同步，无需上传")).toHaveLength(2);
+    // 不受影响的槽位保持可选状态
+    expect(screen.getAllByText("点击选择或拖拽文件")).toHaveLength(3);
+  });
+
   it("主数据员工页会挂载旧版新增、导入、筛选和列表结构", async () => {
     window.history.replaceState({}, "", "/admin/employees/manage");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
@@ -1107,7 +1139,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("主要操作")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入导出" })).not.toBeInTheDocument();
     expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
     expect(screen.queryByText("选择人员和月份后维护手工修正值")).not.toBeInTheDocument();
     expect(screen.getByText("请先查询员工和月份")).toBeInTheDocument();
@@ -1186,7 +1218,10 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("M001")).toBeInTheDocument();
     expect(await screen.findByText("经理甲")).toBeInTheDocument();
     expect(await screen.findByText("出勤天数：20")).toBeInTheDocument();
-    expect(await screen.findByText("经理修正")).toBeInTheDocument();
+    expect(await screen.findByText(/逐日修正 2 天（工伤×1、全勤×1）/)).toBeInTheDocument();
+    expect(await screen.findByText(/月度修正（历史）：出勤天数：20/)).toBeInTheDocument();
+    expect(await screen.findByText("补卡修正")).toBeInTheDocument();
+    expect(await screen.findByText("2026-05-12 10:00:00（admin）")).toBeInTheDocument();
     expect(document.querySelector(".table-pager select")).not.toBeNull();
     expect(screen.getByText("第 1 / 1 页")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
@@ -1902,6 +1937,16 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
           },
         ]),
       );
+    case "/api/admin/attendance-settings":
+      return Promise.resolve(
+        jsonResponse({
+          manager_attendance_source: "local",
+          dingtalk_configured: false,
+          employee_attendance_source: "local",
+          card_db_configured: false,
+          card_db: {},
+        }),
+      );
     case "/api/admin/account-sets/1/imports":
       return Promise.resolve(
         jsonResponse([
@@ -2038,6 +2083,13 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
                 marriage_days: null,
                 funeral_days: null,
                 late_early_minutes: 5,
+              },
+              daily: {
+                corrected_days: 2,
+                status_counts: { 工伤: 1, 全勤: 1 },
+                updated_at: "2026-05-12T10:00:00",
+                updated_by_name: "admin",
+                remark: "补卡修正",
               },
             },
           ],

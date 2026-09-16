@@ -729,12 +729,6 @@ def _override_field_labels(override_type: str) -> dict[str, str]:
 
 
 
-def _override_state_from_row(row: object | None, fields: tuple[str, ...]) -> dict[str, object]:
-    state = {field: getattr(row, field) if row else None for field in fields}
-    state["remark"] = row.remark if row else ""
-    return state
-
-
 def _has_override_state_changes(before: dict[str, object], after: dict[str, object]) -> bool:
     keys = set(before.keys()) | set(after.keys())
     return any(before.get(key) != after.get(key) for key in keys)
@@ -1691,9 +1685,44 @@ def _manager_attendance_override_payload(row: ManagerAttendanceOverride | None) 
     return payload
 
 
-def _manager_attendance_row(emp_id: int, month: str, include_overrides: bool) -> dict[str, object] | None:
+def _daily_override_summary_by_emp(emp_ids: list[int], month: str) -> dict[int, dict[str, object]]:
+    """按人聚合逐日修正：天数、状态分布、最近一次修正时间/人/备注（修正中心列表展示用）。"""
+    from services.daily_override_service import daily_override_maps
+
+    if not emp_ids:
+        return {}
+    summaries: dict[int, dict[str, object]] = {}
+    for emp_id, overrides in daily_override_maps(month, emp_ids).items():
+        if not overrides:
+            continue
+        latest = max(overrides.values(), key=lambda row: row.updated_at or datetime.min)
+        status_counts: dict[str, int] = {}
+        for row in overrides.values():
+            if row.status:
+                status_counts[row.status] = status_counts.get(row.status, 0) + 1
+        summaries[emp_id] = {
+            "corrected_days": len(overrides),
+            "status_counts": status_counts,
+            "updated_at": latest.updated_at.isoformat() if latest.updated_at else None,
+            "updated_by_name": _user_display_name(latest.updated_by_user),
+            "remark": latest.remark or "",
+        }
+    return summaries
+
+
+def _manager_attendance_row(
+    emp_id: int,
+    month: str,
+    include_overrides: bool,
+    include_daily_overrides: bool = True,
+) -> dict[str, object] | None:
     options = _manager_attendance_options(month)
-    rows = build_manager_rows(options, [emp_id], include_overrides=include_overrides)
+    rows = build_manager_rows(
+        options,
+        [emp_id],
+        include_overrides=include_overrides,
+        include_daily_overrides=include_daily_overrides,
+    )
     return rows[0] if rows else None
 
 
@@ -1701,7 +1730,8 @@ def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, obj
     employee = db.session.get(Employee, emp_id)
     if not employee or not employee.is_manager:
         return {"error": "employee is not manager"}, 400
-    automatic = _manager_attendance_row(emp_id, month, include_overrides=False)
+    # 系统值为纯系统口径（不含逐日/月度修正），最终应用为全部口径
+    automatic = _manager_attendance_row(emp_id, month, include_overrides=False, include_daily_overrides=False)
     applied = _manager_attendance_row(emp_id, month, include_overrides=True)
     override = ManagerAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
     return {
@@ -1710,6 +1740,7 @@ def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, obj
         "automatic": automatic,
         "override": _manager_attendance_override_payload(override),
         "applied": applied,
+        "daily": _daily_override_summary_by_emp([emp_id], month).get(emp_id),
         "history": _history_rows_for_month("manager", month),
     }, 200
 
@@ -1736,8 +1767,15 @@ def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[d
     rows: list[dict[str, object]] = []
     options = _manager_attendance_options(month)
     valid_ids = list(employees.keys())
-    automatic_by_emp = {row["emp_id"]: row for row in build_manager_rows(options, valid_ids, include_overrides=False)}
+    # 系统值为纯系统口径（不含逐日/月度修正），最终应用为全部口径
+    automatic_by_emp = {
+        row["emp_id"]: row
+        for row in build_manager_rows(
+            options, valid_ids, include_overrides=False, include_daily_overrides=False
+        )
+    }
     applied_by_emp = {row["emp_id"]: row for row in build_manager_rows(options, valid_ids, include_overrides=True)}
+    daily_by_emp = _daily_override_summary_by_emp(valid_ids, month)
     for emp_id in emp_ids:
         employee = employees.get(emp_id)
         if not employee:
@@ -1748,6 +1786,7 @@ def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[d
                 "automatic": automatic_by_emp.get(emp_id),
                 "override": _manager_attendance_override_payload(overrides.get(emp_id)),
                 "applied": applied_by_emp.get(emp_id),
+                "daily": daily_by_emp.get(emp_id),
             }
         )
     return {"rows": rows, "month": month}, 200
@@ -1779,148 +1818,6 @@ def _nullable_int(data: dict[str, object], key: str) -> tuple[int | None, str | 
     return parsed, None
 
 
-def _override_workbook_response(wb: openpyxl.Workbook, filename: str):
-    output = BytesIO()
-    wb.save(output)
-    output.seek(0)
-    return send_file(
-        output,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
-
-
-def _employee_override_export_headers() -> list[str]:
-    return [
-        "月份",
-        "工号",
-        "姓名",
-        "系统考勤天数",
-        "系统实际出勤天数",
-        "系统工时",
-        "系统半勤天数",
-        "系统迟到早退",
-        "考勤天数",
-        "实际出勤天数",
-        "工时",
-        "半勤天数",
-        "迟到早退",
-        "备注",
-    ]
-
-
-def _manager_override_export_headers() -> list[str]:
-    return [
-        "月份",
-        "工号",
-        "姓名",
-        "系统出勤天数",
-        "系统工伤",
-        "系统出差",
-        "系统婚假",
-        "系统丧假",
-        "系统迟到早退",
-        "出勤天数",
-        "工伤",
-        "出差",
-        "婚假",
-        "丧假",
-        "迟到早退",
-        "备注",
-    ]
-
-
-def _build_employee_override_export_workbook(month: str, include_real_rows: bool) -> openpyxl.Workbook:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "员工考勤修正"
-    ws.append(_employee_override_export_headers())
-    if include_real_rows:
-        employees = (
-            Employee.query.filter_by(is_manager=False)
-            .order_by(Employee.dept_id.asc(), Employee.emp_no.asc(), Employee.name.asc())
-            .all()
-        )
-        automatic_by_emp = _employee_automatic_rows_by_emp([e.id for e in employees], month)
-        overrides_by_emp = {
-            row.emp_id: row
-            for row in EmployeeAttendanceOverride.query.filter(
-                EmployeeAttendanceOverride.month == month
-            ).all()
-        }
-        for employee in employees:
-            automatic = automatic_by_emp.get(employee.id) or {}
-            override = overrides_by_emp.get(employee.id)
-            ws.append(
-                [
-                    month,
-                    employee.emp_no,
-                    employee.name,
-                    automatic.get("attendance_days"),
-                    automatic.get("actual_attendance_days"),
-                    automatic.get("work_hours"),
-                    automatic.get("half_days"),
-                    automatic.get("late_early_minutes"),
-                    override.attendance_days if override else "",
-                    override.actual_attendance_days if override else "",
-                    override.work_hours if override else "",
-                    override.half_days if override else "",
-                    override.late_early_minutes if override else "",
-                    override.remark if override and override.remark else "",
-                ]
-            )
-    else:
-        ws.append(["2026-05", "1001001", "张三", 20, 18, 160, 0, 5, "", "", "", "", "", "留空表示不覆盖"])
-    return wb
-
-
-def _build_manager_override_export_workbook(month: str, include_real_rows: bool) -> openpyxl.Workbook:
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "管理人员考勤修正"
-    ws.append(_manager_override_export_headers())
-    if include_real_rows:
-        employees = _manager_scope_employees()
-        options = _manager_attendance_options(month)
-        automatic_by_emp = {
-            row["emp_id"]: row
-            for row in build_manager_rows(options, [e.id for e in employees], include_overrides=False)
-        }
-        overrides_by_emp = {
-            row.emp_id: row
-            for row in ManagerAttendanceOverride.query.filter(
-                ManagerAttendanceOverride.month == month
-            ).all()
-        }
-        for employee in employees:
-            automatic = automatic_by_emp.get(employee.id) or {}
-            override = overrides_by_emp.get(employee.id)
-            ws.append(
-                [
-                    month,
-                    employee.emp_no,
-                    employee.name,
-                    automatic.get("attendance_days"),
-                    automatic.get("injury_days"),
-                    automatic.get("business_trip_days"),
-                    automatic.get("marriage_days"),
-                    automatic.get("funeral_days"),
-                    automatic.get("late_early_minutes"),
-                    override.attendance_days if override else "",
-                    override.injury_days if override else "",
-                    override.business_trip_days if override else "",
-                    override.marriage_days if override else "",
-                    override.funeral_days if override else "",
-                    override.late_early_minutes if override else "",
-                    override.remark if override and override.remark else "",
-                ]
-            )
-    else:
-        ws.append(["2026-05", "2001001", "李经理", 22, 0, 2, 0, 0, 0, "", "", "", "", "", "", "留空表示不覆盖"])
-    return wb
-
-
 def _import_summary(success_count: int, skipped_count: int, failed_count: int, changed_count: int, errors: list[str]) -> dict[str, object]:
     return {
         "success_count": success_count,
@@ -1929,54 +1826,6 @@ def _import_summary(success_count: int, skipped_count: int, failed_count: int, c
         "changed_count": changed_count,
         "errors": errors,
     }
-
-
-def _apply_employee_override_updates(
-    row: EmployeeAttendanceOverride | None,
-    emp_id: int,
-    month: str,
-    updates: dict[str, object],
-    action_type: str,
-    source_file_name: str | None = None,
-) -> bool:
-    before_values = _override_state_from_row(row, _EMPLOYEE_OVERRIDE_FIELDS)
-    after_values = dict(before_values)
-    after_values.update(updates)
-    if not _has_override_state_changes(before_values, after_values):
-        return False
-    if not row:
-        row = EmployeeAttendanceOverride(emp_id=emp_id, month=month)
-        db.session.add(row)
-    for field in _EMPLOYEE_OVERRIDE_FIELDS:
-        setattr(row, field, after_values.get(field))
-    row.remark = str(after_values.get("remark") or "")
-    row.updated_by = g.current_user.id
-    _record_override_history("employee", emp_id, month, action_type, before_values, after_values, source_file_name)
-    return True
-
-
-def _apply_manager_override_updates(
-    row: ManagerAttendanceOverride | None,
-    emp_id: int,
-    month: str,
-    updates: dict[str, object],
-    action_type: str,
-    source_file_name: str | None = None,
-) -> bool:
-    before_values = _override_state_from_row(row, _MANAGER_ATTENDANCE_OVERRIDE_FIELDS)
-    after_values = dict(before_values)
-    after_values.update(updates)
-    if not _has_override_state_changes(before_values, after_values):
-        return False
-    if not row:
-        row = ManagerAttendanceOverride(emp_id=emp_id, month=month)
-        db.session.add(row)
-    for field in _MANAGER_ATTENDANCE_OVERRIDE_FIELDS:
-        setattr(row, field, after_values.get(field))
-    row.remark = str(after_values.get("remark") or "")
-    row.updated_by = g.current_user.id
-    _record_override_history("manager", emp_id, month, action_type, before_values, after_values, source_file_name)
-    return True
 
 
 def _stat_key_for_month(month: str) -> tuple[int, str]:
@@ -2687,20 +2536,33 @@ def _employee_override_values(override: EmployeeAttendanceOverride | None) -> di
     return {field: getattr(override, field) if override else None for field in _EMPLOYEE_OVERRIDE_FIELDS}
 
 
-def _employee_automatic_row(emp_id: int, month: str) -> dict[str, object] | None:
-    return _employee_automatic_rows_by_emp([emp_id], month).get(emp_id)
+def _employee_automatic_row(
+    emp_id: int, month: str, include_daily_overrides: bool = True
+) -> dict[str, object] | None:
+    return _employee_automatic_rows_by_emp([emp_id], month, include_daily_overrides).get(emp_id)
 
 
-def _employee_automatic_rows_by_emp(emp_ids: list[int], month: str) -> dict[int, dict[str, object]]:
+def _employee_automatic_rows_by_emp(
+    emp_ids: list[int], month: str, include_daily_overrides: bool = True
+) -> dict[int, dict[str, object]]:
     from routes.query_core import _build_final_rows
 
     if not emp_ids:
         return {}
-    # include_overrides=False：automatic 为「系统原始 + 逐日修正」，不含月度修正（月度优先级最高，applied 单独体现）
     # _build_final_rows 接收 emp_id 列表，但返回行内只有 emp_no（唯一），故用 emp_no 反查 emp_id
     emp_no_by_id = {e.id: e.emp_no for e in Employee.query.filter(Employee.id.in_(emp_ids)).all()}
-    rows_by_emp_no = {row[1]: row for row in _build_final_rows(month, emp_ids, include_overrides=False)}
-    late_by_emp = _employee_late_early_minutes_by_emp(emp_ids, month)
+    rows_by_emp_no = {
+        row[1]: row
+        for row in _build_final_rows(
+            month,
+            emp_ids,
+            include_overrides=False,
+            include_daily_overrides=include_daily_overrides,
+        )
+    }
+    late_by_emp = _employee_late_early_minutes_by_emp(
+        emp_ids, month, include_daily_overrides=include_daily_overrides
+    )
     result: dict[int, dict[str, object]] = {}
     for emp_id, emp_no in emp_no_by_id.items():
         row = rows_by_emp_no.get(emp_no)
@@ -2720,7 +2582,9 @@ def _employee_late_early_minutes(emp_id: int, month: str) -> int:
     return _employee_late_early_minutes_by_emp([emp_id], month).get(emp_id, 0)
 
 
-def _employee_late_early_minutes_by_emp(emp_ids: list[int], month: str) -> dict[int, int]:
+def _employee_late_early_minutes_by_emp(
+    emp_ids: list[int], month: str, include_daily_overrides: bool = True
+) -> dict[int, int]:
     from routes.query_core import _month_date_range
     from services.daily_override_service import (
         daily_override_maps,
@@ -2741,7 +2605,7 @@ def _employee_late_early_minutes_by_emp(emp_ids: list[int], month: str) -> dict[
         .all()
     ):
         records_by_emp[record.emp_id].append(record)
-    overrides_by_emp = daily_override_maps(month, emp_ids)
+    overrides_by_emp = daily_override_maps(month, emp_ids) if include_daily_overrides else {}
     totals: dict[int, int] = {}
     for emp_id in emp_ids:
         overrides = overrides_by_emp.get(emp_id, {})
@@ -2772,19 +2636,22 @@ def _employee_override_response(emp_id: int, month: str) -> tuple[dict[str, obje
     employee = db.session.get(Employee, emp_id)
     if not employee or employee.is_manager:
         return {"error": "employee is a manager, not a regular employee"}, 400
-    automatic = _employee_automatic_row(emp_id, month)
+    # 系统值为纯系统口径；applied 以「系统+逐日」为底，再叠加月度修正（历史只读）
+    automatic = _employee_automatic_row(emp_id, month, include_daily_overrides=False)
+    effective = _employee_automatic_row(emp_id, month)
     override = EmployeeAttendanceOverride.query.filter_by(emp_id=emp_id, month=month).first()
     override_data = _employee_override_values(override)
     applied: dict[str, object] = {}
-    if automatic:
+    if effective:
         for field in _EMPLOYEE_OVERRIDE_FIELDS:
-            applied[field] = override_data[field] if override_data[field] is not None else automatic.get(field)
+            applied[field] = override_data[field] if override_data[field] is not None else effective.get(field)
     return {
         "employee": _serialize_employee(employee),
         "month": month,
         "automatic": automatic,
         "override": _employee_override_payload(override),
         "applied": applied,
+        "daily": _daily_override_summary_by_emp([emp_id], month).get(emp_id),
         "history": _history_rows_for_month("employee", month),
     }, 200
 
@@ -2809,7 +2676,10 @@ def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[di
         ).all()
     }
     rows: list[dict[str, object]] = []
-    automatic_by_emp = _employee_automatic_rows_by_emp(list(employees.keys()), month)
+    # automatic 为纯系统口径（不含逐日/月度修正）；applied 以「系统+逐日」为底，再叠加月度修正（历史只读）
+    automatic_by_emp = _employee_automatic_rows_by_emp(list(employees.keys()), month, include_daily_overrides=False)
+    effective_by_emp = _employee_automatic_rows_by_emp(list(employees.keys()), month)
+    daily_by_emp = _daily_override_summary_by_emp(list(employees.keys()), month)
     for emp_id in emp_ids:
         employee = employees.get(emp_id)
         if not employee:
@@ -2817,16 +2687,18 @@ def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[di
         override = overrides.get(emp_id)
         override_data = _employee_override_values(override)
         automatic = automatic_by_emp.get(emp_id)
+        effective = effective_by_emp.get(emp_id)
         applied: dict[str, object] = {}
-        if automatic:
+        if effective:
             for field in _EMPLOYEE_OVERRIDE_FIELDS:
-                applied[field] = override_data[field] if override_data[field] is not None else automatic.get(field)
+                applied[field] = override_data[field] if override_data[field] is not None else effective.get(field)
         rows.append(
             {
                 "employee": _serialize_employee(employee),
                 "automatic": automatic,
                 "override": _employee_override_payload(override),
                 "applied": applied,
+                "daily": daily_by_emp.get(emp_id),
             }
         )
     return {"rows": rows, "month": month}, 200

@@ -4304,6 +4304,16 @@ input[type="checkbox"] {
   background: rgba(16, 185, 129, 0.05) !important;
 }
 
+.upload-slot-card.is-disabled,
+.upload-slot-card.is-disabled:hover {
+  cursor: not-allowed !important;
+  opacity: 0.55 !important;
+  border-style: dotted !important;
+  background: var(--ent-secondary-bg) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
 .upload-slot-icon {
   font-size: 24px !important;
   margin-bottom: 8px !important;

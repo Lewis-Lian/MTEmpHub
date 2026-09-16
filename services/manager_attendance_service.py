@@ -656,10 +656,14 @@ def build_manager_rows(
     options: ManagerAttendanceOptions,
     emp_ids: list[int] | None = None,
     include_overrides: bool = True,
+    include_daily_overrides: bool = True,
     sync_month_stats: bool = False,
     progress_cb: Callable[[int, int], None] | None = None,
 ) -> list[dict[str, object]]:
     """计算管理人员月度考勤及扣薪。
+
+    include_overrides 控制月度手工修正层，include_daily_overrides 控制逐日修正层；
+    两层都关闭即为「纯系统口径」（修正中心的系统值列使用）。
 
     各类假期扣薪规则：
     - 计入「出勤天数」（不扣薪）：出差、婚假、丧假。
@@ -694,7 +698,9 @@ def build_manager_rows(
     overtime_rows_by_employee = _overtime_rows_by_employee(employee_ids, options.month)
     override_rows_by_employee = _override_rows_by_employee(employee_ids, options.month) if include_overrides else {}
     month_stats_by_employee = _manager_month_stats_by_employee(employee_ids, options.month)
-    daily_override_by_emp = daily_override_maps(options.month, employee_ids)
+    daily_override_by_emp = (
+        daily_override_maps(options.month, employee_ids) if include_daily_overrides else {}
+    )
     evening_dates_by_emp = evening_overtime_dates_by_emp(options.month, employee_ids)
     factory_rest_periods_by_date = _factory_rest_periods_by_date(options.month)
     factory_rest_days = _factory_rest_days_from_periods(factory_rest_periods_by_date)
