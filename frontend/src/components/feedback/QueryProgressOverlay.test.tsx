@@ -11,6 +11,10 @@ describe("QueryProgressOverlay", () => {
     expect(screen.getByText("64%")).toBeInTheDocument();
     expect(screen.getByText("正在整理考勤数据...")).toBeInTheDocument();
     expect(screen.getByRole("progressbar").querySelectorAll(".query-progress-milestone")).toHaveLength(4);
+    expect(screen.getByText("准备")).toHaveClass("is-reached");
+    expect(screen.getByText("读取")).toHaveClass("is-reached");
+    expect(screen.getByText("处理")).toHaveClass("is-current");
+    expect(screen.getByText("完成")).toHaveClass("is-pending");
   });
 
   it("keeps the overlay hidden when inactive", () => {

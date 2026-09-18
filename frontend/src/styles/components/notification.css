@@ -17,12 +17,14 @@
   position: relative;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 10px 30px rgba(24, 49, 83, 0.16);
-  border: 1px solid #d8e0e8;
+  gap: 13px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 16px 34px rgba(24, 49, 83, 0.12), 0 2px 8px rgba(24, 49, 83, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.72);
   color: #183153;
   pointer-events: auto;
   font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
@@ -31,39 +33,43 @@
 
 /* 各种类型的样式变体 */
 .notification-item.notification-success {
-  background: rgba(240, 253, 244, 0.98);
-  border-color: rgba(34, 197, 94, 0.3);
-  box-shadow: 0 10px 30px rgba(34, 197, 94, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(34, 197, 94, 0.24);
+  box-shadow: 0 16px 34px rgba(34, 197, 94, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
 }
 .notification-item.notification-success .notification-icon {
   color: #16a34a;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .notification-item.notification-error {
-  background: rgba(254, 242, 242, 0.98);
-  border-color: rgba(239, 68, 68, 0.3);
-  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(239, 68, 68, 0.26);
+  box-shadow: 0 16px 34px rgba(239, 68, 68, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
 }
 .notification-item.notification-error .notification-icon {
   color: #dc2626;
+  background: rgba(239, 68, 68, 0.11);
 }
 
 .notification-item.notification-warning {
-  background: rgba(255, 251, 235, 0.98);
-  border-color: rgba(245, 158, 11, 0.4);
-  box-shadow: 0 10px 30px rgba(245, 158, 11, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: 0 16px 34px rgba(245, 158, 11, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
 }
 .notification-item.notification-warning .notification-icon {
   color: #d97706;
+  background: rgba(245, 158, 11, 0.13);
 }
 
 .notification-item.notification-info {
-  background: rgba(240, 249, 255, 0.98);
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 10px 30px rgba(56, 189, 248, 0.08);
+  background: rgba(255, 255, 255, 0.88);
+  border-color: rgba(56, 189, 248, 0.28);
+  box-shadow: 0 16px 34px rgba(56, 189, 248, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
 }
 .notification-item.notification-info .notification-icon {
   color: #0284c7;
+  background: rgba(56, 189, 248, 0.13);
 }
 
 /* 图标 */
@@ -72,12 +78,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 1px;
+  width: 30px;
+  height: 30px;
+  margin-top: -1px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.05);
 }
 
 .notification-icon svg {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
 }
 
 .notification-success .notification-icon svg {
@@ -94,8 +104,9 @@
   flex: 1;
   min-width: 0;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
   font-weight: 500;
+  color: #334155;
   padding-right: 18px;
   white-space: pre-wrap;
   word-break: break-all;

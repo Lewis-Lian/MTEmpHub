@@ -5,7 +5,12 @@ interface QueryProgressOverlayProps {
   className?: string;
 }
 
-const MILESTONES = [0, 33, 66, 100];
+const MILESTONES = [
+  { value: 0, label: "准备" },
+  { value: 33, label: "读取" },
+  { value: 66, label: "处理" },
+  { value: 100, label: "完成" },
+] as const;
 
 export default function QueryProgressOverlay({ active, progress, text, className = "" }: QueryProgressOverlayProps) {
   const safeProgress = Math.max(0, Math.min(100, Math.round(progress)));
@@ -30,12 +35,26 @@ export default function QueryProgressOverlay({ active, progress, text, className
           <span className="query-progress-milestones" aria-hidden="true">
             {MILESTONES.map((milestone) => (
               <span
-                className={`query-progress-milestone ${safeProgress >= milestone ? "is-reached" : ""}`}
-                key={milestone}
+                className={`query-progress-milestone ${safeProgress >= milestone.value ? "is-reached" : ""}`}
+                key={milestone.value}
                 role="presentation"
               />
             ))}
           </span>
+        </div>
+        <div className="query-progress-stages" aria-hidden="true">
+          {MILESTONES.map((milestone, index) => {
+            const isReached = safeProgress >= milestone.value;
+            const isCurrent = !isReached && (index === 0 || safeProgress >= MILESTONES[index - 1].value);
+            return (
+              <span
+                className={`query-progress-stage ${isReached ? "is-reached" : isCurrent ? "is-current" : "is-pending"}`}
+                key={milestone.value}
+              >
+                {milestone.label}
+              </span>
+            );
+          })}
         </div>
         <p className="query-progress-text">{text}</p>
       </div>
