@@ -52,6 +52,7 @@ export interface QueryBootstrap {
 export interface HeaderRowsResponse {
   headers: string[];
   rows: Array<Array<string | number | null>>;
+  employee_ids?: Array<number | null>;
 }
 
 export interface FactoryRestEntry {

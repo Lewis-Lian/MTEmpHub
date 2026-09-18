@@ -56,6 +56,7 @@ interface QueryPageProps {
   buildHeaderRowMeta?: (payload: HeaderRowsResponse, state: QueryState, bootstrap: QueryBootstrap) => unknown[];
   cellModal?: QueryTableCellModalConfig;
   emptyState?: QueryPageEmptyStateConfig;
+  templateExportHint?: string;
 }
 
 interface QueryState {
@@ -84,6 +85,7 @@ export default function QueryPage({
   buildHeaderRowMeta,
   cellModal,
   emptyState,
+  templateExportHint,
 }: QueryPageProps) {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -384,16 +386,17 @@ export default function QueryPage({
               {isQuerying ? "查询中..." : "查询"}
             </button>
             {exportPath ? (
-              <button className="btn btn-outline-success" onClick={() => handleDownload(exportPath)} type="button">
-                下载XLSX
+              <button className="btn btn-outline-success" disabled={isQuerying} onClick={() => handleDownload(exportPath)} type="button">
+                {isQuerying ? "处理中..." : "下载XLSX"}
               </button>
             ) : null}
             {templateExportPath ? (
-              <button className="btn btn-outline-secondary" onClick={() => handleDownload(templateExportPath)} type="button">
-                按模板导出
+              <button className="btn btn-outline-secondary" disabled={isQuerying} onClick={() => handleDownload(templateExportPath)} type="button">
+                {isQuerying ? "处理中..." : "按模板导出"}
               </button>
             ) : null}
           </div>
+          {templateExportPath && templateExportHint ? <p className="query-export-hint">{templateExportHint}</p> : null}
         </div>
 
         {error ? <p className="legacy-inline-error">{error}</p> : null}

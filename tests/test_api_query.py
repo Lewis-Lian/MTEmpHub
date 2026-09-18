@@ -19,7 +19,7 @@ from models.manager_month_stat import ManagerMonthStat
 from models.user import User, UserEmployeeAssignment
 from routes import register_routes
 from routes.auth_helpers import issue_slider_verified_token
-from routes.query_core import _effective_attendance_day_value
+from routes.query_core import MANAGER_ATTENDANCE_TEMPLATE_PATH, _effective_attendance_day_value, _fill_manager_template
 from tests.csrf_helper import attach_origin
 
 
@@ -397,6 +397,20 @@ class ApiQueryTests(unittest.TestCase):
         punch_index = shown["headers"].index("打卡天数")
         self.assertEqual(shown["rows"][0][punch_index], 1.0)
 
+    def test_manager_attendance_api_returns_employee_ids_aligned_with_rows(self) -> None:
+        with self.app.app_context():
+            department = Department.query.filter_by(dept_no="D001").first()
+            db.session.add(Employee(emp_no="M002", name="经理甲", dept_id=department.id, is_manager=True))
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get("/api/query/manager-attendance?month=2026-05")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["employee_ids"], [3, 4])
+        self.assertEqual([row[1] for row in payload["rows"]], ["经理甲", "经理甲"])
+
     def test_manager_attendance_export_toggles_punch_days_column(self) -> None:
         self._login("admin", "admin123")
 
@@ -406,6 +420,62 @@ class ApiQueryTests(unittest.TestCase):
         wb = openpyxl.load_workbook(io.BytesIO(response.data))
         header_row = [cell.value for cell in wb["管理人员查询"][1]]
         self.assertIn("打卡天数", header_row)
+
+    def test_manager_template_export_preserves_template_columns_and_same_names_as_rows(self) -> None:
+        with self.app.app_context():
+            department = Department.query.filter_by(dept_no="D001").first()
+            duplicate = Employee(emp_no="M002", name="经理甲", dept_id=department.id, is_manager=True)
+            db.session.add(duplicate)
+            db.session.commit()
+
+        self._login("admin", "admin123")
+        response = self.client.get(
+            "/api/query/manager-attendance/export-template?month=2026-05"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        wb = openpyxl.load_workbook(io.BytesIO(response.data))
+        ws = wb.active
+        headers = [ws.cell(2, column).value for column in range(1, ws.max_column + 1)]
+        self.assertEqual(headers, [
+            "部   门", "姓名", "出勤天数", "事/病假", "工伤", "出差", "婚假", "丧假",
+            "迟到\\早退", "汇总", "福利天数", "加班变化", "备注",
+        ])
+        self.assertEqual([ws.cell(row, 2).value for row in (3, 4)], ["经理甲", "经理甲"])
+        self.assertIn("A3:A4", {str(merged_range) for merged_range in ws.merged_cells.ranges})
+        self.assertEqual(ws.cell(3, 3).font.name, ws.cell(105, 3).font.name)
+
+    def test_manager_template_export_moves_footer_merges_after_extra_data_rows(self) -> None:
+        wb = openpyxl.load_workbook(MANAGER_ATTENDANCE_TEMPLATE_PATH)
+        ws = wb.active
+        rows = [
+            {
+                "dept_name": "制造一部",
+                "name": f"经理{i}",
+                "attendance_days": 20,
+                "personal_sick_days": 0,
+                "injury_days": 0,
+                "business_trip_days": 0,
+                "marriage_days": 0,
+                "funeral_days": 0,
+                "late_early_minutes": 0,
+                "summary": "",
+                "benefit_days": 0,
+                "overtime_change": 0,
+                "remark": "",
+            }
+            for i in range(104)
+        ]
+
+        _fill_manager_template(ws, rows, "2026-05")
+
+        merges = {str(merged_range) for merged_range in ws.merged_cells.ranges}
+        self.assertIn("B107:N107", merges)
+        self.assertIn("K109:M109", merges)
+        self.assertIn("K110:M110", merges)
+        self.assertIn("以上公布情况", ws.cell(107, 2).value)
+        self.assertEqual(ws.row_dimensions[107].height, 60.0)
+        self.assertRegex(ws.cell(110, 11).value, r"^\d{4}年\d{1,2}月$")
 
     def test_manager_punch_records_returns_manager_attendance_rows(self) -> None:
         with self.app.app_context():

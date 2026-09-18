@@ -241,12 +241,15 @@ function buildManagerRowMeta(payload: HeaderRowsResponse, state: { selectedMonth
   const overtimeIndex = payload.headers.indexOf("加班变化");
   const currentAccountSet = bootstrap.account_sets.find((item) => item.month === state.selectedMonth);
 
-  return payload.rows.map((row) => {
+  return payload.rows.map((row, rowIndex) => {
     const deptName = deptIndex >= 0 ? String(row[deptIndex] ?? "").trim() : "";
     const employeeName = nameIndex >= 0 ? String(row[nameIndex] ?? "").trim() : "";
-    const employee = bootstrap.employees.find((item) => item.name === employeeName && item.dept_name === deptName);
+    const employeeId = payload.employee_ids?.[rowIndex] ?? null;
+    const employee = employeeId
+      ? bootstrap.employees.find((item) => item.id === employeeId)
+      : bootstrap.employees.find((item) => item.name === employeeName && item.dept_name === deptName);
     return {
-      employeeId: employee?.id ?? null,
+      employeeId: employeeId ?? employee?.id ?? null,
       employeeName,
       deptName,
       month: state.selectedMonth,
