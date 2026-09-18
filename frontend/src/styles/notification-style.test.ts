@@ -10,9 +10,9 @@ describe("通知卡片视觉样式", () => {
     const css = readFileSync(join(srcRoot, "components/notification.css"), "utf8");
     const baseRule = css.match(/\.notification-item\s*\{([\s\S]*?)\n\}/)?.[1] ?? "";
 
-    expect(baseRule).toContain("background: rgba(255, 255, 255, 0.88)");
-    expect(baseRule).toContain("backdrop-filter: blur(18px)");
-    expect(baseRule).toContain("border-radius: 14px");
+    expect(baseRule).toContain("background: rgba(255, 255, 255, 0.72)");
+    expect(baseRule).toContain("backdrop-filter: blur(24px) saturate(190%)");
+    expect(baseRule).toContain("border-radius: 16px");
     expect(baseRule).not.toContain("border-left");
   });
 });

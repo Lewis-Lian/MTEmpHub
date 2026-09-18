@@ -550,24 +550,23 @@
 .admin-message-sim-popup {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 12px;
+  gap: 12px;
+  padding: 14px;
   border: 1px solid var(--ent-border);
-  border-radius: var(--ent-radius, 8px);
-  background: var(--ent-secondary-bg);
+  border-radius: 12px;
+  background: var(--ent-bg);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
 }
 
 .admin-message-sim-popup-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  background: var(--ent-blue-focus);
-  color: var(--ent-blue);
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .admin-message-sim-popup-content {

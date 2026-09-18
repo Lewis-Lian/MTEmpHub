@@ -8,6 +8,7 @@ import RichTextEditor from "../../components/editor/RichTextEditor";
 import { htmlToTextPreview, isBlankRichText } from "../../utils/richText";
 import { sanitizeHtml } from "../../utils/sanitizeHtml";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
+import { parseMessageMeta } from "../../components/nav/MessageCenter";
 import "../../styles/components/admin-message-page.css";
 
 // 统一描边微图标（stroke currentColor）
@@ -355,31 +356,69 @@ export default function AdminMessagesPage() {
             <div className="admin-message-preview-body">
               {previewMode === "popup" ? (
                 /* 顶栏消息浮窗效果仿真 */
-                <div className="admin-message-sim-popup">
-                  <div className="admin-message-sim-popup-badge">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect width="20" height="16" x="2" y="4" rx="2" />
-                      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                    </svg>
-                  </div>
-                  <div className="admin-message-sim-popup-content">
-                    <div className="admin-message-sim-popup-title-row">
-                      <strong className="admin-message-sim-popup-title">
-                        {form.title.trim() || "（请输入消息标题）"}
-                      </strong>
-                      <span className="admin-message-sim-dot" />
-                      <span className="admin-message-sim-time">刚刚</span>
+                (() => {
+                  const simMeta = parseMessageMeta(form.title);
+                  return (
+                    <div className="admin-message-sim-popup">
+                      <div className={`admin-message-sim-popup-badge message-badge-${simMeta.category}`}>
+                        {simMeta.category === "announcement" ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 11l18-5v12L3 13v-2z" />
+                            <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+                          </svg>
+                        ) : simMeta.category === "attendance" ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                          </svg>
+                        ) : simMeta.category === "holiday" ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <line x1="16" y1="2" x2="16" y2="6" />
+                            <line x1="8" y1="2" x2="8" y2="6" />
+                            <line x1="3" y1="10" x2="21" y2="10" />
+                          </svg>
+                        ) : simMeta.category === "reminder" ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="12" cy="12" r="7" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                          </svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+                          </svg>
+                        )}
+                      </div>
+                      <div className="admin-message-sim-popup-content">
+                        <div className="admin-message-sim-popup-title-row">
+                          {simMeta.tag && (
+                            <span className={`message-center-tag-badge tag-${simMeta.category}`}>
+                              {simMeta.tag}
+                            </span>
+                          )}
+                          <strong className="admin-message-sim-popup-title">
+                            {form.title.trim() || "（请输入消息标题）"}
+                          </strong>
+                          <span className="admin-message-sim-dot" />
+                          <span className="admin-message-sim-time">刚刚</span>
+                        </div>
+                        <p className="admin-message-sim-popup-text">
+                          {!isContentEmpty
+                            ? htmlToTextPreview(form.content)
+                            : "（输入消息正文后在此实时生成纯文本摘要...）"}
+                        </p>
+                        <div className="admin-message-sim-popup-footer">
+                          <small>系统管理员</small>
+                        </div>
+                      </div>
                     </div>
-                    <p className="admin-message-sim-popup-text">
-                      {!isContentEmpty
-                        ? htmlToTextPreview(form.content)
-                        : "（输入消息正文后在此实时生成纯文本摘要...）"}
-                    </p>
-                    <div className="admin-message-sim-popup-footer">
-                      <small>系统管理员</small>
-                    </div>
-                  </div>
-                </div>
+                  );
+                })()
               ) : (
                 /* 详情页效果仿真 */
                 <div className="admin-message-sim-detail">
