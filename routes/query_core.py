@@ -12,6 +12,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 from flask import jsonify, request, g, send_file
 from sqlalchemy.orm import joinedload
 import openpyxl
+from openpyxl.utils import get_column_letter
 
 from models import db
 from models.employee import Employee
@@ -75,6 +76,7 @@ MANAGER_TEMPLATE_HEADER_ROW = 2
 MANAGER_TEMPLATE_FIRST_DATA_ROW = 3
 MANAGER_TEMPLATE_LAST_DATA_ROW = 105
 MANAGER_TEMPLATE_NOTICE_ROW = 106
+MANAGER_TEMPLATE_NOTICE_HEIGHT = 60.0
 MANAGER_TEMPLATE_SIGN_ROW = 108
 MANAGER_TEMPLATE_DATE_ROW = 109
 
@@ -2218,6 +2220,7 @@ def manager_attendance_api():
         {
             "headers": manager_headers(include_actual_attendance_days, include_emp_no, include_punch_days),
             "rows": rows_as_table(rows, include_actual_attendance_days, include_emp_no, include_punch_days),
+            "employee_ids": [row.get("emp_id") for row in rows],
             "month": options.month,
             "factory_rest_days": options.factory_rest_days,
             "monthly_benefit_days": options.monthly_benefit_days,
@@ -2376,6 +2379,32 @@ def _copy_manager_template_row_style(ws, source_row_idx: int, target_row_idx: in
     ws.row_dimensions[target_row_idx].height = ws.row_dimensions[source_row_idx].height
 
 
+def _insert_manager_template_column(ws, column_idx: int, source_column_idx: int) -> None:
+    merges: list[tuple[int, int, int, int]] = []
+    for merged_range in list(ws.merged_cells.ranges):
+        merges.append((merged_range.min_row, merged_range.max_row, merged_range.min_col, merged_range.max_col))
+        ws.unmerge_cells(str(merged_range))
+
+    source_width = ws.column_dimensions[get_column_letter(source_column_idx)].width
+    ws.insert_cols(column_idx)
+    for row_idx in range(1, ws.max_row + 1):
+        source = ws.cell(row_idx, source_column_idx)
+        target = ws.cell(row_idx, column_idx)
+        target._style = copy(source._style)
+        if source.number_format:
+            target.number_format = source.number_format
+    if source_width is not None:
+        ws.column_dimensions[get_column_letter(column_idx)].width = source_width
+
+    for min_row, max_row, min_col, max_col in merges:
+        if min_col >= column_idx:
+            min_col += 1
+            max_col += 1
+        elif max_col >= column_idx:
+            max_col += 1
+        ws.merge_cells(start_row=min_row, start_column=min_col, end_row=max_row, end_column=max_col)
+
+
 def _manager_export_rows_with_top_level_departments(rows: list[dict[str, object]]) -> list[dict[str, object]]:
     normalized_rows: list[dict[str, object]] = []
     for item in rows:
@@ -2466,6 +2495,27 @@ def _clear_manager_template_merges(
             ws.unmerge_cells(str(merged_range))
 
 
+def _remove_manager_footer_merges(ws, start_row: int) -> list[tuple[int, int, int, int]]:
+    footer_merges: list[tuple[int, int, int, int]] = []
+    for merged_range in list(ws.merged_cells.ranges):
+        if merged_range.min_row >= start_row:
+            footer_merges.append(
+                (merged_range.min_row, merged_range.max_row, merged_range.min_col, merged_range.max_col)
+            )
+            ws.unmerge_cells(str(merged_range))
+    return footer_merges
+
+
+def _restore_manager_footer_merges(ws, merges: list[tuple[int, int, int, int]], row_offset: int = 0) -> None:
+    for min_row, max_row, min_col, max_col in merges:
+        ws.merge_cells(
+            start_row=min_row + row_offset,
+            start_column=min_col,
+            end_row=max_row + row_offset,
+            end_column=max_col,
+        )
+
+
 def _manager_template_values(item: dict[str, object], include_actual_attendance_days: bool) -> list[object]:
     return [
         item.get("name", ""),
@@ -2496,23 +2546,11 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
         and ws.max_column == len(MANAGER_HEADERS) - 1
         and ws.cell(MANAGER_TEMPLATE_HEADER_ROW, 4).value == "事/病假"
     ):
-        ws.insert_cols(4)
-        for row_idx in range(1, ws.max_row + 1):
-            source = ws.cell(row_idx, 3)
-            target = ws.cell(row_idx, 4)
-            target._style = copy(source._style)
-            if source.number_format:
-                target.number_format = source.number_format
+        _insert_manager_template_column(ws, 4, 3)
     funeral_col_idx = 9 if include_actual_attendance_days else 8
     late_col_idx = funeral_col_idx + 1
     if ws.max_column == len(headers) - 1 and ws.cell(MANAGER_TEMPLATE_HEADER_ROW, funeral_col_idx).value == "迟到\\早退":
-        ws.insert_cols(funeral_col_idx)
-        for row_idx in range(1, ws.max_row + 1):
-            source = ws.cell(row_idx, late_col_idx)
-            target = ws.cell(row_idx, funeral_col_idx)
-            target._style = copy(source._style)
-            if source.number_format:
-                target.number_format = source.number_format
+        _insert_manager_template_column(ws, funeral_col_idx, late_col_idx)
 
     ws.cell(MANAGER_TEMPLATE_TITLE_ROW, 1).value = _manager_template_title(month)
     for col_idx, header in enumerate(headers, start=1):
@@ -2523,9 +2561,11 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
     template_style_row = MANAGER_TEMPLATE_LAST_DATA_ROW
     current_data_rows = template_data_rows
     required_data_rows = len(rows)
+    footer_merges: list[tuple[int, int, int, int]] = []
 
     if required_data_rows > current_data_rows:
         extra_rows = required_data_rows - current_data_rows
+        footer_merges = _remove_manager_footer_merges(ws, footer_start_row)
         ws.insert_rows(footer_start_row, extra_rows)
         for target_row_idx in range(footer_start_row, footer_start_row + extra_rows):
             _copy_manager_template_row_style(ws, template_style_row, target_row_idx)
@@ -2583,18 +2623,26 @@ def _fill_manager_template(ws, rows: list[dict[str, object]], month: str, includ
                     bottom=bottom_style if row_idx == end_row else middle_bottom_style,
                 )
 
-    ws.cell(date_row, 10).value = _manager_template_current_month_text()
-    ws.print_area = f"A1:M{ws.max_row}"
+    summary_column = headers.index("汇总") + 1
+    ws.cell(date_row, summary_column).value = _manager_template_current_month_text()
+    _restore_manager_footer_merges(ws, footer_merges, extra_rows)
+    ws.row_dimensions[footer_start_row + extra_rows].height = MANAGER_TEMPLATE_NOTICE_HEIGHT
+    ws.print_area = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
+
+
+def _manager_export_scope() -> tuple[ManagerAttendanceOptions, list[dict[str, object]]]:
+    accessible_ids = _manager_emp_ids(_accessible_emp_ids())
+    requested_ids = _requested_emp_ids()
+    if requested_ids:
+        allowed = set(accessible_ids)
+        accessible_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
+    options = _manager_options()
+    rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, accessible_ids))
+    return options, rows
 
 
 def manager_attendance_export_api():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
-    requested_ids = _requested_emp_ids()
-    if requested_ids:
-        allowed = set(emp_ids)
-        emp_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
-    options = _manager_options()
-    rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, emp_ids))
+    options, rows = _manager_export_scope()
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
     include_emp_no = request.args.get("show_emp_no") == "1"
     include_punch_days = request.args.get("show_punch_days") == "1"
@@ -2618,13 +2666,7 @@ def manager_attendance_export_api():
 
 
 def manager_attendance_template_export_api():
-    emp_ids = _manager_emp_ids(_accessible_emp_ids())
-    requested_ids = _requested_emp_ids()
-    if requested_ids:
-        allowed = set(emp_ids)
-        emp_ids = [emp_id for emp_id in requested_ids if emp_id in allowed]
-    options = _manager_options()
-    rows = _manager_export_rows_with_top_level_departments(build_manager_rows(options, emp_ids))
+    options, rows = _manager_export_scope()
     include_actual_attendance_days = request.args.get("show_actual_attendance_days") == "1"
 
     if MANAGER_ATTENDANCE_TEMPLATE_PATH.exists():
