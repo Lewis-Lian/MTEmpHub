@@ -12,64 +12,90 @@
   pointer-events: none;
 }
 
-/* 单个通知卡片 */
+/* 单个通知卡片 (Apple 级通透磨砂玻璃质感) */
 .notification-item {
   position: relative;
   display: flex;
   align-items: flex-start;
   gap: 13px;
-  padding: 15px 16px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.88);
-  -webkit-backdrop-filter: blur(18px);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 16px 34px rgba(24, 49, 83, 0.12), 0 2px 8px rgba(24, 49, 83, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.72);
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 20px 48px -8px rgba(15, 23, 42, 0.16),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.78);
   color: #183153;
   pointer-events: auto;
-  font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
   overflow: hidden;
 }
 
-/* 各种类型的样式变体 */
+[data-theme="dark"] .notification-item {
+  background: rgba(24, 32, 47, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.15),
+    0 20px 48px -8px rgba(0, 0, 0, 0.5),
+    0 4px 12px -2px rgba(0, 0, 0, 0.3);
+  color: var(--ent-text, #f1f5f9);
+}
+
+/* 各种类型的样式变体：保持磨砂玻璃通透底色，增强柔光边缘与微阴影 */
 .notification-item.notification-success {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(34, 197, 94, 0.24);
-  box-shadow: 0 16px 34px rgba(34, 197, 94, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
+  border-color: rgba(34, 197, 94, 0.35);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 20px 48px -8px rgba(34, 197, 94, 0.15),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
 }
 .notification-item.notification-success .notification-icon {
   color: #16a34a;
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.15);
+  box-shadow: 0 2px 8px rgba(34, 197, 94, 0.15);
 }
 
 .notification-item.notification-error {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(239, 68, 68, 0.26);
-  box-shadow: 0 16px 34px rgba(239, 68, 68, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
+  border-color: rgba(239, 68, 68, 0.35);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 20px 48px -8px rgba(239, 68, 68, 0.15),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
 }
 .notification-item.notification-error .notification-icon {
   color: #dc2626;
-  background: rgba(239, 68, 68, 0.11);
+  background: rgba(239, 68, 68, 0.15);
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.15);
 }
 
 .notification-item.notification-warning {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: 0 16px 34px rgba(245, 158, 11, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
+  border-color: rgba(245, 158, 11, 0.38);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 20px 48px -8px rgba(245, 158, 11, 0.15),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
 }
 .notification-item.notification-warning .notification-icon {
   color: #d97706;
-  background: rgba(245, 158, 11, 0.13);
+  background: rgba(245, 158, 11, 0.16);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
 }
 
 .notification-item.notification-info {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(56, 189, 248, 0.28);
-  box-shadow: 0 16px 34px rgba(56, 189, 248, 0.1), 0 2px 8px rgba(24, 49, 83, 0.05);
+  border-color: rgba(56, 189, 248, 0.38);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 20px 48px -8px rgba(56, 189, 248, 0.15),
+    0 4px 14px -2px rgba(15, 23, 42, 0.08);
 }
 .notification-item.notification-info .notification-icon {
   color: #0284c7;
-  background: rgba(56, 189, 248, 0.13);
+  background: rgba(56, 189, 248, 0.16);
+  box-shadow: 0 2px 8px rgba(56, 189, 248, 0.15);
 }
 
 /* 图标 */

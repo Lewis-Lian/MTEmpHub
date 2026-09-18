@@ -15,6 +15,18 @@ describe("QueryProgressOverlay", () => {
     expect(screen.getByText("读取")).toHaveClass("is-reached");
     expect(screen.getByText("处理")).toHaveClass("is-current");
     expect(screen.getByText("完成")).toHaveClass("is-pending");
+    expect(screen.getByText("PROCESSING")).toBeInTheDocument();
+  });
+
+  it("shows check icon and reaches final stage when completed at 100%", () => {
+    const { container } = render(<QueryProgressOverlay active progress={100} text="数据处理完成" />);
+
+    expect(screen.getByRole("status")).toHaveClass("is-active");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+    expect(screen.getByText("100%")).toBeInTheDocument();
+    expect(screen.getByText("完成")).toHaveClass("is-reached");
+    expect(container.querySelector(".query-progress-check")).toBeInTheDocument();
+    expect(container.querySelector(".query-progress-spinner")).not.toBeInTheDocument();
   });
 
   it("keeps the overlay hidden when inactive", () => {
@@ -24,3 +36,4 @@ describe("QueryProgressOverlay", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
   });
 });
+

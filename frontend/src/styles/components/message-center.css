@@ -1,10 +1,11 @@
-/* 顶栏消息中心弹窗样式规范 */
+/* 顶栏消息与公告中心弹窗视觉规范 */
 
 .message-center {
   position: relative;
 }
 
 .message-center-trigger {
+  position: relative;
   margin-left: 2px;
 }
 
@@ -21,78 +22,136 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 999px;
-  background: #ef4444;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   color: #ffffff;
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 16px;
   text-align: center;
   box-sizing: border-box;
-  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.4);
+  box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
   border: 1.5px solid var(--ent-bg);
+  pointer-events: none;
 }
 
-/* 消息中心弹出面板 */
+/* 消息中心弹出面板 (Apple 级通透磨砂玻璃 + 高阶多层柔光阴影) */
 .message-center-panel {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 10px);
   right: 0;
-  width: 380px;
-  max-height: 540px;
+  width: 400px;
+  max-height: 560px;
   display: flex;
   flex-direction: column;
-  background: var(--ent-bg);
-  border: 1px solid var(--ent-border-strong);
-  border-radius: var(--ent-radius-lg, 12px);
-  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.16), 0 6px 16px -2px rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 24px 56px -8px rgba(15, 23, 42, 0.18),
+    0 8px 24px -4px rgba(15, 23, 42, 0.08);
   z-index: var(--z-dropdown, 1200);
   overflow: hidden;
-  animation: message-center-scale-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
 }
 
-@keyframes message-center-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translateY(-8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+/* 深色模式适配 */
+[data-theme="dark"] .message-center-panel {
+  background: rgba(24, 32, 47, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.15),
+    0 24px 56px -8px rgba(0, 0, 0, 0.5),
+    0 8px 24px -4px rgba(0, 0, 0, 0.3);
 }
 
-/* 头部 */
+/* 弹窗头部 */
 .message-center-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--ent-border);
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.55);
   color: var(--ent-text);
+  background: transparent;
 }
 
 .message-center-heading-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+.message-center-heading-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.message-center-heading-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--ent-blue-light, rgba(37, 99, 235, 0.1));
+  color: var(--ent-blue);
 }
 
 .message-center-heading-left strong {
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--ent-text);
+  letter-spacing: -0.2px;
 }
 
 .message-center-count-pill {
   display: inline-flex;
   align-items: center;
-  padding: 1px 7px;
+  padding: 1.5px 8px;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
   font-size: 11px;
   font-weight: 600;
   line-height: 1.3;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.message-center-count-pill.is-all-read {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.message-center-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-center-quick-read-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.06);
+  color: var(--ent-blue);
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.message-center-quick-read-btn:hover {
+  background: var(--ent-blue-light);
+  border-color: var(--ent-blue);
 }
 
 .message-center-close {
@@ -103,11 +162,11 @@
   height: 26px;
   padding: 0;
   border: 0;
-  border-radius: var(--ent-radius-sm, 6px);
+  border-radius: 7px;
   background: transparent;
   color: var(--ent-text-secondary);
   cursor: pointer;
-  transition: var(--ent-transition, all 0.15s ease);
+  transition: all 0.15s ease;
 }
 
 .message-center-close:hover {
@@ -115,29 +174,38 @@
   color: var(--ent-text);
 }
 
-/* 筛选 Tab 栏 */
+/* 筛选 Segmented Tab 栏 */
 .message-center-tabs {
+  padding: 8px 16px;
+  background: transparent;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.55);
+}
+
+.message-center-tab-segment {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  background: var(--ent-secondary-bg);
-  border-bottom: 1px solid var(--ent-border);
+  gap: 4px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .message-center-tab {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border: 0;
-  border-radius: var(--ent-radius-sm, 6px);
+  border-radius: 7px;
   background: transparent;
   color: var(--ent-text-secondary);
   font-size: 12.5px;
-  font-weight: 500;
+  font-weight: 550;
   cursor: pointer;
-  transition: var(--ent-transition, all 0.15s ease);
+  transition: all 0.16s ease;
 }
 
 .message-center-tab:hover {
@@ -145,36 +213,42 @@
 }
 
 .message-center-tab.is-active {
-  background: var(--ent-bg);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--ent-blue);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  font-weight: 650;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] .message-center-tab.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .message-center-tab-count {
   font-size: 11px;
   color: var(--ent-text-tertiary);
+  font-weight: 500;
 }
 
 .message-center-tab-unread-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
+  min-width: 17px;
+  height: 17px;
   padding: 0 4px;
   border-radius: 999px;
   background: #ef4444;
   color: #ffffff;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 10.5px;
+  font-weight: 700;
   line-height: 1;
 }
 
 /* 错误提示 */
 .message-center-error {
   margin: 0;
-  padding: 8px 16px;
+  padding: 9px 18px;
   background: rgba(220, 38, 38, 0.08);
   color: #dc2626;
   font-size: 12.5px;
@@ -184,64 +258,133 @@
 /* 消息列表区 */
 .message-center-list {
   flex: 1;
-  max-height: 350px;
+  max-height: 380px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ent-border-strong) transparent;
 }
 
-.message-center-list article {
+.message-center-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.message-center-list::-webkit-scrollbar-thumb {
+  background: var(--ent-border-strong);
+  border-radius: 999px;
+}
+
+/* 列表卡片项 */
+.message-center-list article,
+.message-center-card {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 13px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--ent-border);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.16s ease, transform 0.16s ease;
   position: relative;
+  background: transparent;
 }
 
-.message-center-list article:last-child {
+.message-center-list article:last-child,
+.message-center-card:last-child {
   border-bottom: none;
 }
 
-.message-center-list article:hover {
-  background: var(--ent-secondary-bg);
+.message-center-list article:hover,
+.message-center-card:hover {
+  background: rgba(37, 99, 235, 0.06);
 }
 
-.message-center-list article.is-unread {
-  background: var(--ent-blue-light);
+/* 未读条目强调 (半透明柔光微透) */
+.message-center-list article.is-unread,
+.message-center-card.is-unread {
+  background: rgba(37, 99, 235, 0.05);
 }
 
-.message-center-list article.is-unread:hover {
-  background: color-mix(in srgb, var(--ent-blue-light) 70%, var(--ent-secondary-bg));
+.message-center-list article.is-unread::before,
+.message-center-card.is-unread::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3.5px;
+  border-radius: 0 4px 4px 0;
+  background: var(--ent-blue);
+  box-shadow: 0 0 6px rgba(37, 99, 235, 0.4);
 }
 
-.message-center-item-icon-col {
-  flex-shrink: 0;
-  margin-top: 2px;
+.message-center-list article.is-unread:hover,
+.message-center-card.is-unread:hover {
+  background: rgba(37, 99, 235, 0.09);
 }
 
+/* 分类图标微徽标 */
 .message-center-type-badge {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: var(--ent-tertiary-bg);
-  color: var(--ent-text-secondary);
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 10px;
+  transition: transform 0.18s ease;
 }
 
-.message-center-type-badge.is-unread {
-  background: var(--ent-blue-focus);
-  color: var(--ent-blue);
+.message-center-card:hover .message-center-type-badge {
+  transform: scale(1.05);
 }
 
+/* 各类型专属色彩与徽章 */
+/* 1. 重要公告 / 公告：暖金琥珀 */
+.message-badge-announcement {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.22) 0%, rgba(245, 158, 11, 0.16) 100%);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.12);
+}
+
+/* 2. 考勤提醒：翡翠绿 */
+.message-badge-attendance {
+  background: linear-gradient(135deg, rgba(52, 211, 153, 0.22) 0%, rgba(16, 185, 129, 0.16) 100%);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.12);
+}
+
+/* 3. 节假日通知：紫罗兰 */
+.message-badge-holiday {
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.22) 0%, rgba(139, 92, 246, 0.16) 100%);
+  color: #7c3aed;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12);
+}
+
+/* 4. 温馨提示：青碧海蓝 */
+.message-badge-reminder {
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.22) 0%, rgba(6, 182, 212, 0.16) 100%);
+  color: #0891b2;
+  border: 1px solid rgba(6, 182, 212, 0.28);
+  box-shadow: 0 2px 8px rgba(6, 182, 212, 0.12);
+}
+
+/* 5. 系统通知：品牌经典蓝 */
+.message-badge-system {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.22) 0%, rgba(37, 99, 235, 0.16) 100%);
+  color: #2563eb;
+  border: 1px solid rgba(37, 99, 235, 0.28);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+}
+
+/* 内容主体 */
 .message-center-item-content {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
 .message-center-item-title-row {
@@ -250,6 +393,47 @@
   gap: 6px;
 }
 
+/* 语义化标签胶囊 */
+.message-center-tag-badge {
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.2;
+  padding: 1.5px 5.5px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tag-announcement {
+  background: rgba(245, 158, 11, 0.15);
+  color: #b45309;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.tag-attendance {
+  background: rgba(16, 185, 129, 0.15);
+  color: #047857;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.tag-holiday {
+  background: rgba(139, 92, 246, 0.15);
+  color: #6d28d9;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.tag-reminder {
+  background: rgba(6, 182, 212, 0.15);
+  color: #0e7490;
+  border: 1px solid rgba(6, 182, 212, 0.25);
+}
+
+.tag-system {
+  background: rgba(37, 99, 235, 0.15);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+}
+
+/* 标题样式 */
 .message-center-title {
   font-size: 13.5px;
   font-weight: 600;
@@ -258,29 +442,39 @@
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  letter-spacing: -0.1px;
 }
 
+/* 未读呼吸红点 */
 .message-center-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: #ef4444;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.25);
+  animation: message-center-dot-pulse 2.4s ease infinite;
+}
+
+@keyframes message-center-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.18); opacity: 0.82; }
 }
 
 .message-center-item-time {
-  font-size: 11.5px;
+  font-size: 11px;
   color: var(--ent-text-tertiary);
   flex-shrink: 0;
   white-space: nowrap;
+  font-weight: 500;
 }
 
+/* 内容摘要 */
 .message-center-preview {
-  margin: 0;
+  margin: 5px 0 6px;
   color: var(--ent-text-secondary);
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -289,6 +483,7 @@
   word-break: break-word;
 }
 
+/* 卡片底部元信息 */
 .message-center-item-footer {
   display: flex;
   align-items: center;
@@ -304,37 +499,84 @@
   font-size: 11.5px;
 }
 
-/* 空状态 */
+.message-center-sender-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-tertiary);
+}
+
+.message-center-view-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ent-blue);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: all 0.18s ease;
+}
+
+.message-center-card:hover .message-center-view-hint {
+  opacity: 0.95;
+  transform: translateX(0);
+}
+
+/* 空状态精美插画 */
 .message-center-empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 42px 20px;
+  padding: 46px 20px 42px;
   text-align: center;
 }
 
+.message-center-empty-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.message-center-empty-halo {
+  position: absolute;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--ent-blue-light) 0%, transparent 70%);
+  opacity: 0.6;
+}
+
 .message-center-empty-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
   color: var(--ent-text-tertiary);
-  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
 .message-center-empty {
   margin: 0;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 600;
   color: var(--ent-text-secondary);
 }
 
 .message-center-empty-hint {
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 12px;
   color: var(--ent-text-tertiary);
 }
@@ -344,29 +586,35 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: var(--ent-secondary-bg);
-  border-top: 1px solid var(--ent-border);
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.25);
+  border-top: 1px solid rgba(226, 232, 240, 0.55);
+}
+
+[data-theme="dark"] .message-center-panel-footer {
+  background: rgba(0, 0, 0, 0.15);
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 
 .message-center-footer-summary {
   font-size: 12px;
   color: var(--ent-text-tertiary);
+  font-weight: 500;
 }
 
 .message-center-mark-all-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  gap: 5px;
+  padding: 4px 10px;
   border: 0;
-  border-radius: var(--ent-radius-sm, 6px);
+  border-radius: 6px;
   background: transparent;
   color: var(--ent-blue);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: var(--ent-transition, all 0.15s ease);
+  transition: all 0.15s ease;
 }
 
 .message-center-mark-all-btn:hover {
@@ -374,7 +622,13 @@
 }
 
 .message-center-mark-all-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-center-dot {
+    animation: none;
+  }
 }
 

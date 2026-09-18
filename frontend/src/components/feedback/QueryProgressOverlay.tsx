@@ -19,7 +19,10 @@ export default function QueryProgressOverlay({ active, progress, text, className
     <div className={`query-progress-overlay ${active ? "is-active" : ""} ${className}`.trim()} role="status">
       <div className="query-progress-card">
         <div className="query-progress-heading">
-          <span className="query-progress-eyebrow">PROCESSING</span>
+          <div className="query-progress-status-badge">
+            <span className="query-progress-pulse-dot" aria-hidden="true" />
+            <span className="query-progress-eyebrow">PROCESSING</span>
+          </div>
           <span className="query-progress-percent">{safeProgress}%</span>
         </div>
         <div
@@ -56,7 +59,18 @@ export default function QueryProgressOverlay({ active, progress, text, className
             );
           })}
         </div>
-        <p className="query-progress-text">{text}</p>
+        <div className="query-progress-footer">
+          {safeProgress >= 100 ? (
+            <span className="query-progress-check" aria-hidden="true">
+              <svg fill="none" height="13" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" viewBox="0 0 24 24" width="13">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </span>
+          ) : (
+            <span className="query-progress-spinner" aria-hidden="true" />
+          )}
+          <p className="query-progress-text">{text}</p>
+        </div>
       </div>
     </div>
   );
