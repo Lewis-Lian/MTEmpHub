@@ -352,32 +352,39 @@ export default function SummaryDownloadPage() {
 
       {/* 载入高级页内 CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
-        .summary-download-container .query-progress-overlay {
-          position: fixed !important;
-          border-radius: 0 !important;
-        }
         .summary-download-container {
+          position: static !important;
           max-width: 1200px;
           margin: 0 auto;
           animation: fadeIn 0.4s ease-out;
+        }
+        .summary-download-container .query-progress-overlay {
+          position: absolute !important;
+          inset: 0 !important;
+          border-radius: 0 !important;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
         .step-card {
-          background: rgba(255, 255, 255, 0.85);
-          backdrop-filter: blur(20px);
-          border: 1px solid rgba(226, 232, 240, 0.8);
+          background: rgba(255, 255, 255, 0.48);
+          backdrop-filter: blur(24px) saturate(190%);
+          -webkit-backdrop-filter: blur(24px) saturate(190%);
+          border: 1px solid rgba(255, 255, 255, 0.85);
           border-radius: 16px;
           padding: 24px;
           margin-bottom: 24px;
-          box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+          box-shadow:
+            inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+            0 8px 24px rgba(148, 163, 184, 0.08);
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .step-card:hover {
-          box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
-          border-color: rgba(191, 219, 254, 0.8);
+          box-shadow:
+            inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+            0 14px 32px rgba(148, 163, 184, 0.12);
+          border-color: rgba(255, 255, 255, 0.95);
         }
         .step-header {
           display: flex;

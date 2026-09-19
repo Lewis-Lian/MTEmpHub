@@ -13,6 +13,7 @@
   overflow: hidden;
   box-sizing: border-box;
   width: 100%;
+  position: relative;
 }
 
 /* ==========================================================================
@@ -23,11 +24,14 @@
 .individual-attendance-page .individual-filter-rail {
   padding: 12px 20px;
   border-radius: 14px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
-  box-shadow: 0 4px 18px rgba(148, 163, 184, 0.06);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 24px rgba(148, 163, 184, 0.1);
   flex-shrink: 0;
   z-index: var(--z-sticky-raised, 10);
 }
@@ -126,20 +130,26 @@
 /* 基础卡片微拟物白底玻璃质感 */
 .individual-attendance-header,
 .individual-attendance-section {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 14px;
   padding: 18px 22px;
-  box-shadow: 0 4px 18px rgba(148, 163, 184, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 24px rgba(148, 163, 184, 0.08);
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .individual-attendance-header:hover,
 .individual-attendance-section:hover {
-  box-shadow: 0 8px 24px rgba(148, 163, 184, 0.09);
-  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 12px 30px rgba(148, 163, 184, 0.12);
+  border-color: rgba(255, 255, 255, 0.95);
 }
 
 /* ==========================================================================
@@ -261,16 +271,18 @@
 }
 
 .kpi-card {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.85); /* 统一细边框，无顶部粗线 */
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85); /* 统一细边框，无顶部粗线 */
   border-radius: 12px;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 4px 14px rgba(148, 163, 184, 0.04);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 6px 16px rgba(148, 163, 184, 0.07);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
@@ -441,8 +453,8 @@
   inset: 0;
   z-index: var(--z-modal);
   background: rgba(15, 23, 42, 0.48);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   cursor: pointer;
   animation: individualBackdropFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -475,11 +487,11 @@
   z-index: var(--z-overlay);
   margin: 0;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.98);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
-  border: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 25px 60px -12px rgba(15, 23, 42, 0.35), 0 0 1px rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.68);
+  backdrop-filter: blur(32px) saturate(190%);
+  -webkit-backdrop-filter: blur(32px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95), 0 25px 60px -12px rgba(15, 23, 42, 0.35), 0 0 1px rgba(15, 23, 42, 0.1);
   display: flex;
   flex-direction: column;
   padding: 22px 26px;
@@ -734,14 +746,16 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(226, 232, 240, 0.85);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
   border-radius: 14px;
   padding: 40px 24px;
   text-align: center;
-  box-shadow: 0 4px 18px rgba(148, 163, 184, 0.05);
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 24px rgba(148, 163, 184, 0.08);
 }
 
 .empty-visual-badge {
