@@ -4,12 +4,13 @@
 
 /* 极光背景流光球 */
 .employee-dashboard-page {
-  padding: 24px;
+  padding: 20px 24px 24px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   min-width: 0;
-  min-height: calc(100vh - 86px);
+  min-height: 100%;
+  height: 100%;
   box-sizing: border-box;
-  background-color: var(--qh-bg-page);
+  background-color: var(--qh-bg-page, #f8fafc);
   background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1.5px, transparent 0);
   background-size: 28px 28px;
   position: relative;
@@ -19,16 +20,7 @@
      查询条件栏与结果面板收缩为内容宽，页面右侧留出大片空白 */
   align-items: stretch;
   gap: 16px;
-  height: calc(100vh - 64px);
   overflow: hidden;
-}
-
-.employee-dashboard-page > .query-result-panel,
-.employee-dashboard-page > .query-workspace {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .employee-dashboard-page > .query-result-panel,
@@ -59,14 +51,15 @@
   display: flex;
   flex-direction: column;
   overflow: visible;
+  position: static;
 }
 
 /* 极光动态流光背景球 */
 .employee-dashboard-page .qh-glow-sphere {
   position: absolute;
   border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.05;
+  filter: blur(100px);
+  opacity: 0.35;
   pointer-events: none;
   z-index: 0;
   animation: auroraFlow 22s infinite alternate ease-in-out;
@@ -109,21 +102,28 @@
    筛选栏面板重构（高透磨砂玻璃）
    ========================================================================== */
 .employee-dashboard-page .query-filter-rail {
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 16px;
   padding: 24px 28px;
-  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.85),
+    0 10px 28px rgba(148, 163, 184, 0.08),
+    0 2px 6px rgba(148, 163, 184, 0.04);
   position: relative;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  transition: box-shadow 0.3s ease, border-color 0.3s ease, background 0.3s ease;
   gap: 16px;
 }
 
 .employee-dashboard-page .query-filter-rail:hover {
-  box-shadow: 0 16px 35px rgba(148, 163, 184, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  border-color: rgba(203, 213, 225, 0.8);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 16px 36px rgba(148, 163, 184, 0.12),
+    0 4px 10px rgba(148, 163, 184, 0.06);
+  border-color: rgba(255, 255, 255, 0.95);
 }
 
 .employee-dashboard-page .query-filter-heading {

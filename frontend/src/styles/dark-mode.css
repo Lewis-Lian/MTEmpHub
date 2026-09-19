@@ -308,11 +308,13 @@
 
 [data-theme="dark"] .query-filter-rail,
 [data-theme="dark"] .employee-dashboard-page .query-filter-rail {
-  background: rgba(30, 41, 59, 0.88) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border-color: #334155 !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35) !important;
+  background: rgba(30, 41, 59, 0.48) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.12),
+    0 10px 30px rgba(0, 0, 0, 0.35) !important;
   color: #f8fafc !important;
 }
 
@@ -885,14 +887,48 @@
 }
 
 [data-theme="dark"] .master-modal {
-  background: #1e293b !important;
-  border-color: #334155 !important;
+  background: rgba(24, 32, 47, 0.78) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
   color: #f8fafc !important;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.15),
+    0 25px 60px -12px rgba(0, 0, 0, 0.7) !important;
+}
+
+[data-theme="dark"] .confirm-card,
+[data-theme="dark"] .avatar-modal-card,
+[data-theme="dark"] .search-command-modal,
+[data-theme="dark"] .daydetail-card,
+[data-theme="dark"] .app-header-user-menu,
+[data-theme="dark"] .individual-details-card.is-fullscreen {
+  background: rgba(24, 32, 47, 0.80) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.15),
+    0 24px 56px -8px rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="dark"] .individual-attendance-header,
+[data-theme="dark"] .individual-attendance-section,
+[data-theme="dark"] .individual-attendance-page .individual-filter-rail,
+[data-theme="dark"] .individual-kpi-grid .kpi-card,
+[data-theme="dark"] .individual-attendance-empty,
+[data-theme="dark"] .query-empty-state {
+  background: rgba(30, 41, 59, 0.48) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.3) !important;
 }
 
 [data-theme="dark"] .master-modal-header {
-  border-bottom-color: #334155 !important;
+  border-bottom-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 [data-theme="dark"] .master-modal-header h2 {
@@ -909,15 +945,19 @@
 
 /* 员工选择弹窗 EmployeePicker / DepartmentPicker */
 [data-theme="dark"] .employee-picker-modal .modal-content {
-  background: #1e293b !important;
-  border-color: #334155 !important;
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.7) !important;
+  background: rgba(24, 32, 47, 0.82) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.15),
+    0 28px 80px rgba(0, 0, 0, 0.7) !important;
 }
 
 [data-theme="dark"] .employee-picker-modal .modal-header,
 [data-theme="dark"] .employee-picker-modal .modal-footer {
-  background: #1e293b !important;
-  border-color: #334155 !important;
+  background: rgba(15, 23, 42, 0.65) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 [data-theme="dark"] .employee-picker-modal .modal-title {

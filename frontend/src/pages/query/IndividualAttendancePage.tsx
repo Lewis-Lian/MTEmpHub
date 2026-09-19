@@ -6,6 +6,7 @@ import AccountSetSelector from "../../components/query/AccountSetSelector";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import ErrorState from "../../components/feedback/ErrorState";
 import LoadingState from "../../components/feedback/LoadingState";
+import QueryProgressOverlay from "../../components/feedback/QueryProgressOverlay";
 import QueryEmptyState, { IndividualAttendanceIcon } from "../../components/query/QueryEmptyState";
 import type { AttendanceCalendarData, HeaderRowsResponse, QueryBootstrap, QueryEmployee } from "../../types/query";
 import "./individual-attendance.css";
@@ -65,6 +66,7 @@ export default function IndividualAttendancePage() {
 
   return (
     <div className="individual-attendance-page employee-dashboard-page query-page-shell">
+      <QueryProgressOverlay active={isQuerying} progress={isQuerying ? 75 : 0} text="正在加载考勤档案与明细..." />
       {/* 极光背景流动球 */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
