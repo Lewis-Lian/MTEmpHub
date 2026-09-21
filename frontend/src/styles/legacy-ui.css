@@ -270,6 +270,22 @@ body {
   box-shadow: 0 0 0 3px rgba(24, 24, 27, 0.08);
 }
 
+/* 校验失败状态：红边框 + 字段下方错误小字。 */
+.login-input--invalid {
+  border-color: #dc2626;
+}
+
+.login-input--invalid:focus {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+.login-field-error {
+  color: #dc2626;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .login-password-control {
   position: relative;
   display: block;

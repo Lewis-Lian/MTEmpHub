@@ -19,6 +19,8 @@ export default function ChangePasswordPage() {
   const [success, setSuccess] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [captchaToken, setCaptchaToken] = useState("");
+  // 滑块 token 失效（如 5 分钟过期后提交收到 403）时递增该 key，强制重挂载滑块重新验证。
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   const notification = useNotification();
   const passwordLength = currentPassword.length + newPassword.length + confirmPassword.length;
@@ -54,6 +56,11 @@ export default function ChangePasswordPage() {
       const errMsg = caughtError instanceof ApiError ? caughtError.message : "修改失败，请稍后重试";
       setError(errMsg);
       notification.error(errMsg);
+      // 403 = 滑块验证缺失/已过期：自动重置滑块，让用户重新完成验证而不是反复报错。
+      if (caughtError instanceof ApiError && caughtError.status === 403) {
+        setCaptchaToken("");
+        setCaptchaResetKey((key) => key + 1);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -220,7 +227,7 @@ export default function ChangePasswordPage() {
                 </label>
                 <div className="login-field">
                   <span className="login-field-label">滑块验证</span>
-                  <SliderCaptcha onReset={() => setCaptchaToken("")} onVerified={setCaptchaToken} />
+                  <SliderCaptcha key={captchaResetKey} onReset={() => setCaptchaToken("")} onVerified={setCaptchaToken} />
                 </div>
                 <div className="login-form-meta">
                   <Link className="login-link" to="/login">

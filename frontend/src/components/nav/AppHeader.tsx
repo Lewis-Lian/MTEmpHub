@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import type { AuthUser } from "../../api/auth";
 import type { QueryNavigationEntry, QueryNavigationModule } from "../../types/query";
 import { applyTheme, getStoredThemeMode, getSystemTheme, setStoredThemeMode, type ThemeMode } from "../../utils/theme";
@@ -8,6 +7,7 @@ import "../../styles/components/app-header.css";
 import MessageCenter from "./MessageCenter";
 import UserAvatar from "../common/UserAvatar";
 import AvatarChangeModal from "../common/AvatarChangeModal";
+import ChangePasswordModal from "../common/ChangePasswordModal";
 
 interface AppHeaderProps {
   currentEntry: QueryNavigationEntry | null;
@@ -42,10 +42,10 @@ export default function AppHeader({
   onUserUpdate,
   user,
 }: AppHeaderProps) {
-  const navigate = useNavigate();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => getStoredThemeMode());
   const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() =>
     themeMode === "auto" ? getSystemTheme() : themeMode
@@ -338,7 +338,7 @@ export default function AppHeader({
                 className="app-header-action-link"
                 onClick={() => {
                   setIsUserMenuOpen(false);
-                  navigate("/change-password");
+                  setIsChangePasswordModalOpen(true);
                 }}
                 type="button"
               >
@@ -377,6 +377,11 @@ export default function AppHeader({
         isOpen={isAvatarModalOpen}
         onClose={() => setIsAvatarModalOpen(false)}
         onUserUpdate={onUserUpdate}
+        user={user}
+      />
+      <ChangePasswordModal
+        isOpen={isChangePasswordModalOpen}
+        onClose={() => setIsChangePasswordModalOpen(false)}
         user={user}
       />
     </header>

@@ -177,6 +177,214 @@ describe("App smoke regression", () => {
     );
   });
 
+  it("登录页提交空表单时显示字段级错误且不发起登录请求", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "欢迎回来！" });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByText("请输入账号")).toBeInTheDocument();
+    expect(screen.getByText("请输入密码")).toBeInTheDocument();
+    expect(hasRequestedPath("/api/auth/login")).toBe(false);
+
+    // 纯空格账号与空账号同等拦截
+    fireEvent.change(screen.getByLabelText("账号"), { target: { value: "   " } });
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+    expect(await screen.findByText("请输入账号")).toBeInTheDocument();
+    expect(hasRequestedPath("/api/auth/login")).toBe(false);
+  });
+
+  it("登录页滑块验证过期（403）后会重置滑块要求重新验证", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
+      }
+      if (path === "/api/auth/login") {
+        return Promise.resolve(jsonResponse({ error: "请先完成滑块验证" }, { status: 403 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("账号"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
+    await completeSliderCaptcha();
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("请先完成滑块验证");
+    // 滑块重置后回到待验证的折叠状态，用户可重新拖动
+    expect(await screen.findByRole("button", { name: "点击进行安全验证" })).toBeInTheDocument();
+  });
+
+  it("修改密码页滑块验证过期（403）后会重置滑块要求重新验证", async () => {
+    window.history.replaceState({}, "", "/change-password");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
+      }
+      if (path === "/api/auth/change-password") {
+        return Promise.resolve(jsonResponse({ error: "请先完成滑块验证" }, { status: 403 }));
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("用户名"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("原密码"), { target: { value: "admin123" } });
+    fireEvent.change(screen.getByLabelText("新密码"), { target: { value: "newpass123" } });
+    fireEvent.change(screen.getByLabelText("确认新密码"), { target: { value: "newpass123" } });
+    await completeSliderCaptcha();
+    fireEvent.click(screen.getByRole("button", { name: "确认修改" }));
+
+    expect((await screen.findAllByText("请先完成滑块验证"))[0]).toBeInTheDocument();
+    // 滑块重置后回到待验证的折叠状态，用户可重新拖动
+    expect(await screen.findByRole("button", { name: "点击进行安全验证" })).toBeInTheDocument();
+  });
+
+  it("登录后右上角修改密码打开弹框，不再跳转独立页", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      if (path === "/api/auth/captcha/slider/verify") {
+        return Promise.resolve(jsonResponse({ verified_token: "test-verified-token" }));
+      }
+      if (path === "/api/auth/login") {
+        return Promise.resolve(
+          jsonResponse({
+            user: {
+              id: 1,
+              username: "admin",
+              role: "admin",
+              page_permissions: { query_home: true },
+            },
+          }),
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    fireEvent.change(await screen.findByLabelText("账号"), { target: { value: "admin" } });
+    fireEvent.change(screen.getByLabelText("密码"), { target: { value: "admin123" } });
+    await completeSliderCaptcha();
+    fireEvent.click(screen.getByRole("button", { name: "登录" }));
+    await waitFor(() => expect(window.location.pathname).toBe("/employee/home"));
+
+    fireEvent.click(await screen.findByRole("button", { name: "用户头像：admin" }));
+    fireEvent.click(screen.getByRole("button", { name: "修改密码" }));
+
+    expect(await screen.findByRole("dialog", { name: "修改密码" })).toBeInTheDocument();
+    // 不再跳转独立修改密码页
+    expect(window.location.pathname).toBe("/employee/home");
+  });
+
+  it("登录页滑块误触（几乎未拖动）不会发起校验请求", async () => {
+    window.history.replaceState({}, "", "/login");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/auth/me") {
+        return Promise.resolve(jsonResponse({ error: "Unauthorized" }, { status: 401 }));
+      }
+      if (path === "/api/auth/captcha/slider") {
+        return Promise.resolve(
+          jsonResponse({
+            challenge_id: "test-challenge",
+            token: "test-slider-token",
+            background: "data:image/png;base64,iVBORw0KGgo=",
+            slider: "data:image/png;base64,iVBORw0KGgo=",
+            slider_width: 44,
+          }),
+        );
+      }
+      throw new Error(`unexpected request: ${path}`);
+    });
+
+    const { default: App } = await import("./App");
+    render(<App />);
+
+    await screen.findByRole("heading", { name: "欢迎回来！" });
+    fireEvent.click(await screen.findByRole("button", { name: "点击进行安全验证" }));
+    await screen.findByAltText("验证码背景");
+    const sliderHandle = screen.getByRole("button", { name: "拖动滑块" });
+    fireEvent.pointerDown(sliderHandle, { clientX: 10, pointerId: 1 });
+    fireEvent.pointerUp(sliderHandle, { clientX: 12, pointerId: 1 });
+
+    expect(hasRequestedPath("/api/auth/captcha/slider/verify")).toBe(false);
+    expect(screen.getByText("向右拖动滑块完成验证")).toBeInTheDocument();
+  });
+
   it("账号输入框聚焦时会触发左侧角色互看动画", async () => {
     window.history.replaceState({}, "", "/login");
     fetchMock.mockImplementation((input) => {

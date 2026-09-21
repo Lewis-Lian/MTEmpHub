@@ -21,6 +21,9 @@ interface SliderCaptchaProps {
 
 // 采样节流间隔（ms）：拖动时每 16ms 采样一个轨迹点，约 60fps。
 const TRACE_SAMPLE_INTERVAL_MS = 16;
+// 误触判定阈值（px，按 320 设计宽度）：释放时拖动距离小于该值视为误触，
+// 直接回到待拖动状态，不发起校验（避免白白消费一次挑战导致图片莫名刷新）。
+const MIN_EFFECTIVE_DRAG_PX = 10;
 
 export default function SliderCaptcha({ onVerified, onReset, className }: SliderCaptchaProps) {
   const [challenge, setChallenge] = useState<SliderChallenge | null>(null);
@@ -34,6 +37,9 @@ export default function SliderCaptcha({ onVerified, onReset, className }: Slider
   const draggingRef = useRef(false);
   const startClientXRef = useRef(0);
   const startOffsetRef = useRef(0);
+  // 实时偏移：pointermove 是连续事件，React 可能批量延迟渲染，
+  // pointerUp 时 state 里的 offset 可能落后于真实位置，故用 ref 记录。
+  const liveOffsetRef = useRef(0);
   const traceRef = useRef<SliderTracePoint[]>([]);
   const lastSampleTimeRef = useRef(0);
   const trackRef = useRef<HTMLDivElement | null>(null);
@@ -66,6 +72,7 @@ export default function SliderCaptcha({ onVerified, onReset, className }: Slider
       draggingRef.current = true;
       startClientXRef.current = event.clientX;
       startOffsetRef.current = 0;
+      liveOffsetRef.current = 0;
       traceRef.current = [{ x: 0, t: Date.now() }];
       lastSampleTimeRef.current = Date.now();
       
@@ -90,6 +97,7 @@ export default function SliderCaptcha({ onVerified, onReset, className }: Slider
       const deltaX = event.clientX - startClientXRef.current;
       const delta = deltaX / currentScaleRef.current;
       const next = Math.max(0, Math.min(maxX, startOffsetRef.current + delta));
+      liveOffsetRef.current = next;
       setOffset(next);
 
       // 节流采样轨迹点。
@@ -111,13 +119,21 @@ export default function SliderCaptcha({ onVerified, onReset, className }: Slider
         target.releasePointerCapture(event.pointerId);
       }
 
+      // 误触保护：几乎没拖动就释放，不发起校验，回到待拖动状态。
+      if (liveOffsetRef.current < MIN_EFFECTIVE_DRAG_PX) {
+        setOffset(0);
+        setStatus("idle");
+        return;
+      }
+
       // 补录最后一个点（保证终点被采样）。
+      const finalOffset = liveOffsetRef.current;
       const finalNow = Date.now();
-      traceRef.current.push({ x: offset, t: finalNow });
+      traceRef.current.push({ x: finalOffset, t: finalNow });
 
       setStatus("verifying");
       try {
-        const result = await verifySliderCaptcha(challenge.token, offset, traceRef.current);
+        const result = await verifySliderCaptcha(challenge.token, finalOffset, traceRef.current);
         setStatus("success");
         setIsExpanded(false);
         onVerified(result.verified_token);
@@ -129,7 +145,7 @@ export default function SliderCaptcha({ onVerified, onReset, className }: Slider
         await loadChallenge();
       }
     },
-    [challenge, offset, onVerified, loadChallenge],
+    [challenge, onVerified, loadChallenge],
   );
 
   const handleRefresh = useCallback(() => {
