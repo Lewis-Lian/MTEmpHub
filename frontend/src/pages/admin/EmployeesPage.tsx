@@ -27,6 +27,7 @@ import QueryTable from "../../components/query/QueryTable";
 // 本页 main 复用 employee-dashboard-page 类名，下拉框样式全部来自查询页共享样式；
 // 不显式引入时，直接进入本页（未先访问过查询页）会缺失这些样式
 import "../query/dashboard-shared.css";
+import "./employee-management.css";
 import type { AdminDepartment, AdminEmployee, AdminShift } from "../../types/admin";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
 
@@ -121,6 +122,7 @@ export default function EmployeesPage() {
   const [isResigning, setIsResigning] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [isFilterExpanded, setIsFilterExpanded] = useState(false);
 
   const notification = useNotification();
   const confirm = useConfirm();
@@ -594,10 +596,12 @@ export default function EmployeesPage() {
                 top: menuPosition.top,
                 left: menuPosition.left,
                 zIndex: "var(--z-dropdown, 1200)",
-                background: "#ffffff",
-                border: "1px solid var(--ent-border-strong, #cbd5e1)",
-                borderRadius: "8px",
-                boxShadow: "0 10px 25px -5px rgba(15, 23, 42, 0.15)",
+                background: "rgba(255, 255, 255, 0.95)",
+                backdropFilter: "blur(20px)",
+                WebkitBackdropFilter: "blur(20px)",
+                border: "1px solid rgba(226, 232, 240, 0.8)",
+                borderRadius: "10px",
+                boxShadow: "0 14px 28px -6px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(0, 0, 0, 0.04)",
                 minWidth: "120px",
                 padding: "4px",
                 whiteSpace: "nowrap",
@@ -829,120 +833,176 @@ export default function EmployeesPage() {
     );
   }
 
+  const hasActiveSecondaryFilters =
+    employmentFilter !== "active" ||
+    Boolean(keyword.trim()) ||
+    Boolean(typeFilter) ||
+    Boolean(nursingFilter) ||
+    Boolean(employeeSourceFilter) ||
+    Boolean(managerSourceFilter);
+
   return (
-    <main className="master-data-page employee-master-page employee-dashboard-page">
-      {/* 顶部控制与摘要行 */}
-      <div className="account-top-control-row" style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "12px",
-        marginBottom: "12px",
-        marginTop: "16px"
-      }}>
-        {/* 左侧控制按钮与状态组 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-          <div className="account-panel-selector" style={{ display: "flex", gap: "10px" }}>
-            <button
-              className="btn btn-outline-secondary"
-              onClick={() => setShowModal("create")}
-              type="button"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
+    <main className="employee-management-page master-data-page employee-master-page employee-dashboard-page">
+      {/* 极光动态流光背景球 (参考查询页设计，赋予磨砂玻璃深度与生动折射) */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
+      {/* 顶部控制栏 (Top Executive Control Rail) */}
+      <header className="emp-top-rail">
+        <div className="emp-top-left">
+          <div className="emp-title-group">
+            <span className="emp-eyebrow">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
-              新建员工
-            </button>
-            <button
-              className="btn btn-outline-secondary"
-              onClick={() => setShowModal("import")}
-              type="button"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="17 8 12 3 7 8"></polyline>
-                <line x1="12" y1="3" x2="12" y2="15"></line>
-              </svg>
-              导入/导出员工
-            </button>
-            <button
-              className="btn btn-outline-secondary"
-              onClick={() => openResignModal("")}
-              type="button"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-              办理离职
-            </button>
-          </div>
-          
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          
-          {/* 已选计数与刷新按钮，和新建导入及状态栏合在同一行 */}
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <span className="master-selected-count" style={{ fontSize: "13.5px", color: "var(--ent-text-secondary)", fontWeight: "500", userSelect: "none" }}>
-              已选 {selectedIds.length} 人
+              Personnel Directory
             </span>
-            <button className="account-action-button" onClick={loadRows} type="button" style={{ padding: "6px 12px" }}>
-              刷新
+            <h1 className="emp-main-title">员工主数据管理</h1>
+          </div>
+
+          {/* 指标胶囊群 */}
+          <div className="emp-metrics-capsules">
+            <span className="emp-stat-pill emp-stat-pill--total" title="员工总数">
+              总计 <strong>{rows.length}</strong>
+            </span>
+            <span className="emp-stat-pill emp-stat-pill--active" title="在职员工">
+              <span className="emp-stat-dot" />
+              在职 <strong>{rows.filter((r) => !r.resigned_at).length}</strong>
+            </span>
+            <span className="emp-stat-pill emp-stat-pill--regular" title="普通员工">
+              普通 <strong>{rows.filter((r) => !r.is_manager).length}</strong>
+            </span>
+            <span className="emp-stat-pill emp-stat-pill--manager" title="管理人员">
+              管理 <strong>{rows.filter((r) => r.is_manager).length}</strong>
+            </span>
+            <span className="emp-stat-pill emp-stat-pill--nursing" title="享受哺乳假">
+              哺乳 <strong>{rows.filter((r) => r.is_nursing).length}</strong>
+            </span>
+            {rows.filter((r) => r.resigned_at).length > 0 ? (
+              <span className="emp-stat-pill emp-stat-pill--resigned" title="已离职员工">
+                离职 <strong>{rows.filter((r) => r.resigned_at).length}</strong>
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        {/* macOS Dock 风格悬浮操作栏 */}
+        <div className="emp-dock-container account-panel-selector">
+          <div className="emp-dock-bar">
+            <button
+              className="emp-dock-item emp-dock-item--create btn btn-outline-secondary"
+              onClick={() => setShowModal("create")}
+              title="新建员工档案"
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span>新建员工</span>
+            </button>
+
+            <button
+              className="emp-dock-item btn btn-outline-secondary"
+              onClick={() => setShowModal("import")}
+              title="导入/导出员工 Excel"
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>导入/导出员工</span>
+            </button>
+
+            <button
+              className="emp-dock-item btn btn-outline-secondary"
+              onClick={() => openResignModal("")}
+              title="办理员工离职"
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>办理离职</span>
+            </button>
+
+            <div className="emp-dock-divider" aria-hidden="true" />
+
+            <button
+              className="emp-dock-item account-action-button"
+              onClick={loadRows}
+              title="刷新员工数据"
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              <span>刷新</span>
+            </button>
+
+            <div className="emp-dock-divider" aria-hidden="true" />
+
+            <div className="emp-dock-selection-badge master-selected-count">
+              已选 {selectedIds.length} 人
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* 紧凑型筛选面板 (参考查询页设计：默认员工选择器，点击展开才显示其余筛选条件，全毛玻璃质感) */}
+      <div className="emp-filter-rail" style={{ position: "relative" }}>
+        {/* 第一行：主要筛选器（员工选择器）与操作组 */}
+        <div className="emp-filter-primary-row">
+          <div className="emp-filter-picker-group query-filter-field">
+            <label className="emp-filter-label form-label">员工筛选器</label>
+            <div className="emp-filter-picker-wrap">
+              <EmployeePicker
+                departments={pickerDepartments}
+                employees={pickerEmployees}
+                onChange={setFilterEmployeeIds}
+                selectedIds={filterEmployeeIds}
+                showFieldChrome={false}
+              />
+            </div>
+          </div>
+
+          <div className="emp-filter-actions-group master-filter-actions">
+            <button
+              className={`emp-filter-toggle-btn${isFilterExpanded ? " is-expanded" : ""}`}
+              onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+              type="button"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isFilterExpanded ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s ease" }}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+              <span>{isFilterExpanded ? "收起筛选" : "展开其余筛选"}</span>
+              {hasActiveSecondaryFilters ? (
+                <span className="emp-filter-badge-dot" title="已有生效的附加筛选条件" />
+              ) : null}
+            </button>
+
+            <button className="emp-btn emp-btn--secondary account-action-button" onClick={clearFilters} type="button">
+              清空筛选
             </button>
           </div>
         </div>
 
-        {/* 右侧信息摘要状态条 */}
-        <div className="active-account-set-summary-bar" style={{
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "16px",
-          minHeight: "36px",
-          boxSizing: "border-box",
-          padding: "0 16px",
-          background: "var(--ent-secondary-bg, #f8fafc)",
-          border: "1px solid var(--ent-border-strong)",
-          borderRadius: "var(--ent-radius-lg, 8px)",
-          fontSize: "13.5px",
-          color: "var(--ent-text)",
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
-        }}>
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>员工总数：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.length} 人</strong>
-          </div>
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)" }}>普通员工：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => !r.is_manager).length} 人</strong>
-          </div>
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)" }}>管理人员：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_manager).length} 人</strong>
-          </div>
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)" }}>哺乳假：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_nursing).length} 人</strong>
-          </div>
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)" }}>已离职：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.resigned_at).length} 人</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="master-filter-panel" style={{ marginBottom: "12px", position: "relative" }}>
-        <div className="master-filter-grid">
-          <div className="query-filter-field">
-            <label className="form-label" htmlFor="employmentFilterSelect">在职状态</label>
+        {/* 第二行：点开展开按钮才显示的其余筛选条件 */}
+        <div className={`emp-filter-secondary-grid master-filter-grid${isFilterExpanded ? " is-open" : " is-closed"}`} style={{ display: isFilterExpanded ? "grid" : "none" }}>
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label" htmlFor="employmentFilterSelect">在职状态</label>
             <select
-              className="form-select"
+              className="emp-filter-select form-select"
               id="employmentFilterSelect"
               onChange={(event) => setEmploymentFilter(event.target.value as EmployeeStatusFilter)}
               value={employmentFilter}
@@ -952,182 +1012,175 @@ export default function EmployeesPage() {
               <option value="all">全部</option>
             </select>
           </div>
-          <div className="query-filter-field">
-            <label className="form-label" htmlFor="employeeKeywordInput">关键词</label>
+
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label" htmlFor="employeeKeywordInput">关键词</label>
             <input
-              className="form-control"
+              className="emp-filter-input form-control"
               id="employeeKeywordInput"
               onChange={(event) => setKeyword(event.target.value)}
               placeholder="工号 / 姓名"
-              style={{ height: "38px", borderRadius: "8px", boxSizing: "border-box", border: "1px solid #cbd5e1", padding: "0 12px" }}
               value={keyword}
             />
           </div>
-          <div className="query-filter-field">
-            <label className="form-label">员工筛选器</label>
-            <EmployeePicker
-              departments={pickerDepartments}
-              employees={pickerEmployees}
-              onChange={setFilterEmployeeIds}
-              selectedIds={filterEmployeeIds}
-              showFieldChrome={false}
-            />
-          </div>
-          <div className="query-filter-field">
-            <label className="form-label">人员类型</label>
-            <select className="form-select" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
+
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label">人员类型</label>
+            <select className="emp-filter-select form-select" onChange={(event) => setTypeFilter(event.target.value)} value={typeFilter}>
               <option value="">全部</option>
               <option value="employee">普通员工</option>
               <option value="manager">管理人员</option>
             </select>
           </div>
-          <div className="query-filter-field">
-            <label className="form-label">哺乳假</label>
-            <select className="form-select" onChange={(event) => setNursingFilter(event.target.value)} value={nursingFilter}>
+
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label">哺乳假</label>
+            <select className="emp-filter-select form-select" onChange={(event) => setNursingFilter(event.target.value)} value={nursingFilter}>
               <option value="">全部</option>
               <option value="1">是</option>
               <option value="0">否</option>
             </select>
           </div>
-          <div className="query-filter-field">
-            <label className="form-label">员工考勤统计来源</label>
-            <select className="form-select" onChange={(event) => setEmployeeSourceFilter(event.target.value)} value={employeeSourceFilter}>
+
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label">员工考勤统计来源</label>
+            <select className="emp-filter-select form-select" onChange={(event) => setEmployeeSourceFilter(event.target.value)} value={employeeSourceFilter}>
               <option value="">全部</option>
               <option value="employee">员工考勤源文件取值</option>
               <option value="manager">管理人员考勤源文件取值</option>
               <option value="auto_fallback">自动回退</option>
             </select>
           </div>
-          <div className="query-filter-field">
-            <label className="form-label">管理人员考勤统计来源</label>
-            <select className="form-select" onChange={(event) => setManagerSourceFilter(event.target.value)} value={managerSourceFilter}>
+
+          <div className="emp-filter-field query-filter-field">
+            <label className="emp-filter-label form-label">管理人员考勤统计来源</label>
+            <select className="emp-filter-select form-select" onChange={(event) => setManagerSourceFilter(event.target.value)} value={managerSourceFilter}>
               <option value="">全部</option>
               <option value="manager">管理人员考勤源文件取值</option>
               <option value="employee">员工考勤源文件取值</option>
               <option value="auto_fallback">自动回退</option>
             </select>
           </div>
-        </div>
-        <div className="master-filter-actions" style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button className="account-action-button" onClick={clearFilters} type="button">清空筛选</button>
         </div>
 
+        {/* 批量操作工具栏 */}
         {selectedIds.length > 0 ? (
-          <EmployeeBatchToolbar
-            batchAction={batchAction}
-            onApply={applyBatchAction}
-            onBatchActionChange={(action) => { setBatchAction(action); setBatchValue(""); }}
-            onClear={() => { setSelectedIds([]); setBatchAction(""); setBatchValue(""); }}
-            onDelete={applyBatchDelete}
-            renderValueControl={renderBatchValueControl}
-            selectedCount={selectedIds.length}
-          />
+          <div style={{ marginTop: "6px", paddingTop: "8px", borderTop: "1px solid rgba(226, 232, 240, 0.7)" }}>
+            <EmployeeBatchToolbar
+              batchAction={batchAction}
+              onApply={applyBatchAction}
+              onBatchActionChange={(action) => { setBatchAction(action); setBatchValue(""); }}
+              onClear={() => { setSelectedIds([]); setBatchAction(""); setBatchValue(""); }}
+              onDelete={applyBatchDelete}
+              renderValueControl={renderBatchValueControl}
+              selectedCount={selectedIds.length}
+            />
+          </div>
         ) : null}
       </div>
 
+      {/* 数据表格面板 */}
+      <div className="emp-table-window">
+        <QueryResultPanel>
+          {loading ? (
+            <LoadingState message="正在加载员工列表..." variant="table" contentOnly headers={employeeTableHeaders.map((header) => typeof header === "string" ? header : typeof header.label === "string" ? header.label : "")} />
+          ) : (
+            <QueryTable
+              emptyText="暂无员工数据"
+              headers={employeeTableHeaders}
+              panelClassName="master-table-panel master-table-panel--with-filter"
+              rows={employeeTableRows}
+              sortRows={employeeTableSortRows}
+              tableClassName="master-table master-table--employees"
+            />
+          )}
+        </QueryResultPanel>
+      </div>
 
-
-      <QueryResultPanel>
-        {loading ? (
-          <LoadingState message="正在加载员工列表..." variant="table" contentOnly headers={employeeTableHeaders.map((header) => typeof header === "string" ? header : typeof header.label === "string" ? header.label : "")} />
-        ) : (
-          <QueryTable
-            emptyText="暂无员工数据"
-            headers={employeeTableHeaders}
-            panelClassName="master-table-panel master-table-panel--with-filter"
-            rows={employeeTableRows}
-            sortRows={employeeTableSortRows}
-            tableClassName="master-table master-table--employees"
-          />
-        )}
-      </QueryResultPanel>
-
-
-
-
-
+      {/* 编辑员工弹窗 */}
       {editing ? (
-        <div className="master-modal-backdrop">
-          <form className="master-modal employee-dept-modal" onSubmit={submitEdit} style={{ maxWidth: "650px", width: "100%" }}>
-            <div className="master-modal-header">
-              <h2>编辑员工</h2>
-              <button className="master-modal-close" onClick={handleCancelEdit} type="button">×</button>
+        <div className="emp-modal-backdrop master-modal-backdrop">
+          <form className="emp-modal-window master-modal employee-dept-modal" onSubmit={submitEdit} style={{ maxWidth: "650px", width: "100%" }}>
+            <div className="emp-modal-header master-modal-header">
+              <div className="emp-modal-title-wrap">
+                <span className="emp-modal-kicker">EMPLOYEE PROFILE</span>
+                <h2 className="emp-modal-title">编辑员工</h2>
+              </div>
+              <button className="emp-modal-close-btn master-modal-close" onClick={handleCancelEdit} type="button">×</button>
             </div>
-            <div className="master-modal-body">
+            <div className="emp-modal-body master-modal-body">
               {renderEmployeeForm(editForm, setEditForm, "保存", "edit", false)}
             </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={handleCancelEdit} type="button">取消</button>
-              <button className="account-action-button account-action-button--primary" type="submit">保存</button>
+            <div className="emp-modal-footer master-modal-footer">
+              <button className="emp-btn emp-btn--secondary account-action-button" onClick={handleCancelEdit} type="button">取消</button>
+              <button className="emp-btn emp-btn--primary account-action-button account-action-button--primary" type="submit">保存</button>
             </div>
           </form>
         </div>
       ) : null}
 
-
-      <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }} style={{
-        position: "fixed",
-        left: showModal === "create" ? "0" : "-9999px",
-        top: "0",
-        width: "100%",
-        height: "100%",
-        zIndex: 1500,
-        background: "rgba(15, 23, 42, 0.48)",
-        backdropFilter: "blur(16px) saturate(160%)",
-        WebkitBackdropFilter: "blur(16px) saturate(160%)",
-        display: "grid",
-        placeItems: "center",
-        padding: "24px",
-        boxSizing: "border-box",
-        opacity: showModal === "create" ? 1 : 0,
-        pointerEvents: showModal === "create" ? "auto" : "none",
-        transition: "opacity 0.15s ease"
-      }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "650px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative", maxHeight: "90vh", overflowY: "auto" }}>
-          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
-          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
-            <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增员工</span>
+      {/* 新增员工弹窗 */}
+      <div
+        className="emp-modal-backdrop master-modal-backdrop"
+        onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+        style={{
+          left: showModal === "create" ? "0" : "-9999px",
+          zIndex: "var(--z-modal)",
+          opacity: showModal === "create" ? 1 : 0,
+          pointerEvents: showModal === "create" ? "auto" : "none",
+          transition: "opacity 0.15s ease",
+        }}
+      >
+        <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "650px" }}>
+          <div className="emp-modal-header">
+            <div className="emp-modal-title-wrap">
+              <span className="emp-modal-kicker">NEW EMPLOYEE</span>
+              <h2 className="emp-modal-title">
+                <span>新增员工</span>
+              </h2>
+            </div>
+            <button className="emp-modal-close-btn master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           </div>
-          <form className="account-create-form" onSubmit={submitCreate}>
-            {renderEmployeeForm(form, setForm, "创建员工", "create")}
-          </form>
-
+          <div className="emp-modal-body">
+            <form className="account-create-form" onSubmit={submitCreate}>
+              {renderEmployeeForm(form, setForm, "创建员工", "create")}
+            </form>
+          </div>
         </div>
       </div>
 
-      <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }} style={{
-        position: "fixed",
-        left: showModal === "import" ? "0" : "-9999px",
-        top: "0",
-        width: "100%",
-        height: "100%",
-        zIndex: 1500,
-        background: "rgba(15, 23, 42, 0.48)",
-        backdropFilter: "blur(16px) saturate(160%)",
-        WebkitBackdropFilter: "blur(16px) saturate(160%)",
-        display: "grid",
-        placeItems: "center",
-        padding: "24px",
-        boxSizing: "border-box",
-        opacity: showModal === "import" ? 1 : 0,
-        pointerEvents: showModal === "import" ? "auto" : "none",
-        transition: "opacity 0.15s ease"
-      }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-          <button className="master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
-          <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
-            <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>数据导入与导出</span>
+      {/* 导入/导出弹窗 */}
+      <div
+        className="emp-modal-backdrop master-modal-backdrop"
+        onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+        style={{
+          left: showModal === "import" ? "0" : "-9999px",
+          zIndex: "var(--z-modal)",
+          opacity: showModal === "import" ? 1 : 0,
+          pointerEvents: showModal === "import" ? "auto" : "none",
+          transition: "opacity 0.15s ease",
+        }}
+      >
+        <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
+          <div className="emp-modal-header">
+            <div className="emp-modal-title-wrap">
+              <span className="emp-modal-kicker">DATA TRANSFER</span>
+              <h2 className="emp-modal-title">
+                <span>数据导入与导出</span>
+              </h2>
+            </div>
+            <button className="emp-modal-close-btn master-modal-close admin-modal-close" onClick={handleCloseModal} type="button">×</button>
           </div>
 
-          <div className="admin-stack-lg">
+          <div className="emp-modal-body admin-stack-lg">
             {/* 批量导入专区 */}
             <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
               <div
                 style={{
                   padding: "32px 20px",
-                  background: isDragOver ? "#eff6ff" : "#f8fafc",
-                  border: isDragOver ? "2px dashed #3b82f6" : "1px dashed #cbd5e1",
-                  borderRadius: "8px",
+                  background: isDragOver ? "#eff6ff" : "rgba(248, 250, 252, 0.75)",
+                  border: isDragOver ? "2px dashed var(--emp-primary)" : "1px dashed rgba(203, 213, 225, 0.9)",
+                  borderRadius: "14px",
                   textAlign: "center",
                   transition: "all 0.2s ease",
                   cursor: "pointer",
@@ -1150,7 +1203,7 @@ export default function EmployeesPage() {
                   }
                 }}
               >
-                <div style={{ marginBottom: "16px", color: importFile ? "#3b82f6" : "#64748b" }}>
+                <div style={{ marginBottom: "16px", color: importFile ? "var(--emp-primary)" : "#64748b" }}>
                   {importFile ? (
                     <svg
                       width="36"
@@ -1201,27 +1254,27 @@ export default function EmployeesPage() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <a className="account-action-button" href="/api/admin/employees/template" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13.5px", padding: "8px 16px", borderRadius: "6px", color: "#2563eb", background: "#eff6ff", border: "1px solid #bfdbfe", fontWeight: "500", textDecoration: "none" }}>
+                <a className="emp-btn emp-btn--secondary account-action-button" href="/api/admin/employees/template" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", padding: "0 16px", color: "var(--emp-primary)", textDecoration: "none" }}>
                   ↓ 下载示例模板
                 </a>
-                <button className={`account-action-button account-action-button--primary${isImporting ? " is-loading" : ""}`} disabled={isImporting} type="submit" style={{ padding: "8px 32px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>
+                <button className={`emp-btn emp-btn--primary account-action-button account-action-button--primary${isImporting ? " is-loading" : ""}`} disabled={isImporting} type="submit" style={{ padding: "0 28px" }}>
                   {isImporting ? "导入中..." : "开始导入"}
                 </button>
               </div>
             </form>
 
-            <div style={{ height: "1px", background: "#e2e8f0" }}></div>
+            <div style={{ height: "1px", background: "rgba(226, 232, 240, 0.8)" }}></div>
 
             {/* 数据导出专区 */}
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "600", color: "#1e293b" }}>数据导出</h4>
+              <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>数据导出</h4>
               <div style={{ display: "flex", gap: "12px" }}>
-                <a className="account-action-button" href="/api/admin/employees/export" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", borderRadius: "6px", fontSize: "13.5px", textDecoration: "none" }}>导出全部主数据</a>
-                <a className="account-action-button" href={buildFilteredExportUrl()} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px", borderRadius: "6px", fontSize: "13.5px", textDecoration: "none" }}>导出当前筛选结果</a>
+                <a className="emp-btn emp-btn--secondary account-action-button" href="/api/admin/employees/export" style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>导出全部主数据</a>
+                <a className="emp-btn emp-btn--secondary account-action-button" href={buildFilteredExportUrl()} style={{ flex: 1, display: "inline-flex", alignItems: "center", justifyContent: "center", textDecoration: "none" }}>导出当前筛选结果</a>
               </div>
             </div>
 
-            <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "#fffbeb", borderRadius: "8px", color: "#92400e", fontSize: "13px", border: "1px solid #fde68a", lineHeight: "1.6" }}>
+            <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "var(--emp-warning-light)", borderRadius: "10px", color: "#92400e", fontSize: "13px", border: "1px solid var(--emp-warning-border)", lineHeight: "1.6" }}>
               <strong style={{ color: "#78350f" }}>模板列要求：</strong><br/>
               人员编号、人员姓名、卡号（选填；文件包含此列时留空将清空已有卡号）、部门名称、班次编号、是否管理人员、是否哺乳假、员工考勤统计来源、管理人员考勤统计来源。
             </div>
@@ -1229,32 +1282,25 @@ export default function EmployeesPage() {
         </div>
       </div>
 
+      {/* 办理离职弹窗 */}
       {showResignModal ? (
-        <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setShowResignModal(false); }} style={{
-          position: "fixed",
-          left: "0",
-          top: "0",
-          width: "100%",
-          height: "100%",
-          zIndex: 1500,
-          background: "rgba(15, 23, 42, 0.48)",
-          backdropFilter: "blur(16px) saturate(160%)",
-          WebkitBackdropFilter: "blur(16px) saturate(160%)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          boxSizing: "border-box",
-        }}>
+        <div
+          className="emp-modal-backdrop master-modal-backdrop"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowResignModal(false); }}
+        >
           <form
-            className="master-modal-container"
+            className="emp-modal-window master-modal-container"
             onSubmit={submitResign}
-            style={{ width: "100%", maxWidth: "440px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}
+            style={{ width: "100%", maxWidth: "460px" }}
           >
-            <button className="master-modal-close admin-modal-close" onClick={() => setShowResignModal(false)} type="button">×</button>
-            <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "20px" }}>
-              <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>办理离职</span>
+            <div className="emp-modal-header">
+              <div className="emp-modal-title-wrap">
+                <span className="emp-modal-kicker">PERSONNEL CHANGE</span>
+                <h2 className="emp-modal-title">办理离职</h2>
+              </div>
+              <button className="emp-modal-close-btn master-modal-close admin-modal-close" onClick={() => setShowResignModal(false)} type="button">×</button>
             </div>
-            <div className="admin-stack">
+            <div className="emp-modal-body admin-stack">
               <label className="account-field" style={{ margin: 0 }}>
                 <span className="account-field-label">离职人员编号/姓名/卡号</span>
                 <input
@@ -1271,10 +1317,10 @@ export default function EmployeesPage() {
                 <div
                   data-testid="resign-employee-preview"
                   style={{
-                    padding: "10px 16px",
-                    background: "#f1f5f9",
-                    border: "1px solid #e2e8f0",
-                    borderRadius: "8px",
+                    padding: "12px 16px",
+                    background: "rgba(241, 245, 249, 0.7)",
+                    border: "1px solid rgba(226, 232, 240, 0.9)",
+                    borderRadius: "10px",
                     fontSize: "13px",
                     lineHeight: "1.9",
                     color: "#475569",
@@ -1309,7 +1355,7 @@ export default function EmployeesPage() {
                     </>
                   ) : resignMatches.length > 1 ? (
                     <>
-                      <div style={{ color: "#dc2626" }}>该姓名对应 {resignMatches.length} 名员工，请输入人员编号精确办理：</div>
+                      <div style={{ color: "#dc2626", fontWeight: 600, marginBottom: "4px" }}>该姓名对应 {resignMatches.length} 名员工，请输入人员编号精确办理：</div>
                       {resignMatches.map((row) => (
                         <div key={row.id}>
                           <strong style={resignPreviewValueStyle}>{row.emp_no}</strong>
@@ -1333,14 +1379,14 @@ export default function EmployeesPage() {
                   value={resignDate}
                 />
               </label>
-              <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "#fffbeb", borderRadius: "8px", color: "#92400e", fontSize: "13px", border: "1px solid #fde68a", lineHeight: "1.6" }}>
+              <div className="panel-note" style={{ margin: 0, padding: "12px 16px", background: "var(--emp-warning-light)", borderRadius: "10px", color: "#92400e", fontSize: "13px", border: "1px solid var(--emp-warning-border)", lineHeight: "1.6" }}>
                 办理后：其关联登录账号将被自动禁用，各查询与统计页面不再显示该员工；可在"已离职"筛选下恢复在职。
               </div>
             </div>
-            <div style={{ marginTop: "20px", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button className="account-action-button" onClick={() => setShowResignModal(false)} type="button">取消</button>
+            <div className="emp-modal-footer">
+              <button className="emp-btn emp-btn--secondary account-action-button" onClick={() => setShowResignModal(false)} type="button">取消</button>
               <button
-                className="account-action-button account-action-button--primary"
+                className="emp-btn emp-btn--primary account-action-button account-action-button--primary"
                 disabled={isResigning}
                 type="submit"
               >

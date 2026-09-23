@@ -1,0 +1,846 @@
+/* ==========================================================================
+   员工管理 (Employee Management) - 参考查询页风格的现代紧凑高质感 macOS 布局
+   ========================================================================== */
+
+:root {
+  --emp-primary: #4f46e5;
+  --emp-primary-hover: #4338ca;
+  --emp-primary-light: rgba(79, 70, 229, 0.08);
+
+  /* macOS 质感面板变量 */
+  --emp-dock-bg: rgba(255, 255, 255, 0.68);
+  --emp-dock-bg-hover: rgba(255, 255, 255, 0.88);
+  --emp-dock-border: rgba(255, 255, 255, 0.82);
+  --emp-dock-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+
+  --emp-window-bg: rgba(255, 255, 255, 0.76);
+  --emp-window-bg-hover: rgba(255, 255, 255, 0.88);
+  --emp-window-border: rgba(255, 255, 255, 0.82);
+  --emp-window-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --emp-text-main: #0f172a;
+  --emp-text-secondary: #475569;
+  --emp-text-muted: #94a3b8;
+
+  --emp-success: #059669;
+  --emp-success-light: rgba(236, 253, 245, 0.85);
+  --emp-success-border: rgba(167, 243, 208, 0.9);
+
+  --emp-warning: #d97706;
+  --emp-warning-light: rgba(254, 243, 199, 0.85);
+  --emp-warning-border: rgba(253, 230, 138, 0.9);
+
+  --emp-info: #0284c7;
+  --emp-info-light: rgba(240, 249, 255, 0.85);
+  --emp-info-border: rgba(186, 230, 253, 0.9);
+
+  --emp-danger: #e11d48;
+  --emp-danger-light: rgba(255, 241, 242, 0.85);
+  --emp-danger-border: rgba(254, 205, 211, 0.9);
+}
+
+/* ==========================================================================
+   页面整体布局容器 (参考查询页设计：全宽利用，紧凑排布，消除无意义大空白)
+   ========================================================================== */
+.employee-management-page.employee-dashboard-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 16px;
+  width: 100%;
+  height: calc(100vh - 92px);
+  min-height: 0;
+  max-height: calc(100vh - 92px);
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ==========================================================================
+   顶部控制栏 (Top Executive Control Rail)
+   左侧：标题 + 状态指标胶囊
+   右侧：macOS 悬浮 Dock 操作条
+   ========================================================================== */
+.emp-top-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px 18px;
+  background: var(--emp-window-bg);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--emp-window-border);
+  border-radius: 16px;
+  box-shadow: var(--emp-window-shadow);
+  position: relative;
+  z-index: 10;
+}
+
+.emp-top-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.emp-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--emp-primary);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.emp-main-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--emp-text-main);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* 指标胶囊群 (Executive Pills) */
+.emp-metrics-capsules {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(203, 213, 225, 0.7);
+}
+
+.emp-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(248, 250, 252, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  color: var(--emp-text-secondary);
+  line-height: 1;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.emp-stat-pill strong {
+  font-weight: 700;
+  color: var(--emp-text-main);
+}
+
+.emp-stat-pill--active {
+  background: var(--emp-success-light);
+  border-color: var(--emp-success-border);
+  color: #065f46;
+}
+
+.emp-stat-pill--active strong {
+  color: #047857;
+}
+
+.emp-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--emp-success);
+  box-shadow: 0 0 0 2.5px rgba(5, 150, 105, 0.2);
+  animation: emp-pulse 2s infinite ease-in-out;
+}
+
+@keyframes emp-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+.emp-stat-pill--manager {
+  background: var(--emp-info-light);
+  border-color: var(--emp-info-border);
+  color: #0369a1;
+}
+
+.emp-stat-pill--manager strong {
+  color: #0284c7;
+}
+
+.emp-stat-pill--nursing {
+  background: var(--emp-warning-light);
+  border-color: var(--emp-warning-border);
+  color: #92400e;
+}
+
+.emp-stat-pill--nursing strong {
+  color: #b45309;
+}
+
+/* ==========================================================================
+   macOS Dock 风格悬浮操作栏 (Authentic macOS Dock Bar)
+   ========================================================================== */
+
+.emp-dock-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.emp-dock-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--emp-dock-bg);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--emp-dock-border);
+  border-radius: 14px;
+  box-shadow: var(--emp-dock-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.emp-dock-bar:hover {
+  background: var(--emp-dock-bg-hover);
+  border-color: #ffffff;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+}
+
+.emp-dock-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--emp-text-main);
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.emp-dock-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-1.5px);
+  color: var(--emp-primary);
+}
+
+.emp-dock-item:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+.emp-dock-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.emp-dock-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 0 2px;
+  flex: none;
+}
+
+/* 新建高亮操作 */
+.emp-dock-item--create {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--emp-primary);
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.emp-dock-item--create:hover:not(:disabled) {
+  background: var(--emp-primary);
+  color: #ffffff;
+  border-color: var(--emp-primary);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.emp-dock-selection-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  height: 34px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--emp-text-secondary);
+  user-select: none;
+}
+
+/* ==========================================================================
+   macOS Window 风格筛选导轨 (Filter Rail - 参考查询页紧凑设计)
+   默认只展示员工选择器，点击展开才显示其余筛选条件，全毛玻璃特效
+   ========================================================================== */
+
+.employee-management-page .emp-filter-rail,
+.employee-management-page .emp-filter-rail.master-filter-panel {
+  background: rgba(255, 255, 255, 0.58) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.25),
+    0 8px 24px rgba(15, 23, 42, 0.05) !important;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  z-index: 9;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.employee-management-page .emp-filter-rail:hover {
+  background: rgba(255, 255, 255, 0.68) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
+  box-shadow:
+    inset 0 1.5px 1px 0 #ffffff,
+    inset 0 -1px 1px 0 rgba(255, 255, 255, 0.3),
+    0 12px 30px rgba(15, 23, 42, 0.08) !important;
+}
+
+.emp-filter-primary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  width: 100%;
+}
+
+.emp-filter-picker-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 260px;
+  max-width: 520px;
+}
+
+.emp-filter-picker-group .emp-filter-label {
+  flex-shrink: 0;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--emp-text-secondary);
+  white-space: nowrap;
+}
+
+.emp-filter-picker-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 员工选择器输入框毛玻璃适配 */
+.emp-filter-rail .employee-lookup .form-control {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  border-right: none !important;
+  border-radius: 8px 0 0 8px !important;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.03) !important;
+}
+
+.emp-filter-rail .employee-lookup .form-control:focus {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: var(--emp-primary) !important;
+}
+
+.emp-filter-rail .employee-lookup .btn {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  border-left: none !important;
+  border-radius: 0 8px 8px 0 !important;
+}
+
+.emp-filter-rail .employee-lookup .btn:hover {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: var(--emp-primary) !important;
+}
+
+.emp-filter-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 展开/收起切换按钮 */
+.emp-filter-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: var(--emp-text-main);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  user-select: none;
+  outline: none;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.emp-filter-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #ffffff;
+  color: var(--emp-primary);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15), inset 0 1px 0 #ffffff;
+}
+
+.emp-filter-toggle-btn.is-expanded {
+  background: rgba(79, 70, 229, 0.1);
+  border-color: rgba(79, 70, 229, 0.3);
+  color: var(--emp-primary);
+}
+
+.emp-filter-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--emp-primary);
+  margin-left: 2px;
+}
+
+/* 点开后展示的其余筛选条件 */
+.emp-filter-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px 14px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(226, 232, 240, 0.6);
+  animation: emp-slide-down 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes emp-slide-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.emp-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.emp-filter-label {
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--emp-text-secondary);
+  letter-spacing: -0.01em;
+}
+
+.emp-filter-input,
+.emp-filter-select {
+  height: 34px;
+  padding: 0 10px;
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--emp-text-main);
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.03);
+}
+
+.emp-filter-input:focus,
+.emp-filter-select:focus {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: var(--emp-primary);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+/* ==========================================================================
+   macOS Window 风格数据表格区 (Table Container)
+   ========================================================================== */
+
+.emp-table-window {
+  background: var(--emp-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--emp-window-border);
+  border-radius: 16px;
+  box-shadow: var(--emp-window-shadow);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  position: relative;
+  z-index: 1;
+}
+
+.emp-table-window .query-result-panel {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+.emp-table-window .query-result-table {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+.emp-table-window .legacy-table-panel,
+.emp-table-window .master-table-panel,
+.emp-table-window .master-table-panel--with-filter {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.emp-table-window .legacy-table-wrap {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: auto !important;
+  background: transparent !important;
+}
+
+.emp-table-window .table-pager {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+  background: rgba(248, 250, 252, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.emp-table-window .master-table {
+  background: transparent !important;
+  margin: 0;
+  width: 100%;
+}
+
+.emp-table-window .master-table th,
+.emp-table-window .legacy-table-head-cell {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(248, 250, 252, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--emp-text-secondary);
+  font-weight: 700;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  padding: 10px 12px;
+}
+
+.emp-table-window .master-table td {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.85);
+  font-size: 13px;
+  color: var(--emp-text-main);
+  padding: 9px 12px;
+  vertical-align: middle;
+}
+
+.emp-table-window .master-table tr:hover td {
+  background: rgba(248, 250, 252, 0.55) !important;
+}
+
+/* 行内操作组 */
+.employee-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.employee-row-action-group {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.employee-row-action-edit,
+.employee-row-menu-trigger {
+  height: 28px;
+  padding: 0 9px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--emp-text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.employee-row-action-edit:hover,
+.employee-row-menu-trigger:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--emp-primary);
+}
+
+.employee-row-menu-trigger {
+  border-left: 1px solid rgba(203, 213, 225, 0.7);
+  padding: 0 7px;
+  font-size: 10px;
+}
+
+/* ==========================================================================
+   macOS Sheet 风格弹窗 (Glass Modals)
+   ========================================================================== */
+
+.emp-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: emp-fade-in 0.2s ease;
+}
+
+@keyframes emp-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.emp-modal-window {
+  position: relative;
+  width: 100%;
+  max-width: 650px;
+  max-height: 90vh;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: emp-modal-scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes emp-modal-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.emp-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.emp-modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.emp-modal-kicker {
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  color: var(--emp-primary);
+  text-transform: uppercase;
+}
+
+.emp-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--emp-text-main);
+  letter-spacing: -0.02em;
+}
+
+.emp-modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  color: var(--emp-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.emp-modal-close-btn:hover {
+  background: #ffffff;
+  color: var(--emp-text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.emp-modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.emp-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(248, 250, 252, 0.5);
+}
+
+/* 按钮通用样式 */
+.emp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.emp-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.emp-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.emp-btn--primary {
+  background: var(--emp-primary);
+  color: #ffffff;
+  border-color: var(--emp-primary);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.emp-btn--primary:hover:not(:disabled) {
+  background: var(--emp-primary-hover);
+  border-color: var(--emp-primary-hover);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.emp-btn--secondary {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--emp-text-main);
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.emp-btn--secondary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.9);
+  color: var(--emp-primary);
+}
+
+/* 响应式适配 */
+@media (max-width: 900px) {
+  .employee-management-page.employee-dashboard-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .emp-table-window {
+    min-height: 400px;
+  }
+  .emp-top-rail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .emp-top-left {
+    justify-content: space-between;
+  }
+  .emp-metrics-capsules {
+    border-left: none;
+    padding-left: 0;
+    width: 100%;
+  }
+  .emp-dock-container {
+    justify-content: center;
+  }
+  .emp-dock-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
