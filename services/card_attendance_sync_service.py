@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import calendar
-import unicodedata
 from collections import defaultdict
 from datetime import date, datetime
 
@@ -13,18 +11,10 @@ from models.daily_record import DailyRecord
 from models.dingtalk_sync_run import DingTalkSyncRun
 from models.employee import Employee
 from services.import_service import ImportService
+from services.attendance_utils import month_bounds, normalize_employee_no
 
 
 CARD_SYNC_SOURCE = "card"
-
-
-def _month_bounds(month: str) -> tuple[date, date]:
-    start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    return start, start.replace(day=calendar.monthrange(start.year, start.month)[1])
-
-
-def _normalized_emp_no(value) -> str:
-    return unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
 
 
 def _actual_hours(times: list[str]) -> float | None:
@@ -113,11 +103,11 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
     if account_set is None:
         update_sync_progress(account_set_id, "employee", 100, "账套不存在", "failed")
         raise ValueError("Account set does not exist")
-    start_date, end_date = _month_bounds(month)
+    start_date, end_date = month_bounds(month)
 
     employees = Employee.query.order_by(Employee.id).all()
     writable = [employee for employee in employees if ImportService._can_receive_employee_source(employee)]
-    employees_by_no = {_normalized_emp_no(employee.emp_no): employee for employee in writable}
+    employees_by_no = {normalize_employee_no(employee.emp_no): employee for employee in writable}
     employees_by_card = {
         str(employee.card_no).strip(): employee
         for employee in writable
@@ -125,7 +115,7 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
     }
     # 未匹配报告只提示完全无法对应本地员工的工号；能对上但该员工
     # （如管理人员）不参与员工口径统计的，静默跳过即可。
-    local_emp_nos = {_normalized_emp_no(employee.emp_no) for employee in employees if employee.emp_no}
+    local_emp_nos = {normalize_employee_no(employee.emp_no) for employee in employees if employee.emp_no}
     unmatched_by_key = {}
 
     try:
@@ -164,18 +154,18 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
                 continue
             person_no = str(item.get("person_no") or "").strip()
             card_no = str(item.get("card_no") or "").strip()
-            employee = employees_by_no.get(_normalized_emp_no(person_no))
+            employee = employees_by_no.get(normalize_employee_no(person_no))
             if employee is None and card_no:
                 employee = employees_by_card.get(card_no)
             if employee is None:
-                if _normalized_emp_no(person_no) in local_emp_nos:
+                if normalize_employee_no(person_no) in local_emp_nos:
                     continue
                 detail = {
                     "emp_no": person_no,
                     "name": str(item.get("person_name") or "").strip(),
                     "record_date": record_date.isoformat(),
                 }
-                key = (_normalized_emp_no(person_no), detail["name"], detail["record_date"])
+                key = (normalize_employee_no(person_no), detail["name"], detail["record_date"])
                 unmatched_by_key.setdefault(key, detail)
                 continue
             grouped[(employee.id, record_date)].append(item)

@@ -27,6 +27,7 @@ import type { AdminAccountSet, AdminAccountSetFactoryRestEntry, AdminAccountSetI
 import MonthPicker from "../../components/common/MonthPicker";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
+import "./account-center.css";
 
 const FILE_INPUT_LABELS = [
   "1. 请假单",
@@ -108,10 +109,6 @@ export default function AdminDashboardPage() {
     [accountSets, selectedAccountSetId],
   );
 
-  const activeAccountSet = useMemo(
-    () => accountSets.find((row) => row.is_active) ?? null,
-    [accountSets],
-  );
   const factoryRestSummary = useMemo(
     () => factoryRestEntries.reduce((sum, entry) => sum + Number(entry.unit || 0), 0),
     [factoryRestEntries],
@@ -355,18 +352,80 @@ export default function AdminDashboardPage() {
       <QueryProgressOverlay active={progressVisible} className="query-progress-overlay-page" progress={progress} text={loadingText} />
 
 
-      {/* 顶部控制与账套信息行 */}
-      <div className="account-top-control-row" style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "12px",
-        marginBottom: "16px",
-        marginTop: "16px"
-      }}>
-        {/* 左侧：控制按钮组 */}
-        <div className="account-panel-selector" style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+      <header className="account-center-heading">
+        <div>
+          <span className="account-center-eyebrow">ADMINISTRATION</span>
+          <h1>账套中心</h1>
+          <p>管理月度账套、导入考勤数据并查看处理记录。</p>
+        </div>
+        <span className="account-center-count">共 {accountSets.length} 个账套</span>
+      </header>
+
+      <section className="account-center-overview" aria-label="当前账套概览">
+        <div className="account-center-overview-main">
+          <div className="account-center-overview-copy">
+            <span className="account-center-overview-label">正在查看</span>
+            <div className="account-center-overview-title-row">
+              <h2>{selectedAccountSet?.name ?? "请选择账套"}</h2>
+              {selectedAccountSet ? (
+                <span className={`account-center-status${selectedAccountSet.is_locked ? " is-locked" : " is-open"}`}>
+                  <span aria-hidden="true" />
+                  {selectedAccountSet.is_locked ? "已锁定" : "可编辑"}
+                </span>
+              ) : null}
+            </div>
+            <p>
+              {selectedAccountSet
+                ? `${selectedAccountSet.month}${selectedAccountSet.is_active ? " · 当前激活账套" : " · 历史账套"}`
+                : "选择一个账套开始管理。"}
+            </p>
+          </div>
+          <div className="account-center-overview-selector">
+            <AccountSetSelector
+              accountSets={accountSets}
+              compact
+              label="切换账套"
+              onChange={(month) => {
+                const accountSet = accountSets.find((item) => item.month === month);
+                setSelectedAccountSetId(accountSet?.id ?? null);
+              }}
+              value={selectedAccountSet?.month ?? ""}
+            />
+          </div>
+        </div>
+
+        <div className="account-center-metrics">
+          <div className="account-center-metric">
+            <span className="account-center-metric-icon is-blue" aria-hidden="true">↥</span>
+            <div><span>导入记录</span><strong>{imports.length}</strong></div>
+          </div>
+          <div className="account-center-metric">
+            <span className="account-center-metric-icon is-violet" aria-hidden="true">◷</span>
+            <div><span>厂休天数</span><strong>{selectedAccountSet?.factory_rest_entries?.reduce((sum, entry) => sum + Number(entry.unit || 0), 0) ?? 0}<small> 天</small></strong></div>
+          </div>
+          <div className="account-center-metric">
+            <span className="account-center-metric-icon is-amber" aria-hidden="true">✦</span>
+            <div><span>福利天数</span><strong>{selectedAccountSet?.monthly_benefit_days ?? 0}<small> 天</small></strong></div>
+          </div>
+        </div>
+
+        <div className="account-panel-selector account-center-actions">
+          {selectedAccountSet && !selectedAccountSet.is_active ? (
+            <button
+              className="account-center-set-active"
+              disabled={isWorking}
+              onClick={() => void runAction(async () => {
+                await activateAccountSet(selectedAccountSet.id);
+                clearQueryBootstrapCache();
+                window.dispatchEvent(new CustomEvent("account-set-active-changed"));
+                notification.success(`已切换当前账套：${selectedAccountSet.name}`);
+                await reloadAccountSets(selectedAccountSet.id);
+              })}
+              type="button"
+            >
+              设为当前
+            </button>
+          ) : null}
           <button
             className="btn-settings"
             onClick={() => setShowModal("settings")}
@@ -376,7 +435,7 @@ export default function AdminDashboardPage() {
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
-            账套设置
+            账套管理
           </button>
           <button
             className="btn-upload"
@@ -417,73 +476,18 @@ export default function AdminDashboardPage() {
             管理人员计算
           </button>
         </div>
+      </section>
 
-        {/* 右侧：当前激活账套信息摘要 */}
-        <div className="active-account-set-summary-bar" style={{
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "16px",
-          minHeight: "36px",
-          boxSizing: "border-box",
-          padding: "0 16px",
-          background: "var(--ent-secondary-bg, #f8fafc)",
-          border: "1px solid var(--ent-border-strong)",
-          borderRadius: "var(--ent-radius-lg, 8px)",
-          fontSize: "13.5px",
-          color: "var(--ent-text)",
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
-        }}>
-          {activeAccountSet ? (
-            <>
-              <div className="admin-row">
-                <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>当前激活账套：</span>
-                <strong style={{ fontSize: "14.5px", color: "var(--ent-primary, #0f172a)" }}>{activeAccountSet.name}</strong>
-              </div>
-              <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div className="admin-row">
-                <span style={{ color: "var(--ent-text-secondary)" }}>账套状态：</span>
-                <span className={`badge ${activeAccountSet.is_locked ? "badge-danger" : "badge-success"}`} style={{
-                  padding: "2px 8px",
-                  borderRadius: "4px",
-                  fontSize: "11.5px",
-                  fontWeight: "600",
-                  background: activeAccountSet.is_locked ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)",
-                  color: activeAccountSet.is_locked ? "#ef4444" : "#22c55e",
-                  border: activeAccountSet.is_locked ? "1px solid rgba(239, 68, 68, 0.15)" : "1px solid rgba(34, 197, 94, 0.15)"
-                }}>
-                  {activeAccountSet.is_locked ? "已锁定" : "未锁定"}
-                </span>
-              </div>
-              <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div className="admin-row">
-                <span style={{ color: "var(--ent-text-secondary)" }}>厂休天数：</span>
-                <strong style={{ color: "var(--ent-primary)" }}>{activeAccountSet.factory_rest_entries?.reduce((sum, entry) => sum + Number(entry.unit || 0), 0) ?? 0} 天</strong>
-              </div>
-              <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-              <div className="admin-row">
-                <span style={{ color: "var(--ent-text-secondary)" }}>福利天数：</span>
-                <strong style={{ color: "var(--ent-primary)" }}>{activeAccountSet.monthly_benefit_days ?? 0} 天</strong>
-              </div>
-            </>
-          ) : (
-            <span style={{ color: "var(--ent-text-secondary)" }}>暂无激活账套</span>
-          )}
-        </div>
-      </div>
-
-      <div className="account-workflow" style={{ display: "block" }}>
-        <div className="account-workflow-main" style={{ width: "100%", flex: 1 }}>
-          <div className="account-card-header" style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "12px 4px",
-            borderBottom: "none",
-            background: "transparent"
-          }}>
-            <span style={{ fontSize: "16px", fontWeight: "600" }}>账套导入记录</span>
-            <span className="account-card-header-note">按当前选中账套展示</span>
+      <div className="account-workflow account-center-imports">
+        <div className="account-workflow-main">
+          <div className="account-center-section-heading">
+            <div>
+              <span className="account-center-eyebrow">ACTIVITY</span>
+              <h2>导入记录</h2>
+            </div>
+            <span className="account-center-card-note">
+              {selectedAccountSet ? `${selectedAccountSet.name} · ${imports.length} 条记录` : "按当前选中账套展示"}
+            </span>
           </div>
           <QueryResultPanel>
             <QueryTable

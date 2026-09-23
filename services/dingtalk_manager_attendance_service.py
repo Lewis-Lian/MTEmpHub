@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import calendar
 import re
-import unicodedata
 from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
 
@@ -13,6 +11,7 @@ from models.account_set import AccountSet
 from models.daily_record import DailyRecord
 from models.dingtalk_sync_run import DingTalkSyncRun
 from models.employee import Employee
+from services.attendance_utils import month_bounds, normalize_employee_no
 
 
 _RESULT_LABELS = {
@@ -67,15 +66,6 @@ def sanitize_dingtalk_error(error: Exception | str | None) -> str:
         sanitized,
     )
     return sanitized or "钉钉同步失败，请查看服务端日志后重试"
-
-
-def _month_bounds(month: str) -> tuple[date, date]:
-    start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    return start, start.replace(day=calendar.monthrange(start.year, start.month)[1])
-
-
-def _normalized_emp_no(value) -> str:
-    return unicodedata.normalize("NFKC", str(value or "")).strip().casefold()
 
 
 def _record_date(value) -> date:
@@ -283,10 +273,10 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
     if account_set is None:
         update_sync_progress(account_set_id, "manager", 100, "账套不存在", "failed")
         raise ValueError("Account set does not exist")
-    start_date, end_date = _month_bounds(month)
+    start_date, end_date = month_bounds(month)
     managers = Employee.query.filter_by(is_manager=True).order_by(Employee.id).all()
     user_ids = list(dict.fromkeys(str(employee.dingtalk_user_id).strip() for employee in managers if employee.dingtalk_user_id and str(employee.dingtalk_user_id).strip()))
-    employees_by_no = {_normalized_emp_no(employee.emp_no): employee for employee in managers}
+    employees_by_no = {normalize_employee_no(employee.emp_no): employee for employee in managers}
     employees_by_user_id = {
         str(employee.dingtalk_user_id).strip(): employee
         for employee in managers
@@ -300,12 +290,12 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
             # 匹配范围是全量员工工号：通讯录里对应本系统任意员工的条目都不是"未匹配"，
             # 否则整个组织会被灌进未匹配报告，只有无法对应任何本地员工的工号才需要提醒。
             local_emp_nos = {
-                _normalized_emp_no(emp_no)
+                normalize_employee_no(emp_no)
                 for (emp_no,) in db.session.query(Employee.emp_no).all()
                 if emp_no
             }
             for directory_user in client.directory_users():
-                normalized_no = _normalized_emp_no(directory_user.get("employee_no"))
+                normalized_no = normalize_employee_no(directory_user.get("employee_no"))
                 employee = employees_by_no.get(normalized_no)
                 user_id = str(directory_user.get("employee_user_id") or "").strip()
                 if employee is None:
@@ -316,7 +306,7 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
                         "name": _record_name(directory_user),
                         "record_date": "",
                     }
-                    key = (_normalized_emp_no(detail["emp_no"]), detail["name"], "")
+                    key = (normalize_employee_no(detail["emp_no"]), detail["name"], "")
                     unmatched_by_key.setdefault(key, detail)
                     continue
                 if not user_id:
@@ -359,8 +349,8 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
             if not start_date <= record_date <= end_date:
                 continue
             emp_no = str(item.get("employee_no") or "").strip()
-            employee = employees_by_no.get(_normalized_emp_no(emp_no))
-            if employee is None and not _normalized_emp_no(emp_no):
+            employee = employees_by_no.get(normalize_employee_no(emp_no))
+            if employee is None and not normalize_employee_no(emp_no):
                 employee = employees_by_user_id.get(str(item.get("employee_user_id") or "").strip())
             if employee is None:
                 detail = {
@@ -368,7 +358,7 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
                     "name": _record_name(item),
                     "record_date": record_date.isoformat(),
                 }
-                key = (_normalized_emp_no(emp_no), detail["name"], detail["record_date"])
+                key = (normalize_employee_no(emp_no), detail["name"], detail["record_date"])
                 unmatched_by_key.setdefault(key, detail)
                 continue
             grouped[(employee.id, record_date)].append(item)

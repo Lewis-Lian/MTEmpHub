@@ -786,13 +786,13 @@ body {
 }
 
 /* 消除查询页在 app-content 内的外层留白与背景割裂 */
-.app-content:has(.employee-dashboard-page) {
+.app-content:has(.app-tab-pane.is-active > .employee-dashboard-page) {
   padding: 0 !important;
   background: var(--qh-bg-page, var(--ent-secondary-bg)) !important;
 }
 
 @supports not selector(:has(*)) {
-  .app-content > .app-tab-pane > .employee-dashboard-page {
+  .app-content > .app-tab-pane.is-active > .employee-dashboard-page {
     margin: -20px -24px -24px -24px;
     height: calc(100% + 44px);
     min-height: calc(100% + 44px);
