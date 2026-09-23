@@ -1133,16 +1133,9 @@ export default function EmployeesPage() {
       ) : null}
 
       {/* 新增员工弹窗 */}
-      <div
+      {showModal === "create" ? <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          left: showModal === "create" ? "0" : "-9999px",
-          zIndex: "var(--z-modal)",
-          opacity: showModal === "create" ? 1 : 0,
-          pointerEvents: showModal === "create" ? "auto" : "none",
-          transition: "opacity 0.15s ease",
-        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "650px" }}>
           <div className="emp-modal-header">
@@ -1160,19 +1153,12 @@ export default function EmployeesPage() {
             </form>
           </div>
         </div>
-      </div>
+      </div> : null}
 
       {/* 导入/导出弹窗 */}
-      <div
+      {showModal === "import" ? <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          left: showModal === "import" ? "0" : "-9999px",
-          zIndex: "var(--z-modal)",
-          opacity: showModal === "import" ? 1 : 0,
-          pointerEvents: showModal === "import" ? "auto" : "none",
-          transition: "opacity 0.15s ease",
-        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
           <div className="emp-modal-header">
@@ -1293,7 +1279,7 @@ export default function EmployeesPage() {
             </div>
           </div>
         </div>
-      </div>
+      </div> : null}
 
       {/* 办理离职弹窗 */}
       {showResignModal ? (
