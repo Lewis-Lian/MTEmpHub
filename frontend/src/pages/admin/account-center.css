@@ -1,94 +1,56 @@
 /* ==========================================================================
-   账套管理 (Account Set Management) - 极高通透感透明磨砂玻璃 (Glassmorphism) 风格
+   账套管理 (Account Set Management) - macOS 原生设计语言与 Dock 栏风格
    ========================================================================== */
 
 :root {
   --acm-primary: #4f46e5;
   --acm-primary-hover: #4338ca;
-  --acm-primary-light: rgba(79, 70, 229, 0.12);
-  --acm-glass-bg: rgba(255, 255, 255, 0.52);
-  --acm-glass-bg-subtle: rgba(255, 255, 255, 0.38);
-  --acm-glass-bg-hover: rgba(255, 255, 255, 0.68);
-  --acm-glass-border: rgba(255, 255, 255, 0.78);
-  --acm-glass-border-strong: rgba(255, 255, 255, 0.92);
-  --acm-glass-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.9);
-  --acm-glass-shadow: 0 12px 36px 0 rgba(31, 38, 135, 0.08), 0 4px 12px 0 rgba(0, 0, 0, 0.03);
+  --acm-primary-light: rgba(79, 70, 229, 0.08);
+
+  /* macOS 质感面板变量 */
+  --acm-dock-bg: rgba(255, 255, 255, 0.65);
+  --acm-dock-bg-hover: rgba(255, 255, 255, 0.85);
+  --acm-dock-border: rgba(255, 255, 255, 0.75);
+  --acm-dock-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+
+  --acm-window-bg: rgba(255, 255, 255, 0.78);
+  --acm-window-bg-hover: rgba(255, 255, 255, 0.88);
+  --acm-window-border: rgba(255, 255, 255, 0.8);
+  --acm-window-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
   --acm-text-main: #0f172a;
-  --acm-text-secondary: #334155;
-  --acm-text-muted: #64748b;
+  --acm-text-secondary: #475569;
+  --acm-text-muted: #94a3b8;
+
   --acm-success: #059669;
-  --acm-success-light: rgba(236, 253, 245, 0.75);
-  --acm-success-border: rgba(167, 243, 208, 0.85);
+  --acm-success-light: rgba(236, 253, 245, 0.8);
+  --acm-success-border: rgba(167, 243, 208, 0.9);
+
   --acm-warning: #d97706;
-  --acm-warning-light: rgba(254, 243, 199, 0.75);
-  --acm-warning-border: rgba(253, 230, 138, 0.85);
+  --acm-warning-light: rgba(254, 243, 199, 0.8);
+  --acm-warning-border: rgba(253, 230, 138, 0.9);
+
   --acm-info: #0284c7;
-  --acm-info-light: rgba(240, 249, 255, 0.75);
-  --acm-info-border: rgba(186, 230, 253, 0.85);
+  --acm-info-light: rgba(240, 249, 255, 0.8);
+  --acm-info-border: rgba(186, 230, 253, 0.9);
+
   --acm-danger: #e11d48;
-  --acm-danger-light: rgba(255, 241, 242, 0.75);
-  --acm-danger-border: rgba(254, 205, 211, 0.85);
+  --acm-danger-light: rgba(255, 241, 242, 0.8);
+  --acm-danger-border: rgba(254, 205, 211, 0.9);
 }
 
-/* 页面整体布局容器及绚丽流光极光网格 (确保磨砂玻璃下方有丰富色彩折射) */
+/* 页面整体布局容器 (完全融入系统全局背景，无任何割裂的色块或边缘) */
 .account-center-page {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  padding: 10px 0 40px;
+  gap: 20px;
+  padding: 4px 0 36px;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   box-sizing: border-box;
-
-  /* 显式多点绚丽极光渐变背景网格，使半透明玻璃面板呈现极强的折射与光泽 */
-  background-image: 
-    radial-gradient(at 10% 8%, rgba(99, 102, 241, 0.28) 0px, transparent 48%),
-    radial-gradient(at 90% 12%, rgba(168, 85, 247, 0.25) 0px, transparent 45%),
-    radial-gradient(at 25% 55%, rgba(14, 165, 233, 0.26) 0px, transparent 52%),
-    radial-gradient(at 88% 68%, rgba(236, 72, 153, 0.2) 0px, transparent 48%),
-    radial-gradient(at 50% 92%, rgba(16, 185, 129, 0.22) 0px, transparent 50%);
-  background-attachment: local;
-}
-
-/* 背景流动光球增强光影景深 */
-.account-center-page::before {
-  content: "";
-  position: absolute;
-  top: 10px;
-  right: 2%;
-  width: 500px;
-  height: 500px;
-  background: radial-gradient(circle, rgba(129, 140, 248, 0.35) 0%, rgba(192, 132, 252, 0.25) 45%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(60px);
-}
-
-.account-center-page::after {
-  content: "";
-  position: absolute;
-  top: 320px;
-  left: -20px;
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(45, 212, 191, 0.22) 45%, transparent 70%);
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 0;
-  filter: blur(60px);
-}
-
-/* 确保页面元素在流光层上方 */
-.account-center-heading,
-.acm-hero-card,
-.acm-dashboard-grid,
-.acm-imports-section {
-  position: relative;
-  z-index: 1;
+  background: transparent;
 }
 
 /* 顶部页面标题栏 */
@@ -106,17 +68,17 @@
   gap: 6px;
   color: var(--acm-primary);
   font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.1em;
+  font-weight: 750;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .account-center-heading h1 {
   margin: 4px 0 0;
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 800;
   color: var(--acm-text-main);
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   line-height: 1.2;
 }
 
@@ -132,37 +94,37 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.55);
+  background: var(--acm-window-bg);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--acm-glass-border);
+  border: 1px solid var(--acm-window-border);
   border-radius: 9999px;
   font-size: 12px;
-  font-weight: 650;
+  font-weight: 600;
   color: var(--acm-text-secondary);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
 }
 
 /* ==========================================================================
-   账套核心状态控制看板 (透光磨砂玻璃 Hero Card)
+   macOS Window 风格主卡片 (Hero Card)
    ========================================================================== */
 
 .acm-hero-card {
   position: relative;
-  background: var(--acm-glass-bg);
-  backdrop-filter: blur(28px) saturate(210%);
-  -webkit-backdrop-filter: blur(28px) saturate(210%);
-  border: 1.5px solid var(--acm-glass-border);
+  background: var(--acm-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--acm-window-border);
   border-radius: 20px;
-  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
+  box-shadow: var(--acm-window-shadow);
   overflow: hidden;
-  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acm-hero-card:hover {
-  background: var(--acm-glass-bg-hover);
-  border-color: var(--acm-glass-border-strong);
-  box-shadow: 0 18px 45px -8px rgba(31, 38, 135, 0.12), var(--acm-glass-highlight);
+  background: var(--acm-window-bg-hover);
+  border-color: #ffffff;
+  box-shadow: 0 14px 32px -4px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .acm-hero-header {
@@ -172,8 +134,7 @@
   flex-wrap: wrap;
   gap: 16px;
   padding: 22px 28px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
-  background: transparent;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
 }
 
 .acm-hero-title-group {
@@ -185,10 +146,10 @@
 
 .acm-hero-title {
   margin: 0;
-  font-size: 23px;
-  font-weight: 800;
+  font-size: 22px;
+  font-weight: 750;
   color: var(--acm-text-main);
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
 }
 
 .acm-badge {
@@ -200,9 +161,8 @@
   font-size: 11.5px;
   font-weight: 650;
   line-height: 1;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .acm-badge-dot {
@@ -219,7 +179,7 @@
 }
 
 .acm-badge--active .acm-badge-dot {
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.28);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
   animation: acm-pulse 2s infinite ease-in-out;
 }
 
@@ -229,7 +189,7 @@
 }
 
 .acm-badge--inactive {
-  background: rgba(241, 245, 249, 0.65);
+  background: rgba(241, 245, 249, 0.7);
   color: var(--acm-text-secondary);
   border: 1px solid rgba(226, 232, 240, 0.8);
 }
@@ -251,14 +211,14 @@
   flex: none;
 }
 
-/* 核心指标条 (透光中继条) */
+/* 核心指标条 (Metrics Bar) */
 .acm-metrics-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(248, 250, 252, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
 }
 
 .acm-metric-card {
@@ -266,48 +226,45 @@
   align-items: center;
   gap: 14px;
   padding: 16px 26px;
-  transition: background 0.18s ease;
+  transition: background 0.15s ease;
 }
 
 .acm-metric-card + .acm-metric-card {
-  border-left: 1px solid rgba(255, 255, 255, 0.45);
+  border-left: 1px solid rgba(226, 232, 240, 0.7);
 }
 
 .acm-metric-card:hover {
-  background: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .acm-metric-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
   flex: none;
-  font-size: 19px;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  font-size: 18px;
 }
 
 .acm-metric-icon--indigo {
-  background: rgba(79, 70, 229, 0.16);
+  background: rgba(79, 70, 229, 0.1);
   color: #4f46e5;
 }
 
 .acm-metric-icon--amber {
-  background: rgba(217, 119, 6, 0.16);
+  background: rgba(217, 119, 6, 0.1);
   color: #d97706;
 }
 
 .acm-metric-icon--emerald {
-  background: rgba(5, 150, 105, 0.16);
+  background: rgba(5, 150, 105, 0.1);
   color: #059669;
 }
 
 .acm-metric-icon--sky {
-  background: rgba(2, 132, 199, 0.16);
+  background: rgba(2, 132, 199, 0.1);
   color: #0284c7;
 }
 
@@ -319,43 +276,145 @@
 }
 
 .acm-metric-label {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--acm-text-secondary);
 }
 
 .acm-metric-value {
-  font-size: 20px;
-  font-weight: 800;
+  font-size: 19px;
+  font-weight: 750;
   color: var(--acm-text-main);
   line-height: 1.2;
 }
 
 .acm-metric-unit {
-  font-size: 12.5px;
-  font-weight: 550;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--acm-text-secondary);
   margin-left: 3px;
 }
 
-/* 主操作按钮工具栏 */
-.acm-actions-bar {
+/* ==========================================================================
+   macOS Dock 风格悬浮操作栏 (Authentic macOS Dock Bar)
+   ========================================================================== */
+
+.acm-dock-container {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 14px 26px;
-  background: rgba(255, 255, 255, 0.32);
+  justify-content: center;
+  padding: 16px 24px;
+  background: rgba(248, 250, 252, 0.35);
 }
 
-.acm-actions-group {
-  display: flex;
+.acm-dock-bar {
+  display: inline-flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--acm-dock-bg);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border: 1px solid var(--acm-dock-border);
+  border-radius: 18px;
+  box-shadow: var(--acm-dock-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.acm-dock-bar:hover {
+  background: var(--acm-dock-bg-hover);
+  border-color: #ffffff;
+  box-shadow: 0 20px 42px -6px rgba(15, 23, 42, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+}
+
+.acm-dock-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--acm-text-main);
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.acm-dock-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  color: var(--acm-primary);
+}
+
+.acm-dock-item:active:not(:disabled) {
+  transform: translateY(0) scale(0.97);
+}
+
+.acm-dock-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.acm-dock-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(148, 163, 184, 0.35);
+  margin: 0 3px;
+  flex: none;
+}
+
+/* 设为当前强调按钮 */
+.acm-dock-item--active-trigger {
+  background: rgba(79, 70, 229, 0.1);
+  color: var(--acm-primary);
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.acm-dock-item--active-trigger:hover:not(:disabled) {
+  background: var(--acm-primary);
+  color: #ffffff;
+  border-color: var(--acm-primary);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
+}
+
+/* 员工计算 - macOS 翡翠绿质感 */
+.acm-dock-item--emp {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.acm-dock-item--emp:hover:not(:disabled) {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 管理人员计算 - macOS 靛蓝/紫质感 */
+.acm-dock-item--mgr {
+  background: rgba(99, 102, 241, 0.12);
+  color: #4338ca;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+
+.acm-dock-item--mgr:hover:not(:disabled) {
+  background: linear-gradient(180deg, #6366f1 0%, #4f46e5 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+/* 通用按钮 */
 .acm-btn {
   display: inline-flex;
   align-items: center;
@@ -367,7 +426,7 @@
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
   outline: none;
   user-select: none;
@@ -388,94 +447,69 @@
   background: var(--acm-primary);
   color: #ffffff;
   border-color: var(--acm-primary);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
 }
 
 .acm-btn--primary:hover:not(:disabled) {
   background: var(--acm-primary-hover);
   border-color: var(--acm-primary-hover);
-  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.42);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
 }
 
 .acm-btn--outline {
-  background: rgba(255, 255, 255, 0.65);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--acm-text-main);
-  border: 1px solid var(--acm-glass-border);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .acm-btn--outline:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: #ffffff;
+  background: #ffffff;
+  border-color: #94a3b8;
   color: var(--acm-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
-}
-
-.acm-btn--calc-emp {
-  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.acm-btn--calc-emp:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
-  filter: brightness(1.05);
-}
-
-.acm-btn--calc-mgr {
-  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
-}
-
-.acm-btn--calc-mgr:hover:not(:disabled) {
-  box-shadow: 0 6px 16px rgba(109, 40, 217, 0.4);
-  filter: brightness(1.05);
 }
 
 .acm-btn--danger-text {
-  background: rgba(255, 241, 242, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: transparent;
   color: var(--acm-danger);
-  border: 1px solid var(--acm-danger-border);
+  border-color: transparent;
 }
 
 .acm-btn--danger-text:hover:not(:disabled) {
-  background: rgba(255, 228, 230, 0.85);
-  border-color: #f43f5e;
+  background: var(--acm-danger-light);
+  border-color: var(--acm-danger-border);
 }
 
 /* ==========================================================================
-   中部功能看板双列网格 (透光磨砂面板)
+   中部功能看板双列网格 (macOS Window Panels)
    ========================================================================== */
 
 .acm-dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 22px;
+  gap: 20px;
 }
 
 .acm-panel {
-  background: var(--acm-glass-bg);
-  backdrop-filter: blur(28px) saturate(210%);
-  -webkit-backdrop-filter: blur(28px) saturate(210%);
-  border: 1.5px solid var(--acm-glass-border);
+  background: var(--acm-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--acm-window-border);
   border-radius: 18px;
-  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
+  box-shadow: var(--acm-window-shadow);
   padding: 22px 26px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acm-panel:hover {
-  background: var(--acm-glass-bg-hover);
-  border-color: var(--acm-glass-border-strong);
-  box-shadow: 0 18px 45px -8px rgba(31, 38, 135, 0.12), var(--acm-glass-highlight);
+  background: var(--acm-window-bg-hover);
+  border-color: #ffffff;
+  box-shadow: 0 12px 28px -4px rgba(15, 23, 42, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
 }
 
 .acm-panel-head {
@@ -493,7 +527,7 @@
 
 .acm-panel-kicker {
   font-size: 10.5px;
-  font-weight: 800;
+  font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--acm-primary);
@@ -501,7 +535,7 @@
 
 .acm-panel-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 16.5px;
   font-weight: 750;
   color: var(--acm-text-main);
 }
@@ -513,18 +547,16 @@
   font-size: 12.5px;
   font-weight: 650;
   color: var(--acm-primary);
-  background: rgba(79, 70, 229, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(79, 70, 229, 0.2);
+  background: rgba(79, 70, 229, 0.06);
+  border: 1px solid rgba(79, 70, 229, 0.15);
   cursor: pointer;
-  padding: 5px 12px;
-  border-radius: 8px;
+  padding: 5px 10px;
+  border-radius: 7px;
   transition: all 0.15s ease;
 }
 
 .acm-panel-action-link:hover {
-  background: rgba(79, 70, 229, 0.16);
+  background: rgba(79, 70, 229, 0.12);
   border-color: var(--acm-primary);
 }
 
@@ -541,19 +573,16 @@
   justify-content: space-between;
   gap: 8px;
   padding: 11px 14px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: rgba(248, 250, 252, 0.65);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 11px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
 }
 
 .acm-source-card:hover {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
 .acm-source-info {
@@ -572,12 +601,12 @@
 
 .acm-source-dot--synced {
   background: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
 }
 
 .acm-source-dot--uploaded {
   background: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
 }
 
 .acm-source-dot--empty {
@@ -596,12 +625,10 @@
 .acm-source-status-pill {
   font-size: 11px;
   font-weight: 650;
-  padding: 3px 8px;
+  padding: 2px 7px;
   border-radius: 9999px;
   white-space: nowrap;
   line-height: 1.2;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .acm-source-status-pill--synced {
@@ -617,7 +644,7 @@
 }
 
 .acm-source-status-pill--empty {
-  background: rgba(241, 245, 249, 0.7);
+  background: rgba(241, 245, 249, 0.8);
   color: var(--acm-text-muted);
 }
 
@@ -626,13 +653,10 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 20px;
-  background: rgba(255, 255, 255, 0.42);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 12px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  padding: 14px 18px;
+  background: rgba(248, 250, 252, 0.65);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 11px;
 }
 
 .acm-rest-preview-item {
@@ -647,21 +671,21 @@
 }
 
 .acm-rest-preview-val {
-  font-size: 19px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 750;
   color: var(--acm-text-main);
 }
 
 .acm-rest-preview-val small {
   font-size: 12px;
-  font-weight: 550;
+  font-weight: 500;
   color: var(--acm-text-secondary);
 }
 
 .acm-rest-preview-divider {
   width: 1px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(226, 232, 240, 0.8);
 }
 
 .acm-rest-tag-list {
@@ -674,13 +698,10 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 9px;
-  border-radius: 7px;
+  padding: 4px 8px;
+  border-radius: 6px;
   font-size: 11.5px;
   font-weight: 600;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .acm-rest-tag--full {
@@ -702,17 +723,17 @@
 }
 
 /* ==========================================================================
-   账套导入记录流水卡片 (磨砂透光表格面板)
+   账套导入记录流水卡片 (macOS Window Table Panel)
    ========================================================================== */
 
 .acm-imports-section {
-  background: var(--acm-glass-bg);
-  backdrop-filter: blur(28px) saturate(210%);
-  -webkit-backdrop-filter: blur(28px) saturate(210%);
-  border: 1.5px solid var(--acm-glass-border);
+  background: var(--acm-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--acm-window-border);
   border-radius: 20px;
-  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
-  padding: 24px 28px;
+  box-shadow: var(--acm-window-shadow);
+  padding: 24px 26px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -727,10 +748,10 @@
 
 .acm-imports-header h2 {
   margin: 0;
-  font-size: 19px;
-  font-weight: 800;
+  font-size: 18.5px;
+  font-weight: 750;
   color: var(--acm-text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.015em;
 }
 
 .acm-imports-subtitle {
@@ -740,7 +761,7 @@
   margin-top: 2px;
 }
 
-/* 让内嵌的表格面板透光，显出磨砂玻璃效果 */
+/* 让表格面板自然融入毛玻璃面板 */
 .acm-imports-section .query-result-panel {
   background: transparent !important;
   border: none !important;
@@ -749,12 +770,12 @@
 }
 
 .acm-imports-section .legacy-table-panel {
-  background: rgba(255, 255, 255, 0.35) !important;
-  backdrop-filter: blur(14px) !important;
-  -webkit-backdrop-filter: blur(14px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
   border-radius: 12px !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
 .acm-imports-section table {
@@ -762,10 +783,8 @@
 }
 
 .acm-imports-section thead th {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+  background: rgba(248, 250, 252, 0.7) !important;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
 }
 
 .acm-imports-section tbody tr {
@@ -774,7 +793,7 @@
 }
 
 .acm-imports-section tbody tr:hover {
-  background: rgba(255, 255, 255, 0.45) !important;
+  background: rgba(255, 255, 255, 0.5) !important;
 }
 
 /* 表格内状态微标 */
@@ -782,13 +801,11 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 9px;
+  padding: 3px 8px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
 }
 
 .acm-table-status-tag--success {
@@ -810,16 +827,16 @@
 }
 
 /* ==========================================================================
-   极致透明磨砂玻璃弹窗 (Crystal Frosted Glass Modals)
+   macOS 原生磨砂玻璃弹窗 (macOS Sheet / Dialog Modals)
    ========================================================================== */
 
 .acm-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
-  background: rgba(15, 23, 42, 0.32);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  background: rgba(15, 23, 42, 0.35);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -834,16 +851,15 @@
 
 .acm-modal-card {
   position: relative;
-  /* 高透光率玻璃质感：52% 半透明白色 + 32px 强模糊折射 + 晶莹高光边框 */
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(34px) saturate(220%) !important;
-  -webkit-backdrop-filter: blur(34px) saturate(220%) !important;
-  border-radius: 22px !important;
-  border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow: 
-    0 25px 60px -10px rgba(0, 0, 0, 0.28),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.9),
-    inset 0 1px 3px rgba(255, 255, 255, 0.95) !important;
+    0 25px 60px -15px rgba(15, 23, 42, 0.2),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 6px rgba(0, 0, 0, 0.04) !important;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -854,7 +870,7 @@
 }
 
 @keyframes acm-scale-up {
-  from { transform: scale(0.96) translateY(12px); opacity: 0; }
+  from { transform: scale(0.96) translateY(10px); opacity: 0; }
   to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
@@ -870,13 +886,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
+  padding: 20px 26px 18px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.7);
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(24px) saturate(200%) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
   z-index: 10;
 }
 
@@ -899,11 +915,9 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  background: rgba(255, 255, 255, 0.6);
   color: var(--acm-text-secondary);
   font-size: 20px;
   cursor: pointer;
@@ -911,13 +925,13 @@
 }
 
 .acm-modal-close-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(241, 245, 249, 0.9);
   color: var(--acm-text-main);
-  border-color: #ffffff;
+  border-color: rgba(203, 213, 225, 0.8);
 }
 
 .acm-modal-body {
-  padding: 24px 28px;
+  padding: 24px 26px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -937,21 +951,21 @@
 }
 
 .acm-card-block {
-  background: rgba(255, 255, 255, 0.45) !important;
-  backdrop-filter: blur(16px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.75) !important;
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
   border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03), inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
 .acm-card-block-title {
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 750;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--acm-text-secondary);
@@ -983,7 +997,7 @@
 }
 
 /* ==========================================================================
-   精美厂休排班日历 (透光排班日历)
+   精美厂休排班日历 (macOS Calendar Grid)
    ========================================================================== */
 
 .acm-calendar-wrapper {
@@ -1050,7 +1064,7 @@
   text-align: center;
   padding: 6px 0;
   font-size: 11.5px;
-  font-weight: 700;
+  font-weight: 650;
   color: var(--acm-text-muted);
 }
 
@@ -1067,20 +1081,19 @@
   min-height: 52px;
   padding: 4px;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  background: rgba(255, 255, 255, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
 }
 
 .acm-calendar-day-btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: #ffffff;
+  border-color: #94a3b8;
   transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
 }
 
 .acm-calendar-day-btn:active:not(:disabled) {
@@ -1108,8 +1121,8 @@
 
 /* 日历单元格状态色彩 */
 .acm-day--none {
-  background: rgba(255, 255, 255, 0.45);
-  border-color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(226, 232, 240, 0.8);
 }
 .acm-day--none .acm-day-state-label {
   color: var(--acm-text-muted);
@@ -1149,7 +1162,7 @@
 }
 
 /* ==========================================================================
-   精美上传槽位体系 (透光 Dropzone)
+   精美上传槽位体系 (macOS Dropzone)
    ========================================================================== */
 
 .acm-upload-grid {
@@ -1164,11 +1177,11 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.4) !important;
-  backdrop-filter: blur(16px) saturate(180%) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  background: rgba(248, 250, 252, 0.65) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
   border: 1.5px dashed rgba(203, 213, 225, 0.85) !important;
-  border-radius: 14px;
+  border-radius: 13px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 72px;
@@ -1176,20 +1189,20 @@
 }
 
 .acm-upload-slot:hover:not(.is-disabled) {
-  background: rgba(238, 242, 255, 0.75) !important;
+  background: rgba(238, 242, 255, 0.8) !important;
   border-color: var(--acm-primary) !important;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
 }
 
 .acm-upload-slot.is-dragover {
-  background: rgba(79, 70, 229, 0.2) !important;
+  background: rgba(79, 70, 229, 0.15) !important;
   border-color: var(--acm-primary) !important;
   border-style: solid !important;
   transform: scale(1.01);
 }
 
 .acm-upload-slot.has-file {
-  background: rgba(240, 253, 244, 0.75) !important;
+  background: rgba(240, 253, 244, 0.85) !important;
   border-color: #86efac !important;
   border-style: solid !important;
 }
@@ -1201,30 +1214,27 @@
 .acm-upload-slot.is-disabled {
   opacity: 0.55;
   cursor: not-allowed;
-  background: rgba(241, 245, 249, 0.35) !important;
+  background: rgba(241, 245, 249, 0.45) !important;
   border-style: dotted !important;
-  border-color: rgba(203, 213, 225, 0.6) !important;
+  border-color: rgba(203, 213, 225, 0.7) !important;
 }
 
 .acm-slot-icon-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.7);
   color: var(--acm-text-secondary);
   flex: none;
-  font-size: 17px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  font-size: 16px;
 }
 
 .has-file .acm-slot-icon-box {
-  background: rgba(220, 252, 231, 0.85);
+  background: #dcfce7;
   border-color: #86efac;
   color: #15803d;
 }
@@ -1256,7 +1266,7 @@
 
 .has-file .acm-slot-hint {
   color: #15803d;
-  font-weight: 600;
+  font-weight: 550;
 }
 
 .acm-slot-clear-btn {
@@ -1266,10 +1276,8 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid var(--acm-glass-border);
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.8);
   color: var(--acm-text-secondary);
   display: flex;
   align-items: center;
@@ -1293,10 +1301,10 @@
   }
   .acm-metric-card:nth-child(3) {
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.45);
+    border-top: 1px solid rgba(226, 232, 240, 0.7);
   }
   .acm-metric-card:nth-child(4) {
-    border-top: 1px solid rgba(255, 255, 255, 0.45);
+    border-top: 1px solid rgba(226, 232, 240, 0.7);
   }
   .acm-dashboard-grid {
     grid-template-columns: 1fr;
@@ -1319,12 +1327,16 @@
   }
   .acm-metric-card + .acm-metric-card {
     border-left: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.45);
+    border-top: 1px solid rgba(226, 232, 240, 0.7);
   }
   .acm-upload-grid {
     grid-template-columns: 1fr;
   }
   .acm-source-readiness-grid {
     grid-template-columns: 1fr;
+  }
+  .acm-dock-bar {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 }

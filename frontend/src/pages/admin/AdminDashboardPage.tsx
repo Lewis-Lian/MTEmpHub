@@ -485,12 +485,12 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* 快捷操作动作栏 */}
-        <div className="acm-actions-bar account-panel-selector">
-          <div className="acm-actions-group">
+        {/* macOS Dock 风格悬浮操作栏 */}
+        <div className="acm-dock-container account-panel-selector">
+          <div className="acm-dock-bar">
             {selectedAccountSet && !selectedAccountSet.is_active ? (
               <button
-                className="acm-btn acm-btn--primary"
+                className="acm-dock-item acm-dock-item--active-trigger"
                 disabled={isWorking}
                 onClick={() =>
                   void runAction(async () => {
@@ -502,68 +502,73 @@ export default function AdminDashboardPage() {
                   })
                 }
                 type="button"
+                title="设为当前激活账套"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                设为当前
+                <span>设为当前</span>
               </button>
             ) : null}
 
             <button
-              className="acm-btn acm-btn--outline btn-settings"
+              className="acm-dock-item btn-settings"
               onClick={() => setShowModal("settings")}
               type="button"
+              title="配置月度账套、厂休与参数"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
               </svg>
-              账套设置
+              <span>账套设置</span>
             </button>
 
             <button
-              className="acm-btn acm-btn--outline btn-upload"
+              className="acm-dock-item btn-upload"
               onClick={() => setShowModal("upload")}
               type="button"
+              title="上传原始考勤文档"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              上传原始文档
+              <span>上传原始文档</span>
             </button>
-          </div>
 
-          <div className="acm-actions-group">
+            <div className="acm-dock-divider" aria-hidden="true" />
+
             <button
-              className="acm-btn acm-btn--calc-emp btn-calc-employee"
+              className="acm-dock-item acm-dock-item--emp btn-calc-employee"
               disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
               onClick={() => void runAction(() => runCalculation("employee"))}
               type="button"
+              title="执行员工考勤结算"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
                 <line x1="9" y1="9" x2="15" y2="15" />
                 <line x1="15" y1="9" x2="9" y2="15" />
               </svg>
-              员工计算
+              <span>员工计算</span>
             </button>
 
             <button
-              className="acm-btn acm-btn--calc-mgr btn-calc-manager"
+              className="acm-dock-item acm-dock-item--mgr btn-calc-manager"
               disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
               onClick={() => void runAction(() => runCalculation("manager"))}
               type="button"
+              title="执行管理人员考勤计算"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                 <circle cx="8.5" cy="7" r="4" />
                 <polyline points="17 11 19 13 23 9" />
               </svg>
-              管理人员计算
+              <span>管理人员计算</span>
             </button>
           </div>
         </div>
