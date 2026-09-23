@@ -113,6 +113,14 @@
   box-shadow: 0 5px 14px rgba(32, 88, 143, 0.2);
 }
 
+/* 显式定义主按钮 hover，避免被上方 .btn:hover 的浅色背景覆盖后白字看不清 */
+.employee-picker-modal .btn-primary:hover {
+  border-color: #1d5c90;
+  background: linear-gradient(135deg, #2e83c6, #1d4f80);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(32, 88, 143, 0.28);
+}
+
 .employee-picker-modal .btn-close {
   width: 30px;
   height: 30px;
