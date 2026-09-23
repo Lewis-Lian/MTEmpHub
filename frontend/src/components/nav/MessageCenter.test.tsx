@@ -3,7 +3,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 import MessageCenter from "./MessageCenter";
-import { markMessageRead } from "../../api/messages";
+import { fetchMessages, markMessageRead } from "../../api/messages";
 
 vi.mock("../../api/messages", () => ({
   fetchMessages: vi.fn().mockResolvedValue({
@@ -101,6 +101,31 @@ describe("MessageCenter", () => {
     });
     await waitFor(() => expect(markMessageRead).toHaveBeenCalledWith(1));
   });
-});
 
+  it("批量标记部分失败时仅更新成功消息并保留失败项未读", async () => {
+    vi.mocked(fetchMessages).mockResolvedValue({
+      messages: [
+        { id: 1, title: "成功消息", content: "内容", sender: "系统管理员", created_at: "2026-09-12T00:00:00", unread: true },
+        { id: 2, title: "失败消息", content: "内容", sender: "系统管理员", created_at: "2026-09-12T00:00:00", unread: true },
+      ],
+      unread_count: 2,
+    });
+    vi.mocked(markMessageRead).mockImplementation((id) => id === 1 ? Promise.resolve({} as never) : Promise.reject(new Error("失败")));
+    const notification = vi.spyOn(window, "dispatchEvent");
+
+    await renderMessageCenter();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /消息/ }));
+    });
+    await act(async () => {
+      fireEvent.click(await screen.findByRole("button", { name: "一键全部已读" }));
+    });
+
+    await waitFor(() => expect(screen.getByRole("button", { name: /消息/ })).toHaveTextContent("1"));
+    expect(screen.getByText("成功消息").closest("article")).not.toHaveClass("is-unread");
+    expect(screen.getByText("失败消息").closest("article")).toHaveClass("is-unread");
+    expect(notification).toHaveBeenCalledWith(expect.objectContaining({ type: "show-notification" }));
+    notification.mockRestore();
+  });
+});
 

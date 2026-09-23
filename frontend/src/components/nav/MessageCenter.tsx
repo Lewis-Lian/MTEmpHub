@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { fetchMessages, markMessageRead, type MessageItem } from "../../api/messages";
+import { triggerNotification } from "../feedback/Notification";
 import { htmlToTextPreview } from "../../utils/richText";
 import "../../styles/components/message-center.css";
 
@@ -219,9 +220,16 @@ export default function MessageCenter() {
     if (!unreadList.length || markingAll) return;
     setMarkingAll(true);
     try {
-      await Promise.allSettled(unreadList.map((m) => markMessageRead(m.id)));
-      setMessages((current) => current.map((item) => ({ ...item, unread: false })));
-      setUnreadCount(0);
+      const results = await Promise.allSettled(unreadList.map((m) => markMessageRead(m.id)));
+      const readIds = new Set<number>();
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") readIds.add(unreadList[index].id);
+      });
+      setMessages((current) => current.map((item) => readIds.has(item.id) ? { ...item, unread: false } : item));
+      setUnreadCount((current) => Math.max(0, current - readIds.size));
+      if (readIds.size < unreadList.length) {
+        triggerNotification("部分消息标记已读失败，请稍后重试", "warning");
+      }
     } finally {
       setMarkingAll(false);
     }
