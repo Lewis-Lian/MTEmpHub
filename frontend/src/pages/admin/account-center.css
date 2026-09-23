@@ -1,300 +1,1172 @@
-.account-center-page {
-  display: grid;
-  gap: 22px;
-  align-content: start;
-  padding: 4px 0 24px;
+/* ==========================================================================
+   账套管理 (Account Set Management) - 现代高雅 SaaS 风格重构样式表
+   ========================================================================== */
+
+:root {
+  --acm-primary: #4f46e5;
+  --acm-primary-hover: #4338ca;
+  --acm-primary-light: #eef2ff;
+  --acm-surface: #ffffff;
+  --acm-surface-subtle: #f8fafc;
+  --acm-surface-muted: #f1f5f9;
+  --acm-border: #e2e8f0;
+  --acm-border-strong: #cbd5e1;
+  --acm-text-main: #0f172a;
+  --acm-text-secondary: #475569;
+  --acm-text-muted: #94a3b8;
+  --acm-success: #059669;
+  --acm-success-light: #ecfdf5;
+  --acm-success-border: #a7f3d0;
+  --acm-warning: #d97706;
+  --acm-warning-light: #fffbeb;
+  --acm-warning-border: #fde68a;
+  --acm-info: #0284c7;
+  --acm-info-light: #f0f9ff;
+  --acm-info-border: #bae6fd;
+  --acm-danger: #e11d48;
+  --acm-danger-light: #fff1f2;
+  --acm-danger-border: #fecdd3;
+  --acm-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.04);
+  --acm-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --acm-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --acm-shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
 }
 
-.account-center-heading,
-.account-center-overview-main,
-.account-center-section-heading {
+/* 页面整体布局容器 */
+.account-center-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 0 32px;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+/* 顶部页面标题栏 */
+.account-center-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-}
-
-.account-center-heading {
-  margin: 4px 0 0;
-}
-
-.account-center-heading h1,
-.account-center-section-heading h2,
-.account-center-overview-title-row h2 {
-  margin: 0;
-  color: var(--ent-text, #17263c);
-}
-
-.account-center-heading h1 {
+  gap: 16px;
   margin-top: 4px;
-  font-size: clamp(25px, 3vw, 32px);
-  line-height: 1.2;
-  letter-spacing: -0.035em;
-}
-
-.account-center-heading p,
-.account-center-overview-copy p {
-  margin: 7px 0 0;
-  color: var(--ent-text-secondary, #718096);
-  font-size: 14px;
 }
 
 .account-center-eyebrow {
-  color: var(--ent-text-secondary, #77869b);
-  font-size: 10px;
-  font-weight: 750;
-  letter-spacing: 0.14em;
-}
-
-.account-center-count {
-  flex: none;
-  padding: 7px 11px;
-  border: 1px solid var(--ent-border-strong, #dce3ec);
-  border-radius: 999px;
-  background: var(--ent-bg, #fff);
-  color: var(--ent-text-secondary, #718096);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.account-center-overview {
-  overflow: visible;
-  border: 1px solid var(--ent-border-strong, #dce3ec);
-  border-radius: 18px;
-  background: var(--ent-bg, #fff);
-  box-shadow: 0 12px 30px rgba(31, 52, 82, 0.055);
-}
-
-.account-center-overview-main {
-  align-items: flex-start;
-  padding: 24px 26px 20px;
-}
-
-.account-center-overview-label {
-  display: block;
-  margin-bottom: 8px;
-  color: var(--ent-text-secondary, #77869b);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.account-center-overview-title-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 11px;
-}
-
-.account-center-overview-title-row h2 {
-  font-size: 23px;
-  line-height: 1.25;
-  letter-spacing: -0.025em;
-}
-
-.account-center-status {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 9px;
-  border-radius: 999px;
+  color: var(--acm-primary);
   font-size: 11px;
   font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
-.account-center-status > span {
+.account-center-heading h1 {
+  margin: 4px 0 0;
+  font-size: 26px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.account-center-heading p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  color: var(--acm-text-secondary);
+  line-height: 1.5;
+}
+
+.account-center-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--acm-surface);
+  border: 1px solid var(--acm-border);
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--acm-text-secondary);
+  box-shadow: var(--acm-shadow-sm);
+}
+
+/* 账套核心状态控制看板 (Hero Control Center) */
+.acm-hero-card {
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+  border: 1px solid var(--acm-border);
+  border-radius: 16px;
+  box-shadow: var(--acm-shadow-md);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.acm-hero-card:hover {
+  border-color: var(--acm-border-strong);
+  box-shadow: var(--acm-shadow-lg);
+}
+
+.acm-hero-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--acm-border);
+}
+
+.acm-hero-title-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.acm-hero-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+  letter-spacing: -0.02em;
+}
+
+.acm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.acm-badge-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: currentColor;
 }
 
-.account-center-status.is-open {
-  background: rgba(22, 163, 101, 0.1);
-  color: #138052;
+.acm-badge--active {
+  background: var(--acm-success-light);
+  color: var(--acm-success);
+  border: 1px solid var(--acm-success-border);
 }
 
-.account-center-status.is-locked {
-  background: rgba(217, 119, 6, 0.11);
-  color: #a85c05;
+.acm-badge--active .acm-badge-dot {
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+  animation: acm-pulse 2s infinite ease-in-out;
 }
 
-.account-center-overview-selector {
-  width: min(290px, 100%);
+@keyframes acm-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.acm-badge--inactive {
+  background: var(--acm-surface-muted);
+  color: var(--acm-text-secondary);
+  border: 1px solid var(--acm-border);
+}
+
+.acm-badge--locked {
+  background: var(--acm-warning-light);
+  color: var(--acm-warning);
+  border: 1px solid var(--acm-warning-border);
+}
+
+.acm-badge--editable {
+  background: var(--acm-info-light);
+  color: var(--acm-info);
+  border: 1px solid var(--acm-info-border);
+}
+
+.acm-hero-selector {
+  width: min(300px, 100%);
   flex: none;
 }
 
-.account-center-overview-selector .account-set-selector.is-compact {
-  width: 100%;
-  max-width: none;
-}
-
-.account-center-metrics {
+/* 核心指标条 (Metrics Bar) */
+.acm-metrics-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  border-top: 1px solid var(--ent-border, #e8edf3);
-  border-bottom: 1px solid var(--ent-border, #e8edf3);
-  background: var(--ent-secondary-bg, #f8fafc);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--acm-surface-subtle);
+  border-bottom: 1px solid var(--acm-border);
 }
 
-.account-center-metric {
+.acm-metric-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 82px;
-  padding: 14px 24px;
+  gap: 14px;
+  padding: 16px 24px;
+  transition: background 0.15s ease;
 }
 
-.account-center-metric + .account-center-metric {
-  border-left: 1px solid var(--ent-border, #e8edf3);
+.acm-metric-card + .acm-metric-card {
+  border-left: 1px solid var(--acm-border);
 }
 
-.account-center-metric-icon {
-  display: grid;
-  width: 38px;
-  height: 38px;
+.acm-metric-card:hover {
+  background: #ffffff;
+}
+
+.acm-metric-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   flex: none;
-  place-items: center;
-  border-radius: 12px;
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 18px;
 }
 
-.account-center-metric-icon.is-blue {
-  background: rgba(42, 110, 220, 0.1);
-  color: #286bd1;
+.acm-metric-icon--indigo {
+  background: rgba(79, 70, 229, 0.1);
+  color: #4f46e5;
 }
 
-.account-center-metric-icon.is-violet {
-  background: rgba(126, 87, 194, 0.11);
-  color: #7651b7;
+.acm-metric-icon--amber {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
 }
 
-.account-center-metric-icon.is-amber {
-  background: rgba(213, 146, 28, 0.12);
-  color: #b8790b;
+.acm-metric-icon--emerald {
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
 }
 
-.account-center-metric div {
-  display: grid;
-  gap: 3px;
+.acm-metric-icon--sky {
+  background: rgba(2, 132, 199, 0.1);
+  color: #0284c7;
 }
 
-.account-center-metric div > span {
-  color: var(--ent-text-secondary, #718096);
+.acm-metric-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acm-metric-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--acm-text-secondary);
+}
+
+.acm-metric-value {
+  font-size: 19px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+  line-height: 1.2;
+}
+
+.acm-metric-unit {
   font-size: 12px;
+  font-weight: 500;
+  color: var(--acm-text-secondary);
+  margin-left: 3px;
 }
 
-.account-center-metric strong {
-  color: var(--ent-text, #17263c);
-  font-size: 20px;
-  line-height: 1.1;
+/* 主操作按钮工具栏 */
+.acm-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 24px;
+  background: #ffffff;
 }
 
-.account-center-metric small {
-  color: var(--ent-text-secondary, #718096);
+.acm-actions-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.acm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.acm-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.acm-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.acm-btn--primary {
+  background: var(--acm-primary);
+  color: #ffffff;
+  border-color: var(--acm-primary);
+  box-shadow: 0 2px 4px rgba(79, 70, 229, 0.2);
+}
+
+.acm-btn--primary:hover:not(:disabled) {
+  background: var(--acm-primary-hover);
+  border-color: var(--acm-primary-hover);
+  box-shadow: 0 4px 8px rgba(79, 70, 229, 0.3);
+}
+
+.acm-btn--outline {
+  background: #ffffff;
+  color: var(--acm-text-main);
+  border-color: var(--acm-border-strong);
+  box-shadow: var(--acm-shadow-sm);
+}
+
+.acm-btn--outline:hover:not(:disabled) {
+  background: var(--acm-surface-subtle);
+  border-color: #94a3b8;
+  color: var(--acm-primary);
+}
+
+.acm-btn--calc-emp {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.acm-btn--calc-emp:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  filter: brightness(1.05);
+}
+
+.acm-btn--calc-mgr {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(109, 40, 217, 0.25);
+}
+
+.acm-btn--calc-mgr:hover:not(:disabled) {
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.35);
+  filter: brightness(1.05);
+}
+
+.acm-btn--danger-text {
+  background: transparent;
+  color: var(--acm-danger);
+  border-color: transparent;
+}
+
+.acm-btn--danger-text:hover:not(:disabled) {
+  background: var(--acm-danger-light);
+  border-color: var(--acm-danger-border);
+}
+
+/* 中部功能看板双列网格 (Readiness & Scheduling Glance) */
+.acm-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.acm-panel {
+  background: var(--acm-surface);
+  border: 1px solid var(--acm-border);
+  border-radius: 14px;
+  box-shadow: var(--acm-shadow-sm);
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  transition: border-color 0.2s ease;
+}
+
+.acm-panel:hover {
+  border-color: var(--acm-border-strong);
+}
+
+.acm-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.acm-panel-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acm-panel-kicker {
+  font-size: 10.5px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--acm-primary);
+}
+
+.acm-panel-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--acm-text-main);
+}
+
+.acm-panel-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--acm-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.acm-panel-action-link:hover {
+  background: var(--acm-primary-light);
+}
+
+/* 6 大考勤数据准备度卡片列表 */
+.acm-source-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.acm-source-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--acm-surface-subtle);
+  border: 1px solid var(--acm-border);
+  border-radius: 9px;
+  transition: all 0.15s ease;
+}
+
+.acm-source-card:hover {
+  background: #ffffff;
+  border-color: var(--acm-border-strong);
+}
+
+.acm-source-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.acm-source-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.acm-source-dot--synced {
+  background: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2);
+}
+
+.acm-source-dot--uploaded {
+  background: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+}
+
+.acm-source-dot--empty {
+  background: #cbd5e1;
+}
+
+.acm-source-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--acm-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acm-source-status-pill {
   font-size: 11px;
+  font-weight: 650;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.acm-source-status-pill--synced {
+  background: var(--acm-info-light);
+  color: var(--acm-info);
+  border: 1px solid var(--acm-info-border);
+}
+
+.acm-source-status-pill--uploaded {
+  background: var(--acm-success-light);
+  color: var(--acm-success);
+  border: 1px solid var(--acm-success-border);
+}
+
+.acm-source-status-pill--empty {
+  background: var(--acm-surface-muted);
+  color: var(--acm-text-muted);
+}
+
+/* 厂休快速预览概览 */
+.acm-rest-preview-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--acm-surface-subtle);
+  border: 1px solid var(--acm-border);
+  border-radius: 10px;
+}
+
+.acm-rest-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.acm-rest-preview-label {
+  font-size: 11.5px;
+  color: var(--acm-text-secondary);
+}
+
+.acm-rest-preview-val {
+  font-size: 18px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+}
+
+.acm-rest-preview-val small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--acm-text-secondary);
+}
+
+.acm-rest-preview-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--acm-border);
+}
+
+.acm-rest-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.acm-rest-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.acm-rest-tag--full {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.acm-rest-tag--am {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.acm-rest-tag--pm {
+  background: #f3e8ff;
+  color: #6b21a8;
+  border: 1px solid #e9d5ff;
+}
+
+/* 账套导入记录流水卡片 */
+.acm-imports-section {
+  background: var(--acm-surface);
+  border: 1px solid var(--acm-border);
+  border-radius: 16px;
+  box-shadow: var(--acm-shadow-sm);
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acm-imports-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.acm-imports-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+  letter-spacing: -0.015em;
+}
+
+.acm-imports-subtitle {
+  font-size: 13px;
+  color: var(--acm-text-secondary);
   font-weight: 500;
 }
 
-.account-center-actions {
+/* 表格内状态微标 */
+.acm-table-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.acm-table-status-tag--success {
+  background: var(--acm-success-light);
+  color: var(--acm-success);
+  border: 1px solid var(--acm-success-border);
+}
+
+.acm-table-status-tag--error {
+  background: var(--acm-danger-light);
+  color: var(--acm-danger);
+  border: 1px solid var(--acm-danger-border);
+}
+
+.acm-table-status-tag--pending {
+  background: var(--acm-info-light);
+  color: var(--acm-info);
+  border: 1px solid var(--acm-info-border);
+}
+
+/* ==========================================================================
+   现代化弹窗体系 (Settings Modal & Upload Modal)
+   ========================================================================== */
+
+.acm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: acm-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes acm-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.acm-modal-card {
+  position: relative;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: var(--acm-shadow-xl);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-sizing: border-box;
   display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  padding: 15px 20px;
+  flex-direction: column;
+  animation: acm-scale-up 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
-.account-center-actions button {
-  min-height: 38px;
-  padding: 0 13px;
-  border-radius: 9px;
-  font-size: 12px;
-  font-weight: 650;
+@keyframes acm-scale-up {
+  from { transform: scale(0.96) translateY(8px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
-.account-center-actions .account-center-set-active {
-  border: 1px solid #286bd1;
-  background: #286bd1;
-  color: #fff;
-  box-shadow: 0 4px 10px rgba(40, 107, 209, 0.18);
+.acm-modal-card--settings {
+  max-width: 900px;
 }
 
-.account-center-actions .account-center-set-active:hover:not(:disabled) {
-  background: #1f5fbe;
+.acm-modal-card--upload {
+  max-width: 680px;
 }
 
-.account-center-imports {
-  display: block;
+.acm-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 26px 18px;
+  border-bottom: 1px solid var(--acm-border);
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 10;
 }
 
-.account-center-section-heading {
-  margin: 0 2px 12px;
+.acm-modal-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.account-center-section-heading h2 {
-  margin-top: 4px;
+.acm-modal-title {
+  margin: 0;
   font-size: 18px;
-  letter-spacing: -0.02em;
+  font-weight: 750;
+  color: var(--acm-text-main);
 }
 
-.account-center-card-note {
-  color: var(--ent-text-secondary, #718096);
+.acm-modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--acm-text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.acm-modal-close-btn:hover {
+  background: var(--acm-surface-muted);
+  color: var(--acm-text-main);
+}
+
+.acm-modal-body {
+  padding: 24px 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 弹窗双栏布局 */
+.acm-modal-split-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+.acm-modal-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.acm-card-block {
+  background: var(--acm-surface);
+  border: 1px solid var(--acm-border);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--acm-shadow-sm);
+}
+
+.acm-card-block-title {
   font-size: 12px;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--acm-text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-@media (max-width: 720px) {
-  .account-center-page {
-    gap: 16px;
-  }
+.acm-card-block-title::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--acm-primary);
+}
 
-  .account-center-heading,
-  .account-center-overview-main,
-  .account-center-section-heading {
+/* 按钮纵向堆叠栏 */
+.acm-button-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acm-button-stack button {
+  width: 100%;
+  height: 38px;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   精美厂休排班日历 (Modern Factory Rest Calendar)
+   ========================================================================== */
+
+.acm-calendar-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.acm-calendar-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.acm-calendar-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--acm-text-secondary);
+}
+
+.acm-calendar-stats strong {
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--acm-text-main);
+  margin-left: 2px;
+}
+
+.acm-calendar-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.acm-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--acm-text-secondary);
+}
+
+.acm-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.acm-legend-dot--none { background: #cbd5e1; }
+.acm-legend-dot--am { background: #38bdf8; }
+.acm-legend-dot--pm { background: #a855f7; }
+.acm-legend-dot--full { background: #f59e0b; }
+
+.acm-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.acm-calendar-weekday {
+  text-align: center;
+  padding: 6px 0;
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--acm-text-muted);
+}
+
+.acm-calendar-spacer {
+  background: transparent;
+  min-height: 48px;
+}
+
+.acm-calendar-day-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--acm-border);
+  background: var(--acm-surface);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.acm-calendar-day-btn:hover:not(:disabled) {
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: var(--acm-shadow-sm);
+}
+
+.acm-calendar-day-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.acm-calendar-day-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.acm-day-number {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--acm-text-main);
+  line-height: 1.2;
+}
+
+.acm-day-state-label {
+  font-size: 10px;
+  font-weight: 650;
+  margin-top: 2px;
+  line-height: 1;
+}
+
+/* 日历单元格状态色彩 */
+.acm-day--none {
+  background: #ffffff;
+  border-color: var(--acm-border);
+}
+.acm-day--none .acm-day-state-label {
+  color: var(--acm-text-muted);
+}
+
+.acm-day--full {
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+.acm-day--full .acm-day-number {
+  color: #78350f;
+}
+.acm-day--full .acm-day-state-label {
+  color: #b45309;
+}
+
+.acm-day--am {
+  background: #e0f2fe;
+  border-color: #7dd3fc;
+}
+.acm-day--am .acm-day-number {
+  color: #075985;
+}
+.acm-day--am .acm-day-state-label {
+  color: #0284c7;
+}
+
+.acm-day--pm {
+  background: #f3e8ff;
+  border-color: #d8b4fe;
+}
+.acm-day--pm .acm-day-number {
+  color: #581c87;
+}
+.acm-day--pm .acm-day-state-label {
+  color: #9333ea;
+}
+
+/* ==========================================================================
+   精美上传槽位体系 (Modern Upload Dropzone)
+   ========================================================================== */
+
+.acm-upload-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.acm-upload-slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--acm-surface-subtle);
+  border: 1.5px dashed var(--acm-border-strong);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  min-height: 72px;
+  box-sizing: border-box;
+}
+
+.acm-upload-slot:hover:not(.is-disabled) {
+  background: var(--acm-primary-light);
+  border-color: var(--acm-primary);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.08);
+}
+
+.acm-upload-slot.is-dragover {
+  background: rgba(79, 70, 229, 0.12);
+  border-color: var(--acm-primary);
+  border-style: solid;
+  transform: scale(1.01);
+}
+
+.acm-upload-slot.has-file {
+  background: #f0fdf4;
+  border-color: #86efac;
+  border-style: solid;
+}
+
+.acm-upload-slot.has-file:hover {
+  border-color: #22c55e;
+}
+
+.acm-upload-slot.is-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--acm-surface-muted);
+  border-style: dotted;
+  border-color: var(--acm-border);
+}
+
+.acm-slot-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid var(--acm-border);
+  color: var(--acm-text-secondary);
+  flex: none;
+  font-size: 16px;
+}
+
+.has-file .acm-slot-icon-box {
+  background: #dcfce7;
+  border-color: #86efac;
+  color: #15803d;
+}
+
+.acm-slot-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+
+.acm-slot-title {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--acm-text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.acm-slot-hint {
+  font-size: 11.5px;
+  color: var(--acm-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.has-file .acm-slot-hint {
+  color: #15803d;
+  font-weight: 550;
+}
+
+.acm-slot-clear-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid var(--acm-border);
+  color: var(--acm-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 5;
+}
+
+.acm-slot-clear-btn:hover {
+  background: var(--acm-danger-light);
+  border-color: var(--acm-danger-border);
+  color: var(--acm-danger);
+}
+
+/* 响应式断点 */
+@media (max-width: 900px) {
+  .acm-metrics-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .acm-metric-card:nth-child(3) {
+    border-left: none;
+    border-top: 1px solid var(--acm-border);
+  }
+  .acm-metric-card:nth-child(4) {
+    border-top: 1px solid var(--acm-border);
+  }
+  .acm-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .acm-modal-split-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .acm-hero-header {
+    flex-direction: column;
     align-items: flex-start;
   }
-
-  .account-center-overview-main {
-    flex-direction: column;
-    padding: 20px 18px 16px;
-  }
-
-  .account-center-overview-selector {
+  .acm-hero-selector {
     width: 100%;
   }
-
-  .account-center-metric {
-    min-height: 72px;
-    gap: 8px;
-    padding: 10px;
+  .acm-metrics-strip {
+    grid-template-columns: 1fr;
   }
-
-  .account-center-metric-icon {
-    width: 31px;
-    height: 31px;
-    border-radius: 10px;
-    font-size: 16px;
+  .acm-metric-card + .acm-metric-card {
+    border-left: none;
+    border-top: 1px solid var(--acm-border);
   }
-
-  .account-center-metric div > span {
-    font-size: 10px;
+  .acm-upload-grid {
+    grid-template-columns: 1fr;
   }
-
-  .account-center-metric strong {
-    font-size: 17px;
-  }
-
-  .account-center-card-note {
-    max-width: 45%;
-    text-align: right;
-  }
-}
-
-@media (max-width: 420px) {
-  .account-center-count {
-    display: none;
-  }
-
-  .account-center-metric {
-    align-items: flex-start;
-    flex-direction: column;
+  .acm-source-readiness-grid {
+    grid-template-columns: 1fr;
   }
 }

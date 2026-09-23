@@ -113,10 +113,12 @@ export default function AdminDashboardPage() {
     () => factoryRestEntries.reduce((sum, entry) => sum + Number(entry.unit || 0), 0),
     [factoryRestEntries],
   );
+
   const factoryRestCalendar = useMemo(
     () => buildFactoryRestCalendar(selectedAccountSet?.month ?? "", factoryRestEntries),
     [factoryRestEntries, selectedAccountSet?.month],
   );
+
   // 槽位禁用原因：来源切为自动获取打卡数据时对应文件无需上传（获取失败时不禁用，页面照常可用）
   const slotDisabledReasons = useMemo(
     () => FILE_INPUT_TYPES.map((type) => slotDisabledReason(type, attendanceSettings)),
@@ -156,7 +158,18 @@ export default function AdminDashboardPage() {
       formatDateTime(record.created_at),
       record.source_filename || "-",
       record.file_type || "-",
-      record.status || "-",
+      <span
+        key={record.id}
+        className={`acm-table-status-tag ${
+          record.status === "success" || record.status === "uploaded"
+            ? "acm-table-status-tag--success"
+            : record.status === "error" || record.status === "failed"
+              ? "acm-table-status-tag--error"
+              : "acm-table-status-tag--pending"
+        }`}
+      >
+        {record.status || "-"}
+      </span>,
       record.imported_count ?? 0,
       record.error_message || "-",
     ]);
@@ -348,39 +361,49 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <section className="account-center-page">
-      <QueryProgressOverlay active={progressVisible} className="query-progress-overlay-page" progress={progress} text={loadingText} />
+    <section className="account-center-page" aria-label="账套管理工作台">
+      <QueryProgressOverlay
+        active={progressVisible}
+        className="query-progress-overlay-page"
+        progress={progress}
+        text={loadingText}
+      />
 
-
+      {/* 顶部标题栏 */}
       <header className="account-center-heading">
         <div>
-          <span className="account-center-eyebrow">ADMINISTRATION</span>
-          <h1>账套中心</h1>
-          <p>管理月度账套、导入考勤数据并查看处理记录。</p>
+          <span className="account-center-eyebrow">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            LEDGER CONTROL CENTER
+          </span>
+          <h1>账套管理</h1>
+          <p>维护月度账套、配置厂休福利参数、同步考勤原始文件与执行结算入库。</p>
         </div>
-        <span className="account-center-count">共 {accountSets.length} 个账套</span>
+        <span className="account-center-count">共 {accountSets.length} 个月度账套</span>
       </header>
 
-      <section className="account-center-overview" aria-label="当前账套概览">
-        <div className="account-center-overview-main">
-          <div className="account-center-overview-copy">
-            <span className="account-center-overview-label">正在查看</span>
-            <div className="account-center-overview-title-row">
-              <h2>{selectedAccountSet?.name ?? "请选择账套"}</h2>
-              {selectedAccountSet ? (
-                <span className={`account-center-status${selectedAccountSet.is_locked ? " is-locked" : " is-open"}`}>
-                  <span aria-hidden="true" />
-                  {selectedAccountSet.is_locked ? "已锁定" : "可编辑"}
+      {/* 账套核心控制中心 Hero Card */}
+      <section className="acm-hero-card" aria-label="当前账套概览">
+        <div className="acm-hero-header">
+          <div className="acm-hero-title-group">
+            <h2 className="acm-hero-title">{selectedAccountSet?.name ?? "请选择账套"}</h2>
+            {selectedAccountSet ? (
+              <>
+                <span className={`acm-badge ${selectedAccountSet.is_active ? "acm-badge--active" : "acm-badge--inactive"}`}>
+                  <span className="acm-badge-dot" />
+                  {selectedAccountSet.is_active ? "当前激活账套" : "历史账套"}
                 </span>
-              ) : null}
-            </div>
-            <p>
-              {selectedAccountSet
-                ? `${selectedAccountSet.month}${selectedAccountSet.is_active ? " · 当前激活账套" : " · 历史账套"}`
-                : "选择一个账套开始管理。"}
-            </p>
+                <span className={`acm-badge ${selectedAccountSet.is_locked ? "acm-badge--locked" : "acm-badge--editable"}`}>
+                  <span className="acm-badge-dot" />
+                  {selectedAccountSet.is_locked ? "已锁定 (不可修改)" : "可编辑 (未锁定)"}
+                </span>
+              </>
+            ) : null}
           </div>
-          <div className="account-center-overview-selector">
+
+          <div className="acm-hero-selector">
             <AccountSetSelector
               accountSets={accountSets}
               compact
@@ -394,184 +417,359 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="account-center-metrics">
-          <div className="account-center-metric">
-            <span className="account-center-metric-icon is-blue" aria-hidden="true">↥</span>
-            <div><span>导入记录</span><strong>{imports.length}</strong></div>
+        {/* 关键业务指标条 */}
+        <div className="acm-metrics-strip">
+          <div className="acm-metric-card">
+            <div className="acm-metric-icon acm-metric-icon--amber">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+            <div className="acm-metric-content">
+              <span className="acm-metric-label">本月厂休</span>
+              <div className="acm-metric-value">
+                {selectedAccountSet?.factory_rest_entries?.reduce((sum, entry) => sum + Number(entry.unit || 0), 0) ?? 0}
+                <span className="acm-metric-unit">天</span>
+              </div>
+            </div>
           </div>
-          <div className="account-center-metric">
-            <span className="account-center-metric-icon is-violet" aria-hidden="true">◷</span>
-            <div><span>厂休天数</span><strong>{selectedAccountSet?.factory_rest_entries?.reduce((sum, entry) => sum + Number(entry.unit || 0), 0) ?? 0}<small> 天</small></strong></div>
+
+          <div className="acm-metric-card">
+            <div className="acm-metric-icon acm-metric-icon--indigo">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </div>
+            <div className="acm-metric-content">
+              <span className="acm-metric-label">可用福利额度</span>
+              <div className="acm-metric-value">
+                {selectedAccountSet?.monthly_benefit_days ?? 0}
+                <span className="acm-metric-unit">天</span>
+              </div>
+            </div>
           </div>
-          <div className="account-center-metric">
-            <span className="account-center-metric-icon is-amber" aria-hidden="true">✦</span>
-            <div><span>福利天数</span><strong>{selectedAccountSet?.monthly_benefit_days ?? 0}<small> 天</small></strong></div>
+
+          <div className="acm-metric-card">
+            <div className="acm-metric-icon acm-metric-icon--emerald">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+              </svg>
+            </div>
+            <div className="acm-metric-content">
+              <span className="acm-metric-label">导入记录流水</span>
+              <div className="acm-metric-value">
+                {imports.length}
+                <span className="acm-metric-unit">条</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="acm-metric-card">
+            <div className="acm-metric-icon acm-metric-icon--sky">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+              </svg>
+            </div>
+            <div className="acm-metric-content">
+              <span className="acm-metric-label">数据源同步</span>
+              <div className="acm-metric-value" style={{ fontSize: "14px", fontWeight: "600", paddingTop: "2px" }}>
+                {attendanceSettings?.employee_attendance_source === "card_db" ? "考勤机直连" : "文件上传"}
+                {" · "}
+                {attendanceSettings?.manager_attendance_source === "dingtalk" ? "钉钉同步" : "文件上传"}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="account-panel-selector account-center-actions">
-          {selectedAccountSet && !selectedAccountSet.is_active ? (
+        {/* 快捷操作动作栏 */}
+        <div className="acm-actions-bar account-panel-selector">
+          <div className="acm-actions-group">
+            {selectedAccountSet && !selectedAccountSet.is_active ? (
+              <button
+                className="acm-btn acm-btn--primary"
+                disabled={isWorking}
+                onClick={() =>
+                  void runAction(async () => {
+                    await activateAccountSet(selectedAccountSet.id);
+                    clearQueryBootstrapCache();
+                    window.dispatchEvent(new CustomEvent("account-set-active-changed"));
+                    notification.success(`已切换当前账套：${selectedAccountSet.name}`);
+                    await reloadAccountSets(selectedAccountSet.id);
+                  })
+                }
+                type="button"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                  <polyline points="22 4 12 14.01 9 11.01" />
+                </svg>
+                设为当前
+              </button>
+            ) : null}
+
             <button
-              className="account-center-set-active"
-              disabled={isWorking}
-              onClick={() => void runAction(async () => {
-                await activateAccountSet(selectedAccountSet.id);
-                clearQueryBootstrapCache();
-                window.dispatchEvent(new CustomEvent("account-set-active-changed"));
-                notification.success(`已切换当前账套：${selectedAccountSet.name}`);
-                await reloadAccountSets(selectedAccountSet.id);
-              })}
+              className="acm-btn acm-btn--outline btn-settings"
+              onClick={() => setShowModal("settings")}
               type="button"
             >
-              设为当前
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82V9a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+              账套设置
             </button>
-          ) : null}
-          <button
-            className="btn-settings"
-            onClick={() => setShowModal("settings")}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-            </svg>
-            账套管理
-          </button>
-          <button
-            className="btn-upload"
-            onClick={() => setShowModal("upload")}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-              <polyline points="17 8 12 3 7 8"></polyline>
-              <line x1="12" y1="3" x2="12" y2="15"></line>
-            </svg>
-            上传原始文档
-          </button>
-          <button
-            className="btn-calc-employee"
-            disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-            onClick={() => void runAction(() => runCalculation("employee"))}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-            </svg>
-            员工计算
-          </button>
-          <button
-            className="btn-calc-manager"
-            disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-            onClick={() => void runAction(() => runCalculation("manager"))}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="8.5" cy="7" r="4"></circle>
-              <polyline points="17 11 19 13 23 9"></polyline>
-            </svg>
-            管理人员计算
-          </button>
+
+            <button
+              className="acm-btn acm-btn--outline btn-upload"
+              onClick={() => setShowModal("upload")}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              上传原始文档
+            </button>
+          </div>
+
+          <div className="acm-actions-group">
+            <button
+              className="acm-btn acm-btn--calc-emp btn-calc-employee"
+              disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+              onClick={() => void runAction(() => runCalculation("employee"))}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+              </svg>
+              员工计算
+            </button>
+
+            <button
+              className="acm-btn acm-btn--calc-mgr btn-calc-manager"
+              disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+              onClick={() => void runAction(() => runCalculation("manager"))}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="8.5" cy="7" r="4" />
+                <polyline points="17 11 19 13 23 9" />
+              </svg>
+              管理人员计算
+            </button>
+          </div>
         </div>
       </section>
 
-      <div className="account-workflow account-center-imports">
-        <div className="account-workflow-main">
-          <div className="account-center-section-heading">
-            <div>
-              <span className="account-center-eyebrow">ACTIVITY</span>
-              <h2>导入记录</h2>
+      {/* 中部业务看板：厂休排班与数据源准备速览 */}
+      <div className="acm-dashboard-grid">
+        {/* 厂休与考勤参数看板 */}
+        <div className="acm-panel">
+          <div className="acm-panel-head">
+            <div className="acm-panel-title-wrap">
+              <span className="acm-panel-kicker">SCHEDULE & PARAMETERS</span>
+              <h3 className="acm-panel-title">厂休排班与福利参数</h3>
             </div>
-            <span className="account-center-card-note">
-              {selectedAccountSet ? `${selectedAccountSet.name} · ${imports.length} 条记录` : "按当前选中账套展示"}
-            </span>
+            <button
+              className="acm-panel-action-link"
+              onClick={() => setShowModal("settings")}
+              type="button"
+            >
+              配置排班
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
           </div>
-          <QueryResultPanel>
-            <QueryTable
-              emptyText="暂无导入记录"
-              headers={tableHeaders}
-              rows={tableRows}
-            />
-          </QueryResultPanel>
+
+          <div className="acm-rest-preview-box">
+            <div className="acm-rest-preview-item">
+              <span className="acm-rest-preview-label">本月厂休总计</span>
+              <div className="acm-rest-preview-val">
+                {factoryRestSummary}
+                <small>天</small>
+              </div>
+            </div>
+            <div className="acm-rest-preview-divider" />
+            <div className="acm-rest-preview-item">
+              <span className="acm-rest-preview-label">已排班日期</span>
+              <div className="acm-rest-preview-val">
+                {factoryRestEntries.length}
+                <small>天</small>
+              </div>
+            </div>
+            <div className="acm-rest-preview-divider" />
+            <div className="acm-rest-preview-item">
+              <span className="acm-rest-preview-label">可用福利额度</span>
+              <div className="acm-rest-preview-val">
+                {selectedAccountSet?.monthly_benefit_days ?? 0}
+                <small>天</small>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontSize: "12px", color: "var(--acm-text-secondary)", marginBottom: "8px", fontWeight: "600" }}>
+              已排厂休日期明细：
+            </div>
+            {factoryRestEntries.length > 0 ? (
+              <div className="acm-rest-tag-list">
+                {factoryRestEntries.map((entry) => (
+                  <span
+                    key={entry.date}
+                    className={`acm-rest-tag acm-rest-tag--${entry.period ?? "full"}`}
+                  >
+                    {entry.date?.slice(5)} ({factoryRestStateLabel(entry.period as FactoryRestPeriod)})
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: "12.5px", color: "var(--acm-text-muted)" }}>
+                本月暂未标记厂休日期，如需厂休请点击右上角“配置排班”。
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 原始考勤数据源准备度 */}
+        <div className="acm-panel">
+          <div className="acm-panel-head">
+            <div className="acm-panel-title-wrap">
+              <span className="acm-panel-kicker">DATA READINESS</span>
+              <h3 className="acm-panel-title">原始考勤数据准备度</h3>
+            </div>
+            <button
+              className="acm-panel-action-link"
+              onClick={() => setShowModal("upload")}
+              type="button"
+            >
+              上传归档
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </div>
+
+          <div className="acm-source-readiness-grid">
+            {FILE_INPUT_LABELS.map((label, index) => {
+              const fileType = FILE_INPUT_TYPES[index];
+              const disabledReason = slotDisabledReasons[index];
+              const isAutoSynced = Boolean(disabledReason);
+              const importedRecord = imports.find(
+                (item) => item.file_type === fileType || item.source_filename?.includes(label.split(". ")[1] ?? ""),
+              );
+
+              return (
+                <div key={label} className="acm-source-card">
+                  <div className="acm-source-info">
+                    <span
+                      className={`acm-source-dot ${
+                        isAutoSynced
+                          ? "acm-source-dot--synced"
+                          : importedRecord
+                            ? "acm-source-dot--uploaded"
+                            : "acm-source-dot--empty"
+                      }`}
+                    />
+                    <span className="acm-source-name">{label}</span>
+                  </div>
+                  <div>
+                    {isAutoSynced ? (
+                      <span className="acm-source-status-pill acm-source-status-pill--synced">自动同步</span>
+                    ) : importedRecord ? (
+                      <span className="acm-source-status-pill acm-source-status-pill--uploaded">已归档</span>
+                    ) : (
+                      <span className="acm-source-status-pill acm-source-status-pill--empty">待上传</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ fontSize: "12px", color: "var(--acm-text-secondary)", lineHeight: "1.4" }}>
+            提示：上传原始文档后，同一类型文件将自动替换归档；准备完毕后即可点击“员工计算”与“管理人员计算”入库。
+          </div>
         </div>
       </div>
 
-      {showModal && (
+      {/* 账套导入记录流水卡片 */}
+      <section className="acm-imports-section" aria-label="账套导入记录">
+        <div className="acm-imports-header">
+          <div>
+            <h2>账套导入记录</h2>
+            <div className="acm-imports-subtitle">
+              {selectedAccountSet ? `${selectedAccountSet.name} · 共 ${imports.length} 条归档记录` : "请选择账套"}
+            </div>
+          </div>
+        </div>
+
+        <QueryResultPanel>
+          <QueryTable
+            emptyText="暂无导入记录"
+            headers={tableHeaders}
+            rows={tableRows}
+          />
+        </QueryResultPanel>
+      </section>
+
+      {/* ====================================================================
+          账套管理与参数设置弹窗 (Settings Modal)
+          ==================================================================== */}
+      {showModal === "settings" && (
         <div
-          className="master-modal-backdrop"
+          className="acm-modal-backdrop"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               handleCloseModal();
             }
           }}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 1500,
-            background: "rgba(15, 23, 42, 0.48)",
-            backdropFilter: "blur(16px) saturate(160%)",
-            WebkitBackdropFilter: "blur(16px) saturate(160%)",
-            display: "grid",
-            placeItems: "center",
-            padding: "24px",
-            boxSizing: "border-box",
-          }}
         >
-          <div
-            className="master-modal-container"
-            style={{
-              background: "#ffffff",
-              borderRadius: "12px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-              width: "100%",
-              maxWidth: showModal === "settings" ? "800px" : "600px",
-              maxHeight: "90vh",
-              overflowY: "auto",
-              position: "relative",
-              padding: "48px 24px 24px 24px",
-              boxSizing: "border-box",
-            }}
-          >
-            <QueryProgressOverlay active={progressVisible} className="query-progress-overlay-modal" progress={progress} text={loadingText} />
+          <div className="acm-modal-card acm-modal-card--settings">
+            <QueryProgressOverlay
+              active={progressVisible}
+              className="query-progress-overlay-modal"
+              progress={progress}
+              text={loadingText}
+            />
 
-            {/* 关闭按钮 */}
-            <button
-              onClick={handleCloseModal}
-              style={{
-                position: "absolute",
-                top: "16px",
-                right: "16px",
-                border: "none",
-                background: "transparent",
-                fontSize: "20px",
-                cursor: "pointer",
-                color: "#64748b",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "32px",
-                height: "32px",
-                borderRadius: "50%",
-                transition: "background 0.2s",
-              }}
-              type="button"
-              aria-label="关闭"
-            >
-              ×
-            </button>
+            <div className="acm-modal-head">
+              <div className="acm-modal-title-group">
+                <h3 className="acm-modal-title">账套设置与参数配置</h3>
+                {selectedAccountSet ? (
+                  <span className={`acm-badge ${selectedAccountSet.is_locked ? "acm-badge--locked" : "acm-badge--editable"}`}>
+                    <span className="acm-badge-dot" />
+                    {selectedAccountSet.is_locked ? "已锁定" : "可编辑"}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                className="acm-modal-close-btn"
+                onClick={handleCloseModal}
+                type="button"
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
 
-            {showModal === "settings" && (
-              <div className="settings-double-panel">
-                {/* 左面板 */}
-                <div className="settings-panel-left">
-                  {/* 创建账套卡片 */}
-                  <div className="settings-card-module">
-                    <div className="settings-card-title">月度账套</div>
+            <div className="acm-modal-body">
+              <div className="acm-modal-split-layout">
+                {/* 左列：月度账套创建与生命周期控制 */}
+                <div className="acm-modal-col">
+                  {/* 创建新账套 */}
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">月度账套</div>
                     <form
-                      className="settings-form-row"
+                      style={{ display: "flex", flexDirection: "column", gap: "10px" }}
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (!createMonth) {
@@ -607,22 +805,27 @@ export default function AdminDashboardPage() {
                         });
                       }}
                     >
-                      <label className="settings-field" style={{ flex: 1, marginBottom: 0 }}>
-                        <span className="settings-field-label">账套月份</span>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={{ fontSize: "12px", color: "var(--acm-text-secondary)", fontWeight: "600" }}>账套月份</span>
                         <MonthPicker
                           onChange={(val) => setCreateMonth(val)}
                           value={createMonth}
                         />
                       </label>
-                      <button disabled={isWorking} type="submit">
+                      <button
+                        className="acm-btn acm-btn--primary"
+                        disabled={isWorking}
+                        type="submit"
+                        style={{ height: "36px" }}
+                      >
                         创建
                       </button>
                     </form>
                   </div>
 
-                  {/* 当前账套激活与状态卡片 */}
-                  <div className="settings-card-module">
-                    <div className="settings-card-title">当前账套</div>
+                  {/* 当前账套切换与状态 */}
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">切换与查看账套</div>
                     <AccountSetSelector
                       accountSets={accountSets}
                       compact
@@ -633,7 +836,7 @@ export default function AdminDashboardPage() {
                       }}
                       value={selectedAccountSet?.month ?? ""}
                     />
-                    <div className="account-lock-notice" style={{ margin: "8px 0 0 0", fontSize: "12px", lineHeight: "1.4" }}>
+                    <div style={{ fontSize: "12px", color: "var(--acm-text-secondary)", lineHeight: "1.4", marginTop: "4px" }}>
                       {!selectedAccountSet
                         ? "请选择账套"
                         : selectedAccountSet.is_locked
@@ -642,254 +845,228 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* 账套控制动作栏 */}
-                  <div className="settings-toolbar">
-                    <button
-                      className="btn-set-current"
-                      disabled={!selectedAccountSet || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在设置当前激活账套...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 10;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 60);
-                          try {
-                            await activateAccountSet(selectedAccountSet.id);
-                            clearInterval(interval);
-                            setProgress(100);
-                            setLoadingText("当前账套设置成功！");
-                            notification.success(`已切换当前账套：${selectedAccountSet.name}`);
-                            clearQueryBootstrapCache();
-                            window.dispatchEvent(new CustomEvent("account-set-active-changed"));
-                            await reloadAccountSets(selectedAccountSet.id);
-                          } catch (caughtError) {
-                            clearInterval(interval);
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "设置当前账套失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      设为当前
-                    </button>
-                    <button
-                      className="btn-lock-set"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          const isConfirmed = await confirm({
-                            message: "确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。",
-                            type: "warning",
-                          });
-                          if (!isConfirmed) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在锁定当前账套...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 10;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 60);
-                          try {
-                            await lockAccountSet(selectedAccountSet.id);
-                            clearInterval(interval);
-                            setProgress(100);
-                            setLoadingText("账套已锁定！");
-                            notification.success(`账套已锁定：${selectedAccountSet.name}`);
-                            await reloadAccountSets(selectedAccountSet.id);
-                          } catch (caughtError) {
-                            clearInterval(interval);
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "锁定账套失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      锁定账套
-                    </button>
-                    <button
-                      className="btn-unlock-set"
-                      disabled={!selectedAccountSet || !selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          const isConfirmed = await confirm({
-                            message: "确认解锁该账套吗？解锁后将恢复修改能力。",
-                            type: "info",
-                          });
-                          if (!isConfirmed) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在解锁当前账套...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 10;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 60);
-                          try {
-                            await unlockAccountSet(selectedAccountSet.id);
-                            clearInterval(interval);
-                            setProgress(100);
-                            setLoadingText("账套已解锁！");
-                            notification.success(`账套已解锁：${selectedAccountSet.name}`);
-                            await reloadAccountSets(selectedAccountSet.id);
-                          } catch (caughtError) {
-                            clearInterval(interval);
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "解锁账套失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      解锁账套
-                    </button>
-                    <button
-                      className="btn-delete-set"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          const isConfirmed = await confirm({
-                            message:
-                              `确认清空 ${selectedAccountSet.month} 账套的已导入数据吗？` +
-                              "将删除该月的月报、日报、请假单、加班单数据及全部归档文件，" +
-                              "清空后需要重新上传源文件并重新计算，且不影响其他月份。",
-                            type: "danger",
-                          });
-                          if (!isConfirmed) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在清空已导入数据...");
-                          try {
-                            const result = await resetAccountSetImported(selectedAccountSet.id);
-                            setProgress(100);
-                            setLoadingText("已导入数据已清空！");
-                            const deletedTotal = Object.values(result.deleted ?? {}).reduce((sum, count) => sum + count, 0);
-                            notification.success(`已清空 ${selectedAccountSet.month} 已导入数据（共 ${deletedTotal} 条记录），请重新上传源文件。`);
-                            await reloadAccountSets(selectedAccountSet.id);
-                          } catch (caughtError) {
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "清空已导入数据失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      清空已导入数据
-                    </button>
-                    <button
-                      className="btn-delete-set"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          const isConfirmed = await confirm({
-                            message: "确认删除该账套吗？将同时删除账套下的归档文件记录。",
-                            type: "danger",
-                          });
-                          if (!isConfirmed) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在删除该账套...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 10;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 60);
-                          try {
-                            await deleteAccountSet(selectedAccountSet.id);
-                            clearInterval(interval);
-                            setProgress(100);
-                            setLoadingText("账套已成功删除！");
-                            notification.success("账套已删除");
-                            await reloadAccountSets(null);
-                          } catch (caughtError) {
-                            clearInterval(interval);
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "删除账套失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      删除
-                    </button>
+                  {/* 账套运维动作按钮组 */}
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">账套生命周期操作</div>
+                    <div className="acm-button-stack">
+                      <button
+                        className="acm-btn acm-btn--outline"
+                        disabled={!selectedAccountSet || isWorking}
+                        onClick={() =>
+                          void runAction(async () => {
+                            if (!selectedAccountSet) return;
+                            setProgressVisible(true);
+                            setProgress(0);
+                            setLoadingText("正在设置当前激活账套...");
+                            try {
+                              await activateAccountSet(selectedAccountSet.id);
+                              setProgress(100);
+                              setLoadingText("当前账套设置成功！");
+                              notification.success(`已切换当前账套：${selectedAccountSet.name}`);
+                              clearQueryBootstrapCache();
+                              window.dispatchEvent(new CustomEvent("account-set-active-changed"));
+                              await reloadAccountSets(selectedAccountSet.id);
+                            } catch (caughtError) {
+                              notification.error(caughtError instanceof ApiError ? caughtError.message : "设置当前账套失败");
+                            } finally {
+                              setTimeout(() => {
+                                setProgressVisible(false);
+                              }, 500);
+                            }
+                          })
+                        }
+                        type="button"
+                      >
+                        设为当前
+                      </button>
 
-                    <button
-                      className="btn-refresh-set"
-                      disabled={isWorking}
-                      onClick={() => void runAction(async () => reloadAccountSets(selectedAccountSetId))}
-                      type="button"
-                    >
-                      刷新
-                    </button>
+                      {selectedAccountSet?.is_locked ? (
+                        <button
+                          className="acm-btn acm-btn--outline"
+                          disabled={!selectedAccountSet || isWorking}
+                          onClick={() =>
+                            void runAction(async () => {
+                              if (!selectedAccountSet) return;
+                              const isConfirmed = await confirm({
+                                message: "确认解锁该账套吗？解锁后将恢复修改能力。",
+                                type: "info",
+                              });
+                              if (!isConfirmed) return;
+                              setProgressVisible(true);
+                              setProgress(0);
+                              setLoadingText("正在解锁当前账套...");
+                              try {
+                                await unlockAccountSet(selectedAccountSet.id);
+                                setProgress(100);
+                                notification.success(`账套已解锁：${selectedAccountSet.name}`);
+                                await reloadAccountSets(selectedAccountSet.id);
+                              } catch (caughtError) {
+                                notification.error(caughtError instanceof ApiError ? caughtError.message : "解锁账套失败");
+                              } finally {
+                                setTimeout(() => setProgressVisible(false), 500);
+                              }
+                            })
+                          }
+                          type="button"
+                        >
+                          解锁账套
+                        </button>
+                      ) : (
+                        <button
+                          className="acm-btn acm-btn--outline"
+                          disabled={!selectedAccountSet || isWorking}
+                          onClick={() =>
+                            void runAction(async () => {
+                              if (!selectedAccountSet) return;
+                              const isConfirmed = await confirm({
+                                message: "确认锁定该账套吗？锁定后将不能上传、计算、修正或删除。",
+                                type: "warning",
+                              });
+                              if (!isConfirmed) return;
+                              setProgressVisible(true);
+                              setProgress(0);
+                              setLoadingText("正在锁定当前账套...");
+                              try {
+                                await lockAccountSet(selectedAccountSet.id);
+                                setProgress(100);
+                                notification.success(`账套已锁定：${selectedAccountSet.name}`);
+                                await reloadAccountSets(selectedAccountSet.id);
+                              } catch (caughtError) {
+                                notification.error(caughtError instanceof ApiError ? caughtError.message : "锁定账套失败");
+                              } finally {
+                                setTimeout(() => setProgressVisible(false), 500);
+                              }
+                            })
+                          }
+                          type="button"
+                        >
+                          锁定账套
+                        </button>
+                      )}
+
+                      <button
+                        className="acm-btn acm-btn--outline"
+                        disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                        onClick={() =>
+                          void runAction(async () => {
+                            if (!selectedAccountSet) return;
+                            const isConfirmed = await confirm({
+                              message:
+                                `确认清空 ${selectedAccountSet.month} 账套的已导入数据吗？` +
+                                "将删除该月的月报、日报、请假单、加班单数据及全部归档文件，" +
+                                "清空后需要重新上传源文件并重新计算，且不影响其他月份。",
+                              type: "danger",
+                            });
+                            if (!isConfirmed) return;
+                            setProgressVisible(true);
+                            setProgress(0);
+                            setLoadingText("正在清空已导入数据...");
+                            try {
+                              const result = await resetAccountSetImported(selectedAccountSet.id);
+                              setProgress(100);
+                              const deletedTotal = Object.values(result.deleted ?? {}).reduce((sum, count) => sum + count, 0);
+                              notification.success(`已清空 ${selectedAccountSet.month} 已导入数据（共 ${deletedTotal} 条记录），请重新上传源文件。`);
+                              await reloadAccountSets(selectedAccountSet.id);
+                            } catch (caughtError) {
+                              notification.error(caughtError instanceof ApiError ? caughtError.message : "清空已导入数据失败");
+                            } finally {
+                              setTimeout(() => setProgressVisible(false), 500);
+                            }
+                          })
+                        }
+                        type="button"
+                      >
+                        清空已导入数据
+                      </button>
+
+                      <button
+                        className="acm-btn acm-btn--danger-text"
+                        disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                        onClick={() =>
+                          void runAction(async () => {
+                            if (!selectedAccountSet) return;
+                            const isConfirmed = await confirm({
+                              message: "确认删除该账套吗？将同时删除账套下的归档文件记录。",
+                              type: "danger",
+                            });
+                            if (!isConfirmed) return;
+                            setProgressVisible(true);
+                            setProgress(0);
+                            setLoadingText("正在删除该账套...");
+                            try {
+                              await deleteAccountSet(selectedAccountSet.id);
+                              setProgress(100);
+                              notification.success("账套已删除");
+                              await reloadAccountSets(null);
+                            } catch (caughtError) {
+                              notification.error(caughtError instanceof ApiError ? caughtError.message : "删除账套失败");
+                            } finally {
+                              setTimeout(() => setProgressVisible(false), 500);
+                            }
+                          })
+                        }
+                        type="button"
+                      >
+                        删除
+                      </button>
+
+                      <button
+                        className="acm-btn acm-btn--outline"
+                        disabled={isWorking}
+                        onClick={() => void runAction(async () => reloadAccountSets(selectedAccountSetId))}
+                        type="button"
+                      >
+                        刷新
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* 右面板 */}
-                <div className="settings-panel-right">
-                  {/* 参数配置卡片 */}
-                  <div className="settings-card-module">
-                    <div className="settings-card-title">参数设置</div>
-                    <div className="account-params-grid admin-form-grid">
-                      <label className="settings-field" style={{ marginBottom: 0 }}>
-                        <span className="settings-field-label">本月厂休天数</span>
-                        <input className="settings-input" readOnly type="number" value={factoryRestSummary} />
-                      </label>
-                      <label className="settings-field" style={{ marginBottom: 0 }}>
-                        <span className="settings-field-label">本月可用福利天数</span>
+                {/* 右列：参数设置与厂休排班日历 */}
+                <div className="acm-modal-col">
+                  {/* 参数配置 */}
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">参数设置</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={{ fontSize: "12.5px", fontWeight: "600", color: "var(--acm-text-secondary)" }}>
+                          本月厂休天数
+                        </span>
                         <input
-                          className="settings-input"
+                          readOnly
+                          style={{
+                            height: "36px",
+                            padding: "0 12px",
+                            borderRadius: "8px",
+                            border: "1px solid var(--acm-border)",
+                            background: "var(--acm-surface-muted)",
+                            fontSize: "14px",
+                            fontWeight: "600",
+                            color: "var(--acm-text-main)",
+                          }}
+                          type="number"
+                          value={factoryRestSummary}
+                        />
+                      </label>
+
+                      <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                        <span style={{ fontSize: "12.5px", fontWeight: "600", color: "var(--acm-text-secondary)" }}>
+                          本月可用福利天数
+                        </span>
+                        <input
                           disabled={!selectedAccountSet || selectedAccountSet.is_locked}
                           min={0}
                           onChange={(event) => setMonthlyBenefitDays(event.target.value)}
                           step={0.5}
+                          style={{
+                            height: "36px",
+                            padding: "0 12px",
+                            borderRadius: "8px",
+                            border: "1px solid var(--acm-border-strong)",
+                            background: "#ffffff",
+                            fontSize: "14px",
+                            color: "var(--acm-text-main)",
+                          }}
                           type="number"
                           value={monthlyBenefitDays}
                         />
@@ -897,342 +1074,312 @@ export default function AdminDashboardPage() {
                     </div>
                   </div>
 
-                  {/* 厂休日期配置日历 */}
-                  <div className="settings-card-module factory-rest-panel" style={{ border: "none", boxShadow: "none", padding: 0, background: "transparent" }}>
-                    <div className="factory-rest-panel-head">
-                      <div>
-                        <div className="factory-rest-panel-kicker">厂休配置</div>
-                        <div className="factory-rest-panel-title">厂休日期明细</div>
-                      </div>
-                      <span
-                        className={`factory-rest-state-badge${
-                          selectedAccountSet?.is_locked ? " factory-rest-state-badge--locked" : " factory-rest-state-badge--editable"
-                        }`}
-                      >
-                        {!selectedAccountSet ? "请选择账套" : selectedAccountSet.is_locked ? "已锁定" : "可编辑"}
-                      </span>
-                    </div>
+                  {/* 厂休日历排班 */}
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">厂休排班日历</div>
+                    <div className="acm-calendar-wrapper">
+                      <div className="acm-calendar-topbar">
+                        <div className="acm-calendar-stats">
+                          <span>已标记厂休: <strong>{factoryRestSummary} 天</strong></span>
+                          <span>已选天数: <strong>{factoryRestEntries.length} 天</strong></span>
+                        </div>
 
-                    <div className="factory-rest-summary-card">
-                      <div>
-                        <div className="factory-rest-summary-label">本月汇总</div>
-                        <div className="factory-rest-summary-value">
-                          <span>{factoryRestSummary}</span>
-                          <span className="factory-rest-summary-unit">天</span>
+                        <div className="acm-calendar-legend" aria-hidden="true">
+                          <span className="acm-legend-item">
+                            <span className="acm-legend-dot acm-legend-dot--none" />
+                            上班
+                          </span>
+                          <span className="acm-legend-item">
+                            <span className="acm-legend-dot acm-legend-dot--am" />
+                            上午
+                          </span>
+                          <span className="acm-legend-item">
+                            <span className="acm-legend-dot acm-legend-dot--pm" />
+                            下午
+                          </span>
+                          <span className="acm-legend-item">
+                            <span className="acm-legend-dot acm-legend-dot--full" />
+                            全天
+                          </span>
                         </div>
                       </div>
-                      <div className="factory-rest-summary-meta">
-                        <div>
-                          <span className="factory-rest-summary-meta-label">已选日期</span>
-                          <span>{factoryRestEntries.length} 天</span>
-                        </div>
-                        <div>
-                          <span className="factory-rest-summary-meta-label">切换方式</span>
-                          <span>上班 / 全天 / 上午 / 下午</span>
-                        </div>
+
+                      <div style={{ fontSize: "11.5px", color: "var(--acm-text-muted)" }}>
+                        提示：点击日历日期按“上班 → 全天 → 上午 → 下午 → 上班”循环切换，配置完毕后请点击下方保存参数。
                       </div>
-                    </div>
 
-                    <div className="factory-rest-panel-note">
-                      点击日期卡片按“上班 → 全天 → 上午 → 下午 → 上班”循环切换，系统会自动汇总厂休天数。
-                    </div>
-
-                    <div className="factory-rest-legend" aria-hidden="true" style={{ marginTop: "12px", marginBottom: "12px" }}>
-                      <span className="factory-rest-legend-item">
-                        <span className="factory-rest-legend-dot factory-rest-legend-dot--none" />
-                        上班
-                      </span>
-                      <span className="factory-rest-legend-item">
-                        <span className="factory-rest-legend-dot factory-rest-legend-dot--am" />
-                        上午
-                      </span>
-                      <span className="factory-rest-legend-item">
-                        <span className="factory-rest-legend-dot factory-rest-legend-dot--pm" />
-                        下午
-                      </span>
-                      <span className="factory-rest-legend-item">
-                        <span className="factory-rest-legend-dot factory-rest-legend-dot--full" />
-                        全天
-                      </span>
-                    </div>
-
-                    {factoryRestCalendar ? (
-                      <div className="factory-rest-grid">
-                        {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
-                          <div key={day} className="factory-rest-weekday">
-                            周{day}
-                          </div>
-                        ))}
-                        {factoryRestCalendar.leadingEmptySlots.map((slot) => (
-                          <div key={`spacer-${slot}`} className="factory-rest-spacer" />
-                        ))}
-                        {factoryRestCalendar.days.map((day) => {
-                          const state = currentFactoryRestState(day.date);
-                          return (
-                            <button
-                              className={`factory-rest-day factory-rest-day--${state}`}
-                              disabled={!selectedAccountSet || selectedAccountSet.is_locked}
-                              key={day.date}
-                              onClick={() => toggleFactoryRestDay(day.date)}
-                              type="button"
-                            >
-                              <span className="factory-rest-day-number">{day.dayOfMonth}</span>
-                              <span className="factory-rest-day-state">{factoryRestStateLabel(state)}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="factory-rest-empty">请选择账套后设置厂休明细</div>
-                    )}
-                  </div>
-
-                  {/* 保存动作栏 */}
-                  <div className="settings-toolbar" style={{ marginTop: "8px" }}>
-                    <button
-                      className="btn-save-params"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在保存账套参数与厂休明细...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 10;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 80);
-                          try {
-                            const payload: { monthly_benefit_days: string; factory_rest_entries?: AdminAccountSetFactoryRestEntry[] } = {
-                              monthly_benefit_days: monthlyBenefitDays,
-                            };
-                            if (isFactoryRestDirty) {
-                              payload.factory_rest_entries = factoryRestEntries;
-                            }
-                            await updateAccountSet(selectedAccountSet.id, payload);
-                            clearInterval(interval);
-                            setProgress(100);
-                            setLoadingText("账套参数已保存！");
-                            notification.success("账套参数已保存");
-                            await reloadAccountSets(selectedAccountSet.id);
-                          } catch (caughtError) {
-                            clearInterval(interval);
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "保存参数失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      type="button"
-                    >
-                      保存参数
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showModal === "upload" && (
-              <div className="account-import-card" style={{ border: "none", boxShadow: "none", margin: 0, padding: 0 }}>
-                <div style={{ borderBottom: "1px solid var(--ent-border)", paddingBottom: "12px", marginBottom: "16px" }}>
-                  <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>导入考勤原始表</span>
-                </div>
-                <div className="account-card-body" style={{ padding: 0 }}>
-                  <div className="panel-note">
-                    可一次上传全部源文件，也可只上传需要更新的部分文件；同一类型的新文件会替换该账套里已有的归档文件。点击“开始计算”后才会生成并持久化考勤数据。
-                  </div>
-
-                  <div className="premium-upload-grid">
-                    {FILE_INPUT_LABELS.map((label, index) => {
-                      const file = uploadFiles[index];
-                      const isDragOver = dragOverIndex[index];
-                      const fileInputId = `file-input-${index}`;
-                      const disabledReason = slotDisabledReasons[index];
-                      const isSlotDisabled = Boolean(disabledReason);
-                      return (
-                        <div
-                          className={`upload-slot-card ${file ? "has-file" : ""} ${isDragOver ? "is-dragover" : ""} ${isSlotDisabled ? "is-disabled" : ""}`}
-                          key={label}
-                          title={disabledReason ?? undefined}
-                          onClick={() => {
-                            if (isSlotDisabled) {
-                              return;
-                            }
-                            document.getElementById(fileInputId)?.click();
-                          }}
-                          onDragLeave={(e) => {
-                            if (isSlotDisabled) {
-                              return;
-                            }
-                            e.preventDefault();
-                            const nextDrag = [...dragOverIndex];
-                            nextDrag[index] = false;
-                            setDragOverIndex(nextDrag);
-                          }}
-                          onDragOver={(e) => {
-                            if (isSlotDisabled) {
-                              return;
-                            }
-                            e.preventDefault();
-                            const nextDrag = [...dragOverIndex];
-                            nextDrag[index] = true;
-                            setDragOverIndex(nextDrag);
-                          }}
-                          onDrop={(e) => {
-                            if (isSlotDisabled) {
-                              return;
-                            }
-                            e.preventDefault();
-                            const nextDrag = [...dragOverIndex];
-                            nextDrag[index] = false;
-                            setDragOverIndex(nextDrag);
-
-                            const droppedFile = e.dataTransfer.files?.[0] ?? null;
-                            if (droppedFile) {
-                              const nextFiles = [...uploadFiles];
-                              nextFiles[index] = droppedFile;
-                              setUploadFiles(nextFiles);
-                            }
-                          }}
-                        >
-                          <input
-                            id={fileInputId}
-                            disabled={isSlotDisabled}
-                            style={{ display: "none" }}
-                            onChange={(event) => {
-                              const nextFiles = [...uploadFiles];
-                              nextFiles[index] = event.target.files?.[0] ?? null;
-                              setUploadFiles(nextFiles);
-                            }}
-                            type="file"
-                          />
-
-                          {file && (
-                            <button
-                              className="upload-slot-clear"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const nextFiles = [...uploadFiles];
-                                nextFiles[index] = null;
-                                setUploadFiles(nextFiles);
-                              }}
-                              title="清除选择"
-                              type="button"
-                            >
-                              ×
-                            </button>
-                          )}
-
-                           <div className="upload-slot-icon">
-                             {file ? (
-                               <svg
-                                 width="24"
-                                 height="24"
-                                 viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 strokeWidth="1.5"
-                                 strokeLinecap="round"
-                                 strokeLinejoin="round"
-                               >
-                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                                 <polyline points="14 2 14 8 20 8" />
-                               </svg>
-                             ) : (
-                               <svg
-                                 width="24"
-                                 height="24"
-                                 viewBox="0 0 24 24"
-                                 fill="none"
-                                 stroke="currentColor"
-                                 strokeWidth="1.5"
-                                 strokeLinecap="round"
-                                 strokeLinejoin="round"
-                               >
-                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                               </svg>
-                             )}
-                           </div>
-                          <div className="upload-slot-title">{label}</div>
-                          <div className="upload-slot-status">
-                            {disabledReason ?? (file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "点击选择或拖拽文件")}
-                          </div>
+                      {factoryRestCalendar ? (
+                        <div className="acm-calendar-grid">
+                          {["一", "二", "三", "四", "五", "六", "日"].map((day) => (
+                            <div key={day} className="acm-calendar-weekday">
+                              周{day}
+                            </div>
+                          ))}
+                          {factoryRestCalendar.leadingEmptySlots.map((slot) => (
+                            <div key={`spacer-${slot}`} className="acm-calendar-spacer" />
+                          ))}
+                          {factoryRestCalendar.days.map((day) => {
+                            const state = currentFactoryRestState(day.date);
+                            return (
+                              <button
+                                className={`acm-calendar-day-btn acm-day--${state}`}
+                                disabled={!selectedAccountSet || selectedAccountSet.is_locked}
+                                key={day.date}
+                                onClick={() => toggleFactoryRestDay(day.date)}
+                                type="button"
+                              >
+                                <span className="acm-day-number">{day.dayOfMonth}</span>
+                                <span className="acm-day-state-label">{factoryRestStateLabel(state)}</span>
+                              </button>
+                            );
+                          })}
                         </div>
-                      );
-                    })}
-                  </div>
+                      ) : (
+                        <div style={{ padding: "24px", textAlign: "center", color: "var(--acm-text-muted)" }}>
+                          请先选择或创建账套以配置厂休日历
+                        </div>
+                      )}
+                    </div>
 
-                  <div className="toolbar-premium">
-                    <button
-                      className="legacy-btn-primary account-primary-button"
-                      disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
-                      onClick={() =>
-                        void runAction(async () => {
-                          if (!selectedAccountSet) {
-                            return;
-                          }
-                          // 双保险：禁用槽位的文件不提交（与后端 calculate 跳过逻辑一致）
-                          const files = uploadFiles.filter(
-                            (file, index) => file && !slotDisabledReasons[index],
-                          ) as File[];
-                          if (!files.length) {
-                            notification.warning("请至少选择一个要上传的源文件");
-                            return;
-                          }
-
-                          setProgressVisible(true);
-                          setProgress(0);
-                          setLoadingText("正在上传原始文件...");
-
-                          try {
-                            const response = await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
-                              setProgress(percent);
-                              if (percent >= 100) {
-                                setLoadingText("上传完成，正在归档原始文件...");
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
+                      <button
+                        className="acm-btn acm-btn--primary"
+                        disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                        onClick={() =>
+                          void runAction(async () => {
+                            if (!selectedAccountSet) return;
+                            setProgressVisible(true);
+                            setProgress(0);
+                            setLoadingText("正在保存账套参数与厂休明细...");
+                            try {
+                              const payload: { monthly_benefit_days: string; factory_rest_entries?: AdminAccountSetFactoryRestEntry[] } = {
+                                monthly_benefit_days: monthlyBenefitDays,
+                              };
+                              if (isFactoryRestDirty) {
+                                payload.factory_rest_entries = factoryRestEntries;
                               }
-                            });
-                            setProgress(100);
-                            setLoadingText("文件上传完成！正在同步账套状态...");
-                            setUploadFiles(Array.from({ length: 6 }, () => null));
-                            await reloadAccountSets(selectedAccountSet.id);
-                            const rejectedFiles = (response.results ?? []).filter((result) => result.status === "error");
-                            if (rejectedFiles.length) {
-                              notification.warning(
-                                `上传完成，${rejectedFiles.length} 个文件被拒绝：${rejectedFiles
-                                  .map((result) => `${result.file}（${result.error ?? "未知原因"}）`)
-                                  .join("；")}`,
-                              );
-                            } else {
-                              notification.success("上传成功，已归档到账套。");
+                              await updateAccountSet(selectedAccountSet.id, payload);
+                              setProgress(100);
+                              notification.success("账套参数已保存");
+                              await reloadAccountSets(selectedAccountSet.id);
+                            } catch (caughtError) {
+                              notification.error(caughtError instanceof ApiError ? caughtError.message : "保存参数失败");
+                            } finally {
+                              setTimeout(() => setProgressVisible(false), 500);
                             }
-                            setShowModal(null);
-                          } catch (caughtError) {
-                            notification.error(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
-                          } finally {
-                            setTimeout(() => {
-                              setProgressVisible(false);
-                            }, 500);
-                          }
-                        })
-                      }
-                      style={{
-                        background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
-                        color: "#ffffff"
-                      }}
-                      type="button"
-                    >
-                      上传原始文件
-                    </button>
+                          })
+                        }
+                        type="button"
+                      >
+                        保存参数
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ====================================================================
+          原始文档上传与结算弹窗 (Upload Modal)
+          ==================================================================== */}
+      {showModal === "upload" && (
+        <div
+          className="acm-modal-backdrop"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCloseModal();
+            }
+          }}
+        >
+          <div className="acm-modal-card acm-modal-card--upload">
+            <QueryProgressOverlay
+              active={progressVisible}
+              className="query-progress-overlay-modal"
+              progress={progress}
+              text={loadingText}
+            />
+
+            <div className="acm-modal-head">
+              <div className="acm-modal-title-group">
+                <h3 className="acm-modal-title">导入考勤原始表</h3>
+                {selectedAccountSet ? (
+                  <span className="acm-badge acm-badge--active">
+                    <span className="acm-badge-dot" />
+                    {selectedAccountSet.name}
+                  </span>
+                ) : null}
+              </div>
+              <button
+                className="acm-modal-close-btn"
+                onClick={handleCloseModal}
+                type="button"
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="acm-modal-body">
+              <div style={{ fontSize: "13px", color: "var(--acm-text-secondary)", lineHeight: "1.5" }}>
+                可一次上传全部源文件，也可只上传需要更新的部分文件；同一类型的新文件会替换该账套里已有的归档文件。点击“开始计算”后才会生成并持久化考勤数据。
+              </div>
+
+              {/* 6 大上传槽位卡片网格 */}
+              <div className="acm-upload-grid">
+                {FILE_INPUT_LABELS.map((label, index) => {
+                  const file = uploadFiles[index];
+                  const isDragOver = dragOverIndex[index];
+                  const fileInputId = `acm-file-input-${index}`;
+                  const disabledReason = slotDisabledReasons[index];
+                  const isSlotDisabled = Boolean(disabledReason);
+
+                  return (
+                    <div
+                      className={`acm-upload-slot ${file ? "has-file" : ""} ${isDragOver ? "is-dragover" : ""} ${isSlotDisabled ? "is-disabled" : ""}`}
+                      key={label}
+                      title={disabledReason ?? undefined}
+                      onClick={() => {
+                        if (isSlotDisabled) return;
+                        document.getElementById(fileInputId)?.click();
+                      }}
+                      onDragLeave={(e) => {
+                        if (isSlotDisabled) return;
+                        e.preventDefault();
+                        const nextDrag = [...dragOverIndex];
+                        nextDrag[index] = false;
+                        setDragOverIndex(nextDrag);
+                      }}
+                      onDragOver={(e) => {
+                        if (isSlotDisabled) return;
+                        e.preventDefault();
+                        const nextDrag = [...dragOverIndex];
+                        nextDrag[index] = true;
+                        setDragOverIndex(nextDrag);
+                      }}
+                      onDrop={(e) => {
+                        if (isSlotDisabled) return;
+                        e.preventDefault();
+                        const nextDrag = [...dragOverIndex];
+                        nextDrag[index] = false;
+                        setDragOverIndex(nextDrag);
+
+                        const droppedFile = e.dataTransfer.files?.[0] ?? null;
+                        if (droppedFile) {
+                          const nextFiles = [...uploadFiles];
+                          nextFiles[index] = droppedFile;
+                          setUploadFiles(nextFiles);
+                        }
+                      }}
+                    >
+                      <input
+                        id={fileInputId}
+                        disabled={isSlotDisabled}
+                        style={{ display: "none" }}
+                        onChange={(event) => {
+                          const nextFiles = [...uploadFiles];
+                          nextFiles[index] = event.target.files?.[0] ?? null;
+                          setUploadFiles(nextFiles);
+                        }}
+                        type="file"
+                      />
+
+                      {file && (
+                        <button
+                          className="acm-slot-clear-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const nextFiles = [...uploadFiles];
+                            nextFiles[index] = null;
+                            setUploadFiles(nextFiles);
+                          }}
+                          title="清除选择"
+                          type="button"
+                        >
+                          ×
+                        </button>
+                      )}
+
+                      <div className="acm-slot-icon-box">
+                        {file ? (
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                            <polyline points="14 2 14 8 20 8" />
+                          </svg>
+                        )}
+                      </div>
+
+                      <div className="acm-slot-content">
+                        <div className="acm-slot-title">{label}</div>
+                        <div className="acm-slot-hint">
+                          {disabledReason ?? (file ? `${file.name} (${(file.size / 1024).toFixed(1)} KB)` : "点击选择或拖拽文件")}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* 弹窗底部操作栏 */}
+              <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", borderTop: "1px solid var(--acm-border)", paddingTop: "16px", marginTop: "8px" }}>
+                <button
+                  className="acm-btn acm-btn--primary"
+                  disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
+                  onClick={() =>
+                    void runAction(async () => {
+                      if (!selectedAccountSet) return;
+                      const files = uploadFiles.filter(
+                        (file, index) => file && !slotDisabledReasons[index],
+                      ) as File[];
+                      if (!files.length) {
+                        notification.warning("请至少选择一个要上传的源文件");
+                        return;
+                      }
+
+                      setProgressVisible(true);
+                      setProgress(0);
+                      setLoadingText("正在上传原始文件...");
+
+                      try {
+                        const response = await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
+                          setProgress(percent);
+                          if (percent >= 100) {
+                            setLoadingText("上传完成，正在归档原始文件...");
+                          }
+                        });
+                        setProgress(100);
+                        setUploadFiles(Array.from({ length: 6 }, () => null));
+                        await reloadAccountSets(selectedAccountSet.id);
+                        const rejectedFiles = (response.results ?? []).filter((result) => result.status === "error");
+                        if (rejectedFiles.length) {
+                          notification.warning(
+                            `上传完成，${rejectedFiles.length} 个文件被拒绝：${rejectedFiles
+                              .map((result) => `${result.file}（${result.error ?? "未知原因"}）`)
+                              .join("；")}`,
+                          );
+                        } else {
+                          notification.success("上传成功，已归档到账套。");
+                        }
+                        setShowModal(null);
+                      } catch (caughtError) {
+                        notification.error(caughtError instanceof ApiError ? caughtError.message : "文件上传失败");
+                      } finally {
+                        setTimeout(() => setProgressVisible(false), 500);
+                      }
+                    })
+                  }
+                  type="button"
+                >
+                  上传原始文件
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
