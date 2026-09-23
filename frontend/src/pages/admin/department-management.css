@@ -1,0 +1,858 @@
+/* ==========================================================================
+   部门管理 (Department Management) - 参考员工管理页标准的现代紧凑高质感 macOS 布局
+   ========================================================================== */
+
+:root {
+  --dept-primary: #4f46e5;
+  --dept-primary-hover: #4338ca;
+  --dept-primary-light: rgba(79, 70, 229, 0.08);
+
+  /* macOS 质感面板变量 */
+  --dept-dock-bg: rgba(255, 255, 255, 0.68);
+  --dept-dock-bg-hover: rgba(255, 255, 255, 0.88);
+  --dept-dock-border: rgba(255, 255, 255, 0.82);
+  --dept-dock-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+
+  --dept-window-bg: rgba(255, 255, 255, 0.76);
+  --dept-window-bg-hover: rgba(255, 255, 255, 0.88);
+  --dept-window-border: rgba(255, 255, 255, 0.82);
+  --dept-window-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --dept-text-main: #0f172a;
+  --dept-text-secondary: #475569;
+  --dept-text-muted: #94a3b8;
+
+  --dept-success: #059669;
+  --dept-success-light: rgba(236, 253, 245, 0.85);
+  --dept-success-border: rgba(167, 243, 208, 0.9);
+
+  --dept-warning: #d97706;
+  --dept-warning-light: rgba(254, 243, 199, 0.85);
+  --dept-warning-border: rgba(253, 230, 138, 0.9);
+
+  --dept-danger: #e11d48;
+  --dept-danger-light: rgba(255, 241, 242, 0.85);
+  --dept-danger-border: rgba(254, 205, 211, 0.9);
+}
+
+/* ==========================================================================
+   页面整体布局容器
+   ========================================================================== */
+.department-master-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 16px;
+  width: 100%;
+  height: calc(100vh - 92px);
+  min-height: 0;
+  max-height: calc(100vh - 92px);
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 页面背景极光柔和光晕 */
+.department-master-page .qh-glow-sphere {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.department-master-page .qh-glow-sphere--1 {
+  width: 460px;
+  height: 460px;
+  top: -80px;
+  right: 5%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, rgba(168, 85, 247, 0.08) 60%, transparent 80%);
+}
+
+.department-master-page .qh-glow-sphere--2 {
+  width: 520px;
+  height: 520px;
+  bottom: -100px;
+  left: 2%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.16) 0%, rgba(99, 102, 241, 0.08) 60%, transparent 80%);
+}
+
+/* ==========================================================================
+   顶部控制栏 (Top Executive Control Rail)
+   ========================================================================== */
+.dept-top-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px 18px;
+  background: var(--dept-window-bg);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--dept-window-border);
+  border-radius: 16px;
+  box-shadow: var(--dept-window-shadow);
+  position: relative;
+  z-index: 10;
+}
+
+.dept-top-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.dept-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dept-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--dept-primary);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.dept-main-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--dept-text-main);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* 指标胶囊群 */
+.dept-metrics-capsules {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(203, 213, 225, 0.7);
+}
+
+.dept-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(248, 250, 252, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  color: var(--dept-text-secondary);
+  line-height: 1;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.dept-stat-pill strong {
+  font-weight: 700;
+  color: var(--dept-text-main);
+}
+
+.dept-stat-pill--warning {
+  background: var(--dept-warning-light);
+  border-color: var(--dept-warning-border);
+  color: #92400e;
+}
+
+.dept-stat-pill--warning strong {
+  color: #b45309;
+}
+
+.dept-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.dept-stat-dot--warning {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
+/* ==========================================================================
+   macOS Dock 悬浮操作栏
+   ========================================================================== */
+.dept-dock-container {
+  display: flex;
+  align-items: center;
+}
+
+.dept-dock-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--dept-dock-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--dept-dock-border);
+  border-radius: 12px;
+  box-shadow: var(--dept-dock-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dept-dock-bar:hover {
+  background: var(--dept-dock-bg-hover);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.14), 0 6px 12px -2px rgba(15, 23, 42, 0.06);
+}
+
+.dept-dock-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 32px !important;
+  padding: 0 11px !important;
+  border-radius: 8px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--dept-text-secondary) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  line-height: normal !important;
+}
+
+.dept-dock-btn svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.dept-dock-btn:hover {
+  color: var(--dept-text-main) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05) !important;
+  transform: translateY(-1px) !important;
+}
+
+.dept-dock-btn:active {
+  transform: translateY(0) !important;
+}
+
+.dept-dock-btn--primary {
+  background: var(--dept-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--dept-primary) !important;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25) !important;
+}
+
+.dept-dock-btn--primary:hover {
+  background: var(--dept-primary-hover) !important;
+  border-color: var(--dept-primary-hover) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 导出全部部门高质感按钮美化 */
+.dept-dock-btn--success,
+.dept-dock-bar a.account-action-button--success,
+.dept-dock-bar .dept-dock-btn--export {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  color: #059669 !important;
+  box-shadow: 0 1px 2px rgba(16, 185, 129, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
+}
+
+.dept-dock-btn--success:hover,
+.dept-dock-bar a.account-action-button--success:hover,
+.dept-dock-bar .dept-dock-btn--export:hover {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border-color: rgba(16, 185, 129, 0.45) !important;
+  color: #047857 !important;
+  box-shadow: 0 3px 8px rgba(16, 185, 129, 0.15), inset 0 1px 0 #ffffff !important;
+  transform: translateY(-1px) !important;
+}
+
+.dept-dock-btn--batch-exec {
+  background: var(--dept-primary) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--dept-primary) !important;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.25) !important;
+  height: 30px !important;
+  padding: 0 11px !important;
+  border-radius: 6px !important;
+}
+
+.dept-dock-btn--batch-exec:hover {
+  background: var(--dept-primary-hover) !important;
+  border-color: var(--dept-primary-hover) !important;
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.35) !important;
+}
+
+.dept-dock-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(203, 213, 225, 0.7);
+  margin: 0 2px;
+}
+
+.dept-dock-batch-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+
+.dept-dock-batch-select {
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  font-size: 12px;
+  color: var(--dept-text-main);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dept-dock-batch-select:focus {
+  border-color: var(--dept-primary);
+  background: #ffffff;
+}
+
+/* ==========================================================================
+   macOS Window 风格表格面板
+   ========================================================================== */
+.dept-table-window {
+  background: var(--dept-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--dept-window-border);
+  border-radius: 16px;
+  box-shadow: var(--dept-window-shadow);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+  z-index: 1;
+}
+
+.dept-table-window .master-list-header {
+  flex-shrink: 0 !important;
+}
+
+.dept-table-window .query-result-panel {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+.dept-table-window .query-result-table {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+.dept-table-window .legacy-table-panel,
+.dept-table-window .master-table-panel {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.dept-table-window .legacy-table-wrap {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: auto !important;
+  background: transparent !important;
+}
+
+.dept-table-window .table-pager {
+  flex-shrink: 0 !important;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+  background: rgba(248, 250, 252, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.dept-table-window .master-table {
+  background: transparent !important;
+  margin: 0;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.dept-table-window .master-table th,
+.dept-table-window .legacy-table-head-cell {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(248, 250, 252, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--dept-text-secondary);
+  font-weight: 700;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  padding: 10px 12px;
+}
+
+.dept-table-window .master-table td {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.85);
+  font-size: 13px;
+  color: var(--dept-text-main);
+  padding: 9px 12px;
+  vertical-align: middle;
+}
+
+.dept-table-window .master-table tr:hover td {
+  background: rgba(248, 250, 252, 0.55) !important;
+}
+
+.dept-table-window .master-table th:nth-child(1),
+.dept-table-window .master-table td:nth-child(1) {
+  width: 48px;
+  text-align: center;
+}
+
+.dept-table-window .master-table th:nth-child(2),
+.dept-table-window .master-table td:nth-child(2) {
+  width: 70px;
+}
+
+.dept-table-window .master-table th:nth-child(3),
+.dept-table-window .master-table td:nth-child(3) {
+  width: 140px;
+}
+
+.dept-table-window .master-table th:nth-child(4),
+.dept-table-window .master-table td:nth-child(4) {
+  width: 200px;
+}
+
+.dept-table-window .master-table th:nth-child(5),
+.dept-table-window .master-table td:nth-child(5) {
+  width: auto;
+  min-width: 180px;
+}
+
+.dept-table-window .master-table th:nth-child(6),
+.dept-table-window .master-table td:nth-child(6) {
+  width: 90px;
+}
+
+.dept-table-window .master-table th:nth-child(7),
+.dept-table-window .master-table td:nth-child(7) {
+  width: 120px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   行内操作组合按钮 (macOS Capsule Split Button)
+   ========================================================================== */
+.dept-row-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dept-row-action-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  padding: 0 !important;
+  height: 26px !important;
+  box-sizing: border-box !important;
+}
+
+.dept-row-action-group:hover {
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.09), inset 0 1px 0 #ffffff !important;
+}
+
+.dept-row-action-edit {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  user-select: none !important;
+  line-height: 24px !important;
+}
+
+.dept-row-action-edit svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.dept-row-action-edit:hover {
+  background: rgba(79, 70, 229, 0.08) !important;
+  color: var(--dept-primary) !important;
+}
+
+.dept-row-action-edit:active {
+  background: rgba(79, 70, 229, 0.14) !important;
+}
+
+.dept-row-menu-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 24px !important;
+  width: 20px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: 1px solid rgba(226, 232, 240, 0.85) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  user-select: none !important;
+}
+
+.dept-row-menu-trigger:hover,
+.dept-row-menu-trigger[aria-expanded="true"] {
+  background: rgba(79, 70, 229, 0.08) !important;
+  color: var(--dept-primary) !important;
+}
+
+.dept-row-menu-trigger svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dept-row-menu-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* 部门行操作悬浮菜单 */
+.dept-row-actions-menu {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 16px 36px -4px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    inset 0 1px 1px #ffffff !important;
+  min-width: 136px;
+  padding: 5px !important;
+  animation: dept-menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes dept-menu-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.dept-row-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.dept-row-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.dept-row-menu-item:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--dept-primary);
+}
+
+.dept-row-menu-item:hover svg {
+  opacity: 1;
+  transform: translateX(1px);
+}
+
+.dept-row-menu-item--danger {
+  color: #e11d48 !important;
+}
+
+.dept-row-menu-item--danger:hover {
+  background: rgba(244, 63, 94, 0.1) !important;
+  color: #be123c !important;
+}
+
+/* ==========================================================================
+   macOS Sheet 风格弹窗 (Glass Modals)
+   ========================================================================== */
+.dept-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: dept-fade-in 0.2s ease;
+}
+
+@keyframes dept-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.dept-modal-window {
+  position: relative;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: dept-modal-scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dept-modal-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.dept-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dept-modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dept-modal-kicker {
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  color: var(--dept-primary);
+  text-transform: uppercase;
+}
+
+.dept-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--dept-text-main);
+  letter-spacing: -0.02em;
+}
+
+.dept-modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  color: var(--dept-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dept-modal-close-btn:hover {
+  background: #ffffff;
+  color: var(--dept-text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.dept-modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dept-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.dept-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.dept-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.dept-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.dept-btn--primary {
+  background: var(--dept-primary);
+  color: #ffffff;
+  border-color: var(--dept-primary);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.dept-btn--primary:hover:not(:disabled) {
+  background: var(--dept-primary-hover);
+  border-color: var(--dept-primary-hover);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.dept-btn--secondary {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--dept-text-main);
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dept-btn--secondary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.9);
+  color: var(--dept-primary);
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .department-master-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .dept-table-window {
+    min-height: 400px;
+  }
+  .dept-top-rail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dept-dock-container {
+    justify-content: center;
+  }
+  .dept-dock-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}

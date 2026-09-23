@@ -1133,9 +1133,27 @@ export default function EmployeesPage() {
       ) : null}
 
       {/* 新增员工弹窗 */}
-      {showModal === "create" ? <div
+      <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+        style={{
+          position: "fixed",
+          left: showModal === "create" ? "0" : "-9999px",
+          top: "0",
+          width: "100%",
+          height: "100%",
+          zIndex: "var(--z-modal)",
+          background: "rgba(15, 23, 42, 0.45)",
+          backdropFilter: "blur(18px) saturate(180%)",
+          WebkitBackdropFilter: "blur(18px) saturate(180%)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+          opacity: showModal === "create" ? 1 : 0,
+          pointerEvents: showModal === "create" ? "auto" : "none",
+          transition: "opacity 0.18s ease",
+        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "650px" }}>
           <div className="emp-modal-header">
@@ -1153,12 +1171,30 @@ export default function EmployeesPage() {
             </form>
           </div>
         </div>
-      </div> : null}
+      </div>
 
       {/* 导入/导出弹窗 */}
-      {showModal === "import" ? <div
+      <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+        style={{
+          position: "fixed",
+          left: showModal === "import" ? "0" : "-9999px",
+          top: "0",
+          width: "100%",
+          height: "100%",
+          zIndex: "var(--z-modal)",
+          background: "rgba(15, 23, 42, 0.45)",
+          backdropFilter: "blur(18px) saturate(180%)",
+          WebkitBackdropFilter: "blur(18px) saturate(180%)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
+          boxSizing: "border-box",
+          opacity: showModal === "import" ? 1 : 0,
+          pointerEvents: showModal === "import" ? "auto" : "none",
+          transition: "opacity 0.18s ease",
+        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
           <div className="emp-modal-header">
@@ -1279,7 +1315,7 @@ export default function EmployeesPage() {
             </div>
           </div>
         </div>
-      </div> : null}
+      </div>
 
       {/* 办理离职弹窗 */}
       {showResignModal ? (

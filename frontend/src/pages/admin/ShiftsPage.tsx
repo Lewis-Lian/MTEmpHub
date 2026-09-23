@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { createAdminShift, deleteAdminShift, fetchAdminShifts, updateAdminShift } from "../../api/admin";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
@@ -7,8 +8,7 @@ import type { AdminShift } from "../../types/admin";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
 import TimePicker from "../../components/common/TimePicker";
-
-
+import "./shift-management.css";
 
 type ShiftFormState = {
   shift_no: string;
@@ -68,6 +68,100 @@ function shiftToForm(shift: AdminShift): ShiftFormState {
   };
 }
 
+function ShiftRowActions({
+  onEdit,
+  onDelete,
+}: {
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  function toggleOpen(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    if (!open) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.right - 140),
+      });
+      setOpen(true);
+    } else {
+      setOpen(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    function close() {
+      setOpen(false);
+    }
+    window.addEventListener("click", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("click", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open]);
+
+  return (
+    <div className="shift-row-actions" style={{ position: "relative" }}>
+      <div className="shift-row-action-group">
+        <button className="shift-row-action-edit" onClick={onEdit} type="button">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+          </svg>
+          <span>编辑</span>
+        </button>
+        <button
+          ref={triggerRef}
+          className="shift-row-menu-trigger"
+          onClick={toggleOpen}
+          aria-expanded={open}
+          type="button"
+          title="更多操作"
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+      </div>
+      {open && typeof document !== "undefined" &&
+        createPortal(
+          <div
+            className="shift-row-actions-menu"
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              zIndex: "var(--z-dropdown, 1200)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="shift-row-menu-item shift-row-menu-item--danger"
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              type="button"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+              <span>删除班次</span>
+            </button>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 export default function ShiftsPage() {
   const confirm = useConfirm();
   const notification = useNotification();
@@ -92,7 +186,6 @@ export default function ShiftsPage() {
       setLoading(false);
     }
   }
-
 
   useEffect(() => {
     void loadRows();
@@ -131,6 +224,7 @@ export default function ShiftsPage() {
       });
       setForm(emptyShiftForm);
       notification.success(`班次 ${form.shift_name} 已创建`);
+      setShowModal(null);
       await loadRows();
     } catch (err) {
       notification.error(err instanceof Error ? err.message : "创建班次失败");
@@ -173,8 +267,6 @@ export default function ShiftsPage() {
     }
   }
 
-
-
   function openEdit(row: AdminShift) {
     setEditing(row);
     setEditForm(shiftToForm(row));
@@ -182,22 +274,34 @@ export default function ShiftsPage() {
 
   function renderSlotEditor(target: "create" | "edit", state: ShiftFormState) {
     return (
-      <div className="master-slot-list" style={{ display: "flex", flexDirection: "column", gap: "12px", marginTop: "12px" }}>
+      <div className="master-slot-list" style={{ display: "flex", flexDirection: "column", gap: "10px", marginTop: "12px" }}>
         {state.time_slots.map((slot, index) => (
-          <div className="master-slot-row admin-row-gap12" key={index} >
-            <TimePicker
-              value={slot[0]}
-              onChange={(val) => updateSlot(target, index, 0, val)}
-              style={{ flex: 1 }}
-            />
-            <span style={{ color: "#94a3b8" }}>-</span>
-            <TimePicker
-              value={slot[1]}
-              onChange={(val) => updateSlot(target, index, 1, val)}
-              style={{ flex: 1 }}
-            />
-            <button className="account-action-button account-action-button--danger" onClick={() => removeSlot(target, index)} type="button" style={{ padding: "8px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px" }} title="删除此时间段">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <div className="master-slot-row shift-slot-row admin-row-gap12" key={index}>
+            <div className="time-picker-wrap">
+              <TimePicker
+                value={slot[0]}
+                onChange={(val) => updateSlot(target, index, 0, val)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <span style={{ color: "#94a3b8", fontWeight: "600" }}>-</span>
+            <div className="time-picker-wrap">
+              <TimePicker
+                value={slot[1]}
+                onChange={(val) => updateSlot(target, index, 1, val)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <button
+              className="shift-slot-delete-btn account-action-button account-action-button--danger"
+              onClick={() => removeSlot(target, index)}
+              title="删除此时间段"
+              type="button"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" />
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
             </button>
           </div>
         ))}
@@ -222,10 +326,11 @@ export default function ShiftsPage() {
         row.shift_name,
         formatSlots(row.time_slots),
         row.is_cross_day ? "是" : "否",
-        <div className="toolbar">
-          <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>
-          <button className="account-action-button account-action-button--danger" onClick={() => removeShift(row)} type="button">删除</button>
-        </div>,
+        <ShiftRowActions
+          key={row.id}
+          onDelete={() => removeShift(row)}
+          onEdit={() => openEdit(row)}
+        />,
       ]);
 
   const shiftTableSortRows = loading
@@ -241,161 +346,217 @@ export default function ShiftsPage() {
 
   return (
     <main className="master-data-page shifts-master-page">
-      {/* 顶部控制与摘要行 */}
-      <div className="account-top-control-row" style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "12px",
-        marginBottom: "16px",
-        marginTop: "16px"
-      }}>
-        {/* 左侧控制按钮组 */}
-        <div className="account-panel-selector" style={{ display: "flex", gap: "10px" }}>
-          <button
-            className="btn btn-outline-secondary"
-            onClick={() => setShowModal("create")}
-            type="button"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
+      {/* 背景极光柔和光晕 */}
+      <div className="qh-glow-sphere qh-glow-sphere--1" />
+      <div className="qh-glow-sphere qh-glow-sphere--2" />
+
+      {/* 顶部控制栏 (Top Executive Control Rail) */}
+      <div className="shift-top-rail">
+        <div className="shift-top-left">
+          <div className="shift-title-group">
+            <span className="shift-eyebrow">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
+              排班与工时规则
+            </span>
+            <h1 className="shift-main-title">班次管理</h1>
+          </div>
+
+          <div className="shift-metrics-capsules">
+            <div className="shift-stat-pill">
+              <span className="shift-stat-dot" />
+              <span>班次总数：</span>
+              <strong>{rows.length} 个</strong>
+            </div>
+            {rows.filter((r) => r.is_cross_day).length > 0 && (
+              <div className="shift-stat-pill shift-stat-pill--info">
+                <span className="shift-stat-dot shift-stat-dot--info" />
+                <span>跨天班次：</span>
+                <strong>{rows.filter((r) => r.is_cross_day).length} 个</strong>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 右侧 macOS 悬浮 Dock 操作条 */}
+        <div className="shift-dock-container">
+          <div className="shift-dock-bar">
+            <button
+              className="shift-dock-btn shift-dock-btn--primary btn btn-outline-secondary"
+              onClick={() => setShowModal("create")}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              新建班次
+            </button>
+
+            <div className="shift-dock-divider" />
+
+            <button
+              className="shift-dock-btn account-action-button"
+              onClick={loadRows}
+              type="button"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" />
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              刷新
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 数据表格区 (macOS Window Table Container) */}
+      <div className="shift-table-window">
+        {/* 表格标题条 */}
+        <div
+          className="account-card-header master-list-header"
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "10px 18px",
+            borderBottom: "1px solid rgba(226, 232, 240, 0.8)",
+            background: "rgba(248, 250, 252, 0.6)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "13.5px", color: "var(--shift-text-main)" }}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
-            新建班次
-          </button>
+            <span>班次列表</span>
+          </div>
         </div>
 
-        {/* 右侧信息摘要状态条 */}
-        <div className="active-account-set-summary-bar" style={{
-          display: "flex",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "16px",
-          minHeight: "36px",
+        <QueryResultPanel>
+          {loading ? (
+            <div className="legacy-table-panel master-table-panel">
+              <div className="legacy-table-wrap">
+                <table className="legacy-table master-table">
+                  <tbody>
+                    <tr>
+                      <td className="legacy-table-empty-cell">正在加载班次列表...</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : (
+            <QueryTable
+              emptyText="暂无班次数据"
+              headers={shiftTableHeaders}
+              panelClassName="master-table-panel"
+              rows={shiftTableRows}
+              sortRows={shiftTableSortRows}
+              tableClassName="master-table"
+            />
+          )}
+        </QueryResultPanel>
+      </div>
+
+      {/* 新增班次 Modal 弹窗 (常驻 DOM 以兼容自动化测试即时查找) */}
+      <div
+        className="shift-modal-backdrop master-modal-backdrop"
+        onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
+        style={{
+          position: "fixed",
+          left: showModal === "create" ? "0" : "-9999px",
+          top: "0",
+          width: "100%",
+          height: "100%",
+          zIndex: "var(--z-modal)",
+          background: "rgba(15, 23, 42, 0.45)",
+          backdropFilter: "blur(18px) saturate(180%)",
+          WebkitBackdropFilter: "blur(18px) saturate(180%)",
+          display: "grid",
+          placeItems: "center",
+          padding: "24px",
           boxSizing: "border-box",
-          padding: "0 16px",
-          background: "var(--ent-secondary-bg, #f8fafc)",
-          border: "1px solid var(--ent-border-strong)",
-          borderRadius: "var(--ent-radius-lg, 8px)",
-          fontSize: "13.5px",
-          color: "var(--ent-text)",
-          boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.02)"
-        }}>
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)", fontWeight: "500" }}>班次总数：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.length} 个</strong>
-          </div>
-          <div style={{ width: "1px", height: "16px", background: "var(--ent-border-strong)", opacity: 0.6 }} />
-          <div className="admin-row">
-            <span style={{ color: "var(--ent-text-secondary)" }}>跨天班次：</span>
-            <strong style={{ color: "var(--ent-primary)" }}>{rows.filter(r => r.is_cross_day).length} 个</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="account-card-header master-list-header" style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "12px 4px",
-        borderBottom: "none",
-        background: "transparent",
-        flexWrap: "wrap",
-        gap: "12px"
-      }}>
-        <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>班次列表</span>
-        <div className="toolbar admin-row">
-          <button className="account-action-button" onClick={loadRows} type="button">
-            刷新
-          </button>
-        </div>
-      </div>
-
-      <QueryResultPanel>
-        {loading ? (
-          <div className="legacy-table-panel master-table-panel">
-            <div className="legacy-table-wrap">
-              <table className="legacy-table master-table">
-                <tbody>
-                  <tr><td className="legacy-table-empty-cell">正在加载班次列表...</td></tr>
-                </tbody>
-              </table>
+          opacity: showModal === "create" ? 1 : 0,
+          pointerEvents: showModal === "create" ? "auto" : "none",
+          transition: "opacity 0.18s ease",
+        }}
+      >
+        <div className="shift-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
+          <div className="shift-modal-header">
+            <div className="shift-modal-title-wrap">
+              <span className="shift-modal-kicker page-tag">排班规则</span>
+              <h3 className="shift-modal-title">新增班次</h3>
             </div>
+            <button className="shift-modal-close-btn master-modal-close admin-icon-btn" onClick={handleCloseModal} type="button">×</button>
           </div>
-        ) : (
-          <QueryTable
-            emptyText="暂无班次数据"
-            headers={shiftTableHeaders}
-            panelClassName="master-table-panel"
-            rows={shiftTableRows}
-            sortRows={shiftTableSortRows}
-            tableClassName="master-table"
-          />
-        )}
-      </QueryResultPanel>
 
-      {/* 新增班次 Modal 弹窗 */}
-      <div className="master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }} style={{
-        position: "fixed",
-        left: showModal === "create" ? "0" : "-9999px",
-        top: "0",
-        width: "100%",
-        height: "100%",
-        zIndex: 1500,
-        background: "rgba(15, 23, 42, 0.48)",
-        backdropFilter: "blur(16px) saturate(160%)",
-        WebkitBackdropFilter: "blur(16px) saturate(160%)",
-        display: "grid",
-        placeItems: "center",
-        padding: "24px",
-        boxSizing: "border-box",
-        opacity: showModal === "create" ? 1 : 0,
-        pointerEvents: showModal === "create" ? "auto" : "none",
-        transition: "opacity 0.15s ease"
-      }}>
-        <div className="master-modal-container" style={{ width: "100%", maxWidth: "600px", background: "#fff", borderRadius: "12px", padding: "28px", boxSizing: "border-box", position: "relative" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", paddingBottom: "12px", borderBottom: "1px solid var(--ent-border)" }}>
-            <div className="admin-row-gap12">
-              <span style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)" }}>新增班次</span>
-              <span className="page-tag">排班规则</span>
-            </div>
-            <button className="master-modal-close admin-icon-btn" onClick={handleCloseModal} type="button">×</button>
-          </div>
-          <form className="account-create-form admin-stack-lg" onSubmit={submitCreate} >
-            {/* 基础信息 */}
-            <div className="admin-stack">
-              <h4 className="admin-modal-title">基础信息</h4>
-              <div className="admin-form-grid">
-                <label className="account-field" style={{ margin: 0 }}>
-                  <span className="account-field-label">班次编号</span>
-                  <input className="account-input" onChange={(event) => setForm({ ...form, shift_no: event.target.value })} required value={form.shift_no} placeholder="例如: A0001" />
-                </label>
-                <label className="account-field" style={{ margin: 0 }}>
-                  <span className="account-field-label">班次名称</span>
-                  <input className="account-input" onChange={(event) => setForm({ ...form, shift_name: event.target.value })} required value={form.shift_name} placeholder="例如: 行政通用班次" />
-                </label>
+          <form className="account-create-form" onSubmit={submitCreate}>
+            <div className="shift-modal-body">
+              {/* 基础信息 */}
+              <div className="admin-stack">
+                <h4 className="admin-modal-title">基础信息</h4>
+                <div className="admin-form-grid">
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">班次编号</span>
+                    <input
+                      className="account-input"
+                      onChange={(event) => setForm({ ...form, shift_no: event.target.value })}
+                      placeholder="例如: A0001"
+                      required
+                      value={form.shift_no}
+                    />
+                  </label>
+                  <label className="account-field" style={{ margin: 0 }}>
+                    <span className="account-field-label">班次名称</span>
+                    <input
+                      className="account-input"
+                      onChange={(event) => setForm({ ...form, shift_name: event.target.value })}
+                      placeholder="例如: 行政通用班次"
+                      required
+                      value={form.shift_name}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* 时间规则 */}
+              <div className="admin-stack">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(226, 232, 240, 0.8)", paddingBottom: "8px" }}>
+                  <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>时间规则</h4>
+                  <button
+                    className="shift-btn shift-btn--secondary account-action-button"
+                    onClick={() => addSlot("create")}
+                    style={{ height: "28px", padding: "0 10px", fontSize: "12px" }}
+                    type="button"
+                  >
+                    + 新增时间段
+                  </button>
+                </div>
+
+                <div className="shift-slot-box">
+                  <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                    <input
+                      checked={form.is_cross_day}
+                      onChange={(event) => setForm({ ...form, is_cross_day: event.target.checked })}
+                      style={{ width: "16px", height: "16px", accentColor: "#4f46e5", cursor: "pointer", margin: 0 }}
+                      type="checkbox"
+                    />
+                    <span className="admin-text" style={{ fontSize: "13px", fontWeight: "500", color: "#334155" }}>
+                      允许跨天班次 (下班时间在次日)
+                    </span>
+                  </label>
+                  {renderSlotEditor("create", form)}
+                </div>
               </div>
             </div>
 
-            {/* 时间规则 */}
-            <div className="admin-stack">
-              <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>时间规则</span>
-                <button className="account-action-button" onClick={() => addSlot("create")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
-              </h4>
-              
-              <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: form.time_slots.length > 0 ? "16px" : "0" }}>
-                  <input checked={form.is_cross_day} onChange={(event) => setForm({ ...form, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                  <span className="admin-text">允许跨天班次 (下班时间在次日)</span>
-                </label>
-                {renderSlotEditor("create", form)}
-              </div>
-            </div>
-
-            <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
-              <button className="account-action-button account-action-button--primary account-primary-button" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>
+            <div className="shift-modal-footer">
+              <button className="shift-btn shift-btn--secondary account-action-button" onClick={handleCloseModal} type="button">取消</button>
+              <button className="shift-btn shift-btn--primary account-action-button account-action-button--primary account-primary-button" type="submit">
                 创建班次
               </button>
             </div>
@@ -403,48 +564,79 @@ export default function ShiftsPage() {
         </div>
       </div>
 
+      {/* 编辑班次 Modal 弹窗 */}
       {editing ? (
-        <div className="master-modal-backdrop">
-          <form className="master-modal" onSubmit={submitEdit} style={{ maxWidth: "600px", width: "100%", padding: 0 }}>
-            <div className="master-modal-header" style={{ padding: "20px 24px", borderBottom: "1px solid var(--ent-border)" }}>
-              <h2 style={{ fontSize: "16px", fontWeight: "600", color: "var(--ent-text)", margin: 0 }}>编辑班次</h2>
-              <button className="master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
+        <div className="shift-modal-backdrop master-modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setEditing(null); }}>
+          <form className="shift-modal-window master-modal" onSubmit={submitEdit} style={{ maxWidth: "600px", width: "100%" }}>
+            <div className="shift-modal-header">
+              <div className="shift-modal-title-wrap">
+                <span className="shift-modal-kicker">班次设置</span>
+                <h2 className="shift-modal-title">编辑班次</h2>
+              </div>
+              <button className="shift-modal-close-btn master-modal-close" onClick={() => setEditing(null)} type="button">×</button>
             </div>
-            <div className="master-modal-body" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px", overflow: "visible" }}>
+            <div className="shift-modal-body">
               {/* 基础信息 */}
               <div className="admin-stack">
                 <h4 className="admin-modal-title">基础信息</h4>
                 <div className="admin-form-grid">
                   <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">班次编号</span>
-                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_no: event.target.value })} required value={editForm.shift_no} placeholder="例如: A0001" />
+                    <input
+                      className="account-input"
+                      onChange={(event) => setEditForm({ ...editForm, shift_no: event.target.value })}
+                      placeholder="例如: A0001"
+                      required
+                      value={editForm.shift_no}
+                    />
                   </label>
                   <label className="account-field" style={{ margin: 0 }}>
                     <span className="account-field-label">班次名称</span>
-                    <input className="account-input" onChange={(event) => setEditForm({ ...editForm, shift_name: event.target.value })} required value={editForm.shift_name} placeholder="例如: 行政通用班次" />
+                    <input
+                      className="account-input"
+                      onChange={(event) => setEditForm({ ...editForm, shift_name: event.target.value })}
+                      placeholder="例如: 行政通用班次"
+                      required
+                      value={editForm.shift_name}
+                    />
                   </label>
                 </div>
               </div>
 
               {/* 时间规则 */}
               <div className="admin-stack">
-                <h4 style={{ margin: 0, fontSize: "15px", fontWeight: "600", color: "#1e293b", borderBottom: "1px solid #e2e8f0", paddingBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>时间规则</span>
-                  <button className="account-action-button" onClick={() => addSlot("edit")} type="button" style={{ padding: "4px 12px", fontSize: "12.5px" }}>+ 新增时间段</button>
-                </h4>
-                
-                <div style={{ background: "#f8fafc", borderRadius: "8px", border: "1px solid #e2e8f0", padding: "16px" }}>
-                  <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", marginBottom: editForm.time_slots.length > 0 ? "16px" : "0" }}>
-                    <input checked={editForm.is_cross_day} onChange={(event) => setEditForm({ ...editForm, is_cross_day: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
-                    <span className="admin-text">允许跨天班次 (下班时间在次日)</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid rgba(226, 232, 240, 0.8)", paddingBottom: "8px" }}>
+                  <h4 style={{ margin: 0, fontSize: "14px", fontWeight: "700", color: "#1e293b" }}>时间规则</h4>
+                  <button
+                    className="shift-btn shift-btn--secondary account-action-button"
+                    onClick={() => addSlot("edit")}
+                    style={{ height: "28px", padding: "0 10px", fontSize: "12px" }}
+                    type="button"
+                  >
+                    + 新增时间段
+                  </button>
+                </div>
+
+                <div className="shift-slot-box">
+                  <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+                    <input
+                      checked={editForm.is_cross_day}
+                      onChange={(event) => setEditForm({ ...editForm, is_cross_day: event.target.checked })}
+                      style={{ width: "16px", height: "16px", accentColor: "#4f46e5", cursor: "pointer", margin: 0 }}
+                      type="checkbox"
+                    />
+                    <span className="admin-text" style={{ fontSize: "13px", fontWeight: "500", color: "#334155" }}>
+                      允许跨天班次 (下班时间在次日)
+                    </span>
                   </label>
                   {renderSlotEditor("edit", editForm)}
                 </div>
               </div>
             </div>
-            <div className="master-modal-footer" style={{ padding: "16px 24px", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button className="account-action-button" onClick={() => setEditing(null)} type="button" style={{ borderRadius: "8px", fontSize: "14px" }}>取消</button>
-              <button className="account-action-button account-action-button--primary" type="submit" style={{ padding: "8px 28px", borderRadius: "8px", fontWeight: "500", fontSize: "14px", boxShadow: "0 2px 4px rgba(37, 99, 235, 0.2)" }}>保存</button>
+
+            <div className="shift-modal-footer">
+              <button className="shift-btn shift-btn--secondary account-action-button" onClick={() => setEditing(null)} type="button">取消</button>
+              <button className="shift-btn shift-btn--primary account-action-button account-action-button--primary" type="submit">保存</button>
             </div>
           </form>
         </div>
@@ -452,4 +644,3 @@ export default function ShiftsPage() {
     </main>
   );
 }
-

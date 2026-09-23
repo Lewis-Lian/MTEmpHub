@@ -1,0 +1,834 @@
+/* ==========================================================================
+   班次管理 (Shift Management) - 参考员工管理页标准的现代紧凑高质感 macOS 布局
+   ========================================================================== */
+
+:root {
+  --shift-primary: #4f46e5;
+  --shift-primary-hover: #4338ca;
+  --shift-primary-light: rgba(79, 70, 229, 0.08);
+
+  /* macOS 质感面板变量 */
+  --shift-dock-bg: rgba(255, 255, 255, 0.68);
+  --shift-dock-bg-hover: rgba(255, 255, 255, 0.88);
+  --shift-dock-border: rgba(255, 255, 255, 0.82);
+  --shift-dock-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.95);
+
+  --shift-window-bg: rgba(255, 255, 255, 0.76);
+  --shift-window-bg-hover: rgba(255, 255, 255, 0.88);
+  --shift-window-border: rgba(255, 255, 255, 0.82);
+  --shift-window-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  --shift-text-main: #0f172a;
+  --shift-text-secondary: #475569;
+  --shift-text-muted: #94a3b8;
+
+  --shift-success: #059669;
+  --shift-success-light: rgba(236, 253, 245, 0.85);
+  --shift-success-border: rgba(167, 243, 208, 0.9);
+
+  --shift-info: #0284c7;
+  --shift-info-light: rgba(240, 249, 255, 0.85);
+  --shift-info-border: rgba(186, 230, 253, 0.9);
+
+  --shift-danger: #e11d48;
+  --shift-danger-light: rgba(255, 241, 242, 0.85);
+  --shift-danger-border: rgba(254, 205, 211, 0.9);
+}
+
+/* ==========================================================================
+   页面整体布局容器
+   ========================================================================== */
+.shifts-master-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 20px 16px;
+  width: 100%;
+  height: calc(100vh - 92px);
+  min-height: 0;
+  max-height: calc(100vh - 92px);
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+  background: transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 页面背景极光柔和光晕 */
+.shifts-master-page .qh-glow-sphere {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  will-change: transform;
+}
+
+.shifts-master-page .qh-glow-sphere--1 {
+  width: 460px;
+  height: 460px;
+  top: -80px;
+  right: 5%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, rgba(168, 85, 247, 0.08) 60%, transparent 80%);
+}
+
+.shifts-master-page .qh-glow-sphere--2 {
+  width: 520px;
+  height: 520px;
+  bottom: -100px;
+  left: 2%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.16) 0%, rgba(99, 102, 241, 0.08) 60%, transparent 80%);
+}
+
+/* ==========================================================================
+   顶部控制栏 (Top Executive Control Rail)
+   ========================================================================== */
+.shift-top-rail {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 12px 18px;
+  background: var(--shift-window-bg);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid var(--shift-window-border);
+  border-radius: 16px;
+  box-shadow: var(--shift-window-shadow);
+  position: relative;
+  z-index: 10;
+}
+
+.shift-top-left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.shift-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shift-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--shift-primary);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.shift-main-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--shift-text-main);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+/* 指标胶囊群 */
+.shift-metrics-capsules {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(203, 213, 225, 0.7);
+}
+
+.shift-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: rgba(248, 250, 252, 0.75);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  color: var(--shift-text-secondary);
+  line-height: 1;
+  user-select: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.shift-stat-pill strong {
+  font-weight: 700;
+  color: var(--shift-text-main);
+}
+
+.shift-stat-pill--info {
+  background: var(--shift-info-light);
+  border-color: var(--shift-info-border);
+  color: #0369a1;
+}
+
+.shift-stat-pill--info strong {
+  color: #0284c7;
+}
+
+.shift-stat-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.shift-stat-dot--info {
+  background: #0284c7;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.25);
+}
+
+/* ==========================================================================
+   macOS Dock 悬浮操作栏
+   ========================================================================== */
+.shift-dock-container {
+  display: flex;
+  align-items: center;
+}
+
+.shift-dock-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  background: var(--shift-dock-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--shift-dock-border);
+  border-radius: 12px;
+  box-shadow: var(--shift-dock-shadow);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.shift-dock-bar:hover {
+  background: var(--shift-dock-bg-hover);
+  border-color: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 16px 36px -4px rgba(15, 23, 42, 0.14), 0 6px 12px -2px rgba(15, 23, 42, 0.06);
+}
+
+.shift-dock-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--shift-text-secondary) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  user-select: none !important;
+  text-decoration: none !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  line-height: normal !important;
+}
+
+.shift-dock-btn svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.shift-dock-btn:hover {
+  color: var(--shift-text-main) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05) !important;
+  transform: translateY(-1px) !important;
+}
+
+.shift-dock-btn:active {
+  transform: translateY(0) !important;
+}
+
+.shift-dock-btn--primary {
+  background: var(--shift-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--shift-primary) !important;
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25) !important;
+}
+
+.shift-dock-btn--primary:hover {
+  background: var(--shift-primary-hover) !important;
+  border-color: var(--shift-primary-hover) !important;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+
+.shift-dock-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(203, 213, 225, 0.7);
+  margin: 0 2px;
+}
+
+/* ==========================================================================
+   macOS Window 风格表格面板
+   ========================================================================== */
+.shift-table-window {
+  background: var(--shift-window-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid var(--shift-window-border);
+  border-radius: 16px;
+  box-shadow: var(--shift-window-shadow);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex !important;
+  flex-direction: column !important;
+  position: relative;
+  z-index: 1;
+}
+
+.shift-table-window .master-list-header {
+  flex-shrink: 0 !important;
+}
+
+.shift-table-window .query-result-panel {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+}
+
+.shift-table-window .query-result-table {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  background: transparent !important;
+  overflow: hidden !important;
+}
+
+.shift-table-window .legacy-table-panel,
+.shift-table-window .master-table-panel {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  max-height: 100% !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.shift-table-window .legacy-table-wrap {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: auto !important;
+  background: transparent !important;
+}
+
+.shift-table-window .table-pager {
+  flex-shrink: 0 !important;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(226, 232, 240, 0.7);
+  background: rgba(248, 250, 252, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.shift-table-window .master-table {
+  background: transparent !important;
+  margin: 0;
+  width: 100% !important;
+  min-width: 0 !important;
+  table-layout: fixed;
+}
+
+.shift-table-window .master-table th,
+.shift-table-window .legacy-table-head-cell {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: rgba(248, 250, 252, 0.95) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--shift-text-secondary);
+  font-weight: 700;
+  font-size: 12.5px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  padding: 10px 14px;
+  white-space: nowrap;
+}
+
+.shift-table-window .master-table td {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(241, 245, 249, 0.85);
+  font-size: 13px;
+  color: var(--shift-text-main);
+  padding: 9px 14px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.shift-table-window .master-table tr:hover td {
+  background: rgba(248, 250, 252, 0.55) !important;
+}
+
+.shift-table-window .master-table th:nth-child(1),
+.shift-table-window .master-table td:nth-child(1) {
+  width: 70px;
+}
+
+.shift-table-window .master-table th:nth-child(2),
+.shift-table-window .master-table td:nth-child(2) {
+  width: 140px;
+}
+
+.shift-table-window .master-table th:nth-child(3),
+.shift-table-window .master-table td:nth-child(3) {
+  width: 180px;
+}
+
+.shift-table-window .master-table th:nth-child(4),
+.shift-table-window .master-table td:nth-child(4) {
+  width: auto;
+  min-width: 180px;
+}
+
+.shift-table-window .master-table th:nth-child(5),
+.shift-table-window .master-table td:nth-child(5) {
+  width: 90px;
+}
+
+.shift-table-window .master-table th:nth-child(6),
+.shift-table-window .master-table td:nth-child(6) {
+  width: 120px;
+  text-align: right;
+}
+
+/* ==========================================================================
+   行内操作组合按钮 (macOS Capsule Split Button)
+   ========================================================================== */
+.shift-row-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.shift-row-action-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(203, 213, 225, 0.85) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.95) !important;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  padding: 0 !important;
+  height: 26px !important;
+  box-sizing: border-box !important;
+}
+
+.shift-row-action-group:hover {
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.09), inset 0 1px 0 #ffffff !important;
+}
+
+.shift-row-action-edit {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #334155 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  user-select: none !important;
+  line-height: 24px !important;
+}
+
+.shift-row-action-edit svg {
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
+.shift-row-action-edit:hover {
+  background: rgba(79, 70, 229, 0.08) !important;
+  color: var(--shift-primary) !important;
+}
+
+.shift-row-action-edit:active {
+  background: rgba(79, 70, 229, 0.14) !important;
+}
+
+.shift-row-menu-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 24px !important;
+  width: 20px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-left: 1px solid rgba(226, 232, 240, 0.85) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: #64748b !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  outline: none !important;
+  user-select: none !important;
+}
+
+.shift-row-menu-trigger:hover,
+.shift-row-menu-trigger[aria-expanded="true"] {
+  background: rgba(79, 70, 229, 0.08) !important;
+  color: var(--shift-primary) !important;
+}
+
+.shift-row-menu-trigger svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.shift-row-menu-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* 班次行操作悬浮菜单 */
+.shift-row-actions-menu {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 16px 36px -4px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    inset 0 1px 1px #ffffff !important;
+  min-width: 136px;
+  padding: 5px !important;
+  animation: shift-menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes shift-menu-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.shift-row-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.shift-row-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.shift-row-menu-item:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--shift-primary);
+}
+
+.shift-row-menu-item:hover svg {
+  opacity: 1;
+  transform: translateX(1px);
+}
+
+.shift-row-menu-item--danger {
+  color: #e11d48 !important;
+}
+
+.shift-row-menu-item--danger:hover {
+  background: rgba(244, 63, 94, 0.1) !important;
+  color: #be123c !important;
+}
+
+/* ==========================================================================
+   macOS Sheet 风格弹窗 (Glass Modals)
+   ========================================================================== */
+.shift-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: shift-fade-in 0.2s ease;
+}
+
+@keyframes shift-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shift-modal-window {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  max-height: 90vh;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(32px) saturate(200%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: shift-modal-scale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes shift-modal-scale {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.shift-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.shift-modal-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shift-modal-kicker {
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  color: var(--shift-primary);
+  text-transform: uppercase;
+}
+
+.shift-modal-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--shift-text-main);
+  letter-spacing: -0.02em;
+}
+
+.shift-modal-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  color: var(--shift-text-secondary);
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shift-modal-close-btn:hover {
+  background: #ffffff;
+  color: var(--shift-text-main);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.shift-modal-body {
+  padding: 22px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.shift-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 14px 24px;
+  border-top: 1px solid rgba(226, 232, 240, 0.8);
+  background: rgba(248, 250, 252, 0.5);
+}
+
+.shift-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid transparent;
+  outline: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.shift-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.shift-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.shift-btn--primary {
+  background: var(--shift-primary);
+  color: #ffffff;
+  border-color: var(--shift-primary);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.shift-btn--primary:hover:not(:disabled) {
+  background: var(--shift-primary-hover);
+  border-color: var(--shift-primary-hover);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+}
+
+.shift-btn--secondary {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--shift-text-main);
+  border-color: rgba(203, 213, 225, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.shift-btn--secondary:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: rgba(148, 163, 184, 0.9);
+  color: var(--shift-primary);
+}
+
+/* 时间段列表编辑区 */
+.shift-slot-box {
+  background: rgba(248, 250, 252, 0.7);
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.shift-slot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shift-slot-row .time-picker-wrap {
+  flex: 1;
+}
+
+.shift-slot-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid rgba(254, 205, 211, 0.9);
+  background: rgba(255, 241, 242, 0.85);
+  color: #e11d48;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shift-slot-delete-btn:hover {
+  background: #ffe4e6;
+  border-color: #f43f5e;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+  .shifts-master-page {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+  .shift-table-window {
+    min-height: 400px;
+  }
+  .shift-top-rail {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .shift-dock-container {
+    justify-content: center;
+  }
+  .shift-dock-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
