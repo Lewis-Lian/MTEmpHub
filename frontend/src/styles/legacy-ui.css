@@ -1308,7 +1308,7 @@ body {
   min-height: 116px;
 }
 
-.attendance-override-page {
+.attendance-override-page:not(.employee-dashboard-page) {
   display: grid;
   gap: 14px;
 }
@@ -1480,7 +1480,7 @@ body {
   width: 100%;
 }
 
-.manager-month-stat-page {
+.manager-month-stat-page:not(.employee-dashboard-page) {
   display: grid;
   gap: 14px;
 }

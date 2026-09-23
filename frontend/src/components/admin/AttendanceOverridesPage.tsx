@@ -11,6 +11,8 @@ import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
 import type { AccountSet, QueryBootstrap } from "../../types/query";
 import MonthPicker from "../common/MonthPicker";
+import QueryEmptyState from "../query/QueryEmptyState";
+import "../../pages/query/dashboard-shared.css";
 import AttendanceOverrideCalendarModal from "./AttendanceOverrideCalendarModal";
 
 interface OverrideEmployee {
@@ -156,44 +158,65 @@ export default function AttendanceOverridesPage({
     ),
   ]);
 
+  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    let fadeTimer: ReturnType<typeof setTimeout>;
+    let resetTimer: ReturnType<typeof setTimeout>;
+
+    if (isQuerying) {
+      setProgressVisible(true);
+      setProgress(10);
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(timer);
+            return 90;
+          }
+          const step = (100 - prev) * 0.15;
+          return Math.min(90, Math.round(prev + step));
+        });
+      }, 150);
+    } else if (progressVisible) {
+      setProgress(100);
+      fadeTimer = setTimeout(() => {
+        setProgressVisible(false);
+        resetTimer = setTimeout(() => {
+          setProgress(0);
+        }, 300);
+      }, 400);
+    }
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(fadeTimer);
+      clearTimeout(resetTimer);
+    };
+  }, [isQuerying]);
+
   async function handleQuery() {
     if (!selectedMonth) {
       notification.error("请选择月份");
       return;
     }
 
+    setLoadingText("正在为您查询考勤数据...");
     setIsQuerying(true);
-    setProgressVisible(true);
-    setProgress(0);
-    setLoadingText("正在查询考勤数据...");
-    let current = 0;
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 20) + 10;
-      if (current >= 95) current = 95;
-      setProgress(current);
-    }, 80);
 
     try {
       const query = new URLSearchParams({ month: selectedMonth });
       selectedIds.forEach((id) => query.append("emp_ids", String(id)));
       const payload = await apiRequest<AttendanceOverrideResponse>(`${endpointBase}?${query.toString()}`);
-      
-      clearInterval(interval);
-      setProgress(100);
-      setLoadingText("查询完成");
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
       const nextRows = Array.isArray(payload.rows) ? payload.rows : [];
       setRows(nextRows);
       setHasQueried(true);
       setEditingRow(null);
     } catch (caughtError) {
-      clearInterval(interval);
       setRows([]);
       setHasQueried(true);
       notification.error(caughtError instanceof Error ? caughtError.message : "修正列表加载失败");
     } finally {
-      setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
     }
   }
@@ -229,10 +252,16 @@ export default function AttendanceOverridesPage({
   }
 
   return (
-    <div className="query-page-shell attendance-override-page">
+    <div className="query-page-shell employee-dashboard-page attendance-override-page">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
           <h2>查询条件</h2>
+          <p>{filterMode === "manager" ? "按管理人员范围和月份维护考勤手工修正结果。" : "按员工范围和月份维护考勤手工修正结果。"}</p>
         </div>
         <div className="query-filter-body">
           <div className="query-filter-field">
@@ -255,7 +284,7 @@ export default function AttendanceOverridesPage({
           <div className="query-filter-field">
             <label className="form-label">主要操作</label>
             <div className="query-filter-actions">
-              <button className="btn btn-primary" disabled={isQuerying} onClick={handleQuery} type="button">
+              <button className={`btn btn-primary${isQuerying ? " is-loading" : ""}`} disabled={isQuerying} onClick={handleQuery} type="button">
                 {isQuerying ? "查询中..." : "查询"}
               </button>
             </div>
@@ -268,15 +297,23 @@ export default function AttendanceOverridesPage({
 
       <section className="query-workspace">
         <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
-        <QueryResultPanel>
-          <QueryTable
-            emptyText={hasQueried ? listEmptyHint : `请先查询${pickerLabel}和月份`}
-            headers={tableHeaders}
-            panelClassName="attendance-override-table-panel"
-            rows={tableRows}
-            tableClassName="attendance-override-table"
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              emptyText={listEmptyHint}
+              headers={tableHeaders}
+              panelClassName="attendance-override-table-panel"
+              rows={tableRows}
+              tableClassName="attendance-override-table"
+              isRefreshing={isQuerying}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            title={`请先查询${pickerLabel}和月份`}
+            description={`在上方选择${pickerLabel}范围及对应月份，点击查询即可查看并维护手工修正数据。`}
           />
-        </QueryResultPanel>
+        )}
       </section>
 
       {editingRow ? (

@@ -392,3 +392,10 @@
   min-height: 0;
   overflow: auto;
 }
+
+/* 修正中心页面自适应高度与面板适配 */
+.employee-dashboard-page .attendance-override-table-panel,
+.employee-dashboard-page .manager-month-stat-table-panel {
+  max-height: none;
+  flex: 1;
+}

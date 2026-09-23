@@ -12,6 +12,8 @@ import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import AccountSetSelector from "../../components/query/AccountSetSelector";
+import QueryEmptyState from "../../components/query/QueryEmptyState";
+import "../query/dashboard-shared.css";
 import type { QueryBootstrap } from "../../types/query";
 
 interface LateOffsetRow {
@@ -75,6 +77,47 @@ export default function LateOffsetPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [hasQueried, setHasQueried] = useState(false);
 
+  // 进度条控制状态
+  const [progress, setProgress] = useState(0);
+  const [progressVisible, setProgressVisible] = useState(false);
+  const [loadingText, setLoadingText] = useState("正在查询迟到冲抵数据...");
+
+  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    let fadeTimer: ReturnType<typeof setTimeout>;
+    let resetTimer: ReturnType<typeof setTimeout>;
+
+    if (isQuerying) {
+      setProgressVisible(true);
+      setProgress(10);
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(timer);
+            return 90;
+          }
+          const step = (100 - prev) * 0.15;
+          return Math.min(90, Math.round(prev + step));
+        });
+      }, 150);
+    } else if (progressVisible) {
+      setProgress(100);
+      fadeTimer = setTimeout(() => {
+        setProgressVisible(false);
+        resetTimer = setTimeout(() => {
+          setProgress(0);
+        }, 300);
+      }, 400);
+    }
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(fadeTimer);
+      clearTimeout(resetTimer);
+    };
+  }, [isQuerying]);
+
   useEffect(() => {
     let cancelled = false;
     fetchQueryBootstrap()
@@ -119,6 +162,7 @@ export default function LateOffsetPage() {
         notification.warning("请先选择账套月份");
         return;
       }
+      setLoadingText("正在为您查询迟到冲抵数据...");
       setIsQuerying(true);
       try {
         const payload = await apiRequest<LateOffsetCandidatesResponse>(buildCandidatesUrl(month, empIds));
@@ -344,7 +388,12 @@ export default function LateOffsetPage() {
   });
 
   return (
-    <div className="query-page-shell late-offset-page">
+    <div className="query-page-shell employee-dashboard-page late-offset-page">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
           <span className="query-filter-kicker">Query Filters</span>
@@ -378,7 +427,7 @@ export default function LateOffsetPage() {
             <label className="form-label">主要操作</label>
             <div className="query-filter-actions">
               <button
-                className="btn btn-primary"
+                className={`btn btn-primary${isQuerying ? " is-loading" : ""}`}
                 disabled={isQuerying}
                 onClick={() => void queryCandidates(selectedMonth, selectedIds)}
                 type="button"
@@ -404,16 +453,24 @@ export default function LateOffsetPage() {
       </aside>
 
       <section className="query-workspace">
-        <QueryProgressOverlay active={isQuerying} progress={isQuerying ? 58 : 0} text="正在查询迟到冲抵数据..." />
-        <QueryResultPanel>
-          <QueryTable
-            emptyText={hasQueried ? "当月没有可冲抵的迟到记录" : "请先选择月份查询"}
-            headers={headers}
-            panelClassName="attendance-override-table-panel"
-            rows={tableRows}
-            tableClassName="attendance-override-table"
+        <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              emptyText="当月没有可冲抵的迟到记录"
+              headers={headers}
+              panelClassName="attendance-override-table-panel"
+              rows={tableRows}
+              tableClassName="attendance-override-table"
+              isRefreshing={isQuerying}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            title="请先选择月份查询"
+            description="在上方选择管理人员范围和账套月份，点击查询即可查看迟到冲抵候选。"
           />
-        </QueryResultPanel>
+        )}
       </section>
 
       {leaveTarget ? (

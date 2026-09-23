@@ -10,6 +10,8 @@ import EmployeePicker from "../query/EmployeePicker";
 import QueryResultPanel from "../query/QueryResultPanel";
 import QueryTable from "../query/QueryTable";
 import YearPicker from "../common/YearPicker";
+import QueryEmptyState from "../query/QueryEmptyState";
+import "../../pages/query/dashboard-shared.css";
 import { useNotification } from "../feedback/Notification";
 import type { QueryBootstrap } from "../../types/query";
 
@@ -102,22 +104,50 @@ export default function ManagerMonthStatPage({
     <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>,
   ]);
 
+  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    let fadeTimer: ReturnType<typeof setTimeout>;
+    let resetTimer: ReturnType<typeof setTimeout>;
+
+    if (isQuerying) {
+      setProgressVisible(true);
+      setProgress(10);
+      timer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev >= 90) {
+            clearInterval(timer);
+            return 90;
+          }
+          const step = (100 - prev) * 0.15;
+          return Math.min(90, Math.round(prev + step));
+        });
+      }, 150);
+    } else if (progressVisible) {
+      setProgress(100);
+      fadeTimer = setTimeout(() => {
+        setProgressVisible(false);
+        resetTimer = setTimeout(() => {
+          setProgress(0);
+        }, 300);
+      }, 400);
+    }
+
+    return () => {
+      clearInterval(timer);
+      clearTimeout(fadeTimer);
+      clearTimeout(resetTimer);
+    };
+  }, [isQuerying]);
+
   async function loadRows() {
     if (!year) {
       notification.error("请选择年份");
       return;
     }
 
+    setLoadingText("正在为您查询统计数据...");
     setIsQuerying(true);
-    setProgressVisible(true);
-    setProgress(0);
-    setLoadingText("正在查询统计数据...");
-    let current = 0;
-    const interval = setInterval(() => {
-      current += Math.floor(Math.random() * 20) + 10;
-      if (current >= 95) current = 95;
-      setProgress(current);
-    }, 80);
 
     try {
       const query = new URLSearchParams({ year, emp_ids: selectedEmployeeIds.join(",") });
@@ -125,23 +155,16 @@ export default function ManagerMonthStatPage({
         apiRequest<ManagerStatRow[]>(`${endpointBase}/records?${query.toString()}`),
         buildColumnStates(year, monthFields.map((field) => field.key)),
       ]);
-      
-      clearInterval(interval);
-      setProgress(100);
-      setLoadingText("查询完成");
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
       setRows(Array.isArray(nextRows) ? nextRows : []);
       setColumnStates(states);
       setHasQueried(true);
       setEditingRow(null);
     } catch (error) {
-      clearInterval(interval);
       setRows([]);
       setHasQueried(true);
       notification.error(error instanceof Error ? error.message : "后台数据加载失败");
     } finally {
-      setTimeout(() => setProgressVisible(false), 300);
       setIsQuerying(false);
     }
   }
@@ -256,10 +279,16 @@ export default function ManagerMonthStatPage({
   }
 
   return (
-    <div className="query-page-shell manager-month-stat-page">
+    <div className="query-page-shell employee-dashboard-page manager-month-stat-page">
+      {/* 极光背景流动球 */}
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
+
       <aside className="query-filter-rail">
         <div className="query-filter-heading">
           <h2>查询条件</h2>
+          <p>{title === "管理人员加班" ? "按年份和管理人员范围维护全年加班统计与明细。" : "按年份和管理人员范围维护全年年休统计与明细。"}</p>
         </div>
         <div className="query-filter-body">
           <div className="query-filter-field">
@@ -284,10 +313,10 @@ export default function ManagerMonthStatPage({
           <div className="query-filter-field">
             <label className="form-label">主要操作</label>
             <div className="query-filter-actions">
-              <button className="btn btn-primary" onClick={loadRows} type="button">
-                查询
+              <button className={`btn btn-primary${isQuerying ? " is-loading" : ""}`} disabled={isQuerying} onClick={loadRows} type="button">
+                {isQuerying ? "查询中..." : "查询"}
               </button>
-              <button className="btn btn-outline-secondary" onClick={() => setShowActionsModal(true)} type="button">
+              <button className="btn btn-outline-secondary" disabled={isQuerying} onClick={() => setShowActionsModal(true)} type="button">
                 导入导出
               </button>
               <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" onChange={submitImport} type="file" />
@@ -299,15 +328,23 @@ export default function ManagerMonthStatPage({
 
       <section className="query-workspace">
         <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
-        <QueryResultPanel>
-          <QueryTable
-            emptyText={isQuerying ? "正在加载..." : hasQueried ? "当前条件无数据" : "请先查询管理人员和年份"}
-            headers={tableHeaders}
-            panelClassName="manager-month-stat-table-panel"
-            rows={tableRows}
-            tableClassName="manager-month-stat-table"
+        {hasQueried ? (
+          <QueryResultPanel>
+            <QueryTable
+              emptyText="当前条件无数据"
+              headers={tableHeaders}
+              panelClassName="manager-month-stat-table-panel"
+              rows={tableRows}
+              tableClassName="manager-month-stat-table"
+              isRefreshing={isQuerying}
+            />
+          </QueryResultPanel>
+        ) : (
+          <QueryEmptyState
+            title="请先查询管理人员和年份"
+            description="在上方选择管理人员范围和年份，点击查询即可查看并维护整年统计数据。"
           />
-        </QueryResultPanel>
+        )}
       </section>
 
       {editingRow ? (
