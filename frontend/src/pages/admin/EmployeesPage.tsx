@@ -596,52 +596,57 @@ export default function EmployeesPage() {
                 top: menuPosition.top,
                 left: menuPosition.left,
                 zIndex: "var(--z-dropdown, 1200)",
-                background: "rgba(255, 255, 255, 0.95)",
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                border: "1px solid rgba(226, 232, 240, 0.8)",
-                borderRadius: "10px",
-                boxShadow: "0 14px 28px -6px rgba(15, 23, 42, 0.16), 0 2px 6px rgba(0, 0, 0, 0.04)",
-                minWidth: "120px",
-                padding: "4px",
-                whiteSpace: "nowrap",
               }}
             >
               {row.resigned_at ? (
                 <button
-                  className="account-action-button"
+                  className="employee-row-menu-item employee-row-menu-item--success"
                   onClick={() => {
                     setOpenMenuId(null);
                     void reinstateEmployee(row);
                   }}
-                  style={{ display: "block", width: "100%", border: "none", textAlign: "left", padding: "8px 12px", borderRadius: "6px" }}
                   type="button"
                 >
-                  恢复在职
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="8.5" cy="7" r="4" />
+                    <polyline points="17 11 19 13 23 9" />
+                  </svg>
+                  <span>恢复在职</span>
                 </button>
               ) : (
                 <button
-                  className="account-action-button"
+                  className="employee-row-menu-item"
                   onClick={() => {
                     setOpenMenuId(null);
                     openResignModal(row.emp_no);
                   }}
-                  style={{ display: "block", width: "100%", border: "none", textAlign: "left", padding: "8px 12px", borderRadius: "6px" }}
                   type="button"
                 >
-                  办理离职
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                  <span>办理离职</span>
                 </button>
               )}
+              <div className="employee-row-menu-divider" />
               <button
-                className="account-action-button account-action-button--danger"
+                className="employee-row-menu-item employee-row-menu-item--danger"
                 onClick={() => {
                   setOpenMenuId(null);
                   void removeEmployee(row);
                 }}
-                style={{ display: "block", width: "100%", border: "none", textAlign: "left", padding: "8px 12px", borderRadius: "6px" }}
                 type="button"
               >
-                删除
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                  <line x1="10" y1="11" x2="10" y2="17" />
+                  <line x1="14" y1="11" x2="14" y2="17" />
+                </svg>
+                <span>删除</span>
               </button>
             </div>
           </>,
@@ -651,11 +656,17 @@ export default function EmployeesPage() {
     return (
       <div className="toolbar employee-row-actions" style={{ position: "relative" }}>
         <div className="employee-row-action-group">
-          <button className="account-action-button employee-row-action-edit" onClick={() => openEdit(row)} type="button">编辑</button>
+          <button className="employee-row-action-edit" onClick={() => openEdit(row)} type="button">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.75 }}>
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            <span>编辑</span>
+          </button>
           <button
             aria-expanded={menuOpen}
             aria-label="员工操作菜单"
-            className="account-action-button employee-row-menu-trigger"
+            className="employee-row-menu-trigger"
             onClick={(event) => {
               if (menuOpen) {
                 setOpenMenuId(null);
@@ -666,7 +677,9 @@ export default function EmployeesPage() {
             onMouseEnter={(event) => openRowMenu(row.id, event)}
             type="button"
           >
-            ▾
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         </div>
         {rowMenu}

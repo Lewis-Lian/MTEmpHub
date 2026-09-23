@@ -603,46 +603,178 @@
   background: rgba(248, 250, 252, 0.55) !important;
 }
 
-/* 行内操作组 */
+/* 行内操作组合按钮 (macOS Capsule Split Button) */
 .employee-row-actions {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
 }
 
 .employee-row-action-group {
   display: inline-flex;
   align-items: center;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(203, 213, 225, 0.8);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(203, 213, 225, 0.85);
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.employee-row-action-edit,
-.employee-row-menu-trigger {
-  height: 28px;
-  padding: 0 9px;
+.employee-row-action-group:hover {
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.09), inset 0 1px 0 #ffffff;
+}
+
+.employee-row-action-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
   background: transparent;
   border: none;
   font-size: 12px;
   font-weight: 600;
-  color: var(--emp-text-main);
+  color: #334155;
   cursor: pointer;
   transition: all 0.15s ease;
+  outline: none;
+  user-select: none;
 }
 
-.employee-row-action-edit:hover,
-.employee-row-menu-trigger:hover {
+.employee-row-action-edit:hover {
   background: rgba(79, 70, 229, 0.08);
   color: var(--emp-primary);
 }
 
+.employee-row-action-edit:active {
+  background: rgba(79, 70, 229, 0.14);
+}
+
 .employee-row-menu-trigger {
-  border-left: 1px solid rgba(203, 213, 225, 0.7);
-  padding: 0 7px;
-  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 26px;
+  width: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-left: 1px solid rgba(226, 232, 240, 0.85);
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  user-select: none;
+}
+
+.employee-row-menu-trigger:hover,
+.employee-row-menu-trigger[aria-expanded="true"] {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--emp-primary);
+}
+
+.employee-row-menu-trigger svg {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.employee-row-menu-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+/* 员工行操作悬浮菜单 (macOS Context Menu 风格) */
+.employee-row-actions-menu {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.95) !important;
+  border-radius: 12px !important;
+  box-shadow:
+    0 16px 36px -4px rgba(15, 23, 42, 0.16),
+    0 4px 12px rgba(15, 23, 42, 0.06),
+    inset 0 1px 1px #ffffff !important;
+  min-width: 136px;
+  padding: 5px !important;
+  animation: emp-menu-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top left;
+}
+
+@keyframes emp-menu-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.employee-row-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #1e293b;
+  font-size: 12.5px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  outline: none;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.employee-row-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.employee-row-menu-item:hover {
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--emp-primary);
+}
+
+.employee-row-menu-item:hover svg {
+  opacity: 1;
+  transform: translateX(1px);
+}
+
+.employee-row-menu-item:active {
+  transform: scale(0.98);
+}
+
+.employee-row-menu-divider {
+  height: 1px;
+  background: rgba(226, 232, 240, 0.8);
+  margin: 4px 6px;
+}
+
+.employee-row-menu-item--danger {
+  color: #e11d48 !important;
+}
+
+.employee-row-menu-item--danger:hover {
+  background: rgba(244, 63, 94, 0.1) !important;
+  color: #be123c !important;
+}
+
+.employee-row-menu-item--success {
+  color: #059669 !important;
+}
+
+.employee-row-menu-item--success:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+  color: #047857 !important;
 }
 
 /* ==========================================================================
