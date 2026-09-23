@@ -1,83 +1,88 @@
 /* ==========================================================================
-   账套管理 (Account Set Management) - 现代高雅透明磨砂玻璃 (Glassmorphism) 风格
+   账套管理 (Account Set Management) - 极高通透感透明磨砂玻璃 (Glassmorphism) 风格
    ========================================================================== */
 
 :root {
   --acm-primary: #4f46e5;
   --acm-primary-hover: #4338ca;
-  --acm-primary-light: rgba(79, 70, 229, 0.08);
-  --acm-surface: rgba(255, 255, 255, 0.82);
-  --acm-surface-subtle: rgba(248, 250, 252, 0.65);
-  --acm-surface-muted: rgba(241, 245, 249, 0.6);
-  --acm-border: rgba(226, 232, 240, 0.8);
-  --acm-border-strong: rgba(203, 213, 225, 0.9);
-  --acm-glass-border: rgba(255, 255, 255, 0.85);
-  --acm-glass-highlight: 0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+  --acm-primary-light: rgba(79, 70, 229, 0.12);
+  --acm-glass-bg: rgba(255, 255, 255, 0.52);
+  --acm-glass-bg-subtle: rgba(255, 255, 255, 0.38);
+  --acm-glass-bg-hover: rgba(255, 255, 255, 0.68);
+  --acm-glass-border: rgba(255, 255, 255, 0.78);
+  --acm-glass-border-strong: rgba(255, 255, 255, 0.92);
+  --acm-glass-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.9);
+  --acm-glass-shadow: 0 12px 36px 0 rgba(31, 38, 135, 0.08), 0 4px 12px 0 rgba(0, 0, 0, 0.03);
   --acm-text-main: #0f172a;
-  --acm-text-secondary: #475569;
-  --acm-text-muted: #94a3b8;
+  --acm-text-secondary: #334155;
+  --acm-text-muted: #64748b;
   --acm-success: #059669;
-  --acm-success-light: rgba(236, 253, 245, 0.85);
-  --acm-success-border: #a7f3d0;
+  --acm-success-light: rgba(236, 253, 245, 0.75);
+  --acm-success-border: rgba(167, 243, 208, 0.85);
   --acm-warning: #d97706;
-  --acm-warning-light: rgba(254, 243, 199, 0.85);
-  --acm-warning-border: #fde68a;
+  --acm-warning-light: rgba(254, 243, 199, 0.75);
+  --acm-warning-border: rgba(253, 230, 138, 0.85);
   --acm-info: #0284c7;
-  --acm-info-light: rgba(240, 249, 255, 0.85);
-  --acm-info-border: #bae6fd;
+  --acm-info-light: rgba(240, 249, 255, 0.75);
+  --acm-info-border: rgba(186, 230, 253, 0.85);
   --acm-danger: #e11d48;
-  --acm-danger-light: rgba(255, 241, 242, 0.85);
-  --acm-danger-border: #fecdd3;
-  --acm-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --acm-shadow-md: 0 10px 25px -5px rgba(15, 23, 42, 0.06), 0 4px 10px -2px rgba(15, 23, 42, 0.03);
-  --acm-shadow-lg: 0 16px 36px -6px rgba(15, 23, 42, 0.09), 0 6px 14px -3px rgba(15, 23, 42, 0.04);
-  --acm-shadow-xl: 0 25px 60px -12px rgba(15, 23, 42, 0.22), 0 12px 24px -6px rgba(15, 23, 42, 0.08);
+  --acm-danger-light: rgba(255, 241, 242, 0.75);
+  --acm-danger-border: rgba(254, 205, 211, 0.85);
 }
 
-/* 页面整体布局容器及背景氛围光晕 */
+/* 页面整体布局容器及绚丽流光极光网格 (确保磨砂玻璃下方有丰富色彩折射) */
 .account-center-page {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 22px;
-  padding: 8px 0 36px;
+  padding: 10px 0 40px;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   box-sizing: border-box;
+
+  /* 显式多点绚丽极光渐变背景网格，使半透明玻璃面板呈现极强的折射与光泽 */
+  background-image: 
+    radial-gradient(at 10% 8%, rgba(99, 102, 241, 0.28) 0px, transparent 48%),
+    radial-gradient(at 90% 12%, rgba(168, 85, 247, 0.25) 0px, transparent 45%),
+    radial-gradient(at 25% 55%, rgba(14, 165, 233, 0.26) 0px, transparent 52%),
+    radial-gradient(at 88% 68%, rgba(236, 72, 153, 0.2) 0px, transparent 48%),
+    radial-gradient(at 50% 92%, rgba(16, 185, 129, 0.22) 0px, transparent 50%);
+  background-attachment: local;
 }
 
-/* 背景流动氛围光斑 (增强磨砂玻璃光学折射质感) */
+/* 背景流动光球增强光影景深 */
 .account-center-page::before {
   content: "";
   position: absolute;
   top: 10px;
-  right: -20px;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(168, 85, 247, 0.1) 35%, rgba(255, 255, 255, 0) 70%);
+  right: 2%;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(129, 140, 248, 0.35) 0%, rgba(192, 132, 252, 0.25) 45%, transparent 70%);
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  filter: blur(40px);
+  filter: blur(60px);
 }
 
 .account-center-page::after {
   content: "";
   position: absolute;
-  top: 360px;
-  left: -30px;
-  width: 460px;
-  height: 460px;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.14) 0%, rgba(59, 130, 246, 0.08) 40%, rgba(255, 255, 255, 0) 70%);
+  top: 320px;
+  left: -20px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.32) 0%, rgba(45, 212, 191, 0.22) 45%, transparent 70%);
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  filter: blur(40px);
+  filter: blur(60px);
 }
 
-/* 确保页面元素在光晕上方 */
+/* 确保页面元素在流光层上方 */
 .account-center-heading,
 .acm-hero-card,
 .acm-dashboard-grid,
@@ -101,17 +106,17 @@
   gap: 6px;
   color: var(--acm-primary);
   font-size: 11px;
-  font-weight: 750;
-  letter-spacing: 0.08em;
+  font-weight: 800;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
 .account-center-heading h1 {
   margin: 4px 0 0;
-  font-size: 27px;
+  font-size: 28px;
   font-weight: 800;
   color: var(--acm-text-main);
-  letter-spacing: -0.03em;
+  letter-spacing: -0.035em;
   line-height: 1.2;
 }
 
@@ -127,37 +132,37 @@
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--acm-glass-border);
   border-radius: 9999px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--acm-text-secondary);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.03);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 /* ==========================================================================
-   账套核心状态控制看板 (Frosted Glass Hero Card)
+   账套核心状态控制看板 (透光磨砂玻璃 Hero Card)
    ========================================================================== */
 
 .acm-hero-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--acm-glass-border);
-  border-radius: 18px;
-  box-shadow: var(--acm-shadow-md), var(--acm-glass-highlight);
+  background: var(--acm-glass-bg);
+  backdrop-filter: blur(28px) saturate(210%);
+  -webkit-backdrop-filter: blur(28px) saturate(210%);
+  border: 1.5px solid var(--acm-glass-border);
+  border-radius: 20px;
+  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
   overflow: hidden;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acm-hero-card:hover {
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--acm-shadow-lg), var(--acm-glass-highlight);
-  border-color: #ffffff;
+  background: var(--acm-glass-bg-hover);
+  border-color: var(--acm-glass-border-strong);
+  box-shadow: 0 18px 45px -8px rgba(31, 38, 135, 0.12), var(--acm-glass-highlight);
 }
 
 .acm-hero-header {
@@ -166,8 +171,9 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 16px;
-  padding: 22px 26px 18px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.65);
+  padding: 22px 28px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+  background: transparent;
 }
 
 .acm-hero-title-group {
@@ -179,10 +185,10 @@
 
 .acm-hero-title {
   margin: 0;
-  font-size: 22px;
-  font-weight: 750;
+  font-size: 23px;
+  font-weight: 800;
   color: var(--acm-text-main);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 .acm-badge {
@@ -194,8 +200,9 @@
   font-size: 11.5px;
   font-weight: 650;
   line-height: 1;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .acm-badge-dot {
@@ -212,7 +219,7 @@
 }
 
 .acm-badge--active .acm-badge-dot {
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.28);
   animation: acm-pulse 2s infinite ease-in-out;
 }
 
@@ -222,9 +229,9 @@
 }
 
 .acm-badge--inactive {
-  background: rgba(241, 245, 249, 0.7);
+  background: rgba(241, 245, 249, 0.65);
   color: var(--acm-text-secondary);
-  border: 1px solid var(--acm-border);
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .acm-badge--locked {
@@ -244,66 +251,64 @@
   flex: none;
 }
 
-/* 核心指标条 (Metrics Bar) */
+/* 核心指标条 (透光中继条) */
 .acm-metrics-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: rgba(248, 250, 252, 0.55);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-bottom: 1px solid rgba(226, 232, 240, 0.65);
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
 }
 
 .acm-metric-card {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 24px;
-  transition: background 0.15s ease;
+  padding: 16px 26px;
+  transition: background 0.18s ease;
 }
 
 .acm-metric-card + .acm-metric-card {
-  border-left: 1px solid rgba(226, 232, 240, 0.65);
+  border-left: 1px solid rgba(255, 255, 255, 0.45);
 }
 
 .acm-metric-card:hover {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.38);
 }
 
 .acm-metric-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   flex: none;
-  font-size: 18px;
-  backdrop-filter: blur(4px);
+  font-size: 19px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .acm-metric-icon--indigo {
-  background: rgba(79, 70, 229, 0.12);
+  background: rgba(79, 70, 229, 0.16);
   color: #4f46e5;
-  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.15);
 }
 
 .acm-metric-icon--amber {
-  background: rgba(217, 119, 6, 0.12);
+  background: rgba(217, 119, 6, 0.16);
   color: #d97706;
-  box-shadow: 0 0 0 1px rgba(217, 119, 6, 0.15);
 }
 
 .acm-metric-icon--emerald {
-  background: rgba(5, 150, 105, 0.12);
+  background: rgba(5, 150, 105, 0.16);
   color: #059669;
-  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.15);
 }
 
 .acm-metric-icon--sky {
-  background: rgba(2, 132, 199, 0.12);
+  background: rgba(2, 132, 199, 0.16);
   color: #0284c7;
-  box-shadow: 0 0 0 1px rgba(2, 132, 199, 0.15);
 }
 
 .acm-metric-content {
@@ -314,21 +319,21 @@
 }
 
 .acm-metric-label {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--acm-text-secondary);
 }
 
 .acm-metric-value {
-  font-size: 19px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 800;
   color: var(--acm-text-main);
   line-height: 1.2;
 }
 
 .acm-metric-unit {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 550;
   color: var(--acm-text-secondary);
   margin-left: 3px;
 }
@@ -340,8 +345,8 @@
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 14px 24px;
-  background: rgba(255, 255, 255, 0.65);
+  padding: 14px 26px;
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .acm-actions-group {
@@ -358,11 +363,11 @@
   gap: 7px;
   height: 38px;
   padding: 0 16px;
-  border-radius: 9px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 650;
   cursor: pointer;
-  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid transparent;
   outline: none;
   user-select: none;
@@ -383,91 +388,94 @@
   background: var(--acm-primary);
   color: #ffffff;
   border-color: var(--acm-primary);
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.28);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .acm-btn--primary:hover:not(:disabled) {
   background: var(--acm-primary-hover);
   border-color: var(--acm-primary-hover);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.38);
+  box-shadow: 0 6px 16px rgba(79, 70, 229, 0.42);
 }
 
 .acm-btn--outline {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   color: var(--acm-text-main);
-  border-color: var(--acm-border-strong);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--acm-glass-border);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
 
 .acm-btn--outline:hover:not(:disabled) {
-  background: #ffffff;
-  border-color: #94a3b8;
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #ffffff;
   color: var(--acm-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .acm-btn--calc-emp {
   background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .acm-btn--calc-emp:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
   filter: brightness(1.05);
 }
 
 .acm-btn--calc-mgr {
   background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
   color: #ffffff;
-  box-shadow: 0 2px 6px rgba(109, 40, 217, 0.25);
+  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .acm-btn--calc-mgr:hover:not(:disabled) {
-  box-shadow: 0 4px 12px rgba(109, 40, 217, 0.35);
+  box-shadow: 0 6px 16px rgba(109, 40, 217, 0.4);
   filter: brightness(1.05);
 }
 
 .acm-btn--danger-text {
-  background: transparent;
+  background: rgba(255, 241, 242, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--acm-danger);
-  border-color: transparent;
+  border: 1px solid var(--acm-danger-border);
 }
 
 .acm-btn--danger-text:hover:not(:disabled) {
-  background: var(--acm-danger-light);
-  border-color: var(--acm-danger-border);
+  background: rgba(255, 228, 230, 0.85);
+  border-color: #f43f5e;
 }
 
 /* ==========================================================================
-   中部功能看板双列网格 (Frosted Glass Panels)
+   中部功能看板双列网格 (透光磨砂面板)
    ========================================================================== */
 
 .acm-dashboard-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 22px;
 }
 
 .acm-panel {
-  background: rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--acm-glass-border);
-  border-radius: 16px;
-  box-shadow: var(--acm-shadow-sm), var(--acm-glass-highlight);
-  padding: 22px 24px;
+  background: var(--acm-glass-bg);
+  backdrop-filter: blur(28px) saturate(210%);
+  -webkit-backdrop-filter: blur(28px) saturate(210%);
+  border: 1.5px solid var(--acm-glass-border);
+  border-radius: 18px;
+  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
+  padding: 22px 26px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .acm-panel:hover {
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: var(--acm-shadow-md), var(--acm-glass-highlight);
-  border-color: #ffffff;
+  background: var(--acm-glass-bg-hover);
+  border-color: var(--acm-glass-border-strong);
+  box-shadow: 0 18px 45px -8px rgba(31, 38, 135, 0.12), var(--acm-glass-highlight);
 }
 
 .acm-panel-head {
@@ -485,7 +493,7 @@
 
 .acm-panel-kicker {
   font-size: 10.5px;
-  font-weight: 750;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--acm-primary);
@@ -493,7 +501,7 @@
 
 .acm-panel-title {
   margin: 0;
-  font-size: 16.5px;
+  font-size: 17px;
   font-weight: 750;
   color: var(--acm-text-main);
 }
@@ -505,16 +513,18 @@
   font-size: 12.5px;
   font-weight: 650;
   color: var(--acm-primary);
-  background: rgba(79, 70, 229, 0.06);
-  border: 1px solid rgba(79, 70, 229, 0.15);
+  background: rgba(79, 70, 229, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(79, 70, 229, 0.2);
   cursor: pointer;
-  padding: 5px 10px;
-  border-radius: 7px;
+  padding: 5px 12px;
+  border-radius: 8px;
   transition: all 0.15s ease;
 }
 
 .acm-panel-action-link:hover {
-  background: rgba(79, 70, 229, 0.12);
+  background: rgba(79, 70, 229, 0.16);
   border-color: var(--acm-primary);
 }
 
@@ -531,18 +541,19 @@
   justify-content: space-between;
   gap: 8px;
   padding: 11px 14px;
-  background: rgba(248, 250, 252, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  border-radius: 10px;
-  transition: all 0.15s ease;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  transition: all 0.18s ease;
 }
 
 .acm-source-card:hover {
-  background: rgba(255, 255, 255, 0.95);
-  border-color: rgba(203, 213, 225, 0.9);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  background: rgba(255, 255, 255, 0.85);
+  border-color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .acm-source-info {
@@ -561,12 +572,12 @@
 
 .acm-source-dot--synced {
   background: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2);
+  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
 }
 
 .acm-source-dot--uploaded {
   background: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.2);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
 }
 
 .acm-source-dot--empty {
@@ -585,10 +596,12 @@
 .acm-source-status-pill {
   font-size: 11px;
   font-weight: 650;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: 9999px;
   white-space: nowrap;
   line-height: 1.2;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .acm-source-status-pill--synced {
@@ -604,7 +617,7 @@
 }
 
 .acm-source-status-pill--empty {
-  background: rgba(241, 245, 249, 0.8);
+  background: rgba(241, 245, 249, 0.7);
   color: var(--acm-text-muted);
 }
 
@@ -613,12 +626,13 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 14px 18px;
-  background: rgba(248, 250, 252, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  border-radius: 11px;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .acm-rest-preview-item {
@@ -633,21 +647,21 @@
 }
 
 .acm-rest-preview-val {
-  font-size: 18px;
-  font-weight: 750;
+  font-size: 19px;
+  font-weight: 800;
   color: var(--acm-text-main);
 }
 
 .acm-rest-preview-val small {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 550;
   color: var(--acm-text-secondary);
 }
 
 .acm-rest-preview-divider {
   width: 1px;
   height: 32px;
-  background: rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .acm-rest-tag-list {
@@ -660,12 +674,13 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  padding: 4px 9px;
+  border-radius: 7px;
   font-size: 11.5px;
   font-weight: 600;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7);
 }
 
 .acm-rest-tag--full {
@@ -687,17 +702,17 @@
 }
 
 /* ==========================================================================
-   账套导入记录流水卡片 (Frosted Glass Table Container)
+   账套导入记录流水卡片 (磨砂透光表格面板)
    ========================================================================== */
 
 .acm-imports-section {
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--acm-glass-border);
-  border-radius: 18px;
-  box-shadow: var(--acm-shadow-sm), var(--acm-glass-highlight);
-  padding: 24px 26px;
+  background: var(--acm-glass-bg);
+  backdrop-filter: blur(28px) saturate(210%);
+  -webkit-backdrop-filter: blur(28px) saturate(210%);
+  border: 1.5px solid var(--acm-glass-border);
+  border-radius: 20px;
+  box-shadow: var(--acm-glass-shadow), var(--acm-glass-highlight);
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -712,10 +727,10 @@
 
 .acm-imports-header h2 {
   margin: 0;
-  font-size: 18.5px;
-  font-weight: 750;
+  font-size: 19px;
+  font-weight: 800;
   color: var(--acm-text-main);
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 .acm-imports-subtitle {
@@ -725,16 +740,55 @@
   margin-top: 2px;
 }
 
+/* 让内嵌的表格面板透光，显出磨砂玻璃效果 */
+.acm-imports-section .query-result-panel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.acm-imports-section .legacy-table-panel {
+  background: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.7) !important;
+  border-radius: 12px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5) !important;
+}
+
+.acm-imports-section table {
+  background: transparent !important;
+}
+
+.acm-imports-section thead th {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.6) !important;
+}
+
+.acm-imports-section tbody tr {
+  background: transparent !important;
+  transition: background 0.15s ease !important;
+}
+
+.acm-imports-section tbody tr:hover {
+  background: rgba(255, 255, 255, 0.45) !important;
+}
+
 /* 表格内状态微标 */
 .acm-table-status-tag {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
+  padding: 3px 9px;
   border-radius: 9999px;
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .acm-table-status-tag--success {
@@ -756,16 +810,16 @@
 }
 
 /* ==========================================================================
-   极富通透感磨砂玻璃弹窗 (Crystal Frosted Glass Modals)
+   极致透明磨砂玻璃弹窗 (Crystal Frosted Glass Modals)
    ========================================================================== */
 
 .acm-modal-backdrop {
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
-  background: rgba(15, 23, 42, 0.38);
-  backdrop-filter: blur(16px) saturate(180%);
-  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
   display: grid;
   place-items: center;
   padding: 24px;
@@ -780,14 +834,16 @@
 
 .acm-modal-card {
   position: relative;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
-  border-radius: 20px;
+  /* 高透光率玻璃质感：52% 半透明白色 + 32px 强模糊折射 + 晶莹高光边框 */
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(34px) saturate(220%) !important;
+  -webkit-backdrop-filter: blur(34px) saturate(220%) !important;
+  border-radius: 22px !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow: 
-    0 25px 60px -15px rgba(15, 23, 42, 0.25),
-    0 0 0 1px rgba(255, 255, 255, 0.8) inset,
-    0 1px 3px rgba(0, 0, 0, 0.05);
+    0 25px 60px -10px rgba(0, 0, 0, 0.28),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.9),
+    inset 0 1px 3px rgba(255, 255, 255, 0.95) !important;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
@@ -795,11 +851,10 @@
   display: flex;
   flex-direction: column;
   animation: acm-scale-up 0.24s cubic-bezier(0.16, 1, 0.3, 1);
-  border: 1px solid rgba(255, 255, 255, 0.85);
 }
 
 @keyframes acm-scale-up {
-  from { transform: scale(0.96) translateY(10px); opacity: 0; }
+  from { transform: scale(0.96) translateY(12px); opacity: 0; }
   to { transform: scale(1) translateY(0); opacity: 1; }
 }
 
@@ -815,13 +870,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 26px 18px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.65);
+  padding: 20px 28px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.55);
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.75);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(24px) saturate(200%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(200%) !important;
   z-index: 10;
 }
 
@@ -844,9 +899,11 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  border: 1px solid rgba(226, 232, 240, 0.6);
-  background: rgba(255, 255, 255, 0.6);
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: var(--acm-text-secondary);
   font-size: 20px;
   cursor: pointer;
@@ -854,13 +911,13 @@
 }
 
 .acm-modal-close-btn:hover {
-  background: rgba(241, 245, 249, 0.9);
+  background: rgba(255, 255, 255, 0.9);
   color: var(--acm-text-main);
-  border-color: var(--acm-border-strong);
+  border-color: #ffffff;
 }
 
 .acm-modal-body {
-  padding: 24px 26px;
+  padding: 24px 28px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -880,21 +937,21 @@
 }
 
 .acm-card-block {
-  background: rgba(255, 255, 255, 0.68);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.75) !important;
   border-radius: 14px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03), inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
 }
 
 .acm-card-block-title {
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--acm-text-secondary);
@@ -926,7 +983,7 @@
 }
 
 /* ==========================================================================
-   精美厂休排班日历 (Modern Factory Rest Calendar)
+   精美厂休排班日历 (透光排班日历)
    ========================================================================== */
 
 .acm-calendar-wrapper {
@@ -993,7 +1050,7 @@
   text-align: center;
   padding: 6px 0;
   font-size: 11.5px;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--acm-text-muted);
 }
 
@@ -1010,19 +1067,20 @@
   min-height: 52px;
   padding: 4px;
   border-radius: 9px;
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
 }
 
 .acm-calendar-day-btn:hover:not(:disabled) {
-  border-color: #94a3b8;
+  background: rgba(255, 255, 255, 0.85);
+  border-color: #ffffff;
   transform: translateY(-1px);
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
 .acm-calendar-day-btn:active:not(:disabled) {
@@ -1050,8 +1108,8 @@
 
 /* 日历单元格状态色彩 */
 .acm-day--none {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(226, 232, 240, 0.8);
+  background: rgba(255, 255, 255, 0.45);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 .acm-day--none .acm-day-state-label {
   color: var(--acm-text-muted);
@@ -1091,7 +1149,7 @@
 }
 
 /* ==========================================================================
-   精美上传槽位体系 (Frosted Glass Dropzone)
+   精美上传槽位体系 (透光 Dropzone)
    ========================================================================== */
 
 .acm-upload-grid {
@@ -1106,11 +1164,11 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: rgba(248, 250, 252, 0.65);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1.5px dashed rgba(203, 213, 225, 0.85);
-  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
+  border: 1.5px dashed rgba(203, 213, 225, 0.85) !important;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   min-height: 72px;
@@ -1118,54 +1176,55 @@
 }
 
 .acm-upload-slot:hover:not(.is-disabled) {
-  background: rgba(238, 242, 255, 0.8);
-  border-color: var(--acm-primary);
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.1);
+  background: rgba(238, 242, 255, 0.75) !important;
+  border-color: var(--acm-primary) !important;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.15);
 }
 
 .acm-upload-slot.is-dragover {
-  background: rgba(79, 70, 229, 0.15);
-  border-color: var(--acm-primary);
-  border-style: solid;
+  background: rgba(79, 70, 229, 0.2) !important;
+  border-color: var(--acm-primary) !important;
+  border-style: solid !important;
   transform: scale(1.01);
 }
 
 .acm-upload-slot.has-file {
-  background: rgba(240, 253, 244, 0.85);
-  border-color: #86efac;
-  border-style: solid;
+  background: rgba(240, 253, 244, 0.75) !important;
+  border-color: #86efac !important;
+  border-style: solid !important;
 }
 
 .acm-upload-slot.has-file:hover {
-  border-color: #22c55e;
+  border-color: #22c55e !important;
 }
 
 .acm-upload-slot.is-disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
-  background: rgba(241, 245, 249, 0.5);
-  border-style: dotted;
-  border-color: var(--acm-border);
+  background: rgba(241, 245, 249, 0.35) !important;
+  border-style: dotted !important;
+  border-color: rgba(203, 213, 225, 0.6) !important;
 }
 
 .acm-slot-icon-box {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(226, 232, 240, 0.7);
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   color: var(--acm-text-secondary);
   flex: none;
-  font-size: 16px;
+  font-size: 17px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
 }
 
 .has-file .acm-slot-icon-box {
-  background: #dcfce7;
+  background: rgba(220, 252, 231, 0.85);
   border-color: #86efac;
   color: #15803d;
 }
@@ -1197,7 +1256,7 @@
 
 .has-file .acm-slot-hint {
   color: #15803d;
-  font-weight: 550;
+  font-weight: 600;
 }
 
 .acm-slot-clear-btn {
@@ -1207,10 +1266,10 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border: 1px solid var(--acm-border);
+  border: 1px solid var(--acm-glass-border);
   color: var(--acm-text-secondary);
   display: flex;
   align-items: center;
@@ -1234,10 +1293,10 @@
   }
   .acm-metric-card:nth-child(3) {
     border-left: none;
-    border-top: 1px solid rgba(226, 232, 240, 0.65);
+    border-top: 1px solid rgba(255, 255, 255, 0.45);
   }
   .acm-metric-card:nth-child(4) {
-    border-top: 1px solid rgba(226, 232, 240, 0.65);
+    border-top: 1px solid rgba(255, 255, 255, 0.45);
   }
   .acm-dashboard-grid {
     grid-template-columns: 1fr;
@@ -1260,7 +1319,7 @@
   }
   .acm-metric-card + .acm-metric-card {
     border-left: none;
-    border-top: 1px solid rgba(226, 232, 240, 0.65);
+    border-top: 1px solid rgba(255, 255, 255, 0.45);
   }
   .acm-upload-grid {
     grid-template-columns: 1fr;
