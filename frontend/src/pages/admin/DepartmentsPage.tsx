@@ -17,6 +17,7 @@ import type { AdminDepartment } from "../../types/admin";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
 import "./department-management.css";
+import "./admin-management-shared.css";
 
 type DepartmentFormState = {
   dept_no: string;
@@ -383,7 +384,7 @@ export default function DepartmentsPage() {
       ]);
 
   return (
-    <main className="master-data-page department-master-page">
+    <main className="admin-management-page master-data-page department-master-page">
       {/* 背景极光微光晕 */}
       <div className="qh-glow-sphere qh-glow-sphere--1" />
       <div className="qh-glow-sphere qh-glow-sphere--2" />
@@ -525,7 +526,7 @@ export default function DepartmentsPage() {
       </div>
 
       {/* 数据表格区 (macOS Window Table Container) */}
-      <div className="dept-table-window">
+      <div className="dept-table-window admin-management-table">
         {/* 表格标题条 */}
         <div
           className="account-card-header master-list-header"
@@ -644,7 +645,7 @@ export default function DepartmentsPage() {
                 </div>
               </div>
             </div>
-            <div className="dept-modal-footer">
+            <div className="dept-modal-footer admin-management-modal-footer">
               <button className="dept-btn dept-btn--secondary account-action-button" onClick={() => setEditing(null)} type="button">取消</button>
               <button className="dept-btn dept-btn--primary account-action-button account-action-button--primary" type="submit">保存</button>
             </div>
@@ -684,7 +685,7 @@ export default function DepartmentsPage() {
                 将应用到已选 {selectedIds.length} 个部门。
               </div>
             </div>
-            <div className="dept-modal-footer">
+            <div className="dept-modal-footer admin-management-modal-footer">
               <button className="dept-btn dept-btn--secondary account-action-button" onClick={() => setBatchParentModalOpen(false)} type="button">取消</button>
               <button className="dept-btn dept-btn--primary account-action-button account-action-button--primary" onClick={applyBatchParent} type="button">保存</button>
             </div>
@@ -692,28 +693,10 @@ export default function DepartmentsPage() {
         </div>
       ) : null}
 
-      {/* 新增部门 Modal 弹窗 (常驻 DOM 以兼容即时 DOM 查询) */}
-      <div
+      {/* 新增部门 Modal 弹窗 */}
+      {showModal === "create" ? <div
         className="dept-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          position: "fixed",
-          left: showModal === "create" ? "0" : "-9999px",
-          top: "0",
-          width: "100%",
-          height: "100%",
-          zIndex: "var(--z-modal)",
-          background: "rgba(15, 23, 42, 0.45)",
-          backdropFilter: "blur(18px) saturate(180%)",
-          WebkitBackdropFilter: "blur(18px) saturate(180%)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          boxSizing: "border-box",
-          opacity: showModal === "create" ? 1 : 0,
-          pointerEvents: showModal === "create" ? "auto" : "none",
-          transition: "opacity 0.18s ease",
-        }}
       >
         <div className="dept-modal-window master-modal-container department-parent-modal" style={{ width: "100%", maxWidth: "560px" }}>
           <div className="dept-modal-header">
@@ -783,36 +766,18 @@ export default function DepartmentsPage() {
               </div>
             </div>
 
-            <div className="dept-modal-footer">
+            <div className="dept-modal-footer admin-management-modal-footer">
               <button className="dept-btn dept-btn--secondary account-action-button" onClick={handleCloseModal} type="button">取消</button>
               <button className="dept-btn dept-btn--primary account-action-button account-action-button--primary account-primary-button" type="submit">创建部门</button>
             </div>
           </form>
         </div>
-      </div>
+      </div> : null}
 
-      {/* 导入/导出部门 Modal 弹窗 (常驻 DOM 以兼容即时 DOM 查询) */}
-      <div
+      {/* 导入/导出部门 Modal 弹窗 */}
+      {showModal === "import" ? <div
         className="dept-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          position: "fixed",
-          left: showModal === "import" ? "0" : "-9999px",
-          top: "0",
-          width: "100%",
-          height: "100%",
-          zIndex: "var(--z-modal)",
-          background: "rgba(15, 23, 42, 0.45)",
-          backdropFilter: "blur(18px) saturate(180%)",
-          WebkitBackdropFilter: "blur(18px) saturate(180%)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          boxSizing: "border-box",
-          opacity: showModal === "import" ? 1 : 0,
-          pointerEvents: showModal === "import" ? "auto" : "none",
-          transition: "opacity 0.18s ease",
-        }}
       >
         <div className="dept-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
           <div className="dept-modal-header">
@@ -950,7 +915,7 @@ export default function DepartmentsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </div> : null}
     </main>
   );
 }

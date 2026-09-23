@@ -28,6 +28,7 @@ import QueryTable from "../../components/query/QueryTable";
 // 不显式引入时，直接进入本页（未先访问过查询页）会缺失这些样式
 import "../query/dashboard-shared.css";
 import "./employee-management.css";
+import "./admin-management-shared.css";
 import type { AdminDepartment, AdminEmployee, AdminShift } from "../../types/admin";
 import type { DepartmentOption, QueryEmployee } from "../../types/query";
 
@@ -674,7 +675,6 @@ export default function EmployeesPage() {
                 openRowMenu(row.id, event);
               }
             }}
-            onMouseEnter={(event) => openRowMenu(row.id, event)}
             type="button"
           >
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -855,7 +855,7 @@ export default function EmployeesPage() {
     Boolean(managerSourceFilter);
 
   return (
-    <main className="employee-management-page master-data-page employee-master-page employee-dashboard-page">
+    <main className="admin-management-page employee-management-page master-data-page employee-master-page employee-dashboard-page">
       {/* 极光动态流光背景球 (参考查询页设计，赋予磨砂玻璃深度与生动折射) */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
@@ -1093,7 +1093,7 @@ export default function EmployeesPage() {
       </div>
 
       {/* 数据表格面板 */}
-      <div className="emp-table-window">
+      <div className="emp-table-window admin-management-table">
         <QueryResultPanel>
           {loading ? (
             <LoadingState message="正在加载员工列表..." variant="table" contentOnly headers={employeeTableHeaders.map((header) => typeof header === "string" ? header : typeof header.label === "string" ? header.label : "")} />
@@ -1124,7 +1124,7 @@ export default function EmployeesPage() {
             <div className="emp-modal-body master-modal-body">
               {renderEmployeeForm(editForm, setEditForm, "保存", "edit", false)}
             </div>
-            <div className="emp-modal-footer master-modal-footer">
+            <div className="emp-modal-footer master-modal-footer admin-management-modal-footer">
               <button className="emp-btn emp-btn--secondary account-action-button" onClick={handleCancelEdit} type="button">取消</button>
               <button className="emp-btn emp-btn--primary account-action-button account-action-button--primary" type="submit">保存</button>
             </div>
@@ -1133,27 +1133,9 @@ export default function EmployeesPage() {
       ) : null}
 
       {/* 新增员工弹窗 */}
-      <div
+      {showModal === "create" ? <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          position: "fixed",
-          left: showModal === "create" ? "0" : "-9999px",
-          top: "0",
-          width: "100%",
-          height: "100%",
-          zIndex: "var(--z-modal)",
-          background: "rgba(15, 23, 42, 0.45)",
-          backdropFilter: "blur(18px) saturate(180%)",
-          WebkitBackdropFilter: "blur(18px) saturate(180%)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          boxSizing: "border-box",
-          opacity: showModal === "create" ? 1 : 0,
-          pointerEvents: showModal === "create" ? "auto" : "none",
-          transition: "opacity 0.18s ease",
-        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "650px" }}>
           <div className="emp-modal-header">
@@ -1171,30 +1153,12 @@ export default function EmployeesPage() {
             </form>
           </div>
         </div>
-      </div>
+      </div> : null}
 
       {/* 导入/导出弹窗 */}
-      <div
+      {showModal === "import" ? <div
         className="emp-modal-backdrop master-modal-backdrop"
         onClick={(e) => { if (e.target === e.currentTarget) handleCloseModal(); }}
-        style={{
-          position: "fixed",
-          left: showModal === "import" ? "0" : "-9999px",
-          top: "0",
-          width: "100%",
-          height: "100%",
-          zIndex: "var(--z-modal)",
-          background: "rgba(15, 23, 42, 0.45)",
-          backdropFilter: "blur(18px) saturate(180%)",
-          WebkitBackdropFilter: "blur(18px) saturate(180%)",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          boxSizing: "border-box",
-          opacity: showModal === "import" ? 1 : 0,
-          pointerEvents: showModal === "import" ? "auto" : "none",
-          transition: "opacity 0.18s ease",
-        }}
       >
         <div className="emp-modal-window master-modal-container" style={{ width: "100%", maxWidth: "600px" }}>
           <div className="emp-modal-header">
@@ -1315,7 +1279,7 @@ export default function EmployeesPage() {
             </div>
           </div>
         </div>
-      </div>
+      </div> : null}
 
       {/* 办理离职弹窗 */}
       {showResignModal ? (
@@ -1418,7 +1382,7 @@ export default function EmployeesPage() {
                 办理后：其关联登录账号将被自动禁用，各查询与统计页面不再显示该员工；可在"已离职"筛选下恢复在职。
               </div>
             </div>
-            <div className="emp-modal-footer">
+            <div className="emp-modal-footer admin-management-modal-footer">
               <button className="emp-btn emp-btn--secondary account-action-button" onClick={() => setShowResignModal(false)} type="button">取消</button>
               <button
                 className="emp-btn emp-btn--primary account-action-button account-action-button--primary"

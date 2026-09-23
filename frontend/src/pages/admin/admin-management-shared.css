@@ -1,0 +1,229 @@
+/* Shared visual language for employee, department, and shift management. */
+.admin-management-page {
+  --admin-control-height: 32px;
+  --admin-control-radius: 8px;
+  --admin-control-border: rgba(203, 213, 225, 0.85);
+  --admin-control-text: #334155;
+  --admin-control-accent: #4f46e5;
+  --admin-glass-bg: rgba(255, 255, 255, 0.76);
+  --admin-glass-border: rgba(255, 255, 255, 0.82);
+  --admin-glass-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.04), 0 2px 6px -1px rgba(15, 23, 42, 0.02), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.admin-management-page .emp-top-rail,
+.admin-management-page .dept-top-rail,
+.admin-management-page .shift-top-rail {
+  background: var(--admin-glass-bg) !important;
+  backdrop-filter: blur(24px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(190%) !important;
+  border: 1px solid var(--admin-glass-border) !important;
+  box-shadow: var(--admin-glass-shadow) !important;
+}
+
+.admin-management-page .emp-dock-bar,
+.admin-management-page .dept-dock-bar,
+.admin-management-page .shift-dock-bar {
+  gap: 4px !important;
+  padding: 4px 8px !important;
+  background: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid var(--admin-glass-border) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 30px -4px rgba(15, 23, 42, 0.1), 0 4px 10px -2px rgba(15, 23, 42, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
+}
+
+.admin-management-page .emp-dock-bar:hover,
+.admin-management-page .dept-dock-bar:hover,
+.admin-management-page .shift-dock-bar:hover {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-color: #fff !important;
+  box-shadow: 0 16px 36px -6px rgba(15, 23, 42, 0.14), inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
+}
+
+.admin-management-page .emp-table-window,
+.admin-management-page .dept-table-window,
+.admin-management-page .shift-table-window {
+  background: var(--admin-glass-bg) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid var(--admin-glass-border) !important;
+  box-shadow: var(--admin-glass-shadow) !important;
+}
+
+.admin-management-page .emp-table-window .table-pager,
+.admin-management-page .dept-table-window .table-pager,
+.admin-management-page .shift-table-window .table-pager {
+  background: rgba(248, 250, 252, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-top: 1px solid rgba(226, 232, 240, 0.7) !important;
+}
+
+.admin-management-page .admin-management-table .master-table th,
+.admin-management-page .admin-management-table .legacy-table-head-cell {
+  height: 40px;
+  padding: 9px 12px !important;
+  color: #475569 !important;
+  font-size: 12.5px !important;
+  font-weight: 700 !important;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
+}
+
+.admin-management-page .admin-management-table .master-table td {
+  height: 42px;
+  padding: 8px 12px !important;
+  color: #0f172a !important;
+  font-size: 13px !important;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.65) !important;
+}
+
+.admin-management-page .admin-management-table .master-table tr:hover td {
+  background: rgba(79, 70, 229, 0.045) !important;
+}
+
+.admin-management-page .admin-management-table .master-table th:last-child,
+.admin-management-page .admin-management-table .master-table td:last-child {
+  text-align: center !important;
+}
+
+.admin-management-page .employee-row-actions,
+.admin-management-page .dept-row-actions,
+.admin-management-page .shift-row-actions {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto;
+}
+
+.admin-management-page .employee-row-action-group,
+.admin-management-page .dept-row-action-group,
+.admin-management-page .shift-row-action-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: var(--admin-control-height) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid var(--admin-control-border) !important;
+  border-radius: var(--admin-control-radius) !important;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), inset 0 1px 0 #fff !important;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease !important;
+}
+
+.admin-management-page .employee-row-action-group:hover,
+.admin-management-page .dept-row-action-group:hover,
+.admin-management-page .shift-row-action-group:hover {
+  background: #fff !important;
+  border-color: rgba(79, 70, 229, 0.42) !important;
+  box-shadow: 0 3px 8px rgba(79, 70, 229, 0.09), inset 0 1px 0 #fff !important;
+}
+
+.admin-management-page .employee-row-action-edit,
+.admin-management-page .dept-row-action-edit,
+.admin-management-page .shift-row-action-edit {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  height: calc(var(--admin-control-height) - 2px) !important;
+  padding: 0 11px !important;
+  color: var(--admin-control-text) !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease, background 0.15s ease !important;
+}
+
+.admin-management-page .employee-row-action-edit:hover,
+.admin-management-page .dept-row-action-edit:hover,
+.admin-management-page .shift-row-action-edit:hover {
+  color: var(--admin-control-accent) !important;
+  background: rgba(79, 70, 229, 0.08) !important;
+}
+
+.admin-management-page .employee-row-menu-trigger,
+.admin-management-page .dept-row-menu-trigger,
+.admin-management-page .shift-row-menu-trigger {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 24px !important;
+  height: calc(var(--admin-control-height) - 2px) !important;
+  padding: 0 !important;
+  color: #64748b !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-left: 1px solid rgba(226, 232, 240, 0.9) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  cursor: pointer !important;
+}
+
+.admin-management-page .employee-row-menu-trigger:hover,
+.admin-management-page .employee-row-menu-trigger[aria-expanded="true"],
+.admin-management-page .dept-row-menu-trigger:hover,
+.admin-management-page .dept-row-menu-trigger[aria-expanded="true"],
+.admin-management-page .shift-row-menu-trigger:hover,
+.admin-management-page .shift-row-menu-trigger[aria-expanded="true"] {
+  color: var(--admin-control-accent) !important;
+  background: rgba(79, 70, 229, 0.08) !important;
+}
+
+.employee-row-menu-item,
+.dept-row-menu-item,
+.shift-row-menu-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  width: 100% !important;
+  min-height: 34px !important;
+  padding: 7px 10px !important;
+  border-radius: 6px !important;
+  font-size: 12.5px !important;
+  text-align: left !important;
+}
+
+.admin-management-page .account-input,
+.admin-management-page .account-select,
+.admin-management-page .emp-filter-input,
+.admin-management-page .emp-filter-select {
+  min-height: var(--admin-control-height);
+  border-radius: var(--admin-control-radius) !important;
+  border-color: var(--admin-control-border) !important;
+  font-size: 13px;
+}
+
+.admin-management-page .account-input:focus,
+.admin-management-page .account-select:focus,
+.admin-management-page .emp-filter-input:focus,
+.admin-management-page .emp-filter-select:focus {
+  border-color: rgba(79, 70, 229, 0.65) !important;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1) !important;
+  outline: none;
+}
+
+.admin-management-page .admin-management-modal-footer > button {
+  min-width: 84px;
+  min-height: 34px;
+  border-radius: var(--admin-control-radius) !important;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .admin-management-page .admin-management-table .master-table th,
+  .admin-management-page .admin-management-table .master-table td {
+    padding-right: 9px !important;
+    padding-left: 9px !important;
+  }
+}
