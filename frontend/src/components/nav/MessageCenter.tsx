@@ -165,7 +165,7 @@ export default function MessageCenter() {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState<"all" | "unread">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "unread">("unread");
   const [markingAll, setMarkingAll] = useState(false);
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -326,16 +326,6 @@ export default function MessageCenter() {
             <div className="message-center-tabs">
               <div className="message-center-tab-segment" role="tablist" aria-label="消息分类">
                 <button
-                  aria-selected={activeTab === "all"}
-                  className={`message-center-tab${activeTab === "all" ? " is-active" : ""}`}
-                  onClick={() => setActiveTab("all")}
-                  role="tab"
-                  type="button"
-                >
-                  <span>全部</span>
-                  <span className="message-center-tab-count">{messages.length}</span>
-                </button>
-                <button
                   aria-selected={activeTab === "unread"}
                   className={`message-center-tab${activeTab === "unread" ? " is-active" : ""}`}
                   onClick={() => setActiveTab("unread")}
@@ -346,6 +336,16 @@ export default function MessageCenter() {
                   {unreadCount > 0 && (
                     <span className="message-center-tab-unread-count">{unreadCount}</span>
                   )}
+                </button>
+                <button
+                  aria-selected={activeTab === "all"}
+                  className={`message-center-tab${activeTab === "all" ? " is-active" : ""}`}
+                  onClick={() => setActiveTab("all")}
+                  role="tab"
+                  type="button"
+                >
+                  <span>全部</span>
+                  <span className="message-center-tab-count">{messages.length}</span>
                 </button>
               </div>
             </div>
