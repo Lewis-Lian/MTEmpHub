@@ -33,6 +33,7 @@ from models.user import (
     UserDepartmentAssignment,
 )
 from services.attendance_service import AttendanceService
+from services.attendance_utils import month_date_range as _month_date_range
 from services.daily_override_service import (
     EMPLOYEE_LEAVE_BUCKETS,
     EVENING_OVERTIME_START,
@@ -228,18 +229,6 @@ def _leave_days_in_month(record: LeaveRecord, month: str) -> float:
         return 0.0
     start_dt, end_dt = datetime_range
     return overlap_duration_days(record.start_time, record.end_time, start_dt, end_dt)
-
-
-def _month_date_range(month: str) -> tuple[date, date] | None:
-    try:
-        start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        return None
-    if start.month == 12:
-        end = date(start.year + 1, 1, 1)
-    else:
-        end = date(start.year, start.month + 1, 1)
-    return start, end
 
 
 def _month_datetime_range(month: str) -> tuple[datetime, datetime] | None:

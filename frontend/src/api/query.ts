@@ -24,29 +24,29 @@ export function clearQueryBootstrapCache() {
   queryBootstrapPromise = null;
 }
 
+function withQuery(path: string, query: URLSearchParams): string {
+  const params = query.toString();
+  return params ? `${path}?${params}` : path;
+}
 
 export function fetchHomeSummary(month?: string): Promise<HomeSummaryResponse> {
   const query = new URLSearchParams();
   if (month) {
     query.set("month", month);
   }
-  const suffix = query.toString() ? `?${query.toString()}` : "";
-  return apiRequest<HomeSummaryResponse>(`/api/query/home-summary${suffix}`);
+  return apiRequest<HomeSummaryResponse>(withQuery("/api/query/home-summary", query));
 }
 
 export function fetchHeaderRows(path: string, query: URLSearchParams): Promise<HeaderRowsResponse> {
-  const suffix = query.toString() ? `?${query.toString()}` : "";
-  return apiRequest<HeaderRowsResponse>(`${path}${suffix}`);
+  return apiRequest<HeaderRowsResponse>(withQuery(path, query));
 }
 
 export function fetchObjectRows<T>(path: string, query: URLSearchParams): Promise<T[]> {
-  const suffix = query.toString() ? `?${query.toString()}` : "";
-  return apiRequest<T[]>(`${path}${suffix}`);
+  return apiRequest<T[]>(withQuery(path, query));
 }
 
 export function buildDownloadUrl(path: string, query: URLSearchParams): string {
-  const suffix = query.toString() ? `?${query.toString()}` : "";
-  return buildApiUrl(`${path}${suffix}`);
+  return buildApiUrl(withQuery(path, query));
 }
 
 export function fetchAttendanceCalendar(empId: number, month: string): Promise<AttendanceCalendarData> {

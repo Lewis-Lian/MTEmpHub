@@ -11,6 +11,7 @@ import {
   updateAdminDepartment,
 } from "../../api/admin";
 import DepartmentPicker from "../../components/query/DepartmentPicker";
+import ExcelImportDropzone from "../../components/admin/ExcelImportDropzone";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
 import QueryTable from "../../components/query/QueryTable";
 import type { AdminDepartment } from "../../types/admin";
@@ -150,8 +151,6 @@ export default function DepartmentsPage() {
   const [batchParentModalOpen, setBatchParentModalOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importInputKey, setImportInputKey] = useState(0);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
 
@@ -325,7 +324,6 @@ export default function DepartmentsPage() {
       const result = await importAdminDepartments(importFile);
       formEl.reset();
       setImportFile(null);
-      setImportInputKey((current) => current + 1);
       notification.success(`导入成功，处理 ${String(result.imported)} 条`);
       setShowModal(null);
       await loadRows();
@@ -791,64 +789,7 @@ export default function DepartmentsPage() {
           <div className="dept-modal-body">
             {/* 批量导入专区 */}
             <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
-              <div
-                className={`account-upload-dropzone${isDragOver ? " is-dragover" : ""}`}
-                style={{
-                  padding: "32px 20px",
-                  background: isDragOver ? "rgba(238, 242, 255, 0.85)" : "rgba(248, 250, 252, 0.75)",
-                  border: isDragOver ? "2px dashed #4f46e5" : "1px dashed #cbd5e1",
-                  borderRadius: "12px",
-                  textAlign: "center",
-                  transition: "all 0.2s ease",
-                  cursor: "pointer",
-                }}
-                onClick={() => document.getElementById("department-import-input")?.click()}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(true);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                  const droppedFile = e.dataTransfer.files?.[0] ?? null;
-                  if (droppedFile) {
-                    setImportFile(droppedFile);
-                  }
-                }}
-              >
-                <div style={{ marginBottom: "14px", color: importFile ? "#4f46e5" : "#64748b" }}>
-                  {importFile ? (
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}>
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                  ) : (
-                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ display: "inline-block" }}>
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                    </svg>
-                  )}
-                </div>
-                <div style={{ marginBottom: "6px", fontSize: "14.5px", color: "#1e293b", fontWeight: "650" }}>
-                  {importFile ? importFile.name : "点击选择，或将 Excel 文件拖拽到这里"}
-                </div>
-                <div style={{ fontSize: "12.5px", color: "#64748b" }}>
-                  {importFile ? `大小: ${(importFile.size / 1024).toFixed(1)} KB` : "支持 .xlsx 格式文件"}
-                </div>
-                <input
-                  id="department-import-input"
-                  key={importInputKey}
-                  className="account-file-input"
-                  name="file"
-                  type="file"
-                  accept=".xlsx"
-                  style={{ display: "none" }}
-                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-                />
-              </div>
+              <ExcelImportDropzone className="account-upload-dropzone" file={importFile} onFileChange={setImportFile} />
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <a

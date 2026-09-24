@@ -1,0 +1,63 @@
+.excel-import-dropzone {
+  padding: 32px 20px;
+  background: rgba(248, 250, 252, 0.75);
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  text-align: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.excel-import-dropzone.is-dragover {
+  background: rgba(238, 242, 255, 0.85);
+  border: 2px dashed #4f46e5;
+}
+
+.excel-import-dropzone-icon {
+  margin-bottom: 14px;
+  color: #64748b;
+}
+
+.excel-import-dropzone.has-file .excel-import-dropzone-icon {
+  color: #4f46e5;
+}
+
+.excel-import-dropzone-title {
+  margin-bottom: 6px;
+  font-size: 14.5px;
+  color: #1e293b;
+  font-weight: 650;
+}
+
+.excel-import-dropzone-detail {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.excel-import-dropzone--employee {
+  border-color: rgba(203, 213, 225, 0.9);
+  border-radius: 14px;
+}
+
+.excel-import-dropzone--employee.is-dragover {
+  background: #eff6ff;
+  border-color: var(--emp-primary);
+}
+
+.excel-import-dropzone--employee .excel-import-dropzone-title {
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.excel-import-dropzone--employee .excel-import-dropzone-icon {
+  margin-bottom: 16px;
+}
+
+.excel-import-dropzone--employee .excel-import-dropzone-detail {
+  font-size: 13px;
+}
+
+.excel-import-dropzone--employee.has-file .excel-import-dropzone-icon {
+  color: var(--emp-primary);
+}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 
 from sqlalchemy.orm import joinedload
 
@@ -15,6 +15,7 @@ from models.employee import (
     Employee,
 )
 from models.monthly_report import MonthlyReport
+from services.attendance_utils import month_date_range as _month_date_range
 
 
 EMPLOYEE_STATS_CONTEXT = "employee_stats"
@@ -40,16 +41,6 @@ class AttendanceRecordView:
     early_leave_minutes: int
     exception_reason: str | None
     raw_data: dict
-
-
-def _month_date_range(month: str) -> tuple[date, date] | None:
-    try:
-        start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        return None
-    if start.month == 12:
-        return start, date(start.year + 1, 1, 1)
-    return start, date(start.year, start.month + 1, 1)
 
 
 def _payload_for_source(record: DailyRecord, source: str) -> dict:

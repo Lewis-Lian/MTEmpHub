@@ -24,6 +24,19 @@ _MONTH_VALIDATED_TYPES = {"monthly", "daily", "manager_monthly", "manager_daily"
 _DAILY_CONTENT_MARKERS = ("刷卡时间数据", "星期", "段1实际上班时间")
 
 
+def _save_xlsx_upload(prefix: str) -> tuple[str | None, tuple | None]:
+    file = request.files.get("file")
+    if not file or not file.filename:
+        return None, (jsonify({"error": "file is required"}), 400)
+    if not file.filename.lower().endswith(".xlsx"):
+        return None, (jsonify({"error": "only .xlsx is supported"}), 400)
+
+    save_path = os.path.join(current_app.config["UPLOAD_FOLDER"], f"{prefix}_{int(datetime.now().timestamp())}.xlsx")
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    file.save(save_path)
+    return save_path, None
+
+
 def _validate_uploaded_file(file, filename: str, file_type: str, account_set) -> str | None:
     """上传前的防线校验，返回错误文案；None 表示通过。
 
@@ -277,17 +290,9 @@ def sync_employee_attendance(account_set_id: int):
 @admin_required
 def import_departments_xlsx():
     from routes import admin_core as admin_module
-    file = request.files.get("file")
-    if not file or not file.filename:
-        return jsonify({"error": "file is required"}), 400
-    if not file.filename.lower().endswith(".xlsx"):
-        return jsonify({"error": "only .xlsx is supported"}), 400
-
-    save_path = os.path.join(
-        current_app.config["UPLOAD_FOLDER"], f"departments_{int(datetime.now().timestamp())}.xlsx"
-    )
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    file.save(save_path)
+    save_path, error = _save_xlsx_upload("departments")
+    if error:
+        return error
 
     wb = openpyxl.load_workbook(save_path, data_only=True)
     try:
@@ -456,17 +461,9 @@ def export_departments_xlsx():
 @admin_required
 def import_employees_xlsx():
     from routes import admin_core as admin_module
-    file = request.files.get("file")
-    if not file or not file.filename:
-        return jsonify({"error": "file is required"}), 400
-    if not file.filename.lower().endswith(".xlsx"):
-        return jsonify({"error": "only .xlsx is supported"}), 400
-
-    save_path = os.path.join(
-        current_app.config["UPLOAD_FOLDER"], f"employees_{int(datetime.now().timestamp())}.xlsx"
-    )
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
-    file.save(save_path)
+    save_path, error = _save_xlsx_upload("employees")
+    if error:
+        return error
 
     wb = openpyxl.load_workbook(save_path, data_only=True, read_only=True)
     try:

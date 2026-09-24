@@ -11,6 +11,7 @@ from models import db
 from models.daily_attendance_override import DailyAttendanceOverride
 from models.employee import Employee
 from models.overtime import OvertimeRecord
+from services.attendance_utils import month_date_range as month_date_bounds
 
 # 出勤类状态 + 假种状态。员工假种与查询页 6 类请假列对齐（无年假/出差列）；
 # 管理人员假种与月度字段（工伤/出差/婚假/丧假）对齐。
@@ -64,18 +65,6 @@ def status_attendance_days(status: str) -> float:
     if status in HALF_DAY_STATUSES:
         return 0.5
     return 0.0
-
-
-def month_date_bounds(month: str) -> tuple[date, date] | None:
-    try:
-        start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        return None
-    if start.month == 12:
-        end = date(start.year + 1, 1, 1)
-    else:
-        end = date(start.year, start.month + 1, 1)
-    return start, end
 
 
 def daily_override_maps(month: str, emp_ids: list[int]) -> dict[int, dict[date, DailyAttendanceOverride]]:
@@ -152,5 +141,4 @@ def serialize_daily_override(row: DailyAttendanceOverride | None) -> dict | None
     payload["updated_at"] = row.updated_at.isoformat() if row.updated_at else None
     payload["updated_by_name"] = row.updated_by_user.username if row.updated_by_user else ""
     return payload
-
 

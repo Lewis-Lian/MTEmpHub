@@ -23,6 +23,7 @@ from services.attendance_source_service import (
     attendance_views_by_employee,
     selected_monthly_report_raw,
 )
+from services.attendance_utils import month_date_range as _month_date_range
 from services.daily_override_service import (
     EVENING_OVERTIME_START,
     MANAGER_LEAVE_FIELD_BY_STATUS,
@@ -67,16 +68,6 @@ def manager_headers(
     if not include_emp_no:
         headers = [h for h in headers if h != "员工编号"]
     return headers
-
-
-def _month_date_range(month: str) -> tuple[date, date] | None:
-    try:
-        start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        return None
-    if start.month == 12:
-        return start, date(start.year + 1, 1, 1)
-    return start, date(start.year, start.month + 1, 1)
 
 
 def _month_datetime_range(month: str) -> tuple[datetime, datetime] | None:

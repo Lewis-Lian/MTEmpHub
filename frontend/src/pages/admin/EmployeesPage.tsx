@@ -20,6 +20,7 @@ import {
 import type { EmployeeStatusFilter } from "../../api/admin";
 
 import DepartmentPicker from "../../components/query/DepartmentPicker";
+import ExcelImportDropzone from "../../components/admin/ExcelImportDropzone";
 import EmployeeBatchToolbar from "../../components/admin/EmployeeBatchToolbar";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import QueryResultPanel from "../../components/query/QueryResultPanel";
@@ -112,8 +113,6 @@ export default function EmployeesPage() {
   const [batchValue, setBatchValue] = useState("");
   const [isImporting, setIsImporting] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importInputKey, setImportInputKey] = useState(0);
-  const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState<"create" | "import" | null>(null);
   const [showResignModal, setShowResignModal] = useState(false);
@@ -438,7 +437,6 @@ export default function EmployeesPage() {
       const result = await importAdminEmployees(importFile);
       form.reset();
       setImportFile(null);
-      setImportInputKey((current) => current + 1);
       const successMsg = `导入成功，处理 ${String(result.imported)} 条`;
       notification.success(successMsg);
       await loadRows();
@@ -1174,83 +1172,7 @@ export default function EmployeesPage() {
           <div className="emp-modal-body admin-stack-lg">
             {/* 批量导入专区 */}
             <form className="account-upload-group" encType="multipart/form-data" onSubmit={submitImport} style={{ display: "flex", flexDirection: "column", gap: "16px", margin: 0 }}>
-              <div
-                style={{
-                  padding: "32px 20px",
-                  background: isDragOver ? "#eff6ff" : "rgba(248, 250, 252, 0.75)",
-                  border: isDragOver ? "2px dashed var(--emp-primary)" : "1px dashed rgba(203, 213, 225, 0.9)",
-                  borderRadius: "14px",
-                  textAlign: "center",
-                  transition: "all 0.2s ease",
-                  cursor: "pointer",
-                }}
-                onClick={() => document.getElementById("employee-import-input")?.click()}
-                onDragLeave={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(true);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setIsDragOver(false);
-                  const droppedFile = e.dataTransfer.files?.[0] ?? null;
-                  if (droppedFile) {
-                    setImportFile(droppedFile);
-                  }
-                }}
-              >
-                <div style={{ marginBottom: "16px", color: importFile ? "var(--emp-primary)" : "#64748b" }}>
-                  {importFile ? (
-                    <svg
-                      width="36"
-                      height="36"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ display: "inline-block" }}
-                    >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14 2 14 8 20 8" />
-                    </svg>
-                  ) : (
-                    <svg
-                      width="36"
-                      height="36"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{ display: "inline-block" }}
-                    >
-                      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                    </svg>
-                  )}
-                </div>
-                <div style={{ marginBottom: "8px", fontSize: "15px", color: "#1e293b", fontWeight: "600" }}>
-                  {importFile ? importFile.name : "点击选择，或将 Excel 文件拖拽到这里"}
-                </div>
-                <div style={{ fontSize: "13px", color: "#64748b" }}>
-                  {importFile ? `大小: ${(importFile.size / 1024).toFixed(1)} KB` : "支持 .xlsx 格式文件"}
-                </div>
-                <input
-                  id="employee-import-input"
-                  key={importInputKey}
-                  className="account-file-input"
-                  name="file"
-                  type="file"
-                  accept=".xlsx"
-                  style={{ display: "none" }}
-                  onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
-                />
-              </div>
+              <ExcelImportDropzone className="excel-import-dropzone--employee" file={importFile} onFileChange={setImportFile} />
 
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <a className="emp-btn emp-btn--secondary account-action-button" href="/api/admin/employees/template" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "13px", padding: "0 16px", color: "var(--emp-primary)", textDecoration: "none" }}>

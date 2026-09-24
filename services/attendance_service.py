@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 
 from flask import has_app_context
 from sqlalchemy import func
@@ -15,16 +15,6 @@ from services.attendance_summary_service import batch_monthly_summaries, empty_m
 
 
 LEAVE_TYPES = ["病假", "事假", "工伤", "丧假", "婚假", "出差", "补休（调休）"]
-
-
-def _month_date_range(month: str) -> tuple[date, date] | None:
-    try:
-        start = datetime.strptime(month, "%Y-%m").date().replace(day=1)
-    except ValueError:
-        return None
-    if start.month == 12:
-        return start, date(start.year + 1, 1, 1)
-    return start, date(start.year, start.month + 1, 1)
 
 
 def _get_employee(emp_id: int) -> Employee | None:
