@@ -104,7 +104,7 @@ describe("EmployeesPage 离职功能", () => {
     );
   });
 
-  it("鼠标移到下拉箭头后，已离职行显示恢复在职和删除", async () => {
+  it("点击下拉箭头后，已离职行显示恢复在职和删除", async () => {
     mockReinstate.mockResolvedValue({ status: "ok", employee: employees[1] });
     render(<EmployeesPage />);
     await screen.findByText("在职员工");
@@ -112,7 +112,7 @@ describe("EmployeesPage 离职功能", () => {
 
     const menuTrigger = await screen.findByRole("button", { name: "员工操作菜单" });
     expect(menuTrigger.parentElement).toHaveClass("employee-row-action-group");
-    fireEvent.mouseEnter(menuTrigger);
+    fireEvent.click(menuTrigger);
     expect(await screen.findByRole("button", { name: "恢复在职" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "删除" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "删除" }).closest(".legacy-table-wrap")).toBeNull();
@@ -121,13 +121,13 @@ describe("EmployeesPage 离职功能", () => {
     await waitFor(() => expect(mockReinstate).toHaveBeenCalledWith(2));
   });
 
-  it("在职行鼠标移到下拉箭头后显示办理离职和删除，并预填工号", async () => {
+  it("点击在职行下拉箭头后显示办理离职和删除，并预填工号", async () => {
     render(<EmployeesPage />);
     await screen.findByText("在职员工");
 
     const menuTrigger = screen.getAllByRole("button", { name: "员工操作菜单" })[0];
     expect(menuTrigger.parentElement).toHaveClass("employee-row-action-group");
-    fireEvent.mouseEnter(menuTrigger);
+    fireEvent.click(menuTrigger);
     const resignButtons = screen.getAllByRole("button", { name: "办理离职" });
     fireEvent.click(resignButtons[resignButtons.length - 1]);
 
@@ -140,7 +140,7 @@ describe("EmployeesPage 离职功能", () => {
     await screen.findByText("在职员工");
 
     expect(screen.queryByRole("button", { name: "删除" })).toBeNull();
-    fireEvent.mouseEnter(screen.getAllByRole("button", { name: "员工操作菜单" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "员工操作菜单" })[0]);
     fireEvent.click(await screen.findByRole("button", { name: "删除" }));
 
     await waitFor(() => expect(mockDeleteEmployee).toHaveBeenCalledWith(1));

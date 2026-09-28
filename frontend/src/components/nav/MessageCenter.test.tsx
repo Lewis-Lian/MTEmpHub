@@ -117,6 +117,7 @@ describe("MessageCenter", () => {
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /消息/ }));
     });
+    fireEvent.click(screen.getByRole("tab", { name: /全部/ }));
     await act(async () => {
       fireEvent.click(await screen.findByRole("button", { name: "一键全部已读" }));
     });
@@ -128,4 +129,3 @@ describe("MessageCenter", () => {
     notification.mockRestore();
   });
 });
-

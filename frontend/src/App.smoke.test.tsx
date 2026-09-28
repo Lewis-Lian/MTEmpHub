@@ -697,14 +697,14 @@ describe("App smoke regression", () => {
     expect(screen.getAllByText("点击选择或拖拽文件")).toHaveLength(3);
   });
 
-  it("主数据员工页会挂载旧版新增、导入、筛选和列表结构", async () => {
+  it("主数据员工页会显示新增、导入、筛选和列表入口", async () => {
     window.history.replaceState({}, "", "/admin/employees/manage");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
     const { container } = render(<App />);
 
-    expect(await screen.findByText("新增员工")).toBeInTheDocument();
+    expect(await screen.findByText("新建员工")).toBeInTheDocument();
     expect(screen.getByText("导入/导出员工")).toBeInTheDocument();
     expect(screen.getByText("员工筛选器")).toBeInTheDocument();
     expect(screen.getAllByText("人员编号").length).toBeGreaterThan(0);
@@ -731,6 +731,8 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("员工筛选器");
+    fireEvent.click(screen.getByRole("button", { name: "导入/导出员工" }));
+    await screen.findByText("数据导入与导出");
     const file = new File(["employee"], "employees.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -758,6 +760,8 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("员工筛选器");
+    fireEvent.click(screen.getByRole("button", { name: "导入/导出员工" }));
+    await screen.findByText("数据导入与导出");
     const file = new File(["employee"], "employees.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -786,7 +790,7 @@ describe("App smoke regression", () => {
     expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("员工甲");
   });
 
-  it("员工管理的部门选择会复用旧版部门选择器结构", async () => {
+  it("员工新建弹窗的部门选择器会打开部门树并回填部门", async () => {
     window.history.replaceState({}, "", "/admin/employees/manage");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
@@ -794,7 +798,9 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("员工筛选器");
-    expect(container.querySelector("#createEmployeeDeptLookup.employee-lookup")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "新建员工" }));
+    await screen.findByRole("heading", { name: "新增员工" });
+    expect(container.querySelector("#createEmployeeDeptLookup")).not.toBeNull();
 
     fireEvent.click(screen.getAllByTitle("选择部门")[0]);
 
@@ -883,6 +889,8 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("部门列表");
+    fireEvent.click(screen.getByRole("button", { name: "导入/导出部门" }));
+    await screen.findByText("数据导入与导出");
     const file = new File(["dept"], "departments.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -910,6 +918,8 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("部门列表");
+    fireEvent.click(screen.getByRole("button", { name: "导入/导出部门" }));
+    await screen.findByText("数据导入与导出");
     const file = new File(["dept"], "departments.xlsx", {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
@@ -929,6 +939,8 @@ describe("App smoke regression", () => {
     render(<App />);
 
     await screen.findByText("部门列表");
+    fireEvent.click(screen.getByRole("button", { name: "新建部门" }));
+    await screen.findByRole("heading", { name: "新增部门" });
     fireEvent.click(screen.getAllByTitle("选择上级部门")[0]);
 
     expect(await screen.findByRole("heading", { name: "选择上级部门" })).toBeInTheDocument();
@@ -939,7 +951,7 @@ describe("App smoke regression", () => {
     expect(screen.getAllByDisplayValue("信息部").length).toBeGreaterThan(0);
   });
 
-  it("部门管理会按旧版使用 lookup 结构和批量更改上级部门弹窗", async () => {
+  it("部门管理支持新建和批量更改上级部门", async () => {
     window.history.replaceState({}, "", "/admin/departments/manage");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
@@ -947,7 +959,11 @@ describe("App smoke regression", () => {
     const { container } = render(<App />);
 
     await screen.findByText("部门列表");
-    expect(container.querySelector("#createDeptParentLookup.employee-lookup")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "新建部门" }));
+    await screen.findByRole("heading", { name: "新增部门" });
+    expect(container.querySelector("#createDeptParentLookup")).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
 
     fireEvent.click(container.querySelector('tbody input[type="checkbox"]') as Element);
     fireEvent.change(screen.getByDisplayValue("批量操作"), { target: { value: "set_parent" } });
@@ -965,6 +981,8 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
 
+    await screen.findByText("部门列表");
+    fireEvent.click(screen.getByRole("button", { name: "新建部门" }));
     const input = await screen.findByPlaceholderText("选择上级部门");
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: "信息" } });
@@ -976,13 +994,14 @@ describe("App smoke regression", () => {
     expect(screen.getByDisplayValue("信息部")).toBeInTheDocument();
   });
 
-  it("主数据班次页会挂载旧版新增时间段和班次列表结构", async () => {
+  it("主数据班次页会显示新增入口和班次列表", async () => {
     window.history.replaceState({}, "", "/admin/shifts/manage");
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
 
     const { default: App } = await import("./App");
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("button", { name: "新建班次" }));
     expect(await screen.findByText("新增班次")).toBeInTheDocument();
     expect(screen.getByText("+ 新增时间段")).toBeInTheDocument();
     expect(screen.getByText("班次列表")).toBeInTheDocument();
