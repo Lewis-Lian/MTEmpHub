@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from collections import defaultdict
+from collections import Counter, defaultdict
 from copy import copy
 from datetime import date, datetime, time, timedelta
 import re
@@ -1619,12 +1619,36 @@ def _format_punch_tokens(values: list[object] | None) -> list[str]:
     return [t for t in (_normalize_punch_token(v) for v in (values or [])) if t]
 
 
+def _calendar_raw_punch_times(record) -> list[str]:
+    return [
+        token
+        for token in (
+            _normalize_punch_token(value)
+            for value in re.findall(r"(\d{1,2}:\d{2})", _extract_raw_punch_data(record))
+        )
+        if token
+    ]
+
+
 def _calendar_punch_times(record) -> dict[str, list[str]]:
-    """日历的每日刷卡时间：优先结构化字段；管理人员的结构化字段常为空（导入管道未填充
-    employee_payload/manager_payload 的 check_in_times），回退到 raw_data 的钉钉原始键提取。"""
+    """日历刷卡时间以原始刷卡记录校准结构化字段；管理人员无结构化字段时回退到 raw_data。"""
     check_in_times = _format_punch_tokens(record.check_in_times)
     check_out_times = _format_punch_tokens(record.check_out_times)
     if check_in_times or check_out_times:
+        raw_punch_times = _calendar_raw_punch_times(record)
+        if raw_punch_times:
+            actual_punches = Counter(raw_punch_times)
+
+            def retain_actual_punches(values: list[str]) -> list[str]:
+                retained = []
+                for token in values:
+                    if actual_punches[token] > 0:
+                        retained.append(token)
+                        actual_punches[token] -= 1
+                return retained
+
+            check_in_times = retain_actual_punches(check_in_times)
+            check_out_times = retain_actual_punches(check_out_times)
         return {"check_in_times": check_in_times, "check_out_times": check_out_times}
 
     raw = record.raw_data or {}
@@ -1786,10 +1810,7 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
         {
             "date": r.record_date.isoformat(),
             **_calendar_punch_times(r),
-            "raw_punch_times": [
-                _normalize_punch_token(token)
-                for token in re.findall(r"(\d{1,2}:\d{2})", _extract_raw_punch_data(r))
-            ],
+            "raw_punch_times": _calendar_raw_punch_times(r),
             "punch_count": _raw_punch_count(r),
             "actual_hours": _calc_record_work_hours(r)[0],
             "late_minutes": r.late_minutes or 0,

@@ -649,20 +649,35 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         with self.app.app_context():
             db.session.add(DailyRecord(
                 emp_id=self.emp_id,
-                record_date=date(2026, 7, 3),
+                record_date=date(2026, 4, 21),
                 employee_payload={
-                    "check_in_times": ["06:46", "12:00"],
-                    "check_out_times": ["12:12", "16:02"],
-                    "actual_hours": 9.47,
-                    "raw_data": {"刷卡时间数据": "06:46,12:12,16:02"},
+                    "check_in_times": ["07:32", "16:34", "12:00"],
+                    "check_out_times": ["11:30"],
+                    "actual_hours": 8.97,
+                    "raw_data": {"刷卡时间数据": "07:32,11:30,16:34"},
+                },
+            ))
+            db.session.add(DailyRecord(
+                emp_id=self.emp_id,
+                record_date=date(2026, 4, 22),
+                employee_payload={
+                    "check_in_times": ["07:32", "12:00", "12:00"],
+                    "check_out_times": ["11:30", "16:34"],
+                    "actual_hours": 9.0,
+                    "raw_data": {"刷卡时间数据": "07:32,11:30,12:00,16:34"},
                 },
             ))
             db.session.commit()
 
-        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
-        day = data["days"][0]
-        self.assertEqual(day["punch_count"], 3)
-        self.assertEqual(day["raw_punch_times"], ["06:46", "12:12", "16:02"])
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-04").get_json()
+        placeholder_day, real_noon_punch_day = data["days"][:2]
+        self.assertEqual(placeholder_day["punch_count"], 3)
+        self.assertEqual(placeholder_day["check_in_times"], ["07:32", "16:34"])
+        self.assertEqual(placeholder_day["check_out_times"], ["11:30"])
+        self.assertEqual(placeholder_day["raw_punch_times"], ["07:32", "11:30", "16:34"])
+        self.assertEqual(real_noon_punch_day["check_in_times"], ["07:32", "12:00"])
+        self.assertEqual(real_noon_punch_day["check_out_times"], ["11:30", "16:34"])
+        self.assertEqual(real_noon_punch_day["raw_punch_times"], ["07:32", "11:30", "12:00", "16:34"])
 
     def test_manager_punch_times_from_raw_data(self):
         """管理人员的结构化刷卡为空时，从 raw_data 的钉钉原始键提取上/下班时间。"""
