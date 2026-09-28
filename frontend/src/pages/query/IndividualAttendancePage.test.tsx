@@ -55,8 +55,9 @@ describe("IndividualAttendancePage", () => {
         {
           date: "2026-05-04",
           punch_count: 2,
-          check_in_times: ["08:55"],
+          check_in_times: ["08:55", "12:00"],
           check_out_times: ["18:05"],
+          raw_punch_times: ["08:55", "18:05"],
           late_minutes: 0,
           early_leave_minutes: 0,
         },
@@ -100,6 +101,7 @@ describe("IndividualAttendancePage", () => {
     // 打卡明细默认展示「打卡数据」表头与合并打卡时间
     expect(screen.getByText("打卡数据")).toBeInTheDocument();
     expect(screen.getByText("08:55、18:05")).toBeInTheDocument();
+    expect(screen.queryByText("12:00")).not.toBeInTheDocument();
 
     // 考勤明细全屏放大与还原测试
     const fullscreenBtn = screen.getByRole("button", { name: "放大到页面内全屏" });

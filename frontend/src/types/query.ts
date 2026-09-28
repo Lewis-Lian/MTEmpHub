@@ -87,6 +87,7 @@ export interface AttendanceCalendarDay {
   date: string;
   check_in_times: string[];
   check_out_times: string[];
+  raw_punch_times?: string[];
   punch_count: number;
   actual_hours: number;
   late_minutes: number;

@@ -1786,6 +1786,10 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
         {
             "date": r.record_date.isoformat(),
             **_calendar_punch_times(r),
+            "raw_punch_times": [
+                _normalize_punch_token(token)
+                for token in re.findall(r"(\d{1,2}:\d{2})", _extract_raw_punch_data(r))
+            ],
             "punch_count": _raw_punch_count(r),
             "actual_hours": _calc_record_work_hours(r)[0],
             "late_minutes": r.late_minutes or 0,

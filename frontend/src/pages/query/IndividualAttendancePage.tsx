@@ -170,10 +170,7 @@ function AttendanceResult({ employee, summary, calendar }: { employee: QueryEmpl
   const punchRows = calendar.days
     .filter((day) => day.punch_count > 0 || Boolean(day.exception_reason))
     .map((day) => {
-      const punches = Array.from(new Set([...day.check_in_times, ...day.check_out_times]))
-        .filter(Boolean)
-        .sort()
-        .join("、") || (day.punch_count > 0 ? `${day.punch_count} 次打卡` : "-");
+      const punches = (day.raw_punch_times ?? []).join("、") || "-";
       const isOdd = day.punch_count === 1 || day.punch_count === 3;
       const cleanReason = (day.exception_reason || "").replace(/旷工/g, "缺勤");
       const abnormalNote = isOdd ? `打卡${day.punch_count}次` : (cleanReason || "-");

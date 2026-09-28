@@ -644,6 +644,26 @@ class AttendanceCalendarApiTests(unittest.TestCase):
         self.assertEqual(day["exception_reason"], "忘打卡")
         self.assertEqual(data["summary"]["late_minutes_total"], 15)
 
+    def test_raw_punch_times_exclude_imported_segment_times(self):
+        """个人页可直接取原始刷卡时间，忽略导入时追加的分段时间。"""
+        with self.app.app_context():
+            db.session.add(DailyRecord(
+                emp_id=self.emp_id,
+                record_date=date(2026, 7, 3),
+                employee_payload={
+                    "check_in_times": ["06:46", "12:00"],
+                    "check_out_times": ["12:12", "16:02"],
+                    "actual_hours": 9.47,
+                    "raw_data": {"刷卡时间数据": "06:46,12:12,16:02"},
+                },
+            ))
+            db.session.commit()
+
+        data = self._get(f"?emp_id={self.emp_id}&month=2026-07").get_json()
+        day = data["days"][0]
+        self.assertEqual(day["punch_count"], 3)
+        self.assertEqual(day["raw_punch_times"], ["06:46", "12:12", "16:02"])
+
     def test_manager_punch_times_from_raw_data(self):
         """管理人员的结构化刷卡为空时，从 raw_data 的钉钉原始键提取上/下班时间。"""
         with self.app.app_context():
