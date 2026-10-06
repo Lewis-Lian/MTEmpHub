@@ -38,7 +38,6 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
   const activeSelectedDate = selectedDate !== undefined ? selectedDate : internalSelectedDate;
   const multiSelectedSet = useMemo(() => new Set(multiSelectedDates ?? []), [multiSelectedDates]);
   const selected = cells.find((cell) => cell.date === activeSelectedDate) ?? null;
-  const hasMonthData = data.days.length > 0 || data.overtimes.length > 0 || data.leaves.length > 0;
 
   if (cells.length === 0) {
     return <div className="attendance-calendar attendance-calendar-empty">无效月份</div>;
@@ -81,7 +80,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
           <div className="attendance-calendar-cell is-empty" key={`empty-${index}`} />
         ))}
         {cells.map((cell) => {
-          const bgKey = cellBackgroundKey(cell, hasMonthData);
+          const bgKey = cellBackgroundKey(cell);
           const override = hasOverrideContent(cell.day?.override) ? cell.day?.override : null;
           return (
             <button
@@ -272,7 +271,7 @@ function overrideBackgroundKey(override: DailyAttendanceOverrideValues): CellBac
   return "none";
 }
 
-function cellBackgroundKey(cell: DayCell, hasMonthData: boolean): CellBackgroundKey {
+function cellBackgroundKey(cell: DayCell): CellBackgroundKey {
   const override = cell.day?.override;
   if (hasOverrideContent(override) && override) {
     const overrideKey = overrideBackgroundKey(override);
@@ -287,7 +286,7 @@ function cellBackgroundKey(cell: DayCell, hasMonthData: boolean): CellBackground
   if (cell.day?.is_half_day) return "half";
   // 考勤机对旷工日也会生成无刷卡的 DailyRecord（如 exception_reason=旷工），出勤须以真实刷卡判定
   if ((cell.day && hasPunch(cell.day)) || cell.overtimes.length > 0) return "attendance";
-  if (hasMonthData && cell.date < todayString()) return "absent";
+  if (cell.date < todayString()) return "absent";
   return "none";
 }
 

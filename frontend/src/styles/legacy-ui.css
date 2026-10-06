@@ -5282,6 +5282,73 @@ input[type="checkbox"] {
   gap: 12px;
   align-items: start;
 }
+.attendance-override-mode-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid #e3eaf3;
+  border-radius: 10px;
+  background: var(--ent-bg);
+  color: #5a6b84;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.attendance-override-mode-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+.attendance-override-mode-switch-track {
+  width: 38px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 3px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #c6d0de;
+  transition: background 160ms ease;
+}
+.attendance-override-mode-switch-track::before {
+  content: "";
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(13, 31, 48, 0.2);
+  transition: transform 160ms ease;
+}
+.attendance-override-mode-switch input:checked + .attendance-override-mode-switch-track {
+  background: #1a56b0;
+}
+.attendance-override-mode-switch input:checked + .attendance-override-mode-switch-track::before {
+  transform: translateX(16px);
+}
+.attendance-override-mode-switch:has(input:checked) {
+  border-color: #c6dafc;
+  color: #1a56b0;
+}
+.attendance-override-mode-switch:has(input:focus-visible) {
+  outline: 2px solid #1a56b0;
+  outline-offset: 3px;
+}
+.attendance-override-mode-switch:has(input:disabled) {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .attendance-override-mode-switch-track,
+  .attendance-override-mode-switch-track::before { transition: none; }
+}
+
 /* 右侧多选批量面板：勾选满 2 天后替代当天详情面板（纵排贴合窄栏） */
 .attendance-override-multiselect-count {
   font-size: 13px;

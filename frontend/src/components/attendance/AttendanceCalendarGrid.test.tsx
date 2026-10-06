@@ -79,7 +79,7 @@ const FUTURE_DATA: AttendanceCalendarData = {
   leaves: [],
 };
 
-// 整月无任何数据：不渲染缺勤红
+// 整月无任何数据：已过去日期全部渲染缺勤红
 const EMPTY_DATA: AttendanceCalendarData = {
   ...DATA,
   days: [],
@@ -249,7 +249,7 @@ describe("AttendanceCalendarGrid", () => {
     expect(screen.queryByText(/异常/)).not.toBeInTheDocument();
   });
 
-  it("缺勤仅标记过去无数据日：未来日期与整月空数据不标记", () => {
+  it("过去月份整月无数据时全部标记缺勤，未来日期不标记", () => {
     const { container } = render(
       <>
         <AttendanceCalendarGrid data={FUTURE_DATA} />
@@ -258,8 +258,10 @@ describe("AttendanceCalendarGrid", () => {
     );
     expect(screen.getByRole("button", { name: "2099-01-04" })).toHaveClass("is-bg-attendance");
     expect(screen.getByRole("button", { name: "2099-01-05" }).className).not.toMatch(/is-bg-/);
-    expect(getCell("2026-07-04").className).not.toMatch(/is-bg-/);
-    expect(container.querySelectorAll(".attendance-calendar-cell.is-bg-absent")).toHaveLength(0);
+    for (let day = 1; day <= 31; day += 1) {
+      expect(getCell(`2026-07-${String(day).padStart(2, "0")}`)).toHaveClass("is-bg-absent");
+    }
+    expect(container.querySelectorAll(".attendance-calendar-cell.is-bg-absent")).toHaveLength(31);
   });
 
   it("图例渲染背景色项、晚加班文字徽标项与手工修正角点说明", () => {

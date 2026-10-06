@@ -136,6 +136,7 @@ export default function AttendanceOverrideCalendarModal({
   const [detailExpanded, setDetailExpanded] = useState(true);
   const [form, setForm] = useState<DetailFormState>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
   const [multiSelectedDates, setMultiSelectedDates] = useState<string[]>([]);
   const [batchStatus, setBatchStatus] = useState("");
   const [batchActual, setBatchActual] = useState<BatchActualChoice>("keep");
@@ -143,8 +144,6 @@ export default function AttendanceOverrideCalendarModal({
 
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const batchStatusOptions = isManager ? MANAGER_DAILY_STATUS_OPTIONS : EMPLOYEE_DAILY_STATUS_OPTIONS;
-  // 选中 1 天为单选模式；勾选满 2 天及以上自动进入多选（右侧批量面板）
-  const isMultiSelect = multiSelectedDates.length >= 2;
   const hasBatchChanges = batchStatus !== "" || batchActual !== "keep";
   const selectedDay = useMemo(
     () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
@@ -162,6 +161,7 @@ export default function AttendanceOverrideCalendarModal({
     setLoadError(null);
     setCalendar(null);
     setSelectedDate(null);
+    resetMultiSelection();
     setDetailExpanded(true);
     fetchAdminDailyOverrideCalendar(employee.id, month)
       .then((payload) => {
@@ -346,9 +346,7 @@ export default function AttendanceOverrideCalendarModal({
     setLeaveEditForm(null);
   }, [selectedDate]);
 
-  // 点击 1 天为单选（右侧当天面板），单选下再点不同格子连同原选中一起进入多选；
-  // 多选中点击格子做勾选/取消，取消到剩 1 天自动回单选；
-  // 单选下再次点击同一格循环切换出勤状态，假种在下方面板设置
+  // 多选由开关控制；单选下再次点击同一格循环切换出勤状态
   function handleCellClick(date: string) {
     if (isMultiSelect) {
       if (isLocked) {
@@ -357,12 +355,7 @@ export default function AttendanceOverrideCalendarModal({
       const next = multiSelectedDates.includes(date)
         ? multiSelectedDates.filter((item) => item !== date)
         : [...multiSelectedDates, date];
-      if (next.length >= 2) {
-        setMultiSelectedDates(next);
-      } else {
-        resetMultiSelection();
-        setSelectedDate(next.length === 1 ? next[0] : null);
-      }
+      setMultiSelectedDates(next);
       return;
     }
     if (selectedDate === date) {
@@ -389,15 +382,11 @@ export default function AttendanceOverrideCalendarModal({
       );
       return;
     }
-    if (selectedDate && !isLocked) {
-      setMultiSelectedDates([selectedDate, date]);
-      setSelectedDate(null);
-      return;
-    }
     setSelectedDate(date);
   }
 
   function resetMultiSelection() {
+    setIsMultiSelect(false);
     setMultiSelectedDates([]);
     setBatchStatus("");
     setBatchActual("keep");
@@ -489,6 +478,26 @@ export default function AttendanceOverrideCalendarModal({
             ) : calendar ? (
               <div className="attendance-override-calendar-layout">
                 <div className="attendance-override-calendar-main">
+                  <label className="attendance-override-mode-switch">
+                    <input
+                      aria-label="多选模式"
+                      checked={isMultiSelect}
+                      disabled={isLocked || isSaving}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          setMultiSelectedDates(selectedDate ? [selectedDate] : []);
+                          setSelectedDate(null);
+                          setIsMultiSelect(true);
+                        } else {
+                          resetMultiSelection();
+                        }
+                      }}
+                      role="switch"
+                      type="checkbox"
+                    />
+                    <span aria-hidden="true" className="attendance-override-mode-switch-track" />
+                    <span>多选模式</span>
+                  </label>
                   <AttendanceCalendarGrid
                     data={calendar}
                     multiSelectedDates={multiSelectedDates}
@@ -575,7 +584,7 @@ export default function AttendanceOverrideCalendarModal({
     );
   }
 
-  // 多选模式右侧批量面板：勾选满 2 天后替代当天详情面板
+  // 开启多选模式后，右侧批量面板替代当天详情面板
   function renderBatchPanel() {
     return (
       <div className="attendance-override-batch-panel" data-testid="daily-override-batch-panel">
