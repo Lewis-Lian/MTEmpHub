@@ -1352,6 +1352,39 @@ body {
   white-space: nowrap;
 }
 
+/* 修正页操作列固定在滚动区域右侧，悬停行即可编辑 */
+.attendance-override-page .attendance-override-table th:last-child,
+.attendance-override-page .attendance-override-table td:last-child {
+  position: sticky;
+  right: 0;
+  min-width: 72px;
+  text-align: center;
+  box-shadow: -4px 0 8px rgba(13, 31, 48, 0.08);
+}
+.attendance-override-page .attendance-override-table th:last-child {
+  z-index: calc(var(--z-sticky) + 1);
+}
+.attendance-override-page .attendance-override-table td:last-child {
+  z-index: 1;
+}
+@media (hover: hover) and (pointer: fine) {
+  .attendance-override-page .attendance-override-table td:last-child .account-action-button {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+  }
+  .attendance-override-page .attendance-override-table tr:hover td:last-child .account-action-button,
+  .attendance-override-page .attendance-override-table tr:focus-within td:last-child .account-action-button {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attendance-override-page .attendance-override-table td:last-child .account-action-button {
+    transition: none;
+  }
+}
+
 /* 迟到冲抵页：首列仅复选框，收窄列宽（该表格类与考勤修正页共用，需限定页面作用域） */
 .late-offset-page .attendance-override-table th:first-child,
 .late-offset-page .attendance-override-table td:first-child {
