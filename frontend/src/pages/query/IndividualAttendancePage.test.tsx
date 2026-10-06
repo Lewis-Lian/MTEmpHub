@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 const mockBootstrap = vi.hoisted(() => vi.fn());
@@ -83,6 +83,8 @@ describe("IndividualAttendancePage", () => {
     expect(screen.getByText("迟到 / 早退")).toBeInTheDocument();
     expect(screen.getByText("请假统计")).toBeInTheDocument();
     expect(screen.getByText("加班累计")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "福利汇总" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "加班汇总" })).not.toBeInTheDocument();
 
     // 档案标签
     expect(screen.getByText("工号: E007")).toBeInTheDocument();
@@ -124,13 +126,21 @@ describe("IndividualAttendancePage", () => {
     selectedEmployeeId.value = 9;
     mockBootstrap.mockResolvedValue({
       employees: [{ id: 9, emp_no: "M009", name: "李四", dept_id: 1, dept_name: "管理部", is_manager: true }],
-      account_sets: [{ id: 1, month: "2026-05", name: "2026年5月", is_active: true }],
+      account_sets: [{ id: 1, month: "2025-05", name: "2025年5月", is_active: true }],
       departments: [],
     });
-    mockHeaderRows.mockResolvedValue({ headers: ["姓名"], rows: [["李四"]] });
+    mockHeaderRows.mockImplementation(async (endpoint: string, query: URLSearchParams) => {
+      if (endpoint === "/api/query/manager-attendance") return { headers: ["姓名"], rows: [["李四"]] };
+      if (query.get("year") !== "2025" || query.get("emp_ids") !== "9") return { headers: [], rows: [] };
+      const overtime = endpoint === "/api/query/manager-overtime";
+      return {
+        headers: ["部门", "姓名", ...(overtime ? ["前年累积天数"] : []), ...Array.from({ length: 12 }, (_, i) => `${i + 1}月`), overtime ? "剩余调休天数" : "剩余年休天数", "备注"],
+        rows: [{ dept_name: "管理部", name: "李四", prev_dec: 2, m1: 1, remaining: overtime ? 5 : 11, remark: overtime ? "加班结余" : "福利结余" }],
+      };
+    });
     mockCalendar.mockResolvedValue({
       employee: { id: 9, emp_no: "M009", name: "李四", dept_name: "管理部" },
-      month: "2026-05",
+      month: "2025-05",
       days: [],
       overtimes: [],
       leaves: [],
@@ -143,7 +153,17 @@ describe("IndividualAttendancePage", () => {
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
     await waitFor(() => expect(mockHeaderRows).toHaveBeenCalledWith("/api/query/manager-attendance", expect.any(URLSearchParams)));
-    expect(screen.getByText("工号: M009")).toBeInTheDocument();
+    expect(await screen.findByText("工号: M009")).toBeInTheDocument();
+    const overtime = await screen.findByRole("region", { name: "加班汇总" });
+    expect(within(overtime).getByText("加班结余")).toBeInTheDocument();
+    expect(within(overtime).getByText("5")).toBeInTheDocument();
+    const benefit = screen.getByRole("region", { name: "福利汇总" });
+    expect(within(benefit).getByText("福利结余")).toBeInTheDocument();
+    expect(within(benefit).getByText("11")).toBeInTheDocument();
+    expect(within(benefit).getByText("2025 年 · 单位：天")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("选择张三"));
+    expect(screen.queryByRole("region", { name: "加班汇总" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "福利汇总" })).not.toBeInTheDocument();
   });
 
   it("当月存在打卡1次或3次时准确统计异常打卡次数", async () => {

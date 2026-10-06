@@ -1323,6 +1323,21 @@ def home_manager_summary_api():
 
 
 
+def _punch_query_date_range(month):
+    try:
+        start = date.fromisoformat(request.args.get("start_date") or f"{month}-01")
+        month_start = date.fromisoformat(f"{month}-01")
+        next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+        end = date.fromisoformat(request.args.get("end_date") or (next_month - timedelta(days=1)).isoformat())
+    except ValueError:
+        raise ValueError("日期格式无效，请使用 YYYY-MM-DD")
+    if start > end:
+        raise ValueError("开始日期不能晚于结束日期")
+    if start < month_start or end >= next_month:
+        raise ValueError("日期范围必须在所选账套月份内")
+    return start, end
+
+
 def punch_records_api():
     emp_ids = _pick_emp_ids()
     dept_id = request.args.get("dept_id", type=int)
@@ -1335,11 +1350,16 @@ def punch_records_api():
         return jsonify([])
 
     month = _resolve_query_month()
+    try:
+        start_date, end_date = _punch_query_date_range(month)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
     rows = []
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
     for employee in employees:
         rows.extend(rows_by_emp.get(employee.id, []))
+    rows = [row for row in rows if row.record_date and start_date <= row.record_date <= end_date]
     rows.sort(key=lambda row: ((row.employee.emp_no if row.employee else ""), row.record_date or date.min), reverse=True)
 
     return jsonify(
@@ -1375,11 +1395,16 @@ def punch_records_export_api():
         return jsonify({"error": "No employee assigned"}), 400
 
     month = _resolve_query_month()
+    try:
+        start_date, end_date = _punch_query_date_range(month)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
     rows = []
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
     for employee in employees:
         rows.extend(rows_by_emp.get(employee.id, []))
+    rows = [row for row in rows if row.record_date and start_date <= row.record_date <= end_date]
     rows.sort(key=lambda row: ((row.employee.emp_no if row.employee else ""), row.record_date or date.min), reverse=True)
 
     punch_headers = [

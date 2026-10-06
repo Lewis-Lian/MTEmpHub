@@ -16,7 +16,7 @@ import YearPicker from "../../components/common/YearPicker";
 import type { AccountSet, HeaderRowsResponse, QueryBootstrap } from "../../types/query";
 import "./dashboard-shared.css";
 
-type FieldType = "month" | "year" | "employees";
+type FieldType = "month" | "year" | "employees" | "dateRange";
 type PageKind = "headerRows" | "objectRows";
 
 interface QueryOption {
@@ -57,12 +57,15 @@ interface QueryPageProps {
   cellModal?: QueryTableCellModalConfig;
   emptyState?: QueryPageEmptyStateConfig;
   templateExportHint?: string;
+  collapsibleFilters?: boolean;
 }
 
 interface QueryState {
   selectedEmployeeIds: number[];
   selectedMonth: string;
   selectedYear: string;
+  startDate: string;
+  endDate: string;
   selectedOptions: Record<string, boolean>;
 }
 
@@ -86,6 +89,7 @@ export default function QueryPage({
   cellModal,
   emptyState,
   templateExportHint,
+  collapsibleFilters = false,
 }: QueryPageProps) {
   const [bootstrap, setBootstrap] = useState<QueryBootstrap | null>(null);
   const [error, setError] = useState("");
@@ -93,6 +97,8 @@ export default function QueryPage({
   const [isQuerying, setIsQuerying] = useState(false);
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<number[]>([]);
   const [selectedMonth, setSelectedMonth] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
   const [selectedOptions, setSelectedOptions] = useState<Record<string, boolean>>(defaultSelectedOptions);
   const [tableHeaders, setTableHeaders] = useState<string[]>(["暂无数据"]);
@@ -101,6 +107,7 @@ export default function QueryPage({
   const [rawObjectRows, setRawObjectRows] = useState<Record<string, unknown>[]>([]);
   const [tableRowMeta, setTableRowMeta] = useState<unknown[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // 进度条控制状态
   const [progress, setProgress] = useState(0);
@@ -190,11 +197,31 @@ export default function QueryPage({
     }
   }, [hasQueried, kind, rawHeaderResult, rawObjectRows, selectedOptions]);
 
+  useEffect(() => {
+    if (fields.includes("dateRange")) {
+      const range = monthDateRange(selectedMonth);
+      setStartDate(range.start);
+      setEndDate(range.end);
+    }
+  }, [selectedMonth]);
+
+  function validateDateRange(): boolean {
+    if (!fields.includes("dateRange")) return true;
+    const range = monthDateRange(selectedMonth);
+    const message = !startDate || !endDate ? "请选择开始日期和结束日期"
+      : startDate > endDate ? "开始日期不能晚于结束日期"
+      : startDate < range.start || endDate > range.end ? "日期范围必须在所选账套月份内" : "";
+    setError(message);
+    return !message;
+  }
+
   function currentState(): QueryState {
     return {
       selectedEmployeeIds,
       selectedMonth,
       selectedYear,
+      startDate,
+      endDate,
       selectedOptions,
     };
   }
@@ -242,6 +269,11 @@ export default function QueryPage({
       state.selectedEmployeeIds.forEach((employeeId) => query.append("emp_ids", String(employeeId)));
     }
 
+    if (fields.includes("dateRange")) {
+      query.set("start_date", state.startDate);
+      query.set("end_date", state.endDate);
+    }
+
     options.forEach((option) => {
       if (state.selectedOptions[option.key]) {
         query.set(option.key, option.value);
@@ -253,6 +285,7 @@ export default function QueryPage({
   }
 
   async function handleQuery() {
+    if (!validateDateRange()) return;
     setLoadingText("正在为您查询考勤数据...");
     setIsQuerying(true);
     setError("");
@@ -284,6 +317,7 @@ export default function QueryPage({
   }
 
   function handleDownload(path: string) {
+    if (!validateDateRange()) return;
     setLoadingText("正在为您生成并下载报表...");
     setIsQuerying(true);
     const query = buildQueryFromState(currentState());
@@ -309,8 +343,70 @@ export default function QueryPage({
   const employeeFieldLabel = employeeFilterMode === "manager" ? "管理人员" : "员工";
   const employeePickerLabel = employeeFilterMode === "manager" ? "管理人员范围" : "员工范围";
 
+  const secondaryFilters = (
+    <>
+          {fields.includes("month") ? (
+            <div className="query-filter-field">
+              <AccountSetSelector
+                accountSets={bootstrap.account_sets}
+                compact
+                label="账套"
+                onChange={(nextMonth) => {
+                  setSelectedMonth(nextMonth);
+                  setHasQueried(false);
+                }}
+                value={selectedMonth}
+              />
+            </div>
+          ) : null}
+
+          {fields.includes("dateRange") ? (
+            <div className="query-filter-field query-date-range-field">
+              <span className="form-label" id="query-date-range-label">日期范围</span>
+              <div className="query-date-range-control" role="group" aria-labelledby="query-date-range-label">
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="5" width="18" height="16" rx="3" />
+                  <path d="M16 3v4M8 3v4M3 11h18" />
+                </svg>
+                <input aria-label="开始日期" type="date" min={monthDateRange(selectedMonth).start} max={monthDateRange(selectedMonth).end} value={startDate}
+                  onChange={(event) => { setStartDate(event.target.value); setHasQueried(false); }} />
+                <span className="query-date-range-separator" aria-hidden="true">至</span>
+                <input aria-label="结束日期" type="date" min={monthDateRange(selectedMonth).start} max={monthDateRange(selectedMonth).end} value={endDate}
+                  onChange={(event) => { setEndDate(event.target.value); setHasQueried(false); }} />
+              </div>
+            </div>
+          ) : null}
+
+          {fields.includes("year") ? (
+            <div className="query-filter-field">
+              <label className="form-label">年份</label>
+              <YearPicker
+                onChange={(nextYear) => {
+                  setSelectedYear(nextYear);
+                  setHasQueried(false);
+                }}
+                value={selectedYear}
+              />
+            </div>
+          ) : null}
+
+          {options.length ? (
+            <div className="query-filter-field">
+              <label className="form-label">显示选项</label>
+              <MultiSelectDropdown
+                onChange={setSelectedOptions}
+                options={options}
+                value={selectedOptions}
+              />
+            </div>
+          ) : null}
+
+    </>
+  );
+  const selectedAccountSet = bootstrap.account_sets.find((accountSet) => accountSet.month === selectedMonth);
+
   return (
-    <div className="query-page-shell employee-dashboard-page">
+    <div className={`query-page-shell employee-dashboard-page${collapsibleFilters ? " query-collapsible-filters" : ""}`}>
       {/* 极光背景流动球 */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
@@ -342,44 +438,7 @@ export default function QueryPage({
             </div>
           ) : null}
 
-          {fields.includes("month") ? (
-            <div className="query-filter-field">
-              <AccountSetSelector
-                accountSets={bootstrap.account_sets}
-                compact
-                label="账套"
-                onChange={(nextMonth) => {
-                  setSelectedMonth(nextMonth);
-                  setHasQueried(false);
-                }}
-                value={selectedMonth}
-              />
-            </div>
-          ) : null}
-
-          {fields.includes("year") ? (
-            <div className="query-filter-field">
-              <label className="form-label">年份</label>
-              <YearPicker
-                onChange={(nextYear) => {
-                  setSelectedYear(nextYear);
-                  setHasQueried(false);
-                }}
-                value={selectedYear}
-              />
-            </div>
-          ) : null}
-
-          {options.length ? (
-            <div className="query-filter-field">
-              <label className="form-label">显示选项</label>
-              <MultiSelectDropdown
-                onChange={setSelectedOptions}
-                options={options}
-                value={selectedOptions}
-              />
-            </div>
-          ) : null}
+          {!collapsibleFilters ? secondaryFilters : null}
 
           <div className="query-filter-actions">
             <button className={`btn btn-primary${isQuerying ? " is-loading" : ""}`} disabled={isQuerying} onClick={handleQuery} type="button">
@@ -396,6 +455,24 @@ export default function QueryPage({
               </button>
             ) : null}
           </div>
+          {collapsibleFilters ? (
+            <>
+              <div className="query-filter-disclosure">
+                <button className="query-filter-toggle" type="button" aria-expanded={filtersExpanded} aria-controls="query-secondary-filters"
+                  onClick={() => setFiltersExpanded((expanded) => !expanded)}>
+                  <span>{filtersExpanded ? "收起筛选" : "更多筛选"}</span>
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d={filtersExpanded ? "m6 15 6-6 6 6" : "m6 9 6 6 6-6"} />
+                  </svg>
+                </button>
+                <div className="query-filter-summary">
+                  <span className="query-filter-summary-account">{selectedAccountSet?.name ?? selectedMonth}</span>
+                  <span>{startDate && endDate ? `${startDate} 至 ${endDate}` : "请选择日期范围"}</span>
+                </div>
+              </div>
+              {filtersExpanded ? <div className="query-secondary-filters" id="query-secondary-filters">{secondaryFilters}</div> : null}
+            </>
+          ) : null}
           {templateExportPath && templateExportHint ? <p className="query-export-hint">{templateExportHint}</p> : null}
         </div>
 
@@ -445,4 +522,10 @@ function stringifyCell(value: unknown): string | number {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+function monthDateRange(month: string): { start: string; end: string } {
+  if (!month) return { start: "", end: "" };
+  const [year, monthNumber] = month.split("-").map(Number);
+  return { start: `${month}-01`, end: `${month}-${new Date(year, monthNumber, 0).getDate()}` };
 }

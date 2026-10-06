@@ -9,6 +9,7 @@ import LoadingState from "../../components/feedback/LoadingState";
 import QueryProgressOverlay from "../../components/feedback/QueryProgressOverlay";
 import QueryEmptyState, { IndividualAttendanceIcon } from "../../components/query/QueryEmptyState";
 import type { AttendanceCalendarData, HeaderRowsResponse, QueryBootstrap, QueryEmployee } from "../../types/query";
+import "./dashboard-shared.css";
 import "./individual-attendance.css";
 
 export default function IndividualAttendancePage() {
@@ -16,6 +17,7 @@ export default function IndividualAttendancePage() {
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [month, setMonth] = useState("");
   const [summary, setSummary] = useState<HeaderRowsResponse | null>(null);
+  const [managerSummaries, setManagerSummaries] = useState<{ overtime: HeaderRowsResponse; benefit: HeaderRowsResponse } | null>(null);
   const [calendar, setCalendar] = useState<AttendanceCalendarData | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -50,9 +52,20 @@ export default function IndividualAttendancePage() {
       const payload = await fetchHeaderRows(endpoint, query);
       setSummary(payload);
       const calendarPayload = await fetchAttendanceCalendar(selectedEmployee.id, month);
+      if (selectedEmployee.is_manager) {
+        const annualQuery = new URLSearchParams({ year: month.slice(0, 4), emp_ids: String(selectedEmployee.id) });
+        const [overtime, benefit] = await Promise.all([
+          fetchHeaderRows("/api/query/manager-overtime", annualQuery),
+          fetchHeaderRows("/api/query/manager-annual-leave", annualQuery),
+        ]);
+        setManagerSummaries({ overtime: normalizeManagerSummary(overtime, true), benefit: normalizeManagerSummary(benefit, false) });
+      } else {
+        setManagerSummaries(null);
+      }
       setCalendar(calendarPayload);
     } catch (caughtError) {
       setSummary(null);
+      setManagerSummaries(null);
       setCalendar(null);
       setError(caughtError instanceof ApiError ? caughtError.message : "查询失败，请稍后重试");
     } finally {
@@ -91,6 +104,7 @@ export default function IndividualAttendancePage() {
                 onChange={(ids) => {
                   setEmployeeId(ids[0] ?? null);
                   setSummary(null);
+                  setManagerSummaries(null);
                   setCalendar(null);
                 }}
                 selectedIds={employeeId ? [employeeId] : []}
@@ -120,7 +134,7 @@ export default function IndividualAttendancePage() {
       {/* 核心看板工作区 */}
       <main className={`individual-attendance-workspace`}>
         {selectedEmployee && summary && calendar ? (
-          <AttendanceResult employee={selectedEmployee} summary={summary} calendar={calendar} />
+          <AttendanceResult employee={selectedEmployee} summary={summary} calendar={calendar} managerSummaries={managerSummaries} />
         ) : (
           <QueryEmptyState
             className="individual-attendance-empty"
@@ -134,7 +148,19 @@ export default function IndividualAttendancePage() {
   );
 }
 
-function AttendanceResult({ employee, summary, calendar }: { employee: QueryEmployee; summary: HeaderRowsResponse; calendar: AttendanceCalendarData }) {
+function normalizeManagerSummary(payload: HeaderRowsResponse, includeCarryover: boolean): HeaderRowsResponse {
+  const keys = ["dept_name", "name", ...(includeCarryover ? ["prev_dec"] : []), ...Array.from({ length: 12 }, (_, index) => `m${index + 1}`), "remaining", "remark"];
+  return {
+    headers: payload.headers,
+    rows: payload.rows.map((row) => {
+      if (Array.isArray(row)) return row;
+      const values = row as Record<string, string | number | null>;
+      return keys.map((key) => values[key] ?? null);
+    }),
+  };
+}
+
+function AttendanceResult({ employee, summary, calendar, managerSummaries }: { employee: QueryEmployee; summary: HeaderRowsResponse; calendar: AttendanceCalendarData; managerSummaries: { overtime: HeaderRowsResponse; benefit: HeaderRowsResponse } | null }) {
   const [detailTab, setDetailTab] = useState<"punch" | "leave" | "overtime">("punch");
   const [isDetailFullscreen, setIsDetailFullscreen] = useState(false);
 
@@ -423,6 +449,24 @@ function AttendanceResult({ employee, summary, calendar }: { employee: QueryEmpl
         </div>
         <SummaryTable summary={summary} />
       </section>
+      {employee.is_manager && managerSummaries ? (
+        <>
+          <section className="individual-attendance-section individual-summary-card" aria-label="加班汇总">
+            <div className="dashboard-card-top">
+              <SectionTitle icon="summary">加班汇总</SectionTitle>
+              <span className="dashboard-card-tag">{calendar.month.slice(0, 4)} 年 · 单位：天</span>
+            </div>
+            <SummaryTable summary={managerSummaries.overtime} />
+          </section>
+          <section className="individual-attendance-section individual-summary-card" aria-label="福利汇总">
+            <div className="dashboard-card-top">
+              <SectionTitle icon="summary">福利汇总</SectionTitle>
+              <span className="dashboard-card-tag">{calendar.month.slice(0, 4)} 年 · 单位：天</span>
+            </div>
+            <SummaryTable summary={managerSummaries.benefit} />
+          </section>
+        </>
+      ) : null}
     </div>
   );
 }

@@ -231,7 +231,7 @@ def manager_leave_records():
 
 
 @api_query_bp.get("/manager-overtime")
-@page_permission_required("manager_overtime_query")
+@any_page_permission_required(("manager_overtime_query", "individual_attendance"))
 def manager_overtime():
     return manager_overtime_query_api()
 
@@ -243,7 +243,7 @@ def manager_overtime_export():
 
 
 @api_query_bp.get("/manager-annual-leave")
-@page_permission_required("manager_annual_leave_query")
+@any_page_permission_required(("manager_annual_leave_query", "individual_attendance"))
 def manager_annual_leave():
     return manager_annual_leave_query_api()
 

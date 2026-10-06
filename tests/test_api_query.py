@@ -364,6 +364,30 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(overtime_payload["rows"][0]["remaining"], 0)
         self.assertEqual(annual_leave_payload["rows"][0]["remaining"], 0)
 
+    def test_individual_attendance_can_query_bound_manager_annual_summaries(self) -> None:
+        with self.app.app_context():
+            manager = Employee.query.filter_by(emp_no="M001").first()
+            user = User(
+                username="ia-manager",
+                role="readonly",
+                page_permissions={"individual_attendance": True, "manager_overtime_query": False, "manager_annual_leave_query": False},
+            )
+            user.set_password("pass123")
+            db.session.add(user)
+            db.session.flush()
+            db.session.add(UserEmployeeAssignment(user_id=user.id, emp_id=manager.id))
+            db.session.commit()
+            manager_id = manager.id
+
+        self._login("ia-manager", "pass123")
+        for endpoint in ("manager-overtime", "manager-annual-leave"):
+            response = self.client.get(f"/api/query/{endpoint}?year=2026&emp_ids={manager_id}")
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([row["emp_id"] for row in response.get_json()["rows"]], [manager_id])
+            inaccessible = self.client.get(f"/api/query/{endpoint}?year=2026&emp_ids=999999")
+            self.assertEqual(inaccessible.status_code, 200)
+            self.assertEqual(inaccessible.get_json()["rows"], [])
+
     def test_manager_attendance_api_toggles_punch_days_column(self) -> None:
         with self.app.app_context():
             manager = Employee.query.filter_by(emp_no="M001").first()
@@ -600,6 +624,37 @@ class ApiQueryTests(unittest.TestCase):
         self.assertEqual(export_response.status_code, 200)
         self.assertEqual(standalone_export_response.status_code, 403)
         self.assertEqual(records_response.get_json()[0]["raw_punch_data"], "08:00,17:30")
+
+    def test_punch_date_range_applies_to_all_employees_and_export(self) -> None:
+        with self.app.app_context():
+            for emp_id in (1, 2):
+                for day in (1, 10, 11, 12):
+                    db.session.add(DailyRecord(emp_id=emp_id, record_date=date(2026, 5, day), actual_hours=8))
+            db.session.commit()
+        self._login("admin", "admin123")
+        query = "?month=2026-05&emp_ids=1&emp_ids=2&start_date=2026-05-10&end_date=2026-05-11"
+        response = self.client.get("/api/query/punch-records" + query)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({(r["emp_no"], r["date"]) for r in response.get_json()}, {
+            ("E001", "2026-05-10"), ("E001", "2026-05-11"),
+            ("E002", "2026-05-10"), ("E002", "2026-05-11"),
+        })
+        exported = self.client.get("/api/query/punch-records/export" + query)
+        self.assertEqual(exported.status_code, 200)
+        sheet = openpyxl.load_workbook(io.BytesIO(exported.data)).active
+        self.assertEqual({(r[1], r[0]) for r in list(sheet.values)[1:]}, {
+            ("E001", "2026-05-10"), ("E001", "2026-05-11"),
+            ("E002", "2026-05-10"), ("E002", "2026-05-11"),
+        })
+
+    def test_punch_date_range_rejects_invalid_dates_on_query_and_export(self) -> None:
+        self._login("admin", "admin123")
+        for start, end in (("2026-05-12", "2026-05-10"), ("bad", "2026-05-10"),
+                           ("2026-04-30", "2026-05-10"), ("2026-05-01", "2026-06-01")):
+            for endpoint in ("punch-records", "punch-records/export"):
+                with self.subTest(start=start, end=end, endpoint=endpoint):
+                    response = self.client.get(f"/api/query/{endpoint}?month=2026-05&emp_ids=1&start_date={start}&end_date={end}")
+                    self.assertEqual(response.status_code, 400)
 
     def test_punch_records_api_falls_back_to_manager_slot_times_for_raw_punch_data(self) -> None:
         with self.app.app_context():

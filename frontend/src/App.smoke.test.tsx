@@ -1162,6 +1162,7 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByRole("heading", { name: "查询条件" })).toBeInTheDocument();
     expect(screen.getByText("查询员工逐日打卡明细，并支持直接导出 Excel。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "更多筛选" }));
     const punchOptionsField = screen.getByText("显示选项").closest("div");
     fireEvent.click(within(punchOptionsField as HTMLElement).getByRole("button"));
     expect(screen.getByRole("checkbox", { name: "原始刷卡" })).toBeInTheDocument();
