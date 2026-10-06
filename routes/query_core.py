@@ -48,6 +48,7 @@ from services.daily_override_service import (
 from services.attendance_source_service import (
     EMPLOYEE_STATS_CONTEXT,
     MANAGER_STATS_CONTEXT,
+    MANAGER_EMPLOYEE_PUNCH_FALLBACK_EMP_NO,
     _actual_attendance_day_value,
     _effective_actual_attendance_day_value,
     _extract_raw_punch_data,
@@ -279,6 +280,11 @@ def _is_half_day_record(record) -> bool:
     工时按刷卡重算，不信任导入原始 actual_hours（manager 来源存的是分钟）。"""
     if not _has_punch_record(record):
         return False
+    if (
+        getattr(record, "source", "") == "manager"
+        and getattr(getattr(record, "employee", None), "emp_no", "") == MANAGER_EMPLOYEE_PUNCH_FALLBACK_EMP_NO
+    ):
+        return False
     actual_hours = _calc_record_work_hours(record)[0]
     if actual_hours < 2:
         return True
@@ -349,6 +355,11 @@ def _effective_is_half_day(record, override, work_hours: float) -> bool:
     if override is not None and override.status:
         return override.status in HALF_DAY_STATUSES
     if record is None or not _has_punch_record(record):
+        return False
+    if (
+        getattr(record, "source", "") == "manager"
+        and getattr(getattr(record, "employee", None), "emp_no", "") == MANAGER_EMPLOYEE_PUNCH_FALLBACK_EMP_NO
+    ):
         return False
     if work_hours < 2:
         return True
@@ -602,6 +613,9 @@ def _missed_punch_backfill_hours(record) -> float | None:
 
 
 def _calc_record_work_hours(record) -> tuple[float, int]:
+    if (record.raw_data or {}).get("employee_punch_fallback"):
+        # 专属兜底保留考勤机已计算的实出勤工时，避免缺卡时重新配对漏算。
+        return round(float(record.actual_hours or 0) / 60.0, 2), 0
     special_hours = _calc_two_punch_hours_with_shift_break(record)
     if special_hours is not None:
         return special_hours, 0

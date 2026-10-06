@@ -21,6 +21,9 @@ from services.attendance_utils import month_date_range as _month_date_range
 EMPLOYEE_STATS_CONTEXT = "employee_stats"
 MANAGER_STATS_CONTEXT = "manager_stats"
 
+# 范小宝保留管理人员统计口径，缺卡日允许提取员工考勤机的真实刷卡。
+MANAGER_EMPLOYEE_PUNCH_FALLBACK_EMP_NO = "101026002"
+
 
 @dataclass
 class AttendanceRecordView:
@@ -114,6 +117,41 @@ def build_attendance_record_view(record: DailyRecord, employee: Employee, contex
         return None
 
     payload = deepcopy(_payload_for_source(record, selected_source))
+    if (
+        employee.emp_no == MANAGER_EMPLOYEE_PUNCH_FALLBACK_EMP_NO
+        and configured_source == ATTENDANCE_SOURCE_MANAGER
+    ):
+        manager_payload = deepcopy(_payload_for_source(record, ATTENDANCE_SOURCE_MANAGER))
+        manager_raw = manager_payload.get("raw_data") or {}
+        employee_payload = _payload_for_source(record, ATTENDANCE_SOURCE_EMPLOYEE)
+        employee_raw = employee_payload.get("raw_data") or {}
+        manager_punches = _extract_raw_punch_data_from_dict(manager_raw)
+        employee_punches = _extract_raw_punch_data_from_dict(employee_raw)
+        tokens = [_normalize_punch_token(token) for token in re.findall(r"\d{1,2}:\d{2}", employee_punches)]
+        has_manager_punch = (
+            manager_payload.get("check_in_times")
+            or manager_payload.get("check_out_times")
+            or re.search(r"\d{1,2}:\d{2}", manager_punches)
+        )
+        if not has_manager_punch and tokens:
+            # 仅保留真实刷卡，去掉导入的段时间及同一时刻重复的上下班卡。
+            actual_tokens = set(tokens)
+            out_times = list(dict.fromkeys(
+                token for value in employee_payload.get("check_out_times") or []
+                if (token := _normalize_punch_token(value)) in actual_tokens
+            ))
+            in_times = list(dict.fromkeys(
+                token for value in employee_payload.get("check_in_times") or []
+                if (token := _normalize_punch_token(value)) in actual_tokens and token not in out_times
+            ))
+            manager_payload["check_in_times"] = in_times
+            manager_payload["check_out_times"] = out_times
+            # 管理来源 actual_hours 的单位是分钟，员工来源为小时。
+            manager_payload["actual_hours"] = float(employee_payload.get("actual_hours") or 0) * 60
+            manager_payload["employee_punch_fallback"] = True
+            manager_payload["raw_data"] = {**manager_raw, "刷卡时间数据": ",".join(tokens)}
+            payload = manager_payload
+            selected_source = ATTENDANCE_SOURCE_MANAGER
     if isinstance(payload, dict):
         if selected_source == ATTENDANCE_SOURCE_EMPLOYEE:
             fallback_payload = record.manager_payload if isinstance(record.manager_payload, dict) else {}

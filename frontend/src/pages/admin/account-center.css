@@ -963,6 +963,12 @@
   box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.03), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
 }
 
+/* 磨砂卡片会创建层叠上下文，下拉弹层显示时需提升整张卡片。 */
+.acm-card-block:has(.month-picker-dropdown, .account-set-selector-menu) {
+  position: relative;
+  z-index: 1;
+}
+
 .acm-card-block-title {
   font-size: 12px;
   font-weight: 750;
