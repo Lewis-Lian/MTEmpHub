@@ -1561,6 +1561,8 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("编辑管理人员加班")).toBeInTheDocument();
     expect(screen.getByLabelText("前年累积天数")).toBeInTheDocument();
     expect(screen.getByLabelText("1月")).toBeDisabled();
+    expect(screen.getByLabelText("2月")).toHaveValue("");
+    expect(screen.getByLabelText("2月")).toHaveAttribute("placeholder", "自动：0 天");
     expect(screen.getByText("第一季度")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("2月"), { target: { value: "1.5" } });
     fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
@@ -1600,11 +1602,57 @@ describe("App smoke regression", () => {
     fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员年休")).toBeInTheDocument();
     expect(screen.getByLabelText("1月")).toBeDisabled();
+    expect(screen.getByLabelText("2月")).toHaveValue("");
+    expect(screen.getByLabelText("2月")).toHaveAttribute("placeholder", "自动：0 天");
     expect(screen.getByText("第一季度")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("2月"), { target: { value: "1.5" } });
     fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
     expect(await screen.findByText("修改已保存")).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it.each(["manager-overtime", "manager-annual-leave"])("%s 修正输入留空使用自动值，显式零可保存并清除", async (endpoint) => {
+    window.history.replaceState({}, "", `/admin/${endpoint}`);
+    const automatic = Object.fromEntries(Array.from({ length: 12 }, (_, index) => [`m${index + 1}`, index === 1 ? 2 : 0]));
+    const overrides: Record<string, number | null> = Object.fromEntries(Object.keys(automatic).map((key) => [key, null]));
+    overrides.m2 = 0;
+    fetchMock.mockImplementation((input, init) => {
+      if (normalizePath(input) === `/api/admin/${endpoint}/records`) {
+        if (init?.method === "PUT") {
+          const payload = JSON.parse(String(init.body)) as Record<string, string>;
+          for (const key of Object.keys(automatic)) {
+            overrides[key] = payload[key] === "" ? null : Number(payload[key]);
+          }
+          return Promise.resolve(jsonResponse({ status: "ok" }));
+        }
+        return Promise.resolve(jsonResponse([{
+          emp_id: 11, dept_name: "信息部", name: "经理甲", remark: "", remaining: 10,
+          ...Object.fromEntries(Object.keys(automatic).map((key) => [key, overrides[key] ?? automatic[key]])),
+          automatic, overrides, legacy_keys: [],
+        }]));
+      }
+      return mockAdminAppResponse(normalizePath(input));
+    });
+    const { default: App } = await import("./App");
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "查询" }));
+    fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
+    expect(screen.getByLabelText("1月")).toHaveValue("");
+    expect(screen.getByLabelText("2月")).toHaveValue("0");
+    expect(screen.getByLabelText("2月")).toHaveAttribute("placeholder", "自动：2 天");
+
+    fireEvent.change(screen.getByLabelText("2月"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(screen.getByLabelText("2月")).toHaveValue("");
+    expect(screen.getByLabelText("2月")).toHaveAttribute("placeholder", "自动：2 天");
+
+    fireEvent.change(screen.getByLabelText("2月"), { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
+    expect(screen.getByLabelText("2月")).toHaveValue("0");
   });
 
   it("账号管理页会挂载旧版创建区和批量操作区", async () => {
@@ -2420,6 +2468,8 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
             m10: 0,
             m11: 0,
             m12: 0,
+            automatic: { prev_dec: 8, m1: 2, m2: 0, m3: 0, m4: 0, m5: 0, m6: 0, m7: 0, m8: 0, m9: 0, m10: 0, m11: 0, m12: 0 },
+            overrides: { prev_dec: null, m1: null, m2: null, m3: null, m4: null, m5: null, m6: null, m7: null, m8: null, m9: null, m10: null, m11: null, m12: null },
             remaining: 10,
             remark: "",
           },
@@ -2444,6 +2494,8 @@ function mockAdminAppResponse(path: string, _init?: RequestInit): Promise<Respon
             m10: 0,
             m11: 0,
             m12: 0,
+            automatic: { m1: 1, m2: 0, m3: 0, m4: 0, m5: 0, m6: 0, m7: 0, m8: 0, m9: 0, m10: 0, m11: 0, m12: 0 },
+            overrides: { m1: null, m2: null, m3: null, m4: null, m5: null, m6: null, m7: null, m8: null, m9: null, m10: null, m11: null, m12: null },
             remaining: 4,
             remark: "",
           },

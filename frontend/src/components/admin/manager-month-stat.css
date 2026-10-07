@@ -40,3 +40,5 @@
   .manager-stat-balance { flex-wrap: wrap; gap: 8px 14px; }
   .manager-stat-balance > span:last-child { margin-left: 0; width: 100%; }
 }
+
+.manager-stat-month input::placeholder { font-size: 12px; color: #8795a7; }

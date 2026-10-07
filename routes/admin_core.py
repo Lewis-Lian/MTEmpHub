@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import logging
+import math
 import os
 import re
 import subprocess
@@ -1597,9 +1598,12 @@ def _apply_saved_manager_stats(values_by_name: dict[str, dict[str, object]], yea
             values["prev_dec"] = ""
         values["remaining"] = row.remaining
         values["remark"] = row.remark or ""
+        values["automatic"] = {key: (row.automatic_values or {}).get(key) for key in _stat_value_keys(stat_type)}
+        values["overrides"] = {key: row.corrections().get(key) for key in _stat_value_keys(stat_type)}
+        values["legacy_keys"] = list(_stat_value_keys(stat_type)) if row.manual_values is None else []
 
 
-def _upsert_manager_month_stat(stat_type: str, emp_id: int, year: int, values: dict[str, float], remark: str) -> tuple[dict[str, str], int]:
+def _upsert_manager_month_stat(stat_type: str, emp_id: int, year: int, values: dict[str, float], remark: str, manual_values: dict[str, float] | None = None, automatic_values: dict[str, float] | None = None) -> tuple[dict[str, str], int]:
     employee = _require_model(Employee, emp_id)
     if not employee.is_manager:
         return {"error": "employee is not manager"}, 400
@@ -1614,6 +1618,11 @@ def _upsert_manager_month_stat(stat_type: str, emp_id: int, year: int, values: d
         row.prev_dec = 0
     for key, value in values.items():
         setattr(row, key, value)
+    row.manual_values = dict(values if manual_values is None else manual_values)
+    if automatic_values is not None:
+        row.automatic_values = automatic_values
+    elif row.automatic_values is None:
+        row.automatic_values = {}
     row.remaining = round(12 - sum(values.values()), 2) if stat_type == "annual_leave" else round(sum(values.values()), 2)
     row.remark = (remark or "").strip()
     db.session.commit()
@@ -1625,26 +1634,42 @@ def _save_manager_month_stat(stat_type: str) -> tuple[dict[str, str], int]:
     emp_id = int(data.get("emp_id") or 0)
     year = int(data.get("year") or datetime.now().year)
     keys = _stat_value_keys(stat_type)
-    submitted_values = {key: float(_number_or_blank(data.get(key)) or 0) for key in keys}
     employee = _require_model(Employee, emp_id)
     if not employee.is_manager:
         return {"error": "employee is not manager"}, 400
 
     row = ManagerMonthStat.query.filter_by(emp_id=employee.id, year=year, stat_type=stat_type).first()
-    values = {
-        key: float(getattr(row, key) or 0) if row else 0.0
-        for key in keys
-    }
+    manual_values = row.corrections() if row else {}
+    automatic_values = dict(row.automatic_values or {}) if row else {}
+    values = {key: float(getattr(row, key) or 0) if row else 0.0 for key in keys}
     skipped_locked_months: list[str] = []
     for key in keys:
+        if key not in data:
+            continue
         month = _stat_key_month(year, key)
         if _stat_key_lock_state(year, key) == "locked":
             if month:
                 skipped_locked_months.append(month)
             continue
-        values[key] = submitted_values[key]
+        submitted = data[key]
+        if submitted is None or (isinstance(submitted, str) and not submitted.strip()):
+            manual_values.pop(key, None)
+            if key not in automatic_values:
+                # Legacy rows have no saved automatic baseline. Recompute only the cleared month.
+                computed = _manager_attendance_row(emp_id, month, include_overrides=True) if key != "prev_dec" and AccountSet.query.filter_by(month=month).first() else None
+                automatic_values[key] = float(computed["benefit_days" if stat_type == "annual_leave" else "overtime_change"]) if computed else 0.0
+            values[key] = automatic_values[key]
+        else:
+            try:
+                value = float(submitted)
+            except (TypeError, ValueError):
+                return {"error": "修正天数必须是有效数字"}, 400
+            if not math.isfinite(value):
+                return {"error": "修正天数必须是有效数字"}, 400
+            manual_values[key] = value
+            values[key] = value
 
-    payload, status = _upsert_manager_month_stat(stat_type, emp_id, year, values, data.get("remark") or "")
+    payload, status = _upsert_manager_month_stat(stat_type, emp_id, year, values, data.get("remark") or "", manual_values, automatic_values)
     if status != 200:
         return payload, status
     if skipped_locked_months:
@@ -1960,6 +1985,8 @@ def _import_manager_stat_file(stat_type: str, year: int):
                 key: float(getattr(existing_row, key) or 0) if existing_row else 0.0
                 for key in _stat_value_keys(stat_type)
             }
+            manual_values = existing_row.corrections() if existing_row else {}
+            automatic_values = dict(existing_row.automatic_values or {}) if existing_row else {}
             for key, label in _stat_col_keys(stat_type):
                 col_idx = headers.get(label)
                 month = _stat_key_month(year, key)
@@ -1968,9 +1995,10 @@ def _import_manager_stat_file(stat_type: str, year: int):
                         skipped_locked_months.add(month)
                     continue
                 values[key] = float(_number_or_blank(ws.cell(row_idx, col_idx).value if col_idx else None) or 0)
+                manual_values[key] = values[key]
             remark_col = headers.get("备注")
             remark = str(ws.cell(row_idx, remark_col).value or "").strip() if remark_col else ""
-            payload, status = _upsert_manager_month_stat(stat_type, employee.id, year, values, remark)
+            payload, status = _upsert_manager_month_stat(stat_type, employee.id, year, values, remark, manual_values, automatic_values)
             if status != 200:
                 errors.append(f"第{row_idx}行：{payload.get('error', '保存失败')}")
                 continue
@@ -2017,6 +2045,9 @@ def _manager_month_rows(values_by_name: dict[str, dict[str, object]], remaining_
             "remaining_label": remaining_label,
             "remaining": values.get("remaining", ""),
             "remark": values.get("remark", ""),
+            "automatic": values.get("automatic", {key: 0 for key in keys}),
+            "overrides": values.get("overrides", {key: None for key in keys}),
+            "legacy_keys": values.get("legacy_keys", []),
         }
         for key in keys:
             row[key] = values.get(key, "")

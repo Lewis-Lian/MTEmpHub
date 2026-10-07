@@ -30,6 +30,7 @@ LABELS = {
     'early_leave_minutes': '早退分钟', 'name': '姓名', 'card_no': '卡号', 'dept_no': '部门编号',
     'dept_name': '部门名称', 'shift_name': '班次名称', 'factory_rest_days': '厂休天数',
     'file_sha256': '文件内容校验值', 'file_size': '文件大小（字节）',
+    'automatic_values': '系统自动值', 'manual_values': '手动修正值',
     'monthly_benefit_days': '福利天数', 'remaining_days': '剩余年假', 'duration': '时长',
 }
 

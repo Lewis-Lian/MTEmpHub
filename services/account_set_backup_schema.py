@@ -59,7 +59,7 @@ DATASETS = {
     'employee_overrides': spec(EmployeeAttendanceOverride, 'month attendance_days work_hours half_days actual_attendance_days late_early_minutes remark', 'emp_no month', 'month'),
     'manager_overrides': spec(ManagerAttendanceOverride, 'month attendance_days injury_days business_trip_days marriage_days funeral_days late_early_minutes remark', 'emp_no month', 'month'),
     'annual_leave': spec(AnnualLeave, 'year total_days used_days remaining_days', 'emp_no year', 'year', 'annual_stats'),
-    'manager_stats': spec(ManagerMonthStat, 'year stat_type prev_dec m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 remaining remark', 'emp_no year stat_type', 'year', 'annual_stats'),
+    'manager_stats': spec(ManagerMonthStat, 'year stat_type prev_dec m1 m2 m3 m4 m5 m6 m7 m8 m9 m10 m11 m12 remaining remark automatic_values manual_values', 'emp_no year stat_type', 'year', 'annual_stats'),
     'override_history': spec(AttendanceOverrideHistory, 'override_type month action_type changed_fields_json before_values_json after_values_json remark source_file_name created_at', 'origin_key', 'month'),
     'sync_history': spec(DingTalkSyncRun, 'month source status read_count imported_count unmatched_count unmatched error_message started_at finished_at', 'origin_key', 'account'),
     'imports': spec(AccountSetImport, 'source_filename file_type status imported_count error_message created_at', 'origin_key', 'account'),

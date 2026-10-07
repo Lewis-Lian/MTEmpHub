@@ -143,3 +143,35 @@ def test_collect_batches_related_employee_and_shift_queries(backup_app):
         event.remove(db.engine, 'before_cursor_execute', record_query)
     assert len(document['datasets']['daily_records']) == 21
     assert len(queries) < 10
+
+
+def test_manager_stat_sources_survive_backup_and_restore(backup_app):
+    from models.manager_month_stat import ManagerMonthStat
+    from services.account_set_restore_service import convert_fields
+
+    db.session.add(ManagerMonthStat(emp_id=1, year=2026, stat_type='annual_leave', m6=0,
+                                   automatic_values={'m6': 2}, manual_values={'m6': 0}))
+    db.session.commit()
+    document = read_backup(export_backup(1))
+    row = document['datasets']['manager_stats'][0]
+    assert row['automatic_values'] == {'m6': 2}
+    assert row['manual_values'] == {'m6': 0}
+    restored = ManagerMonthStat(**convert_fields('manager_stats', row))
+    assert restored.automatic_values == {'m6': 2}
+    assert restored.corrections() == {'m6': 0}
+
+
+def test_legacy_manager_stat_backup_without_source_metadata_is_supported(backup_app):
+    from models.manager_month_stat import ManagerMonthStat
+    from services.account_set_backup_service import validate_document
+
+    db.session.add(ManagerMonthStat(emp_id=1, year=2026, stat_type='annual_leave', m6=1))
+    db.session.commit()
+    document = collect_backup(1)
+    row = document['datasets']['manager_stats'][0]
+    row.pop('automatic_values', None)
+    row.pop('manual_values', None)
+    validated = validate_document(document)['datasets']['manager_stats'][0]
+    assert validated['manual_values'] is None
+    assert validated['automatic_values'] is None
+    assert validated['m6'] == 1

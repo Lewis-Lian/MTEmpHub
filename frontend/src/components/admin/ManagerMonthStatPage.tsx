@@ -42,6 +42,9 @@ type ManagerStatRow = Record<string, unknown> & {
   name?: string;
   remaining?: number | string | null;
   remark?: string;
+  automatic?: Record<string, number | null>;
+  overrides?: Record<string, number | null>;
+  legacy_keys?: string[];
 };
 
 type ColumnState = "editable" | "locked" | "missing_account_set";
@@ -175,7 +178,7 @@ export default function ManagerMonthStatPage({
   function openEdit(row: ManagerStatRow) {
     setEditingRow(row);
     setEditValues(
-      Object.fromEntries(monthFields.map((field) => [field.key, normalizeValue(row[field.key])])),
+      Object.fromEntries(monthFields.map((field) => [field.key, normalizeValue(row.overrides ? row.overrides[field.key] : row[field.key])])),
     );
     setEditRemark(String(row.remark ?? ""));
   }
@@ -271,12 +274,15 @@ export default function ManagerMonthStatPage({
 
   function renderMonthInput(field: MonthField) {
     const locked = columnStates[field.key] === "locked";
+    const automatic = editingRow?.automatic?.[field.key];
+    const legacy = editingRow?.legacy_keys?.includes(field.key);
     return (
       <label className={`manager-stat-month${locked ? " is-locked" : ""}`} key={field.key}>
-        <span>{field.label}{locked ? <small>已锁定</small> : null}</span>
+        <span>{field.label}{locked ? <small>已锁定</small> : legacy ? <small>历史修正</small> : null}</span>
         <div><input className="account-input" inputMode="decimal" disabled={locked || isSaving}
           aria-label={field.label} value={editValues[field.key] ?? ""}
-          onChange={(event) => setEditValues((current) => ({ ...current, [field.key]: event.target.value }))} /><span>天</span></div>
+          placeholder={automatic === null || automatic === undefined ? "自动：待计算" : `自动：${automatic} 天`}
+          onChange={(event) => setEditValues((current) => ({ ...current, [field.key]: event.target.value }))} /><span>{editValues[field.key] ? "天" : ""}</span></div>
       </label>
     );
   }
@@ -383,7 +389,7 @@ export default function ManagerMonthStatPage({
             <div className="master-modal-body">
               <div className="manager-stat-balance">
                 <span>{remainingLabel}</span><strong>{normalizeValue(editingRow.remaining) || "0"}<small> 天</small></strong>
-                <span>按月份修正 · 已锁定月份不可修改</span>
+                <span>留空使用自动值 · 填 0 表示修正为零</span>
               </div>
               {monthFields.filter((field) => field.key === "prev_dec").map((field) => renderMonthInput(field))}
               <div className="manager-stat-quarters">
@@ -401,7 +407,8 @@ export default function ManagerMonthStatPage({
                 <textarea
                   className="account-input attendance-override-edit-remark"
                   onChange={(event) => setEditRemark(event.target.value)}
-                  rows={3}
+                  rows={2}
+                  disabled={isSaving}
                   value={editRemark}
                 />
               </label>

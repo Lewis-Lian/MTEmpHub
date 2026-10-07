@@ -474,6 +474,120 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual(annual_leave_records.status_code, 200)
         self.assertEqual(annual_leave_records.get_json(), annual_leave_collection.get_json())
 
+    def test_manager_stats_distinguish_automatic_override_zero_and_clear(self) -> None:
+        from services.manager_attendance_service import _write_manager_month_stat
+
+        self._login()
+        for stat_type, endpoint in (("overtime", "manager-overtime"), ("annual_leave", "manager-annual-leave")):
+            with self.subTest(stat_type=stat_type):
+                with self.app.app_context():
+                    _write_manager_month_stat(stat_type, self.manager_id, "2026-05", 2)
+                    db.session.commit()
+                url = f"/api/admin/{endpoint}/records"
+                query = f"{url}?year=2026&emp_ids={self.manager_id}"
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["automatic"]["m5"], 2)
+                self.assertIsNone(row["overrides"]["m5"])
+                self.assertEqual(row["m5"], 2)
+
+                response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": 0})
+                self.assertEqual(response.status_code, 200)
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["overrides"]["m5"], 0)
+                self.assertEqual(row["m5"], 0)
+                self.assertEqual(row["automatic"]["m5"], 2)
+
+                # A new calculation updates the automatic hint, preserving the explicit zero override.
+                with self.app.app_context():
+                    _write_manager_month_stat(stat_type, self.manager_id, "2026-05", 1.5)
+                    db.session.commit()
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["m5"], 0)
+                self.assertEqual(row["automatic"]["m5"], 1.5)
+                self.assertEqual(row["overrides"]["m5"], 0)
+
+                response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": ""})
+                self.assertEqual(response.status_code, 200)
+                row = self.client.get(query).get_json()[0]
+                self.assertIsNone(row["overrides"]["m5"])
+                self.assertEqual(row["m5"], 1.5)
+                self.assertEqual(row["remaining"], 10.5 if stat_type == "annual_leave" else 1.5)
+
+    def test_manager_stats_locked_month_keeps_override_when_cleared(self) -> None:
+        from services.manager_attendance_service import _write_manager_month_stat
+
+        self._login()
+        url = "/api/admin/manager-annual-leave/records"
+        with self.app.app_context():
+            _write_manager_month_stat("annual_leave", self.manager_id, "2026-05", 2)
+            db.session.commit()
+        self.assertEqual(self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": 1}).status_code, 200)
+        with self.app.app_context():
+            AccountSet.query.filter_by(month="2026-05").first().is_locked = True
+            db.session.commit()
+        response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": ""})
+        self.assertEqual(response.status_code, 200)
+        row = self.client.get(f"{url}?year=2026&emp_ids={self.manager_id}").get_json()[0]
+        self.assertEqual(row["automatic"]["m5"], 2)
+        self.assertEqual(row["overrides"]["m5"], 1)
+        self.assertEqual(row["m5"], 1)
+
+    def test_manager_stats_legacy_values_remain_manual_until_cleared(self) -> None:
+        from models.manager_month_stat import ManagerMonthStat
+        from services.manager_attendance_service import _write_manager_month_stat
+
+        self._login()
+        with self.app.app_context():
+            db.session.add(ManagerMonthStat(emp_id=self.manager_id, year=2026, stat_type="annual_leave", m5=1, remaining=11))
+            db.session.commit()
+        url = f"/api/admin/manager-annual-leave/records?year=2026&emp_ids={self.manager_id}"
+        row = self.client.get(url).get_json()[0]
+        self.assertEqual(row["m5"], 1)
+        self.assertEqual(row["remaining"], 11)
+        self.assertEqual(row["overrides"]["m5"], 1)
+        self.assertIsNone(row["automatic"]["m5"])
+        self.assertIn("m5", row["legacy_keys"])
+        with self.app.app_context():
+            _write_manager_month_stat("annual_leave", self.manager_id, "2026-05", 2)
+            db.session.commit()
+        row = self.client.get(url).get_json()[0]
+        self.assertEqual(row["m5"], 1)
+        self.assertEqual(row["remaining"], 11)
+        self.assertEqual(row["automatic"]["m5"], 2)
+        response = self.client.put("/api/admin/manager-annual-leave/records", json={"emp_id": self.manager_id, "year": 2026, "m5": None})
+        self.assertEqual(response.status_code, 200)
+        row = self.client.get(url).get_json()[0]
+        self.assertEqual(row["m5"], 2)
+        self.assertEqual(row["remaining"], 10)
+        self.assertIsNone(row["overrides"]["m5"])
+
+    def test_clearing_legacy_correction_computes_missing_automatic_baseline(self) -> None:
+        from models.manager_month_stat import ManagerMonthStat
+
+        self._login()
+        with self.app.app_context():
+            db.session.add(ManagerMonthStat(emp_id=self.manager_id, year=2026, stat_type="annual_leave", m5=1, remaining=11))
+            db.session.commit()
+        url = "/api/admin/manager-annual-leave/records"
+        response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": ""})
+        self.assertEqual(response.status_code, 200)
+        row = self.client.get(f"{url}?year=2026&emp_ids={self.manager_id}").get_json()[0]
+        # May has no attendance in this fixture: the existing rules consume the monthly limit of three days.
+        self.assertEqual(row["automatic"]["m5"], 3)
+        self.assertEqual(row["m5"], 3)
+        self.assertIsNone(row["overrides"]["m5"])
+        self.assertEqual(row["remaining"], 9)
+
+    def test_invalid_manager_stat_input_does_not_remove_existing_correction(self) -> None:
+        self._login()
+        url = "/api/admin/manager-annual-leave/records"
+        self.assertEqual(self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": 1}).status_code, 200)
+        for value in ("abc", "NaN", "Infinity"):
+            response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m5": value})
+            self.assertEqual(response.status_code, 400)
+            row = self.client.get(f"{url}?year=2026&emp_ids={self.manager_id}").get_json()[0]
+            self.assertEqual(row["overrides"]["m5"], 1)
+
     def test_admin_can_list_and_unlock_disabled_users(self) -> None:
         with self.app.app_context():
             temp_locked = User(

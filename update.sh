@@ -53,11 +53,12 @@ echo ""
 echo "=========================================="
 echo "3. 执行数据库迁移（幂等补列 + alembic 增量升级）..."
 echo "=========================================="
-# upgrade-legacy-schema 幂等补齐旧库缺失的表/列，可安全重复执行
+# upgrade-legacy-schema 幂等补齐旧库缺失的表/列，包括 manager_month_stats 的
+# automatic_values、manual_values 字段；可安全重复执行。
 # 注：不跑 init-db（它会执行全部 alembic 迁移，风险较高）
 flask --app manage.py upgrade-legacy-schema
 
-# alembic 增量迁移（补 legacy 补丁不覆盖的新表/新列，如 messages、users.avatar）。
+# alembic 增量迁移（包括 20261007_stat_sources：管理人员加班/年休自动值与手动修正来源字段）。
 # 历史原因：旧库曾长期只靠 upgrade-legacy-schema 补齐，alembic_version 停在初始
 # 版本 681e8410935f，直接 upgrade 会对已存在的表/列报 Duplicate error。幂等补丁
 # 已完整覆盖到 b8c9d0e1f2a3（钉钉同步记录表）为止的对象，因此把这些旧库的版本

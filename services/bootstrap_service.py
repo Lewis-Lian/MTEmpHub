@@ -219,6 +219,13 @@ def ensure_schema_compatibility() -> None:
             db.session.execute(text("ALTER TABLE leave_records ADD COLUMN is_manual_edited BOOLEAN NOT NULL DEFAULT 0"))
             db.session.commit()
 
+    manager_stat_columns = _get_column_names(inspector, "manager_month_stats")
+    if manager_stat_columns is not None:
+        for column in ("automatic_values", "manual_values"):
+            if column not in manager_stat_columns:
+                db.session.execute(text(f"ALTER TABLE manager_month_stats ADD COLUMN {column} JSON"))
+                db.session.commit()
+
     # 性能复合索引（模型层与 Alembic 迁移 b2c3d4e5f6a7、f6a7b8c9d0e1 同名同列）：
     # 旧库升级路径（upgrade-legacy-schema）不跑 Alembic，这里幂等补建
     _performance_indexes = (

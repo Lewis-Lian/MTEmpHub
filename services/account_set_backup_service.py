@@ -249,6 +249,10 @@ def validate_document(document):
         if name == 'imports':
             expected.update(('file_key', 'file_sha256', 'file_size'))
         for row in rows:
+            if name == 'manager_stats' and isinstance(row, dict):
+                # Backups made before source tracking keep their numeric fields as legacy corrections.
+                row.setdefault('automatic_values', None)
+                row.setdefault('manual_values', None)
             if not isinstance(row, dict) or set(row) != expected:
                 raise BackupError('备份字段无效：%s' % name)
             for field in ds.fields:
@@ -273,6 +277,10 @@ def validate_document(document):
                     date.fromisoformat(value)
                 elif isinstance(kind, String):
                     valid = isinstance(value, str) and (not kind.length or len(value) <= kind.length)
+                if name == 'manager_stats' and field in ('automatic_values', 'manual_values'):
+                    allowed_keys = {f'm{month}' for month in range(1, 13)} | {'prev_dec'}
+                    valid = isinstance(value, dict) and set(value) <= allowed_keys and all(
+                        type(days) in (int, float) and math.isfinite(days) for days in value.values())
                 if not valid:
                     raise BackupError('字段类型无效：%s' % field)
             for key in ('emp_no', 'dept_no', 'shift_no', 'parent_no'):

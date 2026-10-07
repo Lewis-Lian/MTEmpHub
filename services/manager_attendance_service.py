@@ -334,14 +334,16 @@ def _write_manager_month_stat(stat_type: str, emp_id: int, month: str, used_days
     year, key = _stat_year_key(month)
     row = ManagerMonthStat.query.filter_by(emp_id=emp_id, year=year, stat_type=stat_type).first()
     if not row:
-        row = ManagerMonthStat(emp_id=emp_id, year=year, stat_type=stat_type)
+        row = ManagerMonthStat(emp_id=emp_id, year=year, stat_type=stat_type, automatic_values={}, manual_values={})
         db.session.add(row)
 
     if stat_type == "annual_leave":
         row.prev_dec = 0
 
-    # Set the current month's value
-    setattr(row, key, _round2(used_days))
+    # Keep the automatic baseline even while an explicit correction (including zero) applies.
+    row.manual_values = row.corrections()
+    row.automatic_values = {**(row.automatic_values or {}), key: _round2(used_days)}
+    setattr(row, key, row.manual_values.get(key, _round2(used_days)))
 
     if sync_all_months:
         _recalc_remaining(row, stat_type)
