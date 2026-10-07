@@ -93,7 +93,14 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
     <div className="acm-modal-body">
       <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '核对差异', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
       {error && <p role="alert" className="backup-error">{error}</p>}
-      {busy && <p role="status">正在处理，请稍候…</p>}
+      {busy && <div className="backup-processing" role="status" aria-live="polite">
+        <span className="backup-processing-spinner" aria-hidden="true" />
+        <div className="backup-processing-copy">
+          <strong>{confirming ? '正在恢复账套数据' : preview ? '正在重新核对差异' : '正在上传并解析备份'}</strong>
+          <p>{confirming ? '正在应用已确认的数据选择，完成后将显示导入结果。' : preview ? '正在比对备份与系统数据，完成后将更新差异清单。' : '正在校验 ZIP 文件并比对账套数据，完成后将显示差异预览。'}</p>
+          <span className="backup-processing-track" aria-hidden="true"><span /></span>
+        </div>
+      </div>}
       {!preview && <div className={`backup-upload-zone${dragging ? ' is-dragging' : ''}`} role="region" aria-label="上传账套备份" aria-busy={busy}
         onDragEnter={event => { event.preventDefault(); if (!busy && event.dataTransfer.types.includes('Files')) { dragDepth.current += 1; setDragging(true); } }}
         onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = busy ? 'none' : 'copy'; }}
