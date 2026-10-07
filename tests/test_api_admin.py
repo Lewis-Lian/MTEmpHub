@@ -561,6 +561,68 @@ class ApiAdminTests(unittest.TestCase):
         self.assertEqual(row["remaining"], 10)
         self.assertIsNone(row["overrides"]["m5"])
 
+    def test_legacy_september_to_december_use_automatic_after_upgrade(self) -> None:
+        from models.manager_month_stat import ManagerMonthStat
+        from services.manager_attendance_service import _write_manager_month_stat
+        from services.bootstrap_service import ensure_schema_compatibility
+
+        self._login()
+        for stat_type, endpoint in (("overtime", "manager-overtime"), ("annual_leave", "manager-annual-leave")):
+            with self.subTest(stat_type=stat_type):
+                with self.app.app_context():
+                    db.session.add(ManagerMonthStat(emp_id=self.manager_id, year=2026, stat_type=stat_type, m8=1, m9=1, remaining=10 if stat_type == "annual_leave" else 2))
+                    db.session.commit()
+                    ensure_schema_compatibility()
+                query = f"/api/admin/{endpoint}/records?year=2026&emp_ids={self.manager_id}"
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["overrides"]["m8"], 1)
+                for key in ("m9", "m10", "m11", "m12"):
+                    self.assertIsNone(row["overrides"][key])
+                    self.assertNotIn(key, row["legacy_keys"])
+                self.assertEqual(row["automatic"]["m9"], 1)
+                self.assertEqual(row["remaining"], 10 if stat_type == "annual_leave" else 2)
+
+                with self.app.app_context():
+                    _write_manager_month_stat(stat_type, self.manager_id, "2026-09", 0.5)
+                    _write_manager_month_stat(stat_type, self.manager_id, "2026-10", 2)
+                    db.session.commit()
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["m8"], 1)
+                self.assertEqual(row["m9"], 0.5)
+                self.assertEqual(row["automatic"]["m9"], 0.5)
+                self.assertEqual(row["m10"], 2)
+                self.assertIsNone(row["overrides"]["m10"])
+
+                # Newly entered manual zero survives both calculation and repeated upgrades.
+                url = f"/api/admin/{endpoint}/records"
+                response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m11": 0})
+                self.assertEqual(response.status_code, 200)
+                with self.app.app_context():
+                    ensure_schema_compatibility()
+                    _write_manager_month_stat(stat_type, self.manager_id, "2026-11", 1)
+                    db.session.commit()
+                row = self.client.get(query).get_json()[0]
+                self.assertEqual(row["m11"], 0)
+                self.assertEqual(row["overrides"]["m11"], 0)
+
+    def test_blank_uncomputed_month_after_upgrade_does_not_consume_annual_leave(self) -> None:
+        from models.manager_month_stat import ManagerMonthStat
+        from services.bootstrap_service import ensure_schema_compatibility
+
+        self._login()
+        with self.app.app_context():
+            db.session.add(AccountSet(month="2026-10", name="未计算的10月"))
+            db.session.add(ManagerMonthStat(emp_id=self.manager_id, year=2026, stat_type="annual_leave", m8=1, remaining=11))
+            db.session.commit()
+            ensure_schema_compatibility()
+        url = "/api/admin/manager-annual-leave/records"
+        response = self.client.put(url, json={"emp_id": self.manager_id, "year": 2026, "m10": ""})
+        self.assertEqual(response.status_code, 200)
+        row = self.client.get(f"{url}?year=2026&emp_ids={self.manager_id}").get_json()[0]
+        self.assertEqual(row["m10"], 0)
+        self.assertIsNone(row["overrides"]["m10"])
+        self.assertEqual(row["remaining"], 11)
+
     def test_clearing_legacy_correction_computes_missing_automatic_baseline(self) -> None:
         from models.manager_month_stat import ManagerMonthStat
 

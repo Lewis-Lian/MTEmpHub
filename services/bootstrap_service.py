@@ -225,6 +225,10 @@ def ensure_schema_compatibility() -> None:
             if column not in manager_stat_columns:
                 db.session.execute(text(f"ALTER TABLE manager_month_stats ADD COLUMN {column} JSON"))
                 db.session.commit()
+        from services.manager_stat_legacy_upgrade import migrate_legacy_manager_stats
+
+        migrate_legacy_manager_stats(db.session.connection())
+        db.session.commit()
 
     # 性能复合索引（模型层与 Alembic 迁移 b2c3d4e5f6a7、f6a7b8c9d0e1 同名同列）：
     # 旧库升级路径（upgrade-legacy-schema）不跑 Alembic，这里幂等补建

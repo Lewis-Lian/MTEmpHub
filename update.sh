@@ -58,7 +58,8 @@ echo "=========================================="
 # 注：不跑 init-db（它会执行全部 alembic 迁移，风险较高）
 flask --app manage.py upgrade-legacy-schema
 
-# alembic 增量迁移（包括 20261007_stat_sources：管理人员加班/年休自动值与手动修正来源字段）。
+# alembic 增量迁移：20261007_stat_sources 补来源字段，20261007_stat_cutoff
+# 保留 2026 年 1—8 月历史修正，让 9—12 月恢复自动计算。
 # 历史原因：旧库曾长期只靠 upgrade-legacy-schema 补齐，alembic_version 停在初始
 # 版本 681e8410935f，直接 upgrade 会对已存在的表/列报 Duplicate error。幂等补丁
 # 已完整覆盖到 b8c9d0e1f2a3（钉钉同步记录表）为止的对象，因此把这些旧库的版本

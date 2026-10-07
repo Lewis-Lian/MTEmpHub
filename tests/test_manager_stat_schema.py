@@ -33,9 +33,25 @@ def test_source_schema_upgrades_preserve_legacy_values(tmp_path):
             with Operations.context(MigrationContext.configure(connection)):
                 migration.upgrade()
                 migration.upgrade()
-        ensure_schema_compatibility()
         values = db.session.execute(text('SELECT m5, remaining, automatic_values, manual_values FROM manager_month_stats')).one()
         assert tuple(values) == (1.5, 10.5, None, None)
+        cutoff_path = migration_path.with_name('20261007_legacy_stat_cutoff.py')
+        cutoff_spec = importlib.util.spec_from_file_location('manager_stat_cutoff', cutoff_path)
+        cutoff = importlib.util.module_from_spec(cutoff_spec)
+        cutoff_spec.loader.exec_module(cutoff)
+        with db.engine.begin() as connection:
+            with Operations.context(MigrationContext.configure(connection)):
+                cutoff.upgrade()
+                cutoff.upgrade()
+        ensure_schema_compatibility()
+        from models.manager_month_stat import ManagerMonthStat
+        legacy = db.session.get(ManagerMonthStat, 1)
+        assert legacy.m5 == 1.5
+        assert legacy.remaining == 10.5
+        assert legacy.manual_values['m5'] == 1.5
+        assert 'm9' not in legacy.manual_values
+        assert legacy.automatic_values == {'m9': 0, 'm10': 0, 'm11': 0, 'm12': 0}
+        db.session.expunge_all()
 
         db.session.execute(text('ALTER TABLE manager_month_stats DROP COLUMN automatic_values'))
         db.session.execute(text('ALTER TABLE manager_month_stats DROP COLUMN manual_values'))
