@@ -102,16 +102,24 @@ def serialize_row(name, row):
     return result
 
 
-def collect_backup(account_set_id):
+def collect_backup(account_set_id, progress=None, phase="data"):
     account = db.session.get(AccountSet, account_set_id)
     if account is None:
         raise BackupError('账套不存在')
     datasets, employee_ids, shift_ids = {}, set(), set()
+    def report_data():
+        if progress:
+            completed, total = len(datasets), len(DATASETS)
+            progress(phase=phase, completed=completed, total=total,
+                     percent=completed * 100 // total,
+                     stage=('读取账套数据' if phase == 'data' else '校验备份数据') + '（%s/%s 类）' % (completed, total))
+    report_data()
     for name, ds in DATASETS.items():
         if ds.scope in ('shared', 'year'):
             continue
         rows = scoped_rows(name, account)
         datasets[name] = [serialize_row(name, row) for row in rows]
+        report_data()
         employee_ids.update(row.emp_id for row in rows if hasattr(row, 'emp_id'))
         shift_ids.update(row.shift_id for row in rows if getattr(row, 'shift_id', None))
     employees = Employee.query.filter(Employee.id.in_(employee_ids)).order_by(Employee.id).all()
@@ -130,49 +138,69 @@ def collect_backup(account_set_id):
             departments[row.id] = row
             identifier = row.parent_id
     datasets['employees'] = [serialize_row('employees', row) for row in employees]
+    report_data()
     datasets['departments'] = [serialize_row('departments', row) for row in departments.values()]
+    report_data()
     datasets['shifts'] = [serialize_row('shifts', row) for row in Shift.query.filter(Shift.id.in_(shift_ids)).all()]
+    report_data()
     datasets['employee_shift_assignments'] = [serialize_row('employee_shift_assignments', row) for row in assignments]
+    report_data()
     for name, ds in DATASETS.items():
         if ds.scope == 'year':
             datasets[name] = [serialize_row(name, row) for row in scoped_rows(name, account, employee_ids)]
+            report_data()
     return {'format_version': 1, 'month': account.month,
             'account_set': {field: serial(getattr(account, field)) for field in ACCOUNT_FIELDS},
             'source_locked': account.is_locked, 'datasets': datasets}
 
 
-def export_backup(account_set_id):
-    document = collect_backup(account_set_id)
+def export_backup(account_set_id, progress=None):
+    document = collect_backup(account_set_id, progress)
     content = canonical(document).encode()
     output = BytesIO()
     files, total = [], len(content)
+    account = db.session.get(AccountSet, account_set_id)
+    sources = {business_key('imports', serialize_row('imports', row)): row for row in scoped_rows('imports', account)}
+    byte_total = sum(item['file_size'] or 0 for item in document['datasets']['imports'])
+    bytes_done = 0
+    def report_packing(filename=''):
+        if progress:
+            progress(phase='packing', completed=bytes_done, total=byte_total,
+                     percent=bytes_done * 100 // byte_total if byte_total else 100,
+                     stage='打包原始文件' + ('：' + filename if filename else ''))
+    report_packing()
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         archive.writestr('data.json', content)
         for item in document['datasets']['imports']:
-            source = next((row for row in scoped_rows('imports', db.session.get(AccountSet, account_set_id)) if serialize_row('imports', row)['origin_key'] == item['origin_key']), None)
-            mapping = AccountSetBackupOrigin.query.filter_by(dataset='imports', origin_key=item['origin_key']).first()
-            if mapping and source is None:
-                source = db.session.get(DATASETS['imports'].model, mapping.local_id)
+            source = sources.get(business_key('imports', item))
             path = Path(source.stored_path) if source else None
             if not path or not path.is_file():
                 raise BackupError('原始文件缺失：%s' % item['source_filename'])
             before = path.stat()
             if before.st_size > MAX_UPLOAD:
                 raise BackupError('原始文件超过 100 MiB')
-            data = path.read_bytes()
+            checksum, size = hashlib.sha256(), 0
+            with path.open('rb') as stream, archive.open(item['file_key'], 'w') as target:
+                while True:
+                    chunk = stream.read(64 * 1024)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    total += len(chunk)
+                    if size > MAX_UPLOAD or total > MAX_TOTAL:
+                        raise BackupError('账套备份超过大小限制')
+                    target.write(chunk)
+                    checksum.update(chunk)
+                    bytes_done += len(chunk)
+                    report_packing(item['source_filename'])
             after = path.stat()
-            if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns) or checksum.hexdigest() != item['file_sha256']:
                 raise BackupError('原始文件发生变化，请重新导出')
-            total += len(data)
-            if total > MAX_TOTAL:
-                raise BackupError('账套备份超过 500 MiB')
-            archive.writestr(item['file_key'], data)
-            files.append({'path': item['file_key'], 'size': len(data), 'sha256': hashlib.sha256(data).hexdigest()})
+            files.append({'path': item['file_key'], 'size': size, 'sha256': checksum.hexdigest()})
         archive.writestr('manifest.json', canonical({'format_version': 1, 'data_sha256': hashlib.sha256(content).hexdigest(), 'files': files}))
     if output.tell() > MAX_UPLOAD:
         raise BackupError('压缩备份超过 100 MiB')
-    # Recheck business state before completing the download.
-    if digest(collect_backup(account_set_id)) != digest(document):
+    if digest(collect_backup(account_set_id, progress, phase='verification')) != digest(document):
         raise BackupError('账套数据发生变化，请重新导出')
     return output.getvalue()
 

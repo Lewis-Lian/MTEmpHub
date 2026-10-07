@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -627,6 +627,25 @@ describe("App smoke regression", () => {
     expect(screen.getByText("locked-user")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "解锁" }));
     expect(await screen.findByText("已解锁账号：locked-user")).toBeInTheDocument();
+  });
+
+  it("账套导出显示实际进度并保留完成状态", async () => {
+    window.history.replaceState({}, "", "/admin/dashboard");
+    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+    const backupApi = await import("./api/accountSetBackup");
+    let finishExport!: () => void;
+    const download = vi.spyOn(backupApi, "downloadAccountSetBackup").mockImplementation((_id, _month, report) => {
+      report({status: "running", phase: "packing", percent: 37, completed: 37, total: 100, stage: "打包原始文件"});
+      return new Promise<void>(resolve => { finishExport = () => { report({status: "completed", phase: "download", percent: 100, stage: "备份下载完成"}); resolve(); }; });
+    });
+    const { default: App } = await import("./App");
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", {name: /账套设置/}));
+    fireEvent.click(screen.getByRole("button", {name: /导出.*账套/}));
+    expect(await screen.findByRole("progressbar", {name: "账套导出当前阶段进度"})).toHaveAttribute("aria-valuenow", "37");
+    await act(async () => { finishExport(); });
+    await waitFor(() => expect(screen.getByRole("progressbar", {name: "账套导出当前阶段进度"})).toHaveAttribute("aria-valuenow", "100"));
+    download.mockRestore();
   });
 
   it("账套中心会挂载旧版账套工作台", async () => {

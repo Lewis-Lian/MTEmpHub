@@ -90,12 +90,29 @@ def register_admin_backup_routes(bp, admin_required):
     @admin_required
     @handled
     def account_set_backup_download(account_set_id):
-        data = export_backup(account_set_id)
+        from services.account_set_export_progress_service import start_export_progress
+        token = request.args.get('export_token')
+        update = start_export_progress(token, account_set_id, g.current_user.id) if token else None
+        try:
+            data = export_backup(account_set_id, progress=update)
+            if update:
+                update(status='ready', phase='verification', percent=100, completed=1, total=1, stage='备份生成完成，准备下载')
+        except Exception as exc:
+            if update:
+                update(status='failed', phase='failed', percent=0, stage=str(exc) if isinstance(exc, BackupError) else '账套导出失败')
+            raise
         from models.account_set import AccountSet
         from models import db
         account = db.session.get(AccountSet, account_set_id)
         return send_file(BytesIO(data), mimetype='application/zip', as_attachment=True,
                          download_name='账套备份_%s.zip' % account.month)
+
+    @bp.get('/account-sets/<int:account_set_id>/backup/progress')
+    @admin_required
+    @handled
+    def account_set_backup_progress(account_set_id):
+        from services.account_set_export_progress_service import get_export_progress
+        return jsonify(get_export_progress(request.args.get('export_token'), account_set_id, g.current_user.id))
 
     @bp.post('/account-set-backups/preview')
     @admin_required

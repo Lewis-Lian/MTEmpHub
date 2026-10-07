@@ -29,7 +29,7 @@ import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
 import "./account-center.css";
 import AccountSetBackupModal from "../../components/admin/AccountSetBackupModal";
-import { backupDownloadUrl } from "../../api/accountSetBackup";
+import { downloadAccountSetBackup, type BackupExportProgress } from "../../api/accountSetBackup";
 
 const FILE_INPUT_LABELS = [
   "1. 请假单",
@@ -79,6 +79,7 @@ export default function AdminDashboardPage() {
   const confirm = useConfirm();
   const notification = useNotification();
   const [showBackup, setShowBackup] = useState(false);
+  const [exportProgress, setExportProgress] = useState<BackupExportProgress | null>(null);
   const [accountSets, setAccountSets] = useState<AdminAccountSet[]>([]);
 
   const [imports, setImports] = useState<AdminAccountSetImport[]>([]);
@@ -100,6 +101,7 @@ export default function AdminDashboardPage() {
 
   const handleCloseModal = () => {
     setShowModal(null);
+    setExportProgress(null);
     setUploadFiles(Array.from({ length: 6 }, () => null));
     setDragOverIndex(Array.from({ length: 6 }, () => false));
     setProgressVisible(false);
@@ -1038,7 +1040,15 @@ export default function AdminDashboardPage() {
                     <p className="acm-backup-settings-hint">导出当前所选月份，或从备份导入对应月份的账套。</p>
                     <div className="acm-backup-settings-actions">
                       <button className="acm-dock-item acm-dock-item--backup-export" type="button" title={selectedAccountSet ? `仅导出 ${selectedAccountSet.month} 月份的完整账套` : "请先选择账套月份"} disabled={!selectedAccountSet || isWorking} onClick={() => {
-                        if (selectedAccountSet) window.location.href = backupDownloadUrl(selectedAccountSet.id);
+                        if (!selectedAccountSet) return;
+                        const account = selectedAccountSet;
+                        void runAction(async () => {
+                          setExportProgress({status: "running", percent: 0, stage: `准备导出 ${account.month} 账套`});
+                          try {
+                            await downloadAccountSetBackup(account.id, account.month, setExportProgress);
+                            notification.success(`${account.month} 账套备份已下载`);
+                          } catch (caughtError) { setExportProgress(null); throw caughtError; }
+                        });
                       }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></svg>
                         <span>{selectedAccountSet ? `导出 ${selectedAccountSet.month} 账套` : "导出月度账套"}</span>
@@ -1048,6 +1058,13 @@ export default function AdminDashboardPage() {
                         <span>导入月度账套</span>
                       </button>
                     </div>
+                    {exportProgress && <div className="acm-export-progress" role="status">
+                      <div className="acm-export-progress-heading"><span>{exportProgress.stage}</span><strong>{exportProgress.status !== "completed" && exportProgress.total === undefined && exportProgress.phase === "download" ? "接收中" : `${exportProgress.percent}%`}</strong></div>
+                      <div className="acm-export-progress-track" role="progressbar" aria-label="账套导出当前阶段进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={exportProgress.status !== "completed" && exportProgress.total === undefined && exportProgress.phase === "download" ? undefined : exportProgress.percent}>
+                        <span style={{width: `${exportProgress.percent}%`}} />
+                      </div>
+                      <p>显示当前阶段的实际完成进度</p>
+                    </div>}
                   </div>
                 </div>
 

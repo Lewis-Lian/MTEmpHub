@@ -1419,3 +1419,10 @@
 
 .acm-backup-settings-hint { margin: 0 0 14px; color: var(--acm-text-secondary); font-size: 12.5px; line-height: 1.6; }
 .acm-backup-settings-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.acm-export-progress { margin-top: 16px; padding: 14px; border: 1px solid #c7d2fe; border-radius: 12px; background: #f5f7ff; }
+.acm-export-progress-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; color: var(--acm-text-secondary); }
+.acm-export-progress-heading span { overflow-wrap: anywhere; }
+.acm-export-progress-heading strong { color: var(--acm-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.acm-export-progress-track { height: 7px; border-radius: 999px; overflow: hidden; background: #e0e7ff; margin-top: 10px; }
+.acm-export-progress-track span { display: block; height: 100%; background: var(--acm-primary); border-radius: inherit; }
+.acm-export-progress p { margin: 8px 0 0; font-size: 11px; color: var(--acm-text-muted); }
