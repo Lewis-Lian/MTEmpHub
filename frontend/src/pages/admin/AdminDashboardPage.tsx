@@ -790,7 +790,7 @@ export default function AdminDashboardPage() {
                   <div className="acm-card-block">
                     <div className="acm-card-block-title">月度账套</div><p className="acm-settings-section-description">按月份建立独立账套</p>
                     <form
-                      style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+                      className="acm-settings-create-form"
                       onSubmit={(event) => {
                         event.preventDefault();
                         if (!createMonth) {
