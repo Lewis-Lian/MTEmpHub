@@ -119,8 +119,8 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
           <fieldset disabled={busy} className="backup-options"><legend>选择导入关联资料（可选）</legend>
             {([['employees', '员工资料'], ['departments', '部门资料'], ['shifts', '班次及默认分配'], ['annual_stats', '年度统计及年假余额']] as const).map(([key, label]) => <label key={key}><input type="checkbox" checked={options[key]} onChange={event => {const next = {...options, [key]: event.target.checked}; setOptions(next); setChoices({}); void refresh(next, {});}} />{label}</label>)}
           </fieldset>
-          <p>共享资料会影响其他月份；年度资料会影响全年。未勾选时沿用系统资料，缺失引用需先补齐。</p>
-          <label><input type="checkbox" disabled={busy} checked={options.delete_month_only} onChange={event => {const next = {...options, delete_month_only: event.target.checked}; setOptions(next); setChoices({}); void refresh(next, {});}} />使当月独有数据与备份一致（删除清单将在确认页展示）</label>
+          <p className="backup-scope-note">共享资料会影响其他月份；年度资料会影响全年。未勾选时沿用系统资料，缺失引用需先补齐。</p>
+          <label className="backup-delete-option"><input type="checkbox" disabled={busy} checked={options.delete_month_only} onChange={event => {const next = {...options, delete_month_only: event.target.checked}; setOptions(next); setChoices({}); void refresh(next, {});}} />使当月独有数据与备份一致（删除清单将在确认页展示）</label>
           <div className="backup-toolbar">
             <label>数据类别<select value={category} onChange={event => setCategory(event.target.value)}><option value="">全部</option>{Object.entries(CATEGORIES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
             <label><input type="checkbox" checked={showSame} onChange={event => setShowSame(event.target.checked)} />显示一致记录</label>
@@ -129,7 +129,7 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
           </div>
           <div className="backup-summary">{([['new', '备份新增'], ['changed', '值不一致'], ['system_only', '系统独有'], ['same', '数据一致']] as const).map(([key, label]) => <div className={`backup-summary-item backup-summary-item--${key}`} key={key}><span>{label}</span><strong>{preview.summary[key]}</strong></div>)}</div>
           <div className="backup-differences">{shown.map(row => <details key={row.key} open={row.status === 'changed'} className={`backup-difference-card backup-difference-card--${row.status}${!row.enabled ? ' backup-disabled' : ''}`}>
-            <summary>{CATEGORIES[row.dataset]} · {identityLabel(row.identity)} · {STATUS[row.status]}{!row.enabled && '（未选导入）'}</summary>
+            <summary><span className="backup-row-category">{CATEGORIES[row.dataset]}</span><span className="backup-row-identity">{identityLabel(row.identity)}</span><span className={`backup-row-status backup-row-status--${row.status}`}>{STATUS[row.status]}</span>{!row.enabled && <span className="backup-row-disabled">未选导入</span>}</summary>
             <p>影响月份：{row.affected_months.join('、') || preview.month}</p>
             {row.status !== 'same' && <label>采用方式<select aria-label={`采用方式 ${row.key}`} disabled={busy || !row.enabled} value={choices[row.key] ?? row.default_choice} onChange={event => choose(row.key, event.target.value as BackupChoice)}>
               <option value="system">{row.status === 'new' ? '不新增' : '以系统为准'}</option>
@@ -142,14 +142,14 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
           <div className="backup-toolbar backup-footer"><button type="button" disabled={busy} onClick={() => void refresh(options, choices)}>重新预览</button><button className="backup-primary-btn" type="button" disabled={busy || !valid || !!preview.blockers.length} onClick={() => setConfirming(true)}>查看导入确认</button></div>
         </>}
         {confirming && <>
-          <h4>确认将执行的变更</h4><p>新增 {adding.length} 条，更新 {updating.length} 条，删除 {deleting.length} 条。</p>
+          <div className="backup-confirm-card"><h4>确认将执行的变更</h4><p>请核对本次导入的变更数量与影响范围</p><div className="backup-confirm-counts"><div><span>新增记录</span><strong>{adding.length}</strong></div><div><span>更新记录</span><strong>{updating.length}</strong></div><div><span>删除记录</span><strong>{deleting.length}</strong></div></div></div>
           <ul>{changed.filter(row => row.affected_months.some(month => month !== preview.month) || ['annual_leave', 'manager_stats'].includes(row.dataset)).map(row => <li key={row.key}>{CATEGORIES[row.dataset]} {identityLabel(row.identity)}：影响 {row.affected_months.join('、') || '全年'}{['annual_leave', 'manager_stats'].includes(row.dataset) && '（全年）'}</li>)}</ul>
           {!!deleting.length && <><h4>删除清单</h4><ul>{deleting.map(row => <li key={row.key}>{CATEGORIES[row.dataset]} {identityLabel(row.identity)}</li>)}</ul></>}
-          <p>请确认上述选择。系统会再次检查差异；失败时回滚本次数据变更。</p>
+          <p className="backup-scope-note">请确认上述选择。系统会再次检查差异；失败时回滚本次数据变更。</p>
           <div className="backup-toolbar backup-footer"><button type="button" disabled={busy} onClick={() => setConfirming(false)}>返回修改</button><button className="backup-primary-btn" type="button" disabled={busy || !valid} onClick={() => void restore()}>确认导入</button></div>
         </>}
       </>}
-      {result && <div className="backup-result"><span className="backup-result-icon" aria-hidden="true">✓</span><h4>账套恢复完成</h4><p>新增 {result.counts.new} · 更新 {result.counts.updated} · 删除 {result.counts.deleted} · 保留或跳过 {result.counts.skipped}</p>{result.warnings.map(message => <p key={message}>{message}</p>)}<button className="backup-primary-btn" type="button" onClick={() => void close()}>完成</button></div>}
+      {result && <div className="backup-result"><span className="backup-result-icon" aria-hidden="true">✓</span><h4>账套恢复完成</h4><div className="backup-result-counts">{([["新增", result.counts.new], ["更新", result.counts.updated], ["删除", result.counts.deleted], ["保留或跳过", result.counts.skipped]] as const).map(([label, count]) => <div key={label}><strong>{count}</strong><span>{label}</span></div>)}</div>{result.warnings.map(message => <p key={message}>{message}</p>)}<button className="backup-primary-btn" type="button" onClick={() => void close()}>完成</button></div>}
     </div>
   </div></div>;
 }
