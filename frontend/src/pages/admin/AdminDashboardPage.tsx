@@ -372,7 +372,7 @@ export default function AdminDashboardPage() {
         text={loadingText}
       />
 
-      {showBackup && <AccountSetBackupModal onClose={() => setShowBackup(false)} onRestored={(id) => {
+      {showBackup && <AccountSetBackupModal onClose={() => { setShowBackup(false); setShowModal("settings"); }} onRestored={(id) => {
         clearQueryBootstrapCache();
         void reloadAccountSets(id);
         void fetchAccountSetImports(id).then(setImports);
@@ -496,16 +496,6 @@ export default function AdminDashboardPage() {
         {/* macOS Dock 风格悬浮操作栏 */}
         <div className="acm-dock-container account-panel-selector">
           <div className="acm-dock-bar">
-            <button className="acm-dock-item acm-dock-item--backup-export" type="button" title={selectedAccountSet ? `仅导出 ${selectedAccountSet.month} 月份的完整账套` : "请先选择账套月份"} disabled={!selectedAccountSet || isWorking} onClick={() => {
-              if (selectedAccountSet) window.location.href = backupDownloadUrl(selectedAccountSet.id);
-            }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></svg>
-              <span>{selectedAccountSet ? `导出 ${selectedAccountSet.month} 账套` : "导出月度账套"}</span>
-            </button>
-            <button className="acm-dock-item acm-dock-item--backup-import" type="button" disabled={isWorking} onClick={() => setShowBackup(true)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" /></svg>
-              <span>导入月度账套</span>
-            </button>
             {selectedAccountSet && !selectedAccountSet.is_active ? (
               <button
                 className="acm-dock-item acm-dock-item--active-trigger"
@@ -1040,6 +1030,22 @@ export default function AdminDashboardPage() {
                         type="button"
                       >
                         刷新
+                      </button>
+                    </div>
+                  </div>
+                  <div className="acm-card-block">
+                    <div className="acm-card-block-title">账套导入与导出</div>
+                    <p className="acm-backup-settings-hint">导出当前所选月份，或从备份导入对应月份的账套。</p>
+                    <div className="acm-backup-settings-actions">
+                      <button className="acm-dock-item acm-dock-item--backup-export" type="button" title={selectedAccountSet ? `仅导出 ${selectedAccountSet.month} 月份的完整账套` : "请先选择账套月份"} disabled={!selectedAccountSet || isWorking} onClick={() => {
+                        if (selectedAccountSet) window.location.href = backupDownloadUrl(selectedAccountSet.id);
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></svg>
+                        <span>{selectedAccountSet ? `导出 ${selectedAccountSet.month} 账套` : "导出月度账套"}</span>
+                      </button>
+                      <button className="acm-dock-item acm-dock-item--backup-import" type="button" disabled={isWorking} onClick={() => { setShowModal(null); setShowBackup(true); }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" /></svg>
+                        <span>导入月度账套</span>
                       </button>
                     </div>
                   </div>

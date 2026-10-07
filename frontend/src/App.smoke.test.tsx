@@ -639,10 +639,15 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("button", { name: /账套设置/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /上传原始文档/ })).toBeInTheDocument();
 
+    expect(screen.queryByRole("button", { name: "导入月度账套" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /导出.*账套/ })).not.toBeInTheDocument();
+
     // 点击 ⚙️ 账套设置 打开弹窗
     fireEvent.click(screen.getByRole("button", { name: /账套设置/ }));
     expect(await screen.findByText("月度账套")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入月度账套" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /导出.*账套/ })).toBeInTheDocument();
 
     // 关闭账套设置弹窗
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));

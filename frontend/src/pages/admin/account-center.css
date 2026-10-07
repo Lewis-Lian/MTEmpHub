@@ -1416,3 +1416,6 @@
   .backup-upload-zone { padding: 28px 16px; }
   .backup-summary-item { padding: 12px; }
 }
+
+.acm-backup-settings-hint { margin: 0 0 14px; color: var(--acm-text-secondary); font-size: 12.5px; line-height: 1.6; }
+.acm-backup-settings-actions { display: flex; gap: 10px; flex-wrap: wrap; }
