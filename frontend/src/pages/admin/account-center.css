@@ -1426,3 +1426,63 @@
 .acm-export-progress-track { height: 7px; border-radius: 999px; overflow: hidden; background: #e0e7ff; margin-top: 10px; }
 .acm-export-progress-track span { display: block; height: 100%; background: var(--acm-primary); border-radius: inherit; }
 .acm-export-progress p { margin: 8px 0 0; font-size: 11px; color: var(--acm-text-muted); }
+
+/* 账套设置：清晰的管理区与月度参数工作区 */
+.acm-modal-card--settings { max-width: 1040px; overflow: hidden; }
+.acm-modal-card--settings .acm-modal-head { flex-shrink: 0; padding: 24px 28px; }
+.acm-modal-card--settings .acm-modal-title-group { gap: 14px; min-width: 0; }
+.acm-settings-title-icon { width: 48px; height: 48px; display: grid; place-items: center; flex-shrink: 0; border-radius: 15px; background: #eef2ff; color: var(--acm-primary); }
+.acm-settings-title-copy p { margin: 6px 0 0; color: var(--acm-text-secondary); font-size: 12.5px; line-height: 1.5; }
+.acm-modal-card--settings .acm-modal-title { font-size: 20px; letter-spacing: -.02em; }
+.acm-modal-card--settings .acm-modal-body { overflow-y: auto; min-height: 0; padding: 24px 28px 28px; background: #f6f8fc; gap: 22px; }
+.acm-settings-overview { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 16px; border: 1px solid #e0e7ff; border-radius: 16px; padding: 20px 24px; background: linear-gradient(110deg, #eef2ff, #fff); }
+.acm-settings-overview > div { display: flex; flex-direction: column; gap: 7px; }
+.acm-settings-overview > div + div { border-left: 1px solid #dfe5f1; padding-left: 24px; }
+.acm-settings-overview span { color: var(--acm-text-secondary); font-size: 12px; }
+.acm-settings-overview strong { color: var(--acm-text-main); font-size: 20px; font-weight: 750; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.acm-settings-overview > div:first-child strong { color: var(--acm-primary); }
+.acm-settings-overview small { margin-left: 6px; color: var(--acm-text-secondary); font-size: 12px; font-weight: 500; }
+.acm-modal-card--settings .acm-modal-split-layout { grid-template-columns: minmax(0, 310px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.acm-modal-card--settings .acm-modal-col { gap: 18px; min-width: 0; }
+.acm-modal-card--settings .acm-card-block { padding: 20px; border-radius: 15px; background: #fff !important; border-color: #e5eaf2 !important; box-shadow: 0 3px 12px rgba(15, 23, 42, .025) !important; gap: 14px; }
+.acm-modal-card--settings .acm-card-block-title { color: var(--acm-text-main); font-size: 14px; letter-spacing: 0; gap: 9px; }
+.acm-modal-card--settings .acm-card-block-title::before { width: 4px; height: 15px; }
+.acm-settings-section-description { margin: -7px 0 0; color: var(--acm-text-secondary); font-size: 12px; line-height: 1.6; }
+.acm-modal-card--settings .acm-button-stack { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.acm-modal-card--settings .acm-button-stack > button:first-child { grid-column: 1 / -1; }
+.acm-modal-card--settings .acm-button-stack button { min-height: 40px; height: auto; padding: 9px 8px; font-size: 12px; border-radius: 9px; }
+.acm-modal-card--settings .acm-btn--danger-text { border: 1px solid #fecdd3; background: #fff7f8; }
+.acm-modal-card--settings .acm-backup-settings-actions { display: grid; grid-template-columns: 1fr; }
+.acm-modal-card--settings .acm-backup-settings-actions button { width: 100%; min-height: 42px; justify-content: center; box-sizing: border-box; border-radius: 10px; }
+.acm-modal-card--settings .acm-backup-settings-hint { margin-bottom: 0; }
+.acm-settings-parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.acm-settings-number-input { box-sizing: border-box; width: 100%; height: 44px; padding: 0 14px; border: 1px solid #dbe2ec; border-radius: 10px; background: #fff; color: var(--acm-text-main); font-size: 16px; font-weight: 650; outline: none; transition: border-color .15s, box-shadow .15s; }
+.acm-settings-number-input:focus { border-color: #818cf8; box-shadow: 0 0 0 3px #eef2ff; }
+.acm-settings-number-input[readonly], .acm-settings-number-input:disabled { background: #f5f7fa; color: #64748b; }
+.acm-modal-card--settings .acm-calendar-topbar { gap: 14px; }
+.acm-modal-card--settings .acm-calendar-stats { width: 100%; padding: 12px 14px; background: #f8fafc; border-radius: 10px; justify-content: space-between; gap: 8px; }
+.acm-modal-card--settings .acm-calendar-legend { gap: 16px; }
+.acm-modal-card--settings .acm-calendar-grid { gap: 8px; }
+.acm-modal-card--settings .acm-calendar-day-btn { min-height: 60px; border-radius: 10px; }
+.acm-modal-card--settings .acm-day-number { font-size: 15px; }
+.acm-modal-card--settings .acm-day-state-label { margin-top: 5px; }
+.acm-settings-save-actions { display: flex; justify-content: flex-end; margin-top: 6px; padding-top: 16px; border-top: 1px solid #edf1f6; }
+.acm-settings-save-actions .acm-btn { min-width: 132px; min-height: 42px; border-radius: 10px; }
+@media (max-width: 800px) {
+  .acm-modal-card--settings .acm-modal-split-layout { grid-template-columns: minmax(0, 1fr); }
+  .acm-modal-card--settings .acm-backup-settings-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 540px) {
+  .acm-modal-card--settings .acm-modal-head { padding: 18px 16px; gap: 10px; }
+  .acm-modal-card--settings .acm-modal-body { padding: 16px; }
+  .acm-modal-card--settings .acm-modal-title { font-size: 16px; }
+  .acm-modal-card--settings .acm-modal-title-group { flex-wrap: wrap; gap: 8px; }
+  .acm-settings-title-icon { width: 36px; height: 36px; border-radius: 11px; }
+  .acm-settings-overview { padding: 16px; gap: 12px; }
+  .acm-settings-overview > div + div { padding-left: 12px; }
+  .acm-settings-overview strong { font-size: 16px; }
+  .acm-modal-card--settings .acm-card-block { padding: 16px; }
+  .acm-modal-card--settings .acm-backup-settings-actions { grid-template-columns: 1fr; }
+  .acm-modal-card--settings .acm-calendar-grid { gap: 5px; }
+  .acm-modal-card--settings .acm-calendar-day-btn { min-height: 52px; }
+}

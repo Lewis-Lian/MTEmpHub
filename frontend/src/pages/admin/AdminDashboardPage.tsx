@@ -748,7 +748,7 @@ export default function AdminDashboardPage() {
             }
           }}
         >
-          <div className="acm-modal-card acm-modal-card--settings">
+          <div className="acm-modal-card acm-modal-card--settings" role="dialog" aria-modal="true" aria-labelledby="account-settings-title">
             <QueryProgressOverlay
               active={progressVisible}
               className="query-progress-overlay-modal"
@@ -758,7 +758,8 @@ export default function AdminDashboardPage() {
 
             <div className="acm-modal-head">
               <div className="acm-modal-title-group">
-                <h3 className="acm-modal-title">账套设置与参数配置</h3>
+                <span className="acm-settings-title-icon" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4 7h16M4 17h16" /><circle cx="9" cy="7" r="3" fill="currentColor" stroke="none" /><circle cx="15" cy="17" r="3" fill="currentColor" stroke="none" /></svg></span>
+                <div className="acm-settings-title-copy"><h3 className="acm-modal-title" id="account-settings-title">账套设置与参数配置</h3><p>管理月度账套，配置福利与厂休安排</p></div>
                 {selectedAccountSet ? (
                   <span className={`acm-badge ${selectedAccountSet.is_locked ? "acm-badge--locked" : "acm-badge--editable"}`}>
                     <span className="acm-badge-dot" />
@@ -777,12 +778,17 @@ export default function AdminDashboardPage() {
             </div>
 
             <div className="acm-modal-body">
+              <div className="acm-settings-overview">
+                <div><span>当前账套</span><strong>{selectedAccountSet?.month ?? "尚未选择"}</strong></div>
+                <div><span>使用状态</span><strong>{selectedAccountSet ? selectedAccountSet.is_active ? "当前激活" : "历史账套" : "请选择账套"}</strong></div>
+                <div><span>本月厂休累计</span><strong>{factoryRestSummary}<small>天</small></strong></div>
+              </div>
               <div className="acm-modal-split-layout">
                 {/* 左列：月度账套创建与生命周期控制 */}
                 <div className="acm-modal-col">
                   {/* 创建新账套 */}
                   <div className="acm-card-block">
-                    <div className="acm-card-block-title">月度账套</div>
+                    <div className="acm-card-block-title">月度账套</div><p className="acm-settings-section-description">按月份建立独立账套</p>
                     <form
                       style={{ display: "flex", flexDirection: "column", gap: "10px" }}
                       onSubmit={(event) => {
@@ -862,7 +868,7 @@ export default function AdminDashboardPage() {
 
                   {/* 账套运维动作按钮组 */}
                   <div className="acm-card-block">
-                    <div className="acm-card-block-title">账套生命周期操作</div>
+                    <div className="acm-card-block-title">账套生命周期操作</div><p className="acm-settings-section-description">管理当前账套的激活与锁定状态</p>
                     <div className="acm-button-stack">
                       <button
                         className="acm-btn acm-btn--outline"
@@ -1072,24 +1078,15 @@ export default function AdminDashboardPage() {
                 <div className="acm-modal-col">
                   {/* 参数配置 */}
                   <div className="acm-card-block">
-                    <div className="acm-card-block-title">参数设置</div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div className="acm-card-block-title">参数设置</div><p className="acm-settings-section-description">厂休天数由日历汇总，福利天数可单独配置</p>
+                    <div className="acm-settings-parameter-grid">
                       <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                         <span style={{ fontSize: "12.5px", fontWeight: "600", color: "var(--acm-text-secondary)" }}>
                           本月厂休天数
                         </span>
                         <input
                           readOnly
-                          style={{
-                            height: "36px",
-                            padding: "0 12px",
-                            borderRadius: "8px",
-                            border: "1px solid var(--acm-border)",
-                            background: "var(--acm-surface-muted)",
-                            fontSize: "14px",
-                            fontWeight: "600",
-                            color: "var(--acm-text-main)",
-                          }}
+                          className="acm-settings-number-input"
                           type="number"
                           value={factoryRestSummary}
                         />
@@ -1104,15 +1101,7 @@ export default function AdminDashboardPage() {
                           min={0}
                           onChange={(event) => setMonthlyBenefitDays(event.target.value)}
                           step={0.5}
-                          style={{
-                            height: "36px",
-                            padding: "0 12px",
-                            borderRadius: "8px",
-                            border: "1px solid var(--acm-border-strong)",
-                            background: "#ffffff",
-                            fontSize: "14px",
-                            color: "var(--acm-text-main)",
-                          }}
+                          className="acm-settings-number-input"
                           type="number"
                           value={monthlyBenefitDays}
                         />
@@ -1187,7 +1176,7 @@ export default function AdminDashboardPage() {
                       )}
                     </div>
 
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "10px" }}>
+                    <div className="acm-settings-save-actions">
                       <button
                         className="acm-btn acm-btn--primary"
                         disabled={!selectedAccountSet || selectedAccountSet.is_locked || isWorking}
