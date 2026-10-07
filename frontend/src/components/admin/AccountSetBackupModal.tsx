@@ -24,6 +24,8 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
   const [choices, setChoices] = useState<Record<string, BackupChoice>>({});
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const dragDepth = useRef(0);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState<BackupRestoreResult | null>(null);
@@ -44,6 +46,8 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
     } finally { if (generation.current === requestGeneration) setBusy(false); }
   }
   async function upload(file: File) {
+    if (busy) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) { setError('请选择 ZIP 格式的账套备份'); return; }
     setBusy(true); setError('');
     try { setPreview(await uploadBackup(file)); setValid(true); }
     catch (caught) { setError(caught instanceof Error ? caught.message : '上传失败'); }
@@ -90,7 +94,17 @@ export default function AccountSetBackupModal({onClose, onRestored}: {onClose: (
       <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '核对差异', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
       {error && <p role="alert" className="backup-error">{error}</p>}
       {busy && <p role="status">正在处理，请稍候…</p>}
-      {!preview && <div className="backup-upload-zone"><span className="backup-upload-icon" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6v20h12V6zM14 2v5h5M9 12h6m-6 4h6" /></svg></span><h4>选择一个月份的账套备份</h4><p>支持完整 ZIP 备份，上传后自动识别账套月份</p><label className="backup-file-picker">选择账套备份<input type="file" accept=".zip" disabled={busy} onChange={event => {const file = event.target.files?.[0]; if (file) void upload(file);}} /></label><span className="backup-upload-hint">先预览差异，再选择采用的数据</span></div>}
+      {!preview && <div className={`backup-upload-zone${dragging ? ' is-dragging' : ''}`} role="region" aria-label="上传账套备份" aria-busy={busy}
+        onDragEnter={event => { event.preventDefault(); if (!busy && event.dataTransfer.types.includes('Files')) { dragDepth.current += 1; setDragging(true); } }}
+        onDragOver={event => { event.preventDefault(); event.dataTransfer.dropEffect = busy ? 'none' : 'copy'; }}
+        onDragLeave={event => { event.preventDefault(); dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }}
+        onDrop={event => {
+          event.preventDefault(); dragDepth.current = 0; setDragging(false);
+          if (busy) return;
+          const files = event.dataTransfer.files;
+          if (files.length > 1) { setError('请每次上传一个账套备份'); return; }
+          if (files[0]) void upload(files[0]);
+        }}><span className="backup-upload-icon" aria-hidden="true"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6v20h12V6zM14 2v5h5M9 12h6m-6 4h6" /></svg></span><h4>选择一个月份的账套备份</h4><p>将 ZIP 备份拖入此处，或点击下方选择文件</p><label className="backup-file-picker">选择账套备份<input type="file" accept=".zip" disabled={busy} onChange={event => {const file = event.target.files?.[0]; if (file) void upload(file);}} /></label><span className="backup-upload-hint">先预览差异，再选择采用的数据</span></div>}
       {preview && !result && <>
         <h4 className="backup-month-badge">{preview.month} 账套备份</h4>
         {preview.source_locked && <p>来源账套已锁定；导入不会改变系统中的锁定状态。</p>}

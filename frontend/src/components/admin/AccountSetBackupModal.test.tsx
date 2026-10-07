@@ -45,3 +45,32 @@ it('returns to preview when the target changes', async () => {
   await screen.findByText(/系统数据已变化/);
   expect(screen.getByRole('button', {name:'查看导入确认'})).toBeInTheDocument();
 });
+
+it('uploads a dropped ZIP and highlights the drop area', async () => {
+  render(<AccountSetBackupModal onClose={() => {}} onRestored={() => {}} />);
+  const zone = screen.getByRole('region', {name: '上传账套备份'});
+  const file = new File(['x'], 'backup.zip');
+  fireEvent.dragEnter(zone, {dataTransfer: {types: ['Files']}});
+  expect(zone).toHaveClass('is-dragging');
+  fireEvent.drop(zone, {dataTransfer: {files: [file]}});
+  await screen.findByText('2026-06 账套备份');
+  expect(mocks.upload).toHaveBeenCalledWith(file);
+});
+it('rejects multiple files and non-ZIP drops without uploading', () => {
+  render(<AccountSetBackupModal onClose={() => {}} onRestored={() => {}} />);
+  const zone = screen.getByRole('region', {name: '上传账套备份'});
+  fireEvent.drop(zone, {dataTransfer: {files: [new File(['x'], 'a.zip'), new File(['x'], 'b.zip')]}});
+  expect(screen.getByRole('alert')).toHaveTextContent('请每次上传一个账套备份');
+  fireEvent.drop(zone, {dataTransfer: {files: [new File(['x'], 'a.xlsx')]}});
+  expect(screen.getByRole('alert')).toHaveTextContent('请选择 ZIP 格式的账套备份');
+  expect(mocks.upload).not.toHaveBeenCalled();
+});
+it('ignores another dropped file while uploading', () => {
+  mocks.upload.mockReturnValue(new Promise(() => {}));
+  render(<AccountSetBackupModal onClose={() => {}} onRestored={() => {}} />);
+  const zone = screen.getByRole('region', {name: '上传账套备份'});
+  const file = new File(['x'], 'a.zip');
+  fireEvent.drop(zone, {dataTransfer: {files: [file]}});
+  fireEvent.drop(zone, {dataTransfer: {files: [file]}});
+  expect(mocks.upload).toHaveBeenCalledTimes(1);
+});
