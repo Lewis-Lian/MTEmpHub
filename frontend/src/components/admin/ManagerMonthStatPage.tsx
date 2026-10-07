@@ -12,6 +12,7 @@ import QueryTable from "../query/QueryTable";
 import YearPicker from "../common/YearPicker";
 import QueryEmptyState from "../query/QueryEmptyState";
 import "../../pages/query/dashboard-shared.css";
+import "./manager-month-stat.css";
 import { useNotification } from "../feedback/Notification";
 import type { QueryBootstrap } from "../../types/query";
 
@@ -67,7 +68,7 @@ export default function ManagerMonthStatPage({
   const [editRemark, setEditRemark] = useState("");
   const [columnStates, setColumnStates] = useState<Record<string, ColumnState>>({});
   const [hasQueried, setHasQueried] = useState(false);
-  const [showActionsModal, setShowActionsModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
@@ -92,14 +93,16 @@ export default function ManagerMonthStatPage({
   const tableHeaders = [
     "部门",
     "姓名",
-    ...summaryColumns.map((column) => column.label),
+    ...monthFields.map((field) => field.label),
+    ...summaryColumns.filter((column) => !monthFields.some((field) => field.key === column.key)).map((column) => column.label),
     "备注",
     { label: "操作", sortable: false as const },
   ];
   const tableRows = rows.map((row) => [
     String(row.dept_name ?? ""),
     String(row.name ?? ""),
-    ...summaryColumns.map((column) => column.render(row)),
+    ...monthFields.map((field) => normalizeValue(row[field.key]) || "—"),
+    ...summaryColumns.filter((column) => !monthFields.some((field) => field.key === column.key)).map((column) => column.render(row)),
     String(row.remark ?? ""),
     <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>,
   ]);
@@ -191,14 +194,18 @@ export default function ManagerMonthStatPage({
       payload[field.key] = editValues[field.key] ?? "";
     });
 
+    setIsSaving(true);
     try {
       await apiRequest(`${endpointBase}/records`, {
         body: payload,
         method: "PUT",
       });
       await loadRows();
+      notification.success("修改已保存");
     } catch (error) {
       notification.error(error instanceof Error ? error.message : "保存失败");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -262,6 +269,18 @@ export default function ManagerMonthStatPage({
     }
   }
 
+  function renderMonthInput(field: MonthField) {
+    const locked = columnStates[field.key] === "locked";
+    return (
+      <label className={`manager-stat-month${locked ? " is-locked" : ""}`} key={field.key}>
+        <span>{field.label}{locked ? <small>已锁定</small> : null}</span>
+        <div><input className="account-input" inputMode="decimal" disabled={locked || isSaving}
+          aria-label={field.label} value={editValues[field.key] ?? ""}
+          onChange={(event) => setEditValues((current) => ({ ...current, [field.key]: event.target.value }))} /><span>天</span></div>
+      </label>
+    );
+  }
+
   function handleExport() {
     if (!year) {
       notification.error("请选择年份");
@@ -279,7 +298,7 @@ export default function ManagerMonthStatPage({
   }
 
   return (
-    <div className="query-page-shell employee-dashboard-page manager-month-stat-page">
+    <div className="query-page-shell employee-dashboard-page attendance-override-page manager-month-stat-page">
       {/* 极光背景流动球 */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
@@ -316,9 +335,9 @@ export default function ManagerMonthStatPage({
               <button className={`btn btn-primary${isQuerying ? " is-loading" : ""}`} disabled={isQuerying} onClick={loadRows} type="button">
                 {isQuerying ? "查询中..." : "查询"}
               </button>
-              <button className="btn btn-outline-secondary" disabled={isQuerying} onClick={() => setShowActionsModal(true)} type="button">
-                导入导出
-              </button>
+              <button className="btn btn-outline-secondary" disabled={isQuerying} onClick={() => fileInputRef.current?.click()} type="button">导入</button>
+              <button className="btn btn-outline-secondary" disabled={isQuerying} onClick={handleExport} type="button">导出</button>
+              <a className="manager-stat-template" href={buildApiUrl(`${endpointBase}/template`)}>模板下载</a>
               <input ref={fileInputRef} accept=".xlsx" className="attendance-override-file-input" onChange={submitImport} type="file" />
             </div>
             <div className="account-lock-notice" style={{ marginTop: "4px" }}>{buildLockNotice(year, columnStates)}</div>
@@ -335,7 +354,7 @@ export default function ManagerMonthStatPage({
               headers={tableHeaders}
               panelClassName="manager-month-stat-table-panel"
               rows={tableRows}
-              tableClassName="manager-month-stat-table"
+              tableClassName="attendance-override-table manager-month-stat-table"
               isRefreshing={isQuerying}
             />
           </QueryResultPanel>
@@ -348,50 +367,34 @@ export default function ManagerMonthStatPage({
       </section>
 
       {editingRow ? (
-        <div className="master-modal-backdrop">
+        <div className="master-modal-backdrop" role="dialog" aria-modal="true" aria-label={editTitle}>
           <div className="master-modal manager-month-stat-edit-modal">
             <div className="master-modal-header">
               <div>
                 <h2>{editTitle}</h2>
                 <div className="attendance-override-edit-meta">
-                  {String(editingRow.name ?? "")} / {year}
+                  {String(editingRow.name ?? "")} · {String(editingRow.dept_name ?? "")} · {year} 年
                 </div>
               </div>
-              <button aria-label="关闭" className="master-modal-close" onClick={() => setEditingRow(null)} type="button">
+              <button aria-label="关闭" className="master-modal-close" disabled={isSaving} onClick={() => setEditingRow(null)} type="button">
                 ×
               </button>
             </div>
             <div className="master-modal-body">
-              <div className="attendance-override-edit-table-wrap">
-                <table className="legacy-table attendance-override-edit-table manager-month-stat-edit-table">
-                  <thead>
-                    <tr>
-                      {monthFields.map((field) => (
-                        <th className="legacy-table-head-cell" key={field.key}>
-                          {field.label}
-                        </th>
-                      ))}
-                      <th className="legacy-table-head-cell">{remainingLabel}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      {monthFields.map((field) => (
-                        <td className="legacy-table-body-cell" key={field.key}>
-                          <input
-                            className="account-input attendance-override-edit-input"
-                            disabled={columnStates[field.key] === "locked"}
-                            onChange={(event) =>
-                              setEditValues((current) => ({ ...current, [field.key]: event.target.value }))
-                            }
-                            value={editValues[field.key] ?? ""}
-                          />
-                        </td>
-                      ))}
-                      <td className="legacy-table-body-cell">{normalizeValue(editingRow.remaining)}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="manager-stat-balance">
+                <span>{remainingLabel}</span><strong>{normalizeValue(editingRow.remaining) || "0"}<small> 天</small></strong>
+                <span>按月份修正 · 已锁定月份不可修改</span>
+              </div>
+              {monthFields.filter((field) => field.key === "prev_dec").map((field) => renderMonthInput(field))}
+              <div className="manager-stat-quarters">
+                {["第一季度", "第二季度", "第三季度", "第四季度"].map((quarter, index) => (
+                  <section className="manager-stat-quarter" key={quarter}>
+                    <h3>{quarter}</h3>
+                    <div className="manager-stat-months">
+                      {monthFields.filter((field) => [index * 3 + 1, index * 3 + 2, index * 3 + 3].some((month) => field.key === `m${month}`)).map((field) => renderMonthInput(field))}
+                    </div>
+                  </section>
+                ))}
               </div>
               <label className="account-field">
                 <span className="account-field-label">备注</span>
@@ -404,56 +407,18 @@ export default function ManagerMonthStatPage({
               </label>
             </div>
             <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setEditingRow(null)} type="button">
+              <button className="account-action-button" disabled={isSaving} onClick={() => setEditingRow(null)} type="button">
                 取消
               </button>
-              <button className="account-action-button account-action-button--primary" onClick={saveEdit} type="button">
-                保存修改
+              <button className="account-action-button account-action-button--primary" disabled={isSaving} onClick={saveEdit} type="button">
+                {isSaving ? "保存中..." : "保存修改"}
               </button>
             </div>
           </div>
         </div>
       ) : null}
 
-      {showActionsModal ? (
-        <div aria-label="导入导出" aria-modal="true" className="master-modal-backdrop attendance-override-actions-backdrop" role="dialog">
-          <div className="master-modal attendance-override-actions-modal">
-            <div className="master-modal-header">
-              <div>
-                <h2>导入导出</h2>
-                <div className="attendance-override-edit-meta">选择需要执行的数据导出或导入操作</div>
-              </div>
-              <button aria-label="关闭" className="master-modal-close" onClick={() => setShowActionsModal(false)} type="button">
-                ×
-              </button>
-            </div>
-            <div className="master-modal-body attendance-override-actions-body">
-              <button
-                className="account-action-button account-action-button--primary attendance-override-actions-button"
-                onClick={() => { handleExport(); setShowActionsModal(false); }}
-                type="button"
-              >
-                导出
-              </button>
-              <button
-                className="account-action-button account-action-button--success attendance-override-actions-button"
-                onClick={() => { fileInputRef.current?.click(); setShowActionsModal(false); }}
-                type="button"
-              >
-                导入
-              </button>
-              <a className="account-action-button attendance-override-actions-button" href={buildApiUrl(`${endpointBase}/template`)}>
-                示例下载
-              </a>
-            </div>
-            <div className="master-modal-footer">
-              <button className="account-action-button" onClick={() => setShowActionsModal(false)} type="button">
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+
     </div>
   );
 }

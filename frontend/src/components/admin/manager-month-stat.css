@@ -1,0 +1,42 @@
+.manager-month-stat-page.query-page-shell { grid-template-columns: minmax(0, 1fr); }
+.manager-month-stat-page .query-filter-rail { position: static; width: auto; }
+.manager-month-stat-page .query-filter-heading { padding-bottom: 12px; }
+.manager-month-stat-page .query-filter-body { display: grid; grid-template-columns: minmax(240px, 1fr) 180px minmax(300px, 1fr); gap: 20px; align-items: start; }
+.manager-month-stat-page .query-filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.manager-month-stat-page .query-filter-actions .btn { width: auto; flex: 0 0 auto; }
+.manager-stat-template { font-size: 13px; color: var(--color-primary, #4667a0); padding: 8px; }
+.manager-month-stat-page .manager-month-stat-table { min-width: 1500px; }
+.manager-month-stat-page .manager-month-stat-table-panel { max-height: none; }
+.manager-month-stat-page .manager-month-stat-table th,
+.manager-month-stat-page .manager-month-stat-table td { white-space: nowrap; }
+.manager-month-stat-edit-modal.master-modal { width: min(960px, calc(100vw - 32px)); max-width: 960px; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.manager-month-stat-edit-modal .master-modal-body { min-height: 0; overflow-y: auto; display: grid; gap: 16px; padding: 20px; }
+.manager-month-stat-edit-modal .master-modal-header,
+.manager-month-stat-edit-modal .master-modal-footer { flex-shrink: 0; }
+.manager-month-stat-edit-modal .master-modal-footer { justify-content: flex-end; }
+.manager-stat-balance { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border-radius: 12px; background: rgba(79, 115, 190, .08); }
+.manager-stat-balance strong { font-size: 26px; color: #4667a0; font-variant-numeric: tabular-nums; }
+.manager-stat-balance small { font-size: 13px; font-weight: normal; }
+.manager-stat-balance > span:last-child { margin-left: auto; font-size: 12px; color: #6d809a; }
+.manager-stat-quarters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.manager-stat-quarter { border: 1px solid rgba(115, 139, 170, .25); border-radius: 12px; padding: 12px 14px; }
+.manager-stat-quarter h3 { margin: 0 0 10px; font-size: 13px; color: #6d809a; font-weight: 600; }
+.manager-stat-months { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.manager-stat-month { display: grid; gap: 6px; min-width: 0; font-size: 13px; }
+.manager-stat-month > span { display: flex; justify-content: space-between; align-items: center; }
+.manager-stat-month small { color: #8795a7; font-size: 10px; }
+.manager-stat-month > div { position: relative; }
+.manager-stat-month input { width: 100%; min-width: 0; padding-right: 28px; font-variant-numeric: tabular-nums; }
+.manager-stat-month > div > span { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #8795a7; font-size: 12px; pointer-events: none; }
+.manager-stat-month.is-locked input { opacity: .6; cursor: not-allowed; }
+.manager-month-stat-edit-modal .attendance-override-edit-remark { min-height: 64px; }
+@media (max-width: 900px) {
+  .manager-month-stat-page .query-filter-body { grid-template-columns: minmax(0, 1fr) 160px; }
+  .manager-month-stat-page .query-filter-field:last-child { grid-column: 1 / -1; }
+}
+@media (max-width: 600px) {
+  .manager-month-stat-page .query-filter-body { grid-template-columns: minmax(0, 1fr); }
+  .manager-stat-quarters { grid-template-columns: minmax(0, 1fr); }
+  .manager-stat-balance { flex-wrap: wrap; gap: 8px 14px; }
+  .manager-stat-balance > span:last-child { margin-left: 0; width: 100%; }
+}

@@ -1528,9 +1528,14 @@ describe("App smoke regression", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("管理人员加班后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
+  it("管理人员加班后台页修正页展示全年数据并支持分组编辑", async () => {
     window.history.replaceState({}, "", "/admin/manager-overtime");
-    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+    fetchMock.mockImplementation((input) => {
+      if (normalizePath(input) === "/api/admin/account-sets") {
+        return Promise.resolve(jsonResponse([{ month: `${new Date().getFullYear()}-01`, is_locked: true }]));
+      }
+      return mockAdminAppResponse(normalizePath(input));
+    });
 
     const { default: App } = await import("./App");
     const { container } = render(<App />);
@@ -1538,7 +1543,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("管理人员")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
     expect(screen.queryByText("按年度和人员筛选后查看列表，通过弹窗维护单人整年数据")).not.toBeInTheDocument();
     expect(screen.getByText("请先查询管理人员和年份")).toBeInTheDocument();
@@ -1549,17 +1554,28 @@ describe("App smoke regression", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "确定" })[0]);
     fireEvent.click(screen.getByRole("button", { name: "查询" }));
 
-    expect(await screen.findByText("前年累积")).toBeInTheDocument();
+    expect(await screen.findByText("前年累积天数")).toBeInTheDocument();
     expect(screen.getByText("剩余调休天数")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "12月" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员加班")).toBeInTheDocument();
-    expect(screen.getByText("前年累积天数")).toBeInTheDocument();
-    expect(screen.getByText("1月")).toBeInTheDocument();
+    expect(screen.getByLabelText("前年累积天数")).toBeInTheDocument();
+    expect(screen.getByLabelText("1月")).toBeDisabled();
+    expect(screen.getByText("第一季度")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("2月"), { target: { value: "1.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(await screen.findByText("修改已保存")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("管理人员年休后台页会挂载旧版查询区和编辑弹窗工作流", async () => {
+  it("管理人员年休后台页修正页展示全年数据并支持分组编辑", async () => {
     window.history.replaceState({}, "", "/admin/manager-annual-leave");
-    fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
+    fetchMock.mockImplementation((input) => {
+      if (normalizePath(input) === "/api/admin/account-sets") {
+        return Promise.resolve(jsonResponse([{ month: `${new Date().getFullYear()}-01`, is_locked: true }]));
+      }
+      return mockAdminAppResponse(normalizePath(input));
+    });
 
     const { default: App } = await import("./App");
     const { container } = render(<App />);
@@ -1567,7 +1583,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByText("查询条件")).toBeInTheDocument();
     expect(screen.getByText("管理人员")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "查询" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入导出" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入" })).toBeInTheDocument();
     expect(screen.queryByText("Query Filters")).not.toBeInTheDocument();
     expect(screen.queryByText("按年度和人员筛选后查看列表，通过弹窗维护单人整年数据")).not.toBeInTheDocument();
     expect(screen.getByText("请先查询管理人员和年份")).toBeInTheDocument();
@@ -1580,10 +1596,15 @@ describe("App smoke regression", () => {
 
     expect(await screen.findByText("年度已用")).toBeInTheDocument();
     expect(screen.getByText("剩余年休天数")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "12月" })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "编辑" }));
     expect(await screen.findByText("编辑管理人员年休")).toBeInTheDocument();
-    expect(screen.getByText("1月")).toBeInTheDocument();
-    expect(screen.getByText("12月")).toBeInTheDocument();
+    expect(screen.getByLabelText("1月")).toBeDisabled();
+    expect(screen.getByText("第一季度")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("2月"), { target: { value: "1.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存修改" }));
+    expect(await screen.findByText("修改已保存")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("账号管理页会挂载旧版创建区和批量操作区", async () => {
