@@ -1070,6 +1070,8 @@ def reset_account_set_imported(account_set_id: int):
                 os.remove(path)
             except Exception:
                 pass
+    from models.account_set_backup_restore import remove_backup_origins
+    remove_backup_origins('imports', [record.id for record in row.imports])
     deleted["import_records"] = AccountSetImport.query.filter_by(
         account_set_id=row.id
     ).delete(synchronize_session=False)

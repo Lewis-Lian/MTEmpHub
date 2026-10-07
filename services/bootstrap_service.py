@@ -63,6 +63,11 @@ def ensure_schema_compatibility() -> None:
 
         DailyAttendanceOverride.__table__.create(bind=db.engine, checkfirst=True)
 
+    from models.account_set_backup_restore import AccountSetBackupOrigin, AccountSetBackupRestore
+
+    AccountSetBackupOrigin.__table__.create(bind=db.engine, checkfirst=True)
+    AccountSetBackupRestore.__table__.create(bind=db.engine, checkfirst=True)
+
     department_columns = _get_column_names(inspector, "departments")
     if department_columns is not None:
         if "parent_id" not in department_columns:

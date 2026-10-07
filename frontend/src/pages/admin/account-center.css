@@ -1346,3 +1346,18 @@
     justify-content: center;
   }
 }
+
+/* 完整账套备份差异预览 */
+.backup-modal { width: min(1100px, 95vw); max-height: 92vh; }
+.backup-modal .acm-modal-body { overflow-y: auto; }
+.backup-options, .backup-toolbar { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+.backup-options label, .backup-toolbar label { display: flex; align-items: center; gap: 6px; }
+.backup-differences { max-height: 42vh; overflow-y: auto; }
+.backup-differences details { border: 1px solid #d8dee8; border-radius: 8px; padding: 12px; margin: 8px 0; }
+.backup-differences summary { cursor: pointer; overflow-wrap: anywhere; }
+.backup-table-wrap { overflow-x: auto; }
+.backup-modal table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.backup-modal td, .backup-modal th { text-align: left; border-bottom: 1px solid #d8dee8; padding: 8px; max-width: 340px; overflow-wrap: anywhere; }
+.backup-error { color: #b42318; background: #fff4f2; border-radius: 8px; padding: 12px; }
+.backup-disabled { opacity: .65; }
+.backup-modal button, .backup-modal select { padding: 6px 12px; }

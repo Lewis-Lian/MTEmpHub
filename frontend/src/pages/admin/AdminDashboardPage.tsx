@@ -28,6 +28,8 @@ import MonthPicker from "../../components/common/MonthPicker";
 import { useConfirm } from "../../components/feedback/ConfirmDialog";
 import { useNotification } from "../../components/feedback/Notification";
 import "./account-center.css";
+import AccountSetBackupModal from "../../components/admin/AccountSetBackupModal";
+import { backupDownloadUrl } from "../../api/accountSetBackup";
 
 const FILE_INPUT_LABELS = [
   "1. 请假单",
@@ -76,6 +78,7 @@ type FactoryRestPeriod = "none" | "full" | "am" | "pm";
 export default function AdminDashboardPage() {
   const confirm = useConfirm();
   const notification = useNotification();
+  const [showBackup, setShowBackup] = useState(false);
   const [accountSets, setAccountSets] = useState<AdminAccountSet[]>([]);
 
   const [imports, setImports] = useState<AdminAccountSetImport[]>([]);
@@ -369,6 +372,11 @@ export default function AdminDashboardPage() {
         text={loadingText}
       />
 
+      {showBackup && <AccountSetBackupModal onClose={() => setShowBackup(false)} onRestored={(id) => {
+        clearQueryBootstrapCache();
+        void reloadAccountSets(id);
+        void fetchAccountSetImports(id).then(setImports);
+      }} />}
       {/* 顶部标题栏 */}
       <header className="account-center-heading">
         <div>
@@ -488,6 +496,10 @@ export default function AdminDashboardPage() {
         {/* macOS Dock 风格悬浮操作栏 */}
         <div className="acm-dock-container account-panel-selector">
           <div className="acm-dock-bar">
+            <button className="acm-dock-item" type="button" disabled={!selectedAccountSet || isWorking} onClick={() => {
+              if (selectedAccountSet) window.location.href = backupDownloadUrl(selectedAccountSet.id);
+            }}>导出完整备份</button>
+            <button className="acm-dock-item" type="button" disabled={isWorking} onClick={() => setShowBackup(true)}>导入账套备份</button>
             {selectedAccountSet && !selectedAccountSet.is_active ? (
               <button
                 className="acm-dock-item acm-dock-item--active-trigger"

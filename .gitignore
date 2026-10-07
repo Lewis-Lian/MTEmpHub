@@ -25,6 +25,7 @@ attendance.db
 *.sqlite
 *.db
 instance/*.db
+instance/account_set_backups/
 instance/*.sqlite
 instance/*.sqlite3
 *.log

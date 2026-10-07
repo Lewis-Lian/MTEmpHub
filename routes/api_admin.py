@@ -95,6 +95,8 @@ from models.system_setting import SystemSetting
 
 api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
 register_admin_account_routes(api_admin_bp)
+from routes.admin_backups import register_admin_backup_routes
+register_admin_backup_routes(api_admin_bp, admin_required)
 
 from functools import wraps
 def setup_required(f):
