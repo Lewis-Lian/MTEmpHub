@@ -102,3 +102,20 @@ def test_reject_non_finite_numeric_data(backup_app):
     document['datasets']['daily_records'][0]['actual_hours'] = float('inf')
     with pytest.raises(BackupError):
         validate_document(document)
+
+
+def test_export_contains_only_selected_month(backup_app):
+    from models.monthly_report import MonthlyReport
+    other = AccountSet(month='2026-07', name='七月')
+    db.session.add(other)
+    db.session.add(DailyRecord(emp_id=1, record_date=date(2026, 7, 3), actual_hours=5))
+    db.session.add(MonthlyReport(emp_id=1, report_month='2026-07', agg_01=123))
+    db.session.commit()
+    june = read_backup(export_backup(1))
+    july = read_backup(export_backup(other.id))
+    assert june['month'] == '2026-06'
+    assert [row['record_date'] for row in june['datasets']['daily_records']] == ['2026-06-03']
+    assert not june['datasets']['monthly_reports']
+    assert july['month'] == '2026-07'
+    assert [row['record_date'] for row in july['datasets']['daily_records']] == ['2026-07-03']
+    assert july['datasets']['monthly_reports'][0]['agg_01'] == 123
