@@ -102,6 +102,21 @@ def serialize_row(name, row):
     return result
 
 
+def serialize_rows(name, rows):
+    # Keep bulk-loaded references alive while serializing: the session identity
+    # map uses weak references and otherwise repeats lookups for every day.
+    references = []
+    if hasattr(DATASETS[name].model, 'emp_id'):
+        ids = {row.emp_id for row in rows}
+        if ids:
+            references.extend(Employee.query.filter(Employee.id.in_(ids)).all())
+    for field, (_, model, _) in REFS.get(name, {}).items():
+        ids = {getattr(row, field) for row in rows if getattr(row, field)}
+        if ids:
+            references.extend(model.query.filter(model.id.in_(ids)).all())
+    return [serialize_row(name, row) for row in rows]
+
+
 def collect_backup(account_set_id, progress=None, phase="data"):
     account = db.session.get(AccountSet, account_set_id)
     if account is None:
@@ -118,7 +133,7 @@ def collect_backup(account_set_id, progress=None, phase="data"):
         if ds.scope in ('shared', 'year'):
             continue
         rows = scoped_rows(name, account)
-        datasets[name] = [serialize_row(name, row) for row in rows]
+        datasets[name] = serialize_rows(name, rows)
         report_data()
         employee_ids.update(row.emp_id for row in rows if hasattr(row, 'emp_id'))
         shift_ids.update(row.shift_id for row in rows if getattr(row, 'shift_id', None))
@@ -143,11 +158,11 @@ def collect_backup(account_set_id, progress=None, phase="data"):
     report_data()
     datasets['shifts'] = [serialize_row('shifts', row) for row in Shift.query.filter(Shift.id.in_(shift_ids)).all()]
     report_data()
-    datasets['employee_shift_assignments'] = [serialize_row('employee_shift_assignments', row) for row in assignments]
+    datasets['employee_shift_assignments'] = serialize_rows('employee_shift_assignments', assignments)
     report_data()
     for name, ds in DATASETS.items():
         if ds.scope == 'year':
-            datasets[name] = [serialize_row(name, row) for row in scoped_rows(name, account, employee_ids)]
+            datasets[name] = serialize_rows(name, scoped_rows(name, account, employee_ids))
             report_data()
     return {'format_version': 1, 'month': account.month,
             'account_set': {field: serial(getattr(account, field)) for field in ACCOUNT_FIELDS},

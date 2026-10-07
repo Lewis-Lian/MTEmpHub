@@ -119,3 +119,27 @@ def test_export_contains_only_selected_month(backup_app):
     assert july['month'] == '2026-07'
     assert [row['record_date'] for row in july['datasets']['daily_records']] == ['2026-07-03']
     assert july['datasets']['monthly_reports'][0]['agg_01'] == 123
+
+
+def test_collect_batches_related_employee_and_shift_queries(backup_app):
+    from sqlalchemy import event
+    from models.shift import Shift
+
+    shift = Shift(shift_no='S1', shift_name='白班', time_slots=[])
+    db.session.add(shift)
+    db.session.flush()
+    for day in range(4, 24):
+        db.session.add(DailyRecord(emp_id=1, shift_id=shift.id, record_date=date(2026, 6, day)))
+    db.session.commit()
+    db.session.expunge_all()
+    queries = []
+    def record_query(_conn, _cursor, statement, _parameters, _context, _many):
+        if statement.lstrip().upper().startswith('SELECT') and ('FROM employees' in statement or 'FROM shifts' in statement):
+            queries.append(statement)
+    event.listen(db.engine, 'before_cursor_execute', record_query)
+    try:
+        document = collect_backup(1)
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', record_query)
+    assert len(document['datasets']['daily_records']) == 21
+    assert len(queries) < 10
