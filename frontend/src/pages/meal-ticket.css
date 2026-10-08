@@ -181,6 +181,32 @@
 .meal-ticket-reason-presets .meal-ticket-button { min-height: 30px; padding: 4px 10px; border-radius: 999px; background: var(--ent-blue-light); color: var(--ent-blue); font-size: 12px; }
 .meal-ticket-modal .meal-ticket-reason-hint { margin: -10px 0 0; color: var(--ent-text-tertiary); font-size: 12px; }
 .meal-ticket-modal .meal-ticket-actions { justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--ent-border-strong); }
+.meal-ticket-modal > .meal-ticket-operation-dialog { max-height: calc(100dvh - 48px); padding: 20px; }
+.meal-ticket-operation-dialog form { gap: 12px; }
+.meal-ticket-operation-dialog textarea { min-height: 72px; }
+.meal-ticket-operation-dialog .meal-ticket-reason-hint { margin-top: -6px; }
+.meal-ticket-operation-dialog .meal-ticket-operation-heading { padding-bottom: 16px; margin-bottom: 16px; border-bottom: 1px solid var(--ent-border-strong); }
+.meal-ticket-operation-eyebrow { display: block; margin-bottom: 8px; color: var(--ent-blue); font-size: 12px; font-weight: 600; letter-spacing: .08em; }
+.meal-ticket-operation-heading h2 { margin: 0; font-size: 22px; line-height: 1.5; }
+.meal-ticket-operation-heading p { margin: 8px 0 0; }
+.meal-ticket-operation-selection { margin-bottom: 14px; }
+.meal-ticket-operation-selection-heading { display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+.meal-ticket-operation-selection-heading > span { color: var(--ent-text-secondary); font-variant-numeric: tabular-nums; }
+.meal-ticket-operation-selection ul { max-height: 88px; overflow: auto; margin: 10px 0 0; padding: 0; list-style: none; border-block: 1px solid var(--ent-border-strong); }
+.meal-ticket-operation-selection li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 2px; font-size: 13px; }
+.meal-ticket-operation-selection li + li { border-top: 1px solid var(--ent-border); }
+.meal-ticket-operation-selection li > span { min-width: 0; overflow-wrap: anywhere; }
+.meal-ticket-operation-selection small { margin-left: 10px; color: var(--ent-text-tertiary); font-size: 12px; font-weight: 400; }
+.meal-ticket-operation-selection li > strong { flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.meal-ticket-operation-selection p { margin: 8px 0 0; font-size: 12px; }
+.meal-ticket-operation-selection p > strong { color: var(--ent-blue); font-weight: 500; }
+.meal-ticket-operation-progress { padding-top: 16px; border-top: 1px solid var(--ent-border-strong); }
+.meal-ticket-operation-progress .meal-ticket-loading-heading { font-size: 13px; color: var(--ent-text-secondary); }
+.meal-ticket-operation-progress .meal-ticket-loading-heading strong { color: var(--ent-blue); font-size: 22px; }
+.meal-ticket-operation-progress .meal-ticket-progress-track { margin-top: 10px; height: 6px; }
+.meal-ticket-operation-progress p { margin: 8px 0 0; font-size: 12px; color: var(--ent-text-tertiary); }
+.meal-ticket-operation-dialog .meal-ticket-actions { padding-top: 12px; flex-direction: row-reverse; gap: 10px; margin-top: 0; }
+.meal-ticket-operation-dialog .meal-ticket-actions .meal-ticket-button { min-width: 104px; }
 [data-theme="dark"] .meal-ticket-page { color-scheme: dark; }
 [data-theme="dark"] .meal-ticket-stat.is-paid strong, [data-theme="dark"] .meal-ticket-badge.is-success { color: #34d399; }
 [data-theme="dark"] .meal-ticket-settlement.is-settled, [data-theme="dark"] .meal-ticket-workflow > .is-complete .meal-ticket-step-number { color: #34d399; }

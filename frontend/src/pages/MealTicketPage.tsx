@@ -322,7 +322,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       </section>}
     </div>}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
-    {busy && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
+    {busy && !target && !bulk && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
       <div className="meal-ticket-loading-heading"><span><i className="meal-ticket-loading-dot" aria-hidden="true" />{loadProgress?.text ?? "正在提交并等待处理结果"}</span><strong>{progressPercent === null ? "等待响应" : `${progressPercent}%`}</strong></div>
       <div className={`meal-ticket-progress-track${progressPercent === null ? " is-indeterminate" : ""}`} role="progressbar" aria-label={loadProgress?.label ?? "操作进度"} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent ?? undefined}>
         <span style={progressPercent === null ? undefined : { width: `${progressPercent}%` }} />
@@ -390,10 +390,14 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         rows={[...departmentRows.values()].map(d => [<button className="meal-ticket-button is-link" onClick={() => { setDepartmentNames([d.dept_name]); changeResultView("person"); }}>{d.dept_name}</button>,d.count,...[d.base_amount,d.adjustment_amount,d.due_amount,d.paid_amount,d.difference].map(money)])} />}
       </section>
     </>}
-    {(target || bulk) && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label={bulk ? participationForm ? "批量核算处理" : action === "adjustments" ? "批量补扣" : "批量充值" : participationForm ? "核算处理" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
-      <h2>{bulk ? `${bulkItems.length} 人 · ${participationForm ? participationLabel : action === "adjustments" ? "批量补发 / 扣除" : "登记实际充值"}` : `${target?.name} · ${participationForm ? participationLabel : action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2>
-      {bulk && <p>本次处理 {bulkItems.length} 人；仅处理符合条件的选中人员。<br />{bulkItems.map(item => `${item.emp_no} ${item.name}`).join("、")}</p>}
-      {bulk && action === "adjustments" && amount && Number.isFinite(Number(amount)) && <p>本次处理 {bulkItems.length} 人 · 合计调整 {money(Number(amount) * bulkItems.length)} 元</p>}
+    {(target || bulk) && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog" role="dialog" aria-modal="true" aria-busy={busy} aria-label={bulk ? participationForm ? "批量核算处理" : action === "adjustments" ? "批量补扣" : "批量充值" : participationForm ? "核算处理" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
+      <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">{bulk ? "批量操作" : "菜票登记"}</span><h2>{bulk ? `${busy && loadProgress ? loadProgress.total : bulkItems.length} 人 · ${participationForm ? participationLabel : action === "adjustments" ? "批量补发 / 扣除" : "登记实际充值"}` : `${target?.name} · ${participationForm ? participationLabel : action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2><p>核对人员和操作内容后提交，完成后自动更新账目。</p></header>
+      {bulk && <div className="meal-ticket-operation-selection">
+        <div className="meal-ticket-operation-selection-heading"><strong>{busy ? "待处理人员" : "本次处理人员"}</strong><span>{bulkItems.length} 人</span></div>
+        <ul aria-label="本次操作人员">{bulkItems.map(item => <li key={item.id}><span>{item.name}<small>{item.emp_no}</small></span>{!participationForm && action !== "adjustments" && <strong>{money(item.difference)}<small>元</small></strong>}</li>)}</ul>
+        <p>仅处理符合条件的选中人员。{!participationForm && action !== "adjustments" && !busy && <strong> 合计充值 {money(bulkItems.reduce((total, item) => total + Number(item.difference), 0))} 元</strong>}</p>
+      </div>}
+      {bulk && !busy && action === "adjustments" && amount && Number.isFinite(Number(amount)) && <p>本次处理 {bulkItems.length} 人 · 合计调整 {money(Number(amount) * bulkItems.length)} 元</p>}
       {participationForm && <p>{action === "exclude" ? "本月应发金额按 0 元核算，原考勤和补扣记录保留，缺少考勤来源不再阻止确认。" : "恢复按实际打卡天数和原补扣核算，考勤异常需核对后才能确认。"}</p>}
       <form onSubmit={e => { e.preventDefault(); void (bulk ? saveBulk() : save()); }}>
         {!participationForm && action !== "reversal" && (!bulk || action === "adjustments") && <label>{action === "adjustments" ? bulk ? "每人调整金额（元）" : "调整金额（元）" : "金额（元）"}<input type="number" step="0.01" required disabled={busy} value={amount} onChange={e => setAmount(e.target.value)} /></label>}
@@ -407,7 +411,14 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         }}><option value="">请选择月份</option>{Array.from({ length: 12 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1} 月</option>)}</select></label>}
         <label>{participationForm ? "处理原因" : action === "adjustments" ? "调整原因" : "凭证 / 说明"}<textarea required maxLength={500} disabled={busy} value={reason} onChange={e => setReason(e.target.value)} /></label>
         <p className="meal-ticket-reason-hint">原因或说明必填，常用语可继续编辑。</p>
-        {error && <p role="alert">{error}</p>}
+        {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
+        {(bulk || busy) && <div className="meal-ticket-operation-progress" role="status" aria-live="polite">
+          <div className="meal-ticket-loading-heading"><span>{busy ? loadProgress?.text ?? "正在提交并等待处理结果" : error ? "未完成人员可继续重试" : "准备就绪，等待确认"}</span><strong>{bulk ? `${progressPercent ?? 0}%` : "处理中"}</strong></div>
+          <div className={`meal-ticket-progress-track${bulk ? "" : " is-indeterminate"}`} role="progressbar" aria-label={loadProgress?.label ?? (!bulk ? "操作进度" : participationForm ? "批量核算处理进度" : action === "adjustments" ? "批量补扣进度" : bulk ? "批量充值进度" : "操作进度")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={bulk ? progressPercent ?? 0 : undefined}>
+            <span style={bulk ? { width: `${progressPercent ?? 0}%` } : undefined} />
+          </div>
+          <p>{busy && loadProgress ? `已完成 ${loadProgress.completed} / ${loadProgress.total} 人，请等待处理完成。` : busy ? "处理完成后会自动更新账目。" : `待处理 ${bulkItems.length} 人，进度按实际成功人数更新。`}</p>
+        </div>}
         <div className="meal-ticket-actions"><button className="meal-ticket-button is-primary" disabled={busy || !reason.trim() || (bulk && !bulkItems.length)} type="submit">{participationForm ? `确认${participationLabel}` : action === "adjustments" ? "保存补扣" : "确认登记"}</button><button className="meal-ticket-button" type="button" disabled={busy} onClick={() => { setTarget(null); setBulk(false); }}>取消</button></div>
       </form>
     </section></div>}

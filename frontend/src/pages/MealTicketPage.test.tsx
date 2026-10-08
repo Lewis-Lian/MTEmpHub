@@ -529,10 +529,11 @@ describe("菜票中心", () => {
     expect(dialog.getByRole("button", { name: "确认登记" })).toBeDisabled();
     fireEvent.change(dialog.getByLabelText("凭证 / 说明"), { target: { value: "充值凭证001" } });
     fireEvent.click(dialog.getByRole("button", { name: "确认登记" }));
-    expect(screen.getByRole("progressbar", { name: "批量充值进度" })).toHaveAttribute("aria-valuenow", "0");
+    expect(dialog.getByRole("progressbar", { name: "批量充值进度" })).toHaveAttribute("aria-valuenow", "0");
     const partial = { ...confirmed, version: 2, items: [{ ...confirmed.items[0], paid_amount: 176, difference: 0 }, confirmed.items[1]] };
     await act(async () => payments[0](partial));
-    expect(screen.getByRole("progressbar", { name: "批量充值进度" })).toHaveAttribute("aria-valuenow", "50");
+    expect(dialog.getByRole("progressbar", { name: "批量充值进度" })).toHaveAttribute("aria-valuenow", "50");
+    expect(dialog.getByRole("heading", { name: "2 人 · 登记实际充值" })).toBeInTheDocument();
     expect(payments).toHaveLength(2);
     await act(async () => payments[1]({ ...partial, version: 3, items: partial.items.map(item => ({ ...item, paid_amount: 176, difference: 0 })) }));
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
