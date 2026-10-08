@@ -202,6 +202,10 @@ describe("菜票中心", () => {
     fireEvent.click(departmentPicker.getByRole("button", { name: "生产部" }));
     fireEvent.click(departmentPicker.getByRole("button", { name: "确定" }));
     fireEvent.change(screen.getByLabelText("人员类型"), { target: { value: "employee" } });
+    if (view === "payments") {
+      fireEvent.click(screen.getByRole("button", { name: "下一步：登记补发 / 扣回" }));
+      fireEvent.click(screen.getByRole("button", { name: "下一步：核对结清" }));
+    }
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "查看异常（2 人）" })));
     expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("");
     expect(screen.getByPlaceholderText("搜索部门编号/名称")).toHaveValue("");
@@ -352,12 +356,16 @@ describe("菜票中心", () => {
       return Promise.resolve(current);
     });
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
-    await screen.findByText("本月账目已结清");
+    await screen.findByText("员工甲");
+    expect(screen.queryByRole("region", { name: "整月结清检查" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "补扣" }));
     fireEvent.change(screen.getByLabelText("调整金额（元）"), { target: { value: "8" } });
     fireEvent.click(screen.getByRole("button", { name: "线长补卡" }));
     fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "额外补扣" })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "下一步：登记补发 / 扣回" }));
+    fireEvent.click(screen.getByRole("button", { name: "下一步：核对结清" }));
     await screen.findByText("还有差额需要处理");
     fireEvent.click(screen.getByRole("button", { name: "登记充值" }));
     fireEvent.change(screen.getByLabelText("凭证 / 说明"), { target: { value: "补充充值成功" } });

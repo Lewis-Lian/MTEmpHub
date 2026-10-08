@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import MealTicketPage from './MealTicketPage';
@@ -84,4 +84,44 @@ it('数据库模式后续补扣仅保留调整和到账结清两个步骤',async
   const flow=screen.getByRole('list',{name:'后续补扣流程'});
   expect(within(flow).getAllByRole('listitem').map(step=>within(step).getByRole('heading').textContent))
     .toEqual(['补发 / 扣除','核对到账与结清']);
+});
+
+it.each([false,true])('后续补扣进入页面先调整，结清状态为 %s 也不跳过',async settled=>{
+  const current={...batch,items:[{...item,paid_amount:settled?176:0,difference:settled?0:176}]};
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:current));
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  await screen.findByText('员工甲');
+  const flow=screen.getByRole('list',{name:'后续补扣流程'});
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
+  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
+  fireEvent.click(within(flow).getByRole('button',{name:'下一步：核对到账与结清'}));
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账与结清');
+  expect(screen.getByRole('region',{name:'整月结清检查'})).toBeInTheDocument();
+  expect(request.mock.calls.some(([path])=>path==='/api/meal-tickets/reconcile')).toBe(false);
+  fireEvent.click(within(flow).getByRole('button',{name:'返回补发 / 扣除'}));
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
+  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
+});
+
+it('后续补扣保存成功仍停留调整阶段，切换月份重新从第一步开始',async()=>{
+  let current={...batch,items:[{...item,paid_amount:176,difference:0}]};
+  request.mockImplementation((path:string)=>{
+    if(path==='/api/auth/me')return Promise.resolve({role:'admin'});
+    if(path==='/api/meal-tickets/adjustments')current={...current,version:3,items:[{...current.items[0],adjustment_amount:16,due_amount:192,difference:16}]};
+    return Promise.resolve(current);
+  });
+  render(<ConfirmProvider><MemoryRouter initialEntries={["/meal-tickets/payments?recharge_month=2026-09"]}><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  await screen.findByText('员工甲');
+  fireEvent.click(screen.getByRole('button',{name:'补扣'}));
+  fireEvent.change(screen.getByLabelText('调整金额（元）'),{target:{value:'16'}});
+  fireEvent.click(screen.getByRole('button',{name:'线长补卡'}));
+  fireEvent.click(screen.getByRole('button',{name:'保存补扣'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'额外补扣'})).not.toBeInTheDocument());
+  const flow=screen.getByRole('list',{name:'后续补扣流程'});
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
+  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
+  fireEvent.click(within(flow).getByRole('button',{name:'下一步：核对到账与结清'}));
+  fireEvent.change(screen.getByLabelText('计划充值月份'),{target:{value:'2026-10'}});
+  await screen.findByText('员工甲');
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
 });
