@@ -72,6 +72,12 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_json())
         return r.get_json()
 
+    def test_navigation_places_meal_tickets_immediately_after_query_center(self):
+        response = self.client.get('/api/query/navigation', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        slugs = [module['slug'] for module in response.get_json()['modules']]
+        self.assertEqual(slugs[slugs.index('query') + 1], 'meal-tickets')
+
     def test_final_field_next_month_and_no_rounding(self):
         with self.app.app_context():
             EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 22.25

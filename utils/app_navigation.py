@@ -21,15 +21,6 @@ QUERY_CENTER_PERMISSION_KEYS = (
 
 MODULES: list[dict[str, Any]] = [
     {
-        "slug": "meal-tickets", "label": "菜票中心", "short_label": "菜票",
-        "description": "核算次月菜票、登记充值并核对历史账。", "icon_key": "account-dashboard",
-        "entries": [
-            {"key": "meal_ticket_calculation", "label": "月度核算", "href": "/meal-tickets/calculation", "permission_key": "meal_ticket_query"},
-            {"key": "meal_ticket_payments", "label": "充值与对账", "href": "/meal-tickets/payments", "permission_key": "meal_ticket_query"},
-            {"key": "meal_ticket_history", "label": "历史台账", "href": "/meal-tickets/history", "admin_only": True},
-        ],
-    },
-    {
         "slug": "home",
         "label": "首页",
         "short_label": "首页",
@@ -132,6 +123,15 @@ MODULES: list[dict[str, Any]] = [
                 "group": "管理人员考勤",
                 "description": "按部门查询管理人员工时。",
             },
+        ],
+    },
+    {
+        "slug": "meal-tickets", "label": "菜票中心", "short_label": "菜票",
+        "description": "核算次月菜票、登记充值并核对历史账。", "icon_key": "account-dashboard",
+        "entries": [
+            {"key": "meal_ticket_calculation", "label": "月度核算", "href": "/meal-tickets/calculation", "permission_key": "meal_ticket_query"},
+            {"key": "meal_ticket_payments", "label": "充值与对账", "href": "/meal-tickets/payments", "permission_key": "meal_ticket_query"},
+            {"key": "meal_ticket_history", "label": "历史台账", "href": "/meal-tickets/history", "admin_only": True},
         ],
     },
     {
