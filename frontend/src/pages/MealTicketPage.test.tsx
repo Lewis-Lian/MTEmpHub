@@ -21,6 +21,33 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it("核算部门支持多选，汇总和人员视图采用同一部门范围", async () => {
+    const current = { ...batch, items: [
+      batch.items[0],
+      { ...batch.items[0], id: 2, emp_id: 2, emp_no: "002", name: "员工乙", dept_name: "研发部" },
+      { ...batch.items[0], id: 3, emp_id: 3, emp_no: "003", name: "员工丙", dept_name: "未选部门" },
+    ] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    fireEvent.click(screen.getByTitle("展开选择面板"));
+    const picker = within(screen.getByRole("dialog", { name: "选择关联部门" }));
+    fireEvent.click(picker.getByRole("button", { name: "生产部" }));
+    fireEvent.click(picker.getByRole("button", { name: "研发部" }));
+    fireEvent.click(picker.getByRole("button", { name: "确定" }));
+    expect(screen.getByPlaceholderText("搜索部门编号/名称")).toHaveValue("已选 2 个部门");
+    const summary = within(screen.getByRole("table"));
+    expect(summary.getByRole("button", { name: "生产部" })).toBeInTheDocument();
+    expect(summary.getByRole("button", { name: "研发部" })).toBeInTheDocument();
+    expect(summary.queryByRole("button", { name: "未选部门" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "人员明细" }));
+    const detail = within(screen.getByRole("table"));
+    expect(detail.getByText("员工甲")).toBeInTheDocument();
+    expect(detail.getByText("员工乙")).toBeInTheDocument();
+    expect(detail.queryByText("员工丙")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "清空已选内容" }));
+    expect(within(screen.getByRole("table")).getByRole("button", { name: "未选部门" })).toBeInTheDocument();
+  });
   it("同一张表根据人员或部门选择切换，部门可进入人员明细", async () => {
     const current = { ...batch, departments: [], items: [
       { ...batch.items[0], employment_status: "resigned", resigned_at: "2026-09-01", dept_name: "原生产部" },
@@ -39,8 +66,8 @@ describe("菜票中心", () => {
     expect(table.getByText("员工甲")).toBeInTheDocument();
     expect(table.getByText("员工丙")).toBeInTheDocument();
     expect(table.queryByText("员工乙")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTitle("选择核算部门"));
-    const departments = within(screen.getByRole("dialog", { name: "选择核算部门" }));
+    fireEvent.click(screen.getByTitle("展开选择面板"));
+    const departments = within(screen.getByRole("dialog", { name: "选择关联部门" }));
     fireEvent.click(departments.getByRole("button", { name: "原生产部" }));
     fireEvent.click(departments.getByRole("button", { name: "确定" }));
     const summary = within(within(screen.getByRole("region", { name: "部门汇总" })).getByRole("table"));
@@ -58,7 +85,7 @@ describe("菜票中心", () => {
     pickEmployee("003 - 员工丙");
     expect(detail.getByText("员工丙")).toBeInTheDocument();
     expect(detail.queryByText("员工甲")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("核算部门")).toHaveValue("");
+    expect(screen.getByPlaceholderText("搜索部门编号/名称")).toHaveValue("");
     expect(request.mock.calls.every(([path]) => path !== "/api/admin/employees?status=all")).toBe(true);
   });
   it("筛选结果可全选，批量本月不发与恢复核算记录相同原因", async () => {
@@ -170,14 +197,14 @@ describe("菜票中心", () => {
     render(<MemoryRouter><MealTicketPage view={view} /></MemoryRouter>);
     await screen.findByText("正常人员1");
     pickEmployee("1 - 正常人员1");
-    fireEvent.click(screen.getByTitle("选择核算部门"));
-    const departmentPicker = within(screen.getByRole("dialog", { name: "选择核算部门" }));
+    fireEvent.click(screen.getByTitle("展开选择面板"));
+    const departmentPicker = within(screen.getByRole("dialog", { name: "选择关联部门" }));
     fireEvent.click(departmentPicker.getByRole("button", { name: "生产部" }));
     fireEvent.click(departmentPicker.getByRole("button", { name: "确定" }));
     fireEvent.change(screen.getByLabelText("人员类型"), { target: { value: "employee" } });
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "查看异常（2 人）" })));
     expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("");
-    expect(screen.getByLabelText("核算部门")).toHaveValue("");
+    expect(screen.getByPlaceholderText("搜索部门编号/名称")).toHaveValue("");
     expect(screen.getByLabelText("人员类型")).toHaveValue("");
     expect(screen.getByLabelText("发放 / 核算状态")).toHaveValue("issue");
     const table = within(screen.getByRole("region", { name: "人员明细" })).getByRole("table");
