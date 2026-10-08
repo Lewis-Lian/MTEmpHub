@@ -289,7 +289,9 @@ def serialize_batch(batch, accessible=None, check_source=False):
     if accessible is not None:
         query = query.filter(MealTicketItem.emp_id.in_(accessible))
     items, departments = [], {}
-    for item in query.all():
+    for item, employee_id, resigned_at in query.with_entities(
+            MealTicketItem, Employee.id, Employee.resigned_at).outerjoin(
+                Employee, Employee.id == MealTicketItem.emp_id).all():
         due, paid, adjustments, payments = totals(item)
         excluded = bool(participation_state(item).get('excluded'))
         base = 0 if excluded else item.base_cents
@@ -300,6 +302,8 @@ def serialize_batch(batch, accessible=None, check_source=False):
                'participation_history':item.source.get('participation_history', []),
                'due_amount':due/100, 'paid_amount':paid/100, 'difference':(due-paid)/100,
                'error':item.error, 'source':item.source,
+               'employment_status':'missing' if employee_id is None else 'resigned' if resigned_at else 'active',
+               'resigned_at':resigned_at.isoformat() if resigned_at else None,
                'adjustments':[{'id':a.id, 'amount':a.amount_cents/100, 'reason':a.reason, 'operator':a.operator,
                                'created_at':a.created_at.isoformat()} for a in adjustments],
                'payments':[{'id':p.id, 'kind':p.kind, 'amount':p.amount_cents/100, 'date':p.payment_date.isoformat(),

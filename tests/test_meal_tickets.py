@@ -1,7 +1,7 @@
 import io
 import tempfile
 import unittest
-from datetime import timedelta
+from datetime import date, timedelta
 
 from flask import Flask
 from openpyxl import load_workbook, Workbook
@@ -148,6 +148,39 @@ class MealTicketTests(unittest.TestCase):
         batch = self.generate()
         self.assertTrue(any(i['error'] for i in batch['items']))
         self.assertEqual(self.post('/confirm', {'batch_id':batch['id'], 'version':batch['version']}).status_code, 400)
+
+    def test_employee_departure_verification_reads_live_record_without_changing_draft(self):
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).delete()
+            db.session.commit()
+        batch = self.generate()
+        self.assertEqual(batch['items'][0]['employment_status'], 'active')
+        self.assertIsNone(batch['items'][0]['resigned_at'])
+        viewer = {'Authorization': 'Bearer ' + self.viewer_token}
+        scoped = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=viewer).get_json()
+        self.assertEqual(len(scoped['items']), 1)
+        self.assertEqual(scoped['items'][0]['employment_status'], 'active')
+        with self.app.app_context():
+            db.session.get(Employee, self.emp_id).resigned_at = date(2026, 9, 1)
+            db.session.commit()
+        response = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers)
+        result = response.get_json()
+        person = result['items'][0]
+        self.assertEqual(person['employment_status'], 'resigned')
+        self.assertEqual(person['resigned_at'], '2026-09-01')
+        self.assertEqual(result['version'], batch['version'])
+        self.assertFalse(person['excluded'])
+        self.assertEqual(person['error'], batch['items'][0]['error'])
+        self.assertEqual(person['due_amount'], batch['items'][0]['due_amount'])
+        self.assertEqual(person['participation_history'], [])
+        scoped = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=viewer).get_json()
+        self.assertEqual(scoped['items'], [])  # Existing query permissions exclude resigned employees.
+        with self.app.app_context():
+            db.session.get(Employee, self.emp_id).resigned_at = None
+            db.session.commit()
+        restored = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(restored['items'][0]['employment_status'], 'active')
+        self.assertIsNone(restored['items'][0]['resigned_at'])
 
     def exclude(self, batch, item, excluded=True, reason='实际已离职，本月不发'):
         response = self.post('/participation', {'batch_id':batch['id'], 'version':batch['version'],

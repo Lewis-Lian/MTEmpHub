@@ -12,6 +12,83 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it("异常列表自动显示离职登记核对结果，仍保留不发或结算选择", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const current = { ...batch, items: [
+      { ...batch.items[0], error: "缺少考勤来源，请核对", employment_status: "resigned", resigned_at: "2026-09-01" },
+      { ...batch.items[0], id: 2, emp_no: "002", name: "员工乙", error: "缺少考勤来源，请核对", employment_status: "active", resigned_at: null },
+    ] };
+    let reads = 0;
+    request.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      reads += 1;
+      return Promise.resolve(reads === 1 ? { ...current, items: current.items.map(item => ({ ...item, employment_status: "active", resigned_at: null })) } : current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    const issues = await screen.findByRole("button", { name: "查看异常（2 人）" });
+    await act(async () => fireEvent.click(issues));
+    expect(reads).toBe(2);
+    const table = within(screen.getByRole("region", { name: "人员明细" })).getByRole("table");
+    const rows = within(table).getAllByRole("row").slice(1);
+    expect(within(rows[0]).getByText("已登记离职 · 2026-09-01")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("未登记离职")).toBeInTheDocument();
+    expect(within(rows[0]).getByRole("button", { name: "本月不发" })).toBeInTheDocument();
+    expect(within(rows[0]).getByRole("button", { name: "补扣" })).toBeInTheDocument();
+    expect(request.mock.calls.every(([, options]) => !options || options.method !== "POST")).toBe(true);
+    fireEvent.click(within(rows[0]).getByRole("button", { name: "明细" }));
+    expect(within(screen.getByRole("dialog", { name: "菜票明细" })).getByText("员工档案核对：已登记离职 · 2026-09-01")).toBeInTheDocument();
+  });
+  it.each(["calculation", "payments"] as const)("%s 一键异常清除其他筛选并覆盖跨页人员", async view => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    const normal = Array.from({ length: 100 }, (_, index) => ({ ...batch.items[0], id: index + 1,
+      name: `正常人员${index + 1}`, emp_no: String(index + 1), is_manager: false }));
+    const current = { ...batch, status: view === "payments" ? "confirmed" : "draft", items: [...normal,
+      { ...batch.items[0], id: 101, name: "缺少来源人员", error: "缺少考勤来源，请核对", dept_name: "其他部", is_manager: true },
+      { ...batch.items[0], id: 102, name: "负数应发人员", due_amount: -8, difference: -8, is_manager: true },
+      { ...batch.items[0], id: 103, name: "已处理离职人员", error: "缺少考勤来源，请核对", excluded: true, due_amount: 0, difference: 0 },
+    ] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage view={view} /></MemoryRouter>);
+    await screen.findByText("正常人员1");
+    fireEvent.change(screen.getByPlaceholderText("输入工号或姓名"), { target: { value: "正常人员1" } });
+    fireEvent.change(screen.getByLabelText("核算部门"), { target: { value: "生产部" } });
+    fireEvent.change(screen.getByLabelText("人员类型"), { target: { value: "employee" } });
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "查看异常（2 人）" })));
+    expect(screen.getByPlaceholderText("输入工号或姓名")).toHaveValue("");
+    expect(screen.getByLabelText("核算部门")).toHaveValue("");
+    expect(screen.getByLabelText("人员类型")).toHaveValue("");
+    expect(screen.getByLabelText("发放 / 核算状态")).toHaveValue("issue");
+    const table = within(screen.getByRole("region", { name: "人员明细" })).getByRole("table");
+    expect(within(table).getAllByRole("row")).toHaveLength(3);
+    expect(within(table).getByText("缺少来源人员")).toBeInTheDocument();
+    expect(within(table).getByText("负数应发人员")).toBeInTheDocument();
+    expect(within(table).queryByText("已处理离职人员")).not.toBeInTheDocument();
+    expect(request.mock.calls.every(([, options]) => !options || options.method !== "POST")).toBe(true);
+  });
+
+  it("异常人员确认离职本月不发后退出异常列表，数量自动更新", async () => {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+    let current = { ...batch, items: [{ ...batch.items[0], error: "缺少考勤来源，请核对", excluded: false }] };
+    request.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/participation") current = { ...current, version: 2,
+        items: [{ ...current.items[0], excluded: true, base_amount: 0, due_amount: 0, difference: 0 }] };
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    const issues = await screen.findByRole("button", { name: "查看异常（1 人）" });
+    await act(async () => fireEvent.click(issues));
+    expect(screen.getByRole("button", { name: "确认核算" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "本月不发" }));
+    fireEvent.click(screen.getByRole("button", { name: "离职" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认本月不发" }));
+    expect(await screen.findByRole("button", { name: "查看异常（0 人）" })).toBeDisabled();
+    expect(screen.queryByText("员工甲")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认核算" })).toBeEnabled();
+    fireEvent.change(screen.getByLabelText("发放 / 核算状态"), { target: { value: "excluded" } });
+    expect(screen.getByText("员工甲")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "恢复核算" })).toBeInTheDocument();
+  });
   it("月度发放确认后才能导出，并在同页登记充值直至结清", async () => {
     let current = batch;
     request.mockImplementation((path: string) => {
