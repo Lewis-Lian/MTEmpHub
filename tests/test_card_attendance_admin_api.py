@@ -123,12 +123,38 @@ class CardAttendanceAdminApiTests(unittest.TestCase):
                 "employee_attendance_source",
                 "card_db",
                 "card_db_configured",
+                "meal_ticket_db_enabled",
             },
         )
         self.assertEqual(payload["manager_attendance_source"], "local")
         self.assertEqual(payload["employee_attendance_source"], "local")
         self.assertEqual(payload["card_db"], {})
         self.assertFalse(payload["card_db_configured"])
+        self.assertFalse(payload["meal_ticket_db_enabled"])
+
+    def test_meal_database_toggle_reuses_connection_and_is_independent_of_attendance(self):
+        self._login()
+        self._save_card_db_settings()
+        self._set_employee_source('card_db')
+        response = self.client.put('/api/admin/attendance-settings', json={'meal_ticket_db_enabled': True})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['meal_ticket_db_enabled'])
+        self.assertEqual(response.get_json()['employee_attendance_source'], 'card_db')
+        response = self.client.put('/api/admin/attendance-settings', json={'employee_attendance_source': 'local'})
+        self.assertTrue(response.get_json()['meal_ticket_db_enabled'])
+        self.assertTrue(response.get_json()['card_db_configured'])
+        response = self.client.put('/api/admin/attendance-settings', json={'meal_ticket_db_enabled': False})
+        self.assertFalse(response.get_json()['meal_ticket_db_enabled'])
+        self.assertEqual(response.get_json()['employee_attendance_source'], 'local')
+        with self.app.app_context():
+            self.assertEqual(SystemSetting.get_value('card_db_password'), 'card-pass-123')
+
+    def test_meal_database_toggle_rejects_non_boolean_values(self):
+        self._login()
+        for value in ('false', 1, None):
+            with self.subTest(value=value):
+                response = self.client.put('/api/admin/attendance-settings', json={'meal_ticket_db_enabled': value})
+                self.assertEqual(response.status_code, 400)
 
     def test_save_employee_source_and_card_db_config_hides_password(self):
         self._login()

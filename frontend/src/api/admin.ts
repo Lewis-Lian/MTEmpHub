@@ -26,6 +26,7 @@ export interface AdminAttendanceSettings {
   employee_attendance_source: "local" | "card_db";
   card_db: Omit<CardDbConfig, "password">;
   card_db_configured: boolean;
+  meal_ticket_db_enabled?: boolean;
 }
 
 export interface AttendanceConnectionTestResult { ok: boolean; message: string; dingtalk_configured?: boolean }
@@ -101,6 +102,7 @@ export function saveAttendanceSettings(
   options?: {
     employee_attendance_source?: AdminAttendanceSettings["employee_attendance_source"];
     card_db?: CardDbConfig;
+    meal_ticket_db_enabled?: boolean;
   },
 ): Promise<AdminAttendanceSettings> {
   return apiRequest<AdminAttendanceSettings>("/api/admin/attendance-settings", {
@@ -109,6 +111,7 @@ export function saveAttendanceSettings(
       manager_attendance_source: source,
       ...(options?.employee_attendance_source ? { employee_attendance_source: options.employee_attendance_source } : {}),
       ...(options?.card_db ? { card_db: options.card_db } : {}),
+      ...(options?.meal_ticket_db_enabled !== undefined ? { meal_ticket_db_enabled: options.meal_ticket_db_enabled } : {}),
     },
   });
 }

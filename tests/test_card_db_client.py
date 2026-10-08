@@ -132,6 +132,39 @@ class CardDBClientTests(unittest.TestCase):
         self.assertIn("pymssql", hint)
         self.assertIn("pip install", hint)
 
+class MealLedgerClientTests(unittest.TestCase):
+    def test_meal_ledgers_include_archives_preserve_employee_number_and_end_boundary(self):
+        from decimal import Decimal
+        from datetime import datetime
+        recorder=[]
+        client=CardDBClient(CONFIG,connect=fake_connect_factory([
+            ('subsidy',12,'001',datetime(2026,9,30,23,59),Decimal('176.00'))],recorder))
+        rows=client.meal_records(date(2026,9,1),date(2026,10,1))
+        self.assertEqual(rows,[{'source':'subsidy','id':12,'emp_no':'001',
+            'time':datetime(2026,9,30,23,59),'amount':Decimal('176.00')}])
+        sql=next(event[1] for event in recorder if event[0]=='execute')
+        for table in ('ST_Subsidy','ST_SubsidyHistory','ST_SupplyFund','ST_SupplyFundHistory','ST_TakeFund','ST_TakeFundHistory'):
+            self.assertIn(table,sql)
+        self.assertNotIn('XF_Subsidy',sql)
+        self.assertNotIn('Plan_Fund',sql)
+        self.assertNotIn('Is_Del',sql)
+        params=next(event[2] for event in recorder if event[0]=='execute')
+        self.assertEqual(params,('2026-09-01','2026-10-01')*6)
+
+    def test_query_failure_is_sanitized_and_connection_is_closed(self):
+        recorder=[]
+        class BrokenCursor(FakeCursor):
+            def execute(self,sql,params=None):
+                raise RuntimeError('password=secret SQL failure')
+        class BrokenConnection(FakeConnection):
+            def cursor(self):
+                return BrokenCursor([],recorder)
+        client=CardDBClient(CONFIG,connect=lambda **kw: BrokenConnection([],recorder))
+        with self.assertRaises(CardDBClientError) as error:
+            client.meal_records(date(2026,9,1),date(2026,10,1))
+        self.assertNotIn('secret',str(error.exception))
+        self.assertEqual(recorder,[('close',)])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -70,6 +70,10 @@ def _connect_failed():
     raise CardDBClientError("card database connection failed") from None
 
 
+def _query_failed():
+    raise CardDBClientError("card database query failed") from None
+
+
 def sanitize_card_error(error: Exception | str | None) -> str:
     """Return an actionable sync error without exposing the password."""
     message = str(error or "").strip()
@@ -146,6 +150,28 @@ class CardDBClient:
     def test_connection(self) -> str:
         row = self._query("SELECT @@VERSION", single=True)[0]
         return str(row[0]).split("\n")[0] if row and row[0] else ""
+
+    def meal_records(self, start_date, end_exclusive) -> list[dict]:
+        """Read posted funds, not the subsidy dispatch queue or planned funds."""
+        queries = []
+        for source, table, date_column, amount_column in (
+            ('subsidy', 'ST_Subsidy', 'Subsidy_Date', 'Subsidy_Fund'),
+            ('recharge', 'ST_SupplyFund', 'Supply_Date', 'Supply_Fund'),
+            ('refund', 'ST_TakeFund', 'Take_Date', 'Take_Fund'),
+        ):
+            for suffix in ('', 'History'):
+                queries.append(f"""
+SELECT '{source}', f.ID_KEY, CAST(p.Person_No AS VARCHAR(50)),
+       f.{date_column}, f.{amount_column}
+FROM dbo.{table}{suffix} f
+LEFT JOIN dbo.ST_Person p ON p.Person_ID = f.Person_ID
+WHERE f.{date_column} >= %s AND f.{date_column} < %s
+""")
+        params = (start_date.isoformat(), end_exclusive.isoformat()) * len(queries)
+        rows = self._query(' UNION ALL '.join(queries), params)
+        return [{'source':source, 'id':identifier, 'emp_no':str(emp_no or '').strip(),
+                 'time':time, 'amount':amount}
+                for source, identifier, emp_no, time, amount in rows]
 
     def attendance_records(self, start_date, end_date) -> list[dict]:
         """Return card punches between the dates (inclusive), joined with person/department."""

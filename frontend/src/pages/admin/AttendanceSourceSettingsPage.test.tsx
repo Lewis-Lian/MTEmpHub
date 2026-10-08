@@ -198,7 +198,7 @@ describe("AttendanceSourceSettingsPage", () => {
   it("renders the employee panel above the manager panel and switches the employee source", async () => {
     setup();
     await screen.findByText("钉钉凭证已配置");
-    const employeeKicker = screen.getByText("员工考勤");
+    const employeeKicker = screen.getByText("考勤与菜票");
     const managerKicker = screen.getByText("管理人员考勤");
     expect(employeeKicker.compareDocumentPosition(managerKicker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 

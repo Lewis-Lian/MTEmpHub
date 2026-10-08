@@ -8,7 +8,7 @@ export interface MealItem {
   excluded: boolean; original_base_amount: number;
   participation_history: Array<{ excluded: boolean; reason: string; operator: string; created_at: string }>;
   adjustments: Array<{ id: number; amount: number; reason: string; operator: string; created_at: string }>;
-  payments: Array<{ id: number; kind: string; amount: number; date: string; reference: string; operator: string; reversed: boolean }>;
+  payments: Array<{ id: number; kind: string; amount: number; date: string; reference: string; operator: string; reversed: boolean; database_record?: boolean }>;
 }
 export interface MealDepartment {
   dept_name: string; count: number; base_amount: number; adjustment_amount: number; due_amount: number;
@@ -17,6 +17,12 @@ export interface MealDepartment {
 export interface MealBatch {
   id: number; month: string; recharge_month: string; status: "draft" | "confirmed"; version: number;
   source_changed: boolean; items: MealItem[]; departments: MealDepartment[];
+  database?: { enabled: boolean; configured: boolean };
+  reconciliation?: {
+    checked_at: string; start_date: string; end_date: string; added: number; existing: number;
+    unmatched: number; zero_amount: number; outside_subsidy_month: number;
+    sources: { subsidy: number; recharge: number; refund: number };
+  };
 }
 export interface MealImportRow {
   id: number; sheet: string; row: number; kind: string; emp_no: string; name: string; dept_name: string;

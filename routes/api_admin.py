@@ -144,6 +144,7 @@ def _card_db_settings_payload() -> dict:
     return {
         "card_db": card_db,
         "card_db_configured": card_db_configured(config),
+        "meal_ticket_db_enabled": SystemSetting.get_value("meal_ticket_db_enabled", "false") == "true",
     }
 
 
@@ -162,6 +163,8 @@ def attendance_settings():
 @admin_required
 def save_attendance_settings():
     data = request.get_json(silent=True) or {}
+    if "meal_ticket_db_enabled" in data and type(data["meal_ticket_db_enabled"]) is not bool:
+        return jsonify({"error": "meal_ticket_db_enabled 必须是布尔值"}), 400
     manager_source = str(data.get("manager_attendance_source", "")).strip()
     if manager_source:
         if manager_source not in {"local", "dingtalk"}:
@@ -172,6 +175,8 @@ def save_attendance_settings():
         if employee_source not in {"local", "card_db"}:
             return jsonify({"error": "employee_attendance_source 必须是 local 或 card_db"}), 400
         SystemSetting.set_value("employee_attendance_source", employee_source)
+    if "meal_ticket_db_enabled" in data:
+        SystemSetting.set_value("meal_ticket_db_enabled", "true" if data["meal_ticket_db_enabled"] else "false")
     card_db = data.get("card_db")
     if isinstance(card_db, dict):
         from services.card_db_client import CARD_DB_SETTING_KEYS

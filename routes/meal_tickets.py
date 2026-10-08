@@ -17,6 +17,7 @@ from services.meal_ticket_service import (
     payment, serialize_batch, source_snapshot, participation, unconfirm,
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
+from services.meal_ticket_reconciliation import reconcile
 
 meal_tickets_bp = Blueprint('meal_tickets', __name__, url_prefix='/api/meal-tickets')
 
@@ -137,6 +138,17 @@ def add_payment():
     begin_write()
     batch = payment(body, operator)
     result = serialize_batch(batch)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/reconcile')
+@admin_required
+@handled
+def reconcile_batch():
+    batch, report = reconcile(request.get_json(silent=True) or {}, g.current_user.username)
+    result = serialize_batch(batch)
+    result['reconciliation'] = report
     db.session.commit()
     return jsonify(result)
 

@@ -257,6 +257,8 @@ def payment_payload(body):
 
 def payment(body, operator):
     request_key = required_text(body.get('request_key'), '请求标识', 100)
+    if request_key.startswith('card-meal:'):
+        raise MealError('请求标识不能使用数据库流水保留前缀')
     request_digest = digest(payment_payload(body))
     existing = MealTicketPayment.query.filter_by(request_key=request_key).first()
     if existing:
@@ -266,6 +268,10 @@ def payment(body, operator):
     batch = batch_for_write(body.get('batch_id'), body.get('version'))
     if batch.status != 'confirmed':
         raise MealError('请先确认核算再登记充值')
+    if MealTicketPayment.query.join(MealTicketItem, MealTicketItem.key == MealTicketPayment.item_key).filter(
+            MealTicketItem.batch_key == batch.key,
+            MealTicketPayment.request_key.startswith('card-meal:')).first():
+        raise MealError('本月已由数据库核对实际流水，请在菜票软件处理并启用数据库重新核对，不可手工重复登记', 409)
     item = item_for_batch(batch, body.get('item_id'))
     amount, kind = cents(body.get('amount')), body.get('kind')
     due, paid, _, _ = totals(item)
@@ -281,6 +287,8 @@ def payment(body, operator):
         original = MealTicketPayment.query.filter_by(id=body.get('reversal_id'), item_key=item.key).first()
         if not original or original.kind == 'reversal':
             raise MealError('原充值或扣回记录不存在')
+        if original.request_key.startswith('card-meal:'):
+            raise MealError('数据库实际流水不能手工冲正，请在菜票软件处理后重新核对', 409)
         if MealTicketPayment.query.filter_by(reversal_of=original.key).first():
             raise MealError('该记录已冲正', 409)
         reversal, amount = original.key, -original.amount_cents
@@ -322,6 +330,7 @@ def serialize_batch(batch, accessible=None, check_source=False):
                                'created_at':a.created_at.isoformat()} for a in adjustments],
                'payments':[{'id':p.id, 'kind':p.kind, 'amount':p.amount_cents/100, 'date':p.payment_date.isoformat(),
                             'reference':p.reference, 'operator':p.operator, 'reversal_of':p.reversal_of,
+                            'database_record':p.request_key.startswith('card-meal:'),
                             'reversed':any(other.reversal_of == p.key for other in payments)} for p in payments]}
         items.append(row)
         department = departments.setdefault(item.dept_name, {'dept_name':item.dept_name, 'count':0,
@@ -333,7 +342,9 @@ def serialize_batch(batch, accessible=None, check_source=False):
     if check_source:
         account = db.session.get(AccountSet, batch.account_set_id)
         changed = (batch.status == 'confirmed' and not account.is_locked) or digest(source_snapshot(batch.month)) != batch.source_digest
+    from services.meal_ticket_reconciliation import database_status
     return {'id':batch.id, 'month':batch.month, 'recharge_month':batch.recharge_month, 'status':batch.status,
+            'database':database_status(),
             'rule_version':batch.rule_version, 'rate_cents':batch.rate_cents,
             'version':batch.version, 'source_changed':changed, 'created_at':batch.created_at.isoformat(),
             'confirmed_by':batch.confirmed_by, 'items':items, 'departments':list(departments.values())}

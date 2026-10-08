@@ -98,6 +98,22 @@
 .meal-ticket-settlement-message > span:first-child { font-weight: 600; }
 .meal-ticket-settlement .meal-ticket-button { min-height: 28px; padding: 3px 8px; font-size: 12px; }
 .meal-ticket-settlement.is-settled { border-color: rgba(5, 150, 105, .25); background: rgba(5, 150, 105, .06); color: #047857; }
+.meal-ticket-reconciliation { flex-direction: column; align-items: stretch; padding: 20px; gap: 16px; }
+.meal-ticket-reconciliation-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.meal-ticket-reconciliation .meal-ticket-settlement-message { flex-direction: column; align-items: flex-start; gap: 7px; }
+.meal-ticket-reconciliation .meal-ticket-settlement-message strong { font-size: 19px; }
+.meal-ticket-reconciliation-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.meal-ticket-reconciliation-sources > div { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border: 1px solid var(--ent-border); border-radius: var(--ent-radius); background: var(--ent-bg); }
+.meal-ticket-reconciliation-sources span, .meal-ticket-reconciliation-sources small { color: var(--ent-text-secondary); font-size: 12px; }
+.meal-ticket-reconciliation-sources strong { color: var(--ent-text); font-size: 16px; }
+.meal-ticket-reconciliation-controls { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+.meal-ticket-reconciliation-controls label { display: flex; flex-direction: column; gap: 6px; color: var(--ent-text-secondary); font-size: 12px; }
+.meal-ticket-reconciliation-controls input { max-width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius); color: var(--ent-text); background: var(--ent-bg); font: inherit; }
+.meal-ticket-reconciliation-controls .meal-ticket-button { min-height: 36px; padding: 6px 14px; }
+.meal-ticket-reconciliation-controls .meal-ticket-badge { align-self: center; }
+.meal-ticket-reconciliation-note { margin: 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.8; }
+.meal-ticket-reconciliation-result { display: flex; flex-direction: column; gap: 7px; padding: 12px 16px; border-left: 3px solid var(--ent-blue); border-radius: var(--ent-radius); color: var(--ent-text-secondary); background: var(--ent-bg); font-size: 12px; line-height: 1.7; }
+.meal-ticket-reconciliation-result strong { color: var(--ent-text); font-size: 14px; }
 .meal-ticket-page section[aria-label="人员明细"] { scroll-margin-top: 20px; }
 .meal-ticket-empty .meal-ticket-button { margin-top: 20px; }
 .meal-ticket-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
@@ -172,6 +188,8 @@
   .meal-ticket-export { margin-left: 0; }
 }
 @media (max-width: 600px) {
+  .meal-ticket-reconciliation-sources { grid-template-columns: 1fr; }
+  .meal-ticket-reconciliation { padding: 16px; }
   .meal-ticket-workflow { grid-template-columns: 1fr; gap: 10px; }
   .meal-ticket-settlement { flex-direction: column; align-items: flex-start; gap: 12px; }
   .meal-ticket-page { gap: 16px; padding: 16px 12px 28px; }

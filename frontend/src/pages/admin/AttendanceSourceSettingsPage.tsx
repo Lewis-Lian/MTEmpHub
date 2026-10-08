@@ -190,6 +190,22 @@ export default function AttendanceSourceSettingsPage() {
     }
   }
 
+  async function handleMealDbToggle() {
+    if (!attendanceSettings) return;
+    setAttendanceSaving(true);
+    try {
+      const result = await saveAttendanceSettings(attendanceSettings.manager_attendance_source, {
+        meal_ticket_db_enabled: !attendanceSettings.meal_ticket_db_enabled,
+      });
+      setAttendanceSettings(result);
+      notification.success(result.meal_ticket_db_enabled ? "菜票数据库核对已启用" : "菜票数据库核对已关闭");
+    } catch (err: any) {
+      handleAdminApiError(err, "保存菜票数据库用途失败");
+    } finally {
+      setAttendanceSaving(false);
+    }
+  }
+
   function cardDbPayload(includePassword: boolean): CardDbConfig {
     const payload: CardDbConfig = {};
     if (cardDbForm.host.trim()) payload.host = cardDbForm.host.trim();
@@ -369,7 +385,7 @@ export default function AttendanceSourceSettingsPage() {
           <div className="settings-header-title-group">
             <h2 className="settings-header-title">更多设置</h2>
             <p className="settings-header-desc">
-              配置员工考勤机（STCard_Enp 数据库）与管理人员钉钉数据源，管理连接凭据并执行账套同步。
+              管理考勤与菜票共用的 SQL Server 连接，以及管理人员钉钉数据源。
             </p>
           </div>
         </header>
@@ -391,9 +407,9 @@ export default function AttendanceSourceSettingsPage() {
         <section className="settings-card">
           <div className="settings-card-head">
             <div>
-              <span className="settings-card-badge">员工考勤</span>
-              <h3 className="settings-card-title">员工考勤数据源配置</h3>
-              <p className="settings-card-desc">选择本地上传 Excel 或考勤机数据库同步。数据库密码保存后不再回显。</p>
+              <span className="settings-card-badge">考勤与菜票</span>
+              <h3 className="settings-card-title">共享数据库连接与用途</h3>
+              <p className="settings-card-desc">一套连接参数，分别控制考勤同步和菜票核对。数据库密码保存后不再回显。</p>
             </div>
             {attendanceSettings && (
               <span
@@ -432,11 +448,20 @@ export default function AttendanceSourceSettingsPage() {
                 </div>
               </div>
 
+              <div className="settings-database-use">
+                <div><strong>菜票充值核对</strong><p>与考勤共用下方连接参数，用于菜票中心核对实际到账。</p></div>
+                <button type="button" role="switch" aria-label="菜票数据库核对" aria-checked={Boolean(attendanceSettings.meal_ticket_db_enabled)}
+                  disabled={attendanceSaving || cardDbSaving} onClick={handleMealDbToggle}
+                  className={`settings-database-switch${attendanceSettings.meal_ticket_db_enabled ? " is-enabled" : ""}`}>
+                  <span aria-hidden="true" />{attendanceSettings.meal_ticket_db_enabled ? "已启用" : "未启用"}
+                </button>
+              </div>
+
               {/* 考勤机数据库连接参数表单 */}
               <div className="settings-form-panel">
                 <div className="settings-form-panel-header">
                   <span className="settings-form-panel-title">
-                    <span>🗄️</span> 考勤机数据库连接配置 (SQL Server)
+                    <span>🗄️</span> 共享数据库连接配置 (SQL Server)
                   </span>
                   <span style={{ fontSize: 12, color: "var(--ent-text-secondary)" }}>
                     密码留空将保持已保存密码
