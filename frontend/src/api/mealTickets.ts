@@ -35,7 +35,7 @@ export interface MealComparison {
 export const compareMealImport = (id: number) => apiRequest<MealComparison[]>(`/api/meal-tickets/imports/${id}/comparison`);
 export const fetchMealBatch = (month: string) => apiRequest<MealBatch | null>(`/api/meal-tickets?recharge_month=${month}`);
 export const mutateMealBatch = (action: string, body: object) => apiRequest<MealBatch>(`/api/meal-tickets/${action}`, { method: "POST", body });
-export const mealExportUrl = (month: string) => buildApiUrl(`/api/meal-tickets/export?recharge_month=${month}`);
+export const mealRechargeExportUrl = (month: string) => buildApiUrl(`/api/meal-tickets/export-recharge?recharge_month=${month}`);
 export const fetchMealImports = () => apiRequest<MealImport[]>("/api/meal-tickets/imports");
 export const previewMealImport = (body: FormData) => apiRequest<MealImport>("/api/meal-tickets/imports", { method: "POST", body });
 export const confirmMealImport = (record: MealImport) => apiRequest<MealImport>(`/api/meal-tickets/imports/${record.id}/confirm`, {

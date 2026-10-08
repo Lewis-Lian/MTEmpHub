@@ -5,6 +5,7 @@ from datetime import datetime
 from flask import Blueprint, g, jsonify, request, send_file
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill
+import xlwt
 from sqlalchemy.exc import IntegrityError
 
 from models import db
@@ -125,6 +126,38 @@ def add_payment():
     result = serialize_batch(batch)
     db.session.commit()
     return jsonify(result)
+
+
+@meal_tickets_bp.get('/export-recharge')
+@page_permission_required('meal_ticket_query')
+@handled
+def export_recharge():
+    batch = selected_batch()
+    if not batch:
+        raise MealError('没有核算数据', 404)
+    if batch.status != 'confirmed':
+        raise MealError('请先确认核算再导出充值表', 409)
+    data = serialize_batch(batch, accessible())
+    book = xlwt.Workbook()
+    sheet = book.add_sheet('充值表')
+    sheet.write(0, 0, '员工编号')
+    sheet.write(0, 1, '充值金额')
+    amount_style = xlwt.easyxf(num_format_str='0.00')
+    row = 1
+    for item in data['items']:
+        amount = round(item['difference'], 2)
+        if amount <= 0:
+            continue
+        sheet.write(row, 0, item['emp_no'])
+        sheet.write(row, 1, amount, amount_style)
+        row += 1
+    sheet.col(0).width = 20 * 256
+    sheet.col(1).width = 20 * 256
+    output = BytesIO()
+    book.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name=f'菜票充值_{batch.recharge_month}.xls',
+        mimetype='application/vnd.ms-excel')
 
 
 @meal_tickets_bp.get('/export')

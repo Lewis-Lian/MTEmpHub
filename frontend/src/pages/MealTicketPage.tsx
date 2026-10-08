@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchMe } from "../api/auth";
 import { apiRequest } from "../api/client";
-import { fetchMealBatch, mutateMealBatch, mealExportUrl, fetchMealImports, previewMealImport, confirmMealImport, compareMealImport } from "../api/mealTickets";
+import { fetchMealBatch, mutateMealBatch, mealRechargeExportUrl, fetchMealImports, previewMealImport, confirmMealImport, compareMealImport } from "../api/mealTickets";
 import type { MealBatch, MealItem, MealDepartment, MealImport, MealImportRow, MealComparison } from "../api/mealTickets";
 import QueryTable from "../components/query/QueryTable";
 import EmployeePicker from "../components/query/EmployeePicker";
@@ -258,7 +258,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     { title: "生成草稿", text: "按上月考勤生成本月应发名单。", control: admin && <button className="meal-ticket-button" disabled={busy || confirmed} onClick={() => mutate("generate", { recharge_month: month })}>生成 / 重算草稿</button> },
     { title: "补发 / 扣除", text: "核对人员，调整金额或登记本月不发。", control: <button className="meal-ticket-button" disabled={busy || !batch || confirmed} onClick={jumpToPeople}>核对人员与补扣</button> },
     { title: "确认核算", text: "处理异常后，锁定考勤账套并确认。", control: admin && <button className="meal-ticket-button is-primary" disabled={busy || !batch || confirmed || errorCount > 0} onClick={() => mutate("confirm")}>确认核算</button> },
-    { title: "导出充值表", text: "核算完成后导出，按表到充值系统操作。", control: confirmed ? <a className="meal-ticket-button" href={mealExportUrl(month)}>导出人员及部门报表</a> : <button className="meal-ticket-button" disabled>核算后可导出</button> },
+    { title: "导出充值表", text: "仅导出待充值余额，不受列表筛选影响。", control: confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button> },
     { title: "登记充值", text: "实际充值成功后，登记金额与凭证。", control: <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={jumpToPeople}>登记实际充值</button> },
     { title: "核对结清", text: "按每个人的应发与已发金额检查结清。", control: <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={checkSettlement}>重新核对</button> },
   ];
@@ -274,11 +274,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     </section>
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
-        {steps.map((step, index) => <li key={step.title} title={step.text} className={index === currentStep ? "is-current" : !paymentView && ((index === 0 && batch) || ((index === 1 || index === 2) && confirmed)) ? "is-complete" : ""} aria-current={index === currentStep ? "step" : undefined}>
-          <span className="meal-ticket-step-number">{index + 1}</span><h2>{step.title}</h2>
+        {steps.map((step, index) => <li key={step.title} className={index === currentStep ? "is-current" : !paymentView && ((index === 0 && batch) || ((index === 1 || index === 2) && confirmed)) ? "is-complete" : ""} aria-current={index === currentStep ? "step" : undefined}>
+          <div className="meal-ticket-step-heading"><span className="meal-ticket-step-number">{index + 1}</span><h2>{step.title}</h2></div>
+          <p className="meal-ticket-step-description">{step.text}</p>
+          {!paymentView && index === 3 && <div className="meal-ticket-file-info"><span>XLS</span><small>员工编号 / 充值金额</small></div>}
+          <div className="meal-ticket-step-action">{(paymentView || index === 3 || (index < 3 ? !confirmed && (index === 0 || batch) : confirmed && (index !== 4 || !settled))) && step.control}</div>
         </li>)}
       </ol>
-      <div className="meal-ticket-actions meal-ticket-flow-actions">{steps.map((step, index) => (paymentView || (index < 3 ? !confirmed && (index === 0 || batch) : confirmed && (index !== 4 || !settled))) && <span key={step.title}>{step.control}</span>)}</div>
     </div>}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
     {busy && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">

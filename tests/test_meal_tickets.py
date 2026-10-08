@@ -5,6 +5,7 @@ from datetime import date, timedelta
 
 from flask import Flask
 from openpyxl import load_workbook, Workbook
+import xlrd
 
 from models import db
 from models.account_set import AccountSet
@@ -77,6 +78,61 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         slugs = [module['slug'] for module in response.get_json()['modules']]
         self.assertEqual(slugs[slugs.index('query') + 1], 'meal-tickets')
+
+    def test_recharge_export_requires_confirmation(self):
+        url = '/api/meal-tickets/export-recharge?recharge_month=2026-09'
+        self.assertEqual(self.client.get(url, headers=self.headers).status_code, 404)
+        self.generate()
+        self.assertEqual(self.client.get(url, headers=self.headers).status_code, 409)
+
+    def test_recharge_export_is_two_column_xls_with_remaining_amount(self):
+        batch = self.confirm(self.adjustment(self.generate(), '16.50'))
+        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'176', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'充值凭证', 'request_key':'export-partial'})
+        self.assertEqual(response.status_code, 200)
+        response = self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, 'application/vnd.ms-excel')
+        self.assertIn('.xls', response.headers['Content-Disposition'])
+        self.assertTrue(response.data.startswith(bytes.fromhex('d0cf11e0a1b11ae1')))
+        book = xlrd.open_workbook(file_contents=response.data)
+        self.assertEqual(book.nsheets, 1)
+        sheet = book.sheet_by_index(0)
+        self.assertEqual((sheet.nrows, sheet.ncols), (2, 2))
+        self.assertEqual(sheet.row_values(0), ['员工编号', '充值金额'])
+        self.assertEqual(sheet.row_values(1), ['001', 16.5])
+        self.assertEqual(sheet.cell_type(1, 0), xlrd.XL_CELL_TEXT)
+        self.assertEqual(sheet.cell_type(1, 1), xlrd.XL_CELL_NUMBER)
+        current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(len(current['items'][0]['payments']), 1)
+
+    def test_recharge_export_omits_settled_and_refund_items(self):
+        batch = self.confirm(self.generate())
+        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'176', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'充值凭证', 'request_key':'export-settled'})
+        self.assertEqual(response.status_code, 200)
+        url = '/api/meal-tickets/export-recharge?recharge_month=2026-09'
+        for amount in (None, '-8'):
+            if amount:
+                self.adjustment(response.get_json(), amount)
+            exported = self.client.get(url, headers=self.headers)
+            self.assertEqual(exported.status_code, 200)
+            self.assertEqual(xlrd.open_workbook(file_contents=exported.data).sheet_by_index(0).nrows, 1)
+
+    def test_recharge_export_respects_personnel_permissions(self):
+        batch = self.confirm(self.generate())
+        adjusted = self.post('/adjustments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][1]['id'], 'amount':'8', 'reason':'补发'})
+        self.assertEqual(adjusted.status_code, 200)
+        url = '/api/meal-tickets/export-recharge?recharge_month=2026-09'
+        viewer = {'Authorization':'Bearer ' + self.viewer_token}
+        exported = self.client.get(url, headers=viewer)
+        self.assertEqual(exported.status_code, 200)
+        sheet = xlrd.open_workbook(file_contents=exported.data).sheet_by_index(0)
+        self.assertEqual(sheet.col_values(0), ['员工编号', '001'])
+        self.assertEqual(self.client.get(url).status_code, 401)
 
     def test_final_field_next_month_and_no_rounding(self):
         with self.app.app_context():
