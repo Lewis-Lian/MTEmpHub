@@ -33,6 +33,6 @@ def test_overtime_upgrade_after_legacy_schema_patch(tmp_path, existing_flags, le
         columns = {column['name'] for column in inspect(db.engine).get_columns('overtime_records')}
         assert {'is_revoked', 'is_manual_edited'} <= columns
         version = db.session.execute(text('SELECT version_num FROM alembic_version')).scalar()
-        assert version == 'f7a8b9c0d1e2'
+        assert version == '20261008_meals'
         db.session.remove()
         db.drop_all()

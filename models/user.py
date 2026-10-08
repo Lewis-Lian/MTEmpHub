@@ -5,6 +5,7 @@ from . import db
 
 
 PAGE_PERMISSION_LABELS = {
+    "meal_ticket_query": "菜票查询",
     "query_home": "首页",
     "individual_attendance": "个人考勤查询",
     "manager_query": "管理人员考勤数据查询",
@@ -40,6 +41,7 @@ EMPLOYEE_PAGE_PERMISSION_KEYS = (
 )
 
 ALL_PAGE_PERMISSION_KEYS = (
+    "meal_ticket_query",
     *HOME_PAGE_PERMISSION_KEYS,
     *COMMON_PAGE_PERMISSION_KEYS,
     *MANAGER_PAGE_PERMISSION_KEYS,

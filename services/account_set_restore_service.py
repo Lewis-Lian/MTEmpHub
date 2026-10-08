@@ -20,7 +20,7 @@ from models.shift import Shift
 from models.account_set_backup_restore import AccountSetBackupOrigin, AccountSetBackupRestore
 from services.account_set_backup_schema import (
     DATASETS, REFS, HISTORY, DELETE_ALLOWED, ACCOUNT_FIELDS, BackupError,
-    BackupTargetChanged, digest, business_key, options_checked, serial,
+    BackupTargetChanged, digest, business_key, options_checked, serial, MEAL_DATASETS, FILE_DATASETS,
 )
 from services.account_set_backup_service import month_bounds, scoped_rows, serialize_row
 
@@ -194,6 +194,35 @@ def validate_selection(document, options, rows, choices):
         if row['dataset'] in maps and row['backup']:
             natural = DATASETS[row['dataset']].key[0]
             maps[row['dataset']][row['backup'][natural]] = row['backup']
+    meal_maps = {name: {row.key: serialize_row(name, row) for row in DATASETS[name].model.query.all()}
+                 for name in MEAL_DATASETS}
+    for row in changes:
+        if row['dataset'] in meal_maps and row['backup']:
+            meal_maps[row['dataset']][row['backup']['key']] = row['backup']
+    for row in changes:
+        value = row['backup']
+        if row['dataset'] not in MEAL_DATASETS or not value:
+            continue
+        for field, parent in (('batch_key','meal_batches'), ('item_key','meal_items'), ('import_key','meal_imports'), ('reversal_of','meal_payments')):
+            if value.get(field) and value[field] not in meal_maps[parent]:
+                block('missing_meal_reference', '缺少菜票关联记录，请一并选择对应核算/明细')
+        if row['dataset'] in ('meal_adjustments','meal_payments'):
+            source_item = next((item for item in document['datasets']['meal_items'] if item['key'] == value['item_key']), None)
+            retained_item = meal_maps['meal_items'].get(value['item_key'])
+            if retained_item != source_item:
+                block('meal_snapshot_mismatch', '菜票人员核算与备份不一致，不能补入补扣或充值历史')
+            source_batch = next((item for item in document['datasets']['meal_batches'] if source_item and item['key'] == source_item['batch_key']), None)
+            retained_batch = meal_maps['meal_batches'].get(source_item['batch_key']) if source_item else None
+            # Version is a concurrency token, not a financial amount. All
+            # other snapshot fields must match before appending movements.
+            if not source_batch or not retained_batch or any(retained_batch.get(k) != v for k,v in source_batch.items() if k != 'version'):
+                block('meal_batch_mismatch', '菜票批次与备份不一致，不能补入补扣或充值历史')
+            if row['dataset'] == 'meal_payments' and (not retained_batch or retained_batch['status'] != 'confirmed'):
+                block('meal_unconfirmed', '不能向未确认核算恢复实际充值记录')
+            for name in ('meal_adjustments','meal_payments'):
+                source_keys = {item['key'] for item in document['datasets'][name] if item['item_key'] == value['item_key']}
+                if any(item['item_key'] == value['item_key'] and key not in source_keys for key,item in meal_maps[name].items()):
+                    block('meal_target_only_history', '目标菜票已有备份之外的资金记录，不能合并不同历史')
     account = AccountSet.query.filter_by(month=document['month']).first()
     if account is None and not any(row['dataset'] == 'account_set' for row in changes):
         block('missing_account', '新账套必须选择以备份为准，不能跳过账套创建后导入明细')
@@ -201,6 +230,10 @@ def validate_selection(document, options, rows, choices):
         block('locked', '%s 账套已锁定，请先解锁' % document['month'])
     locked = {row.month for row in AccountSet.query.filter_by(is_locked=True).all()}
     for row in changes:
+        if row['dataset'] in MEAL_DATASETS and row['system']:
+            # Financial history is append-only during restoration. Never
+            # overwrite a changed snapshot or an existing movement.
+            block('meal_history_conflict', '菜票已有记录存在差异，不能通过恢复覆盖历史')
         for month in set(row['affected_months']) & locked:
             block('locked', '该修改影响已锁定账套 %s' % month)
         value = row['backup']
@@ -246,7 +279,7 @@ def convert_fields(name, value):
             item = date.fromisoformat(item)
         fields[field] = item
     if hasattr(ds.model, 'emp_id'):
-        fields['emp_id'] = Employee.query.filter_by(emp_no=value['emp_no']).one().id
+        fields['emp_id'] = Employee.query.filter_by(emp_no=value['emp_no']).one().id if value['emp_no'] else None
     for field, (natural, model, attribute) in REFS.get(name, {}).items():
         identifier = value[natural]
         fields[field] = model.query.filter(getattr(model, attribute) == identifier).one().id if identifier else None
@@ -259,7 +292,7 @@ def cleanup_old_files(root):
     if not journal.is_file():
         return warnings
     pending = json.loads(journal.read_text())
-    referenced = {str(Path(row.stored_path).resolve()) for row in DATASETS['imports'].model.query.all()}
+    referenced = {str(Path(row.stored_path).resolve()) for name in FILE_DATASETS for row in DATASETS[name].model.query.all()}
     remaining = []
     for filename in pending:
         try:
@@ -311,9 +344,9 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
             db.session.flush()
             # Persist all new bytes before DB writes; no source filesystem paths are used.
             for item in changes:
-                if item['dataset'] == 'imports' and item['backup']:
+                if item['dataset'] in FILE_DATASETS and item['backup']:
                     destination.mkdir(parents=True, exist_ok=True)
-                    path = destination / item['backup']['origin_key']
+                    path = destination / item['backup'].get('origin_key', item['backup'].get('key'))
                     path.write_bytes(document['_files'][item['backup']['file_key']])
             # Departments are inserted in ancestor order, not source database order.
             ordered = []
@@ -325,7 +358,10 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                 ordered.extend(ready)
                 pending = [row for row in pending if row not in ready]
             for category in ('shifts', 'employees', 'employee_shift_assignments', 'account_set', *[name for name in DATASETS if name not in ('departments', 'shifts', 'employees', 'employee_shift_assignments')]):
-                ordered.extend(row for row in changes if row['dataset'] == category)
+                category_rows = [row for row in changes if row['dataset'] == category]
+                if category == 'meal_payments':
+                    category_rows.sort(key=lambda row: bool((row['backup'] or {}).get('reversal_of')))
+                ordered.extend(category_rows)
             for item in ordered:
                 name, value = item['dataset'], item['backup']
                 if name == 'account_set':
@@ -337,7 +373,7 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                 key = business_key(name, item['system'] or value)
                 target = existing[name].get(key)
                 if value is None:
-                    if name == 'imports':
+                    if name in FILE_DATASETS:
                         old_paths.append(str(Path(target.stored_path).resolve()))
                     if name in HISTORY:
                         AccountSetBackupOrigin.query.filter_by(dataset=name, local_id=target.id).delete(synchronize_session=False)
@@ -347,8 +383,8 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                 fields = convert_fields(name, value)
                 if ds.scope == 'account':
                     fields['account_set_id'] = account.id
-                if name == 'imports':
-                    fields['stored_path'] = str(destination / value['origin_key'])
+                if name in FILE_DATASETS:
+                    fields['stored_path'] = str(destination / value.get('origin_key', value.get('key')))
                     if target:
                         old_paths.append(str(Path(target.stored_path).resolve()))
                 if hasattr(ds.model, 'updated_by'):

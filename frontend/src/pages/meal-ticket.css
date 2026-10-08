@@ -1,0 +1,16 @@
+.meal-ticket-page { padding: 24px; max-width: 1600px; margin: auto; }
+.meal-ticket-heading p { opacity: .75; }
+.meal-ticket-toolbar, .meal-ticket-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.meal-ticket-toolbar { margin: 20px 0; }
+.meal-ticket-page label { display: flex; flex-direction: column; gap: 6px; }
+.meal-ticket-page input:not([type="checkbox"]), .meal-ticket-page select, .meal-ticket-page textarea { padding: 8px; border: 1px solid var(--ent-border-strong); border-radius: 6px; background: var(--ent-bg); color: inherit; }
+.meal-ticket-page button, .meal-ticket-export { padding: 8px 12px; border: 1px solid var(--ent-border-strong); border-radius: 6px; background: var(--ent-secondary-bg); color: inherit; cursor: pointer; }
+.meal-ticket-page button:disabled { opacity: .5; cursor: default; }
+.meal-ticket-totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+.meal-ticket-totals > div { padding: 20px; background: var(--ent-secondary-bg); border: 1px solid var(--ent-border-strong); border-radius: 10px; }
+.meal-ticket-totals strong { display: block; margin-top: 8px; font-size: 26px; }
+.meal-ticket-alert { padding: 12px; border: 1px solid currentColor; border-radius: 6px; margin: 12px 0; }
+.meal-ticket-modal { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: var(--z-modal); }
+.meal-ticket-modal > section { background: var(--ent-bg); color: inherit; padding: 24px; border-radius: 12px; width: min(640px, 90vw); max-height: 85vh; overflow: auto; }
+.meal-ticket-modal form { display: flex; flex-direction: column; gap: 16px; }
+@media (max-width: 700px) { .meal-ticket-page { padding: 12px; } .meal-ticket-totals { grid-template-columns: 1fr; } }

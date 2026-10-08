@@ -20,7 +20,7 @@ from models.shift import Shift
 from models.employee_shift import EmployeeShiftAssignment
 from models.account_set_backup_restore import AccountSetBackupOrigin
 from services.account_set_backup_schema import (
-    DATASETS, REFS, HISTORY, ACCOUNT_FIELDS, BackupError, canonical, digest, serial, business_key,
+    DATASETS, REFS, HISTORY, ACCOUNT_FIELDS, BackupError, canonical, digest, serial, business_key, MEAL_DATASETS, FILE_DATASETS,
 )
 
 MAX_UPLOAD = 100 * 1024 * 1024
@@ -74,9 +74,9 @@ def serialize_row(name, row):
     result = {field: serial(getattr(row, field)) for field in ds.fields}
     if hasattr(row, 'emp_id'):
         employee = db.session.get(Employee, row.emp_id)
-        if not employee:
+        if not employee and row.emp_id is not None:
             raise BackupError('考勤数据引用的员工缺失')
-        result['emp_no'] = employee.emp_no
+        result['emp_no'] = employee.emp_no if employee else None
     for field, (out, model, natural) in REFS.get(name, {}).items():
         identifier = getattr(row, field)
         ref = db.session.get(model, identifier) if identifier else None
@@ -94,8 +94,9 @@ def serialize_row(name, row):
             'source_id': row.id,
             'operator_id': getattr(row, 'operator_user_id', None),
         }
-    if name == 'imports':
-        result['file_key'] = 'files/%s/%s' % (result['origin_key'], Path(row.source_filename).name)
+    if name in FILE_DATASETS:
+        identity = result['key'] if name == 'meal_imports' else result['origin_key']
+        result['file_key'] = 'files/%s/%s' % (identity, Path(row.source_filename).name)
         path = Path(row.stored_path)
         result['file_sha256'] = file_digest(path) if path.is_file() else None
         result['file_size'] = path.stat().st_size if path.is_file() else None
@@ -135,7 +136,7 @@ def collect_backup(account_set_id, progress=None, phase="data"):
         rows = scoped_rows(name, account)
         datasets[name] = serialize_rows(name, rows)
         report_data()
-        employee_ids.update(row.emp_id for row in rows if hasattr(row, 'emp_id'))
+        employee_ids.update(row.emp_id for row in rows if hasattr(row, 'emp_id') and row.emp_id is not None)
         shift_ids.update(row.shift_id for row in rows if getattr(row, 'shift_id', None))
     employees = Employee.query.filter(Employee.id.in_(employee_ids)).order_by(Employee.id).all()
     assignments = EmployeeShiftAssignment.query.filter(EmployeeShiftAssignment.emp_id.in_(employee_ids)).all()
@@ -175,8 +176,9 @@ def export_backup(account_set_id, progress=None):
     output = BytesIO()
     files, total = [], len(content)
     account = db.session.get(AccountSet, account_set_id)
-    sources = {business_key('imports', serialize_row('imports', row)): row for row in scoped_rows('imports', account)}
-    byte_total = sum(item['file_size'] or 0 for item in document['datasets']['imports'])
+    sources = {(name, business_key(name, serialize_row(name, row))): row for name in FILE_DATASETS for row in scoped_rows(name, account)}
+    file_items = [(name, item) for name in FILE_DATASETS for item in document['datasets'][name]]
+    byte_total = sum(item['file_size'] or 0 for _, item in file_items)
     bytes_done = 0
     def report_packing(filename=''):
         if progress:
@@ -186,8 +188,8 @@ def export_backup(account_set_id, progress=None):
     report_packing()
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         archive.writestr('data.json', content)
-        for item in document['datasets']['imports']:
-            source = sources.get(business_key('imports', item))
+        for name, item in file_items:
+            source = sources.get((name, business_key(name, item)))
             path = Path(source.stored_path) if source else None
             if not path or not path.is_file():
                 raise BackupError('原始文件缺失：%s' % item['source_filename'])
@@ -225,6 +227,9 @@ def validate_document(document):
         raise BackupError('不支持的备份版本')
     start, end = month_bounds(document.get('month'))
     datasets = document.get('datasets')
+    if isinstance(datasets, dict):
+        for name in MEAL_DATASETS:
+            datasets.setdefault(name, [])
     if not isinstance(datasets, dict) or set(datasets) != set(DATASETS):
         raise BackupError('备份数据类别不完整')
     account = document.get('account_set')
@@ -246,7 +251,7 @@ def validate_document(document):
         expected.update(ref[0] for ref in REFS.get(name, {}).values())
         if name in HISTORY:
             expected.update(('origin_key', 'provenance'))
-        if name == 'imports':
+        if name in FILE_DATASETS:
             expected.update(('file_key', 'file_sha256', 'file_size'))
         for row in rows:
             if name == 'manager_stats' and isinstance(row, dict):
@@ -291,7 +296,7 @@ def validate_document(document):
                     raise BackupError('业务编号无效')
             if name in HISTORY and (not re.fullmatch('[0-9a-f]{64}', row['origin_key']) or not isinstance(row['provenance'], dict)):
                 raise BackupError('历史来源无效')
-            if name == 'imports':
+            if name in FILE_DATASETS:
                 if not isinstance(row['file_sha256'], str) or not re.fullmatch('[0-9a-f]{64}', row['file_sha256']) or type(row['file_size']) is not int or row['file_size'] < 0:
                     raise BackupError('归档文件校验信息无效')
             key = business_key(name, row)
@@ -307,6 +312,8 @@ def validate_document(document):
                 raise BackupError('日期超出账套月份')
             if ds.scope in ('month', 'report_month') and row[ds.scope] != document['month']:
                 raise BackupError('记录月份不匹配')
+            if name == 'meal_batches' and row['month'] != document['month']:
+                raise BackupError('菜票考勤月份不匹配')
             if ds.scope == 'year' and row['year'] != start.year:
                 raise BackupError('年度记录年份不匹配')
             if ds.scope == 'interval':
@@ -318,7 +325,7 @@ def validate_document(document):
     shifts = {row['shift_no'] for row in datasets['shifts']}
     for name, rows in datasets.items():
         for row in rows:
-            if 'emp_no' in row and row['emp_no'] not in employee_numbers:
+            if row.get('emp_no') and row['emp_no'] not in employee_numbers:
                 raise BackupError('备份缺少关联员工')
             if row.get('dept_no') and row['dept_no'] not in departments:
                 raise BackupError('备份缺少关联部门')
@@ -326,6 +333,21 @@ def validate_document(document):
                 raise BackupError('备份缺少父部门')
             if row.get('shift_no') and row['shift_no'] not in shifts:
                 raise BackupError('备份缺少关联班次')
+    meal_refs = {name: {row['key']: row for row in datasets[name]} for name in MEAL_DATASETS}
+    for name, parent, field in (
+        ('meal_items', 'meal_batches', 'batch_key'),
+        ('meal_adjustments', 'meal_items', 'item_key'),
+        ('meal_payments', 'meal_items', 'item_key'),
+        ('meal_import_rows', 'meal_imports', 'import_key'),
+    ):
+        for row in datasets[name]:
+            if row[field] not in meal_refs[parent]:
+                raise BackupError('备份缺少菜票关联记录')
+    for row in datasets['meal_payments']:
+        original = meal_refs['meal_payments'].get(row['reversal_of']) if row['reversal_of'] else None
+        if row['reversal_of'] and (not original or original['item_key'] != row['item_key'] or
+                                  original['kind'] == 'reversal' or row['amount_cents'] != -original['amount_cents']):
+            raise BackupError('菜票冲正记录无效')
     return document
 
 
@@ -366,13 +388,13 @@ def read_backup(payload):
             paths = [item['path'] for item in files]
             if len(paths) != len(set(paths)) or set(contents) != {'manifest.json', 'data.json', *paths}:
                 raise BackupError('备份文件清单不匹配')
-            if set(paths) != {row['file_key'] for row in document['datasets']['imports']}:
+            if set(paths) != {row['file_key'] for name in FILE_DATASETS for row in document['datasets'][name]}:
                 raise BackupError('原始文件清单不完整')
             for item in files:
                 data = contents[item['path']]
                 if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
                     raise BackupError('原始文件校验失败')
-            for row in document['datasets']['imports']:
+            for row in [row for name in FILE_DATASETS for row in document['datasets'][name]]:
                 if row['file_sha256'] != hashlib.sha256(contents[row['file_key']]).hexdigest() or row['file_size'] != len(contents[row['file_key']]):
                     raise BackupError('归档内容与业务清单不符')
             document['_files'] = {path: contents[path] for path in paths}

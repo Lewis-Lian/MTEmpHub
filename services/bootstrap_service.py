@@ -40,6 +40,9 @@ def ensure_default_admin() -> None:
 def ensure_schema_compatibility() -> None:
     inspector = inspect(db.engine)
     table_names = set(inspector.get_table_names())
+    from models.meal_ticket import MEAL_MODELS
+    for model in MEAL_MODELS:
+        model.__table__.create(bind=db.engine, checkfirst=True)
 
     # The legacy upgrade command intentionally does not depend on Alembic. Keep
     # the DingTalk additions available to installations upgrading an older

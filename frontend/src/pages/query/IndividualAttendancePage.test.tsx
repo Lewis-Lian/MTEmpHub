@@ -27,6 +27,21 @@ vi.mock("../../components/attendance/AttendanceCalendarGrid", () => ({
 }));
 
 describe("IndividualAttendancePage", () => {
+  it("从菜票依据链接带入可访问人员和考勤月份", async () => {
+    window.history.replaceState({}, "", "/employee/individual-attendance?emp_id=7&month=2026-08");
+    mockBootstrap.mockResolvedValue({
+      employees: [{ id: 7, emp_no: "E007", name: "张三", dept_id: 1, dept_name: "研发部", is_manager: false }],
+      account_sets: [{ id: 1, month: "2026-08", name: "2026年8月", is_active: false }],
+      departments: [],
+    });
+    const { default: IndividualAttendancePage } = await import("./IndividualAttendancePage");
+    render(<IndividualAttendancePage />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "查询" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+    await waitFor(() => expect(mockHeaderRows).toHaveBeenCalledWith("/api/query/employee-dashboard", new URLSearchParams({ month: "2026-08", emp_ids: "7" })));
+    window.history.replaceState({}, "", "/");
+  });
+
   it("初始化状态下展示空状态引导", async () => {
     mockBootstrap.mockResolvedValue({
       employees: [{ id: 7, emp_no: "E007", name: "张三", dept_id: 1, dept_name: "研发部", is_manager: false }],
