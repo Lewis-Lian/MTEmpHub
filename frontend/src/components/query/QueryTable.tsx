@@ -21,6 +21,7 @@ interface QueryTableProps {
   tableClassName?: string;
   cellModal?: QueryTableCellModalConfig;
   isRefreshing?: boolean;
+  paginationKey?: string;
 }
 
 export interface QueryTableCellModalContext {
@@ -57,6 +58,7 @@ export default function QueryTable({
   tableClassName,
   cellModal,
   isRefreshing = false,
+  paginationKey,
 }: QueryTableProps) {
   const tableWrapRef = useRef<HTMLDivElement | null>(null);
   const safeHeaders = headers.length ? headers.map(normalizeHeader) : [normalizeHeader("结果")];
@@ -102,7 +104,7 @@ export default function QueryTable({
   useEffect(() => {
     setPage(1);
     setJumpValue("");
-  }, [rows]);
+  }, [paginationKey ?? rows]);
 
   useEffect(() => {
     if (page !== safePage) {

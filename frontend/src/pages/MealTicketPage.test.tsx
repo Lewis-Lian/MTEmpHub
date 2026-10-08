@@ -12,6 +12,76 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it("筛选结果可全选，批量本月不发与恢复核算记录相同原因", async () => {
+    let current = { ...batch, items: [batch.items[0], { ...batch.items[0], id: 2, emp_no: "002", name: "员工乙" }] };
+    request.mockImplementation((path: string, options?: { body?: { item_id: number; excluded: boolean; reason: string; version: number } }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/participation") {
+        expect(options!.body!.version).toBe(current.version);
+        current = { ...current, version: current.version + 1, items: current.items.map(item => item.id === options!.body!.item_id
+          ? { ...item, excluded: options!.body!.excluded, due_amount: options!.body!.excluded ? 0 : 176, difference: options!.body!.excluded ? 0 : 176 } : item) };
+      }
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "全选筛选结果" }));
+    fireEvent.click(screen.getByRole("button", { name: "批量本月不发" }));
+    expect(screen.getByRole("button", { name: "确认本月不发" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "离职" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认本月不发" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(current.items.every(item => (item as { excluded?: boolean }).excluded)).toBe(true);
+    fireEvent.click(screen.getByRole("checkbox", { name: "全选筛选结果" }));
+    fireEvent.click(screen.getByRole("button", { name: "批量恢复核算" }));
+    fireEvent.change(screen.getByLabelText("处理原因"), { target: { value: "核对后结算" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复核算" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(current.items.every(item => !(item as { excluded?: boolean }).excluded)).toBe(true);
+    expect(request.mock.calls.filter(([path]) => path === "/api/meal-tickets/participation")).toHaveLength(4);
+  });
+
+  it("批量补扣中途失败只保留未成功人员，重试不会重复补扣", async () => {
+    let current = { ...batch, items: [batch.items[0], { ...batch.items[0], id: 2, emp_no: "002", name: "员工乙" }] };
+    let fail = true;
+    request.mockImplementation((path: string, options?: { body?: { item_id: number; amount: string } }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/adjustments") {
+        if (options!.body!.item_id === 2 && fail) { fail = false; return Promise.reject(new Error("第二人保存失败")); }
+        current = { ...current, version: current.version + 1, items: current.items.map(item => item.id === options!.body!.item_id
+          ? { ...item, adjustment_amount: item.adjustment_amount + Number(options!.body!.amount) } : item) };
+      }
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("checkbox", { name: "全选筛选结果" }));
+    fireEvent.click(screen.getByRole("button", { name: "批量补发 / 扣除" }));
+    fireEvent.change(screen.getByLabelText("每人调整金额（元）"), { target: { value: "-8" } });
+    fireEvent.click(screen.getByRole("button", { name: "线长补卡" }));
+    expect(screen.getByText("本次处理 2 人 · 合计调整 -16.00 元")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "保存补扣" })).toBeEnabled());
+    expect(screen.getByText("本次处理 1 人 · 合计调整 -8.00 元")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(current.items.map(item => item.adjustment_amount)).toEqual([-8, -8]);
+    expect(request.mock.calls.filter(([path, options]) => path === "/api/meal-tickets/adjustments" && options.body.item_id === 1)).toHaveLength(1);
+  });
+
+  it("多选跨页保持当前页，全选只作用于当前筛选人员", async () => {
+    const items = Array.from({ length: 105 }, (_, index) => ({ ...batch.items[0], id: index + 1, emp_no: String(index + 1), name: `人员${index + 1}` }));
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : { ...batch, items }));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("人员1");
+    fireEvent.click(within(screen.getByRole("region", { name: "人员明细" })).getByRole("button", { name: "下一页" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "选择 101" }));
+    expect(screen.getByRole("checkbox", { name: "选择 101" })).toBeChecked();
+    expect(screen.getByText("已选 1 人")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("输入工号或姓名"), { target: { value: "人员105" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "全选筛选结果" }));
+    expect(screen.getByText("已选 2 人")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "清空选择" }));
+    expect(screen.getByRole("checkbox", { name: "选择 105" })).not.toBeChecked();
+  });
   it("异常列表自动显示离职登记核对结果，仍保留不发或结算选择", async () => {
     HTMLElement.prototype.scrollIntoView = vi.fn();
     const current = { ...batch, items: [
@@ -389,7 +459,7 @@ describe("菜票中心", () => {
     await screen.findByText("已结清1");
     expect(screen.queryByText("考勤异常人员")).not.toBeInTheDocument();
     const table = within(screen.getByRole("region", { name: "人员明细" })).getByRole("table");
-    const names = () => within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell")[1].textContent);
+    const names = () => within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell")[2].textContent);
     const sort = within(table).getByRole("button", { name: /状态 \/ 操作/ });
     fireEvent.click(sort);
     expect(names().slice(0, 5)).toEqual(["负数应发人员", "考勤异常人员", "待扣回人员", "未发人员", "部分发放人员"]);
