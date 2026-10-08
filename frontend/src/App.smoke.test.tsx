@@ -1355,14 +1355,16 @@ describe("App smoke regression", () => {
     await screen.findByText("张三");
     fireEvent.change(screen.getByLabelText("计划充值月份"), { target: { value: "2026-06" } });
     await screen.findByText("张三");
-    fireEvent.change(screen.getByPlaceholderText("输入工号或姓名"), { target: { value: "E001" } });
+    fireEvent.click(screen.getByTitle("选择员工"));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "选择员工" })).getByLabelText("E001 - 张三"));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "选择员工" })).getByRole("button", { name: "确定" }));
     fireEvent.click(screen.getByRole("button", { name: "明细" }));
     fireEvent.click(screen.getByRole("link", { name: "查看考勤依据" }));
     expect(await screen.findByRole("tab", { name: "个人考勤查询" })).toHaveAttribute("aria-selected", "true");
     expect(window.location.search).toBe("?emp_id=1&month=2026-05");
     fireEvent.click(screen.getByRole("tab", { name: "月度发放" }));
     expect(screen.getByLabelText("计划充值月份")).toHaveValue("2026-06");
-    expect(screen.getByPlaceholderText("输入工号或姓名")).toHaveValue("E001");
+    expect(within(screen.getByRole("heading", { name: "月度发放" }).closest("main")!).getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("张三");
     expect(screen.getByRole("dialog", { name: "菜票明细" })).toBeInTheDocument();
   });
 

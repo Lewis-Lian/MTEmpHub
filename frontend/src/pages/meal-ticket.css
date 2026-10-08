@@ -20,6 +20,11 @@
 .meal-ticket-period { align-self: center; color: var(--ent-text-secondary); font-size: 13px; }
 .meal-ticket-page label { display: flex; flex-direction: column; gap: 7px; color: var(--ent-text-secondary); font-size: 12px; font-weight: 600; }
 .meal-ticket-toolbar label { flex: 0 1 200px; min-width: 140px; }
+.meal-ticket-picker-field { flex: 0 1 260px; min-width: 200px; display: flex; flex-direction: column; gap: 7px; }
+.meal-ticket-picker-field > span { color: var(--ent-text-secondary); font-size: 12px; font-weight: 600; }
+.meal-ticket-picker-field label { flex: none; min-width: 0; }
+.meal-ticket-picker-field .input-group { flex-wrap: nowrap; }
+.meal-ticket-picker-field input:not([type="checkbox"]) { flex: 1; width: 0; }
 .meal-ticket-page input:not([type="checkbox"]), .meal-ticket-page select, .meal-ticket-page textarea {
   min-width: 0;
   max-width: 100%;
@@ -164,6 +169,7 @@
   .meal-ticket-stat strong { font-size: 28px; }
   .meal-ticket-toolbar { gap: 12px; }
   .meal-ticket-toolbar label { flex: 1 1 100%; }
+  .meal-ticket-picker-field { flex: 1 1 100%; }
   .meal-ticket-toolbar .meal-ticket-button { flex: 1 1 auto; }
   .meal-ticket-period { width: 100%; }
   .meal-ticket-section-heading { align-items: flex-start; }
