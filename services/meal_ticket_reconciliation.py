@@ -60,9 +60,17 @@ def reconcile(body, operator):
     if len(by_number) != len(items):
         raise MealError('核算人员编号重复，请核对后重试',409)
     payments = MealTicketPayment.query.filter(MealTicketPayment.item_key.in_([i.key for i in items])).all()
-    if any(not p.request_key.startswith(DATABASE_REQUEST_PREFIX) for p in payments):
+    manual = {p.key:p for p in payments if not p.request_key.startswith(DATABASE_REQUEST_PREFIX)}
+    cancelled = set()
+    for reversal in manual.values():
+        original = manual.get(reversal.reversal_of)
+        if (reversal.kind == 'reversal' and original and original.kind != 'reversal'
+                and reversal.item_key == original.item_key and reversal.amount_cents == -original.amount_cents):
+            cancelled.update((original.key, reversal.key))
+    if set(manual) - cancelled:
         raise MealError('本月已有手工发放或冲正记录，请先核对登记与数据库流水，避免重复计入',409)
-    if any(not p.request_key.startswith(f'{DATABASE_REQUEST_PREFIX}{database_id}:') for p in payments):
+    if any(p.request_key.startswith(DATABASE_REQUEST_PREFIX) and
+            not p.request_key.startswith(f'{DATABASE_REQUEST_PREFIX}{database_id}:') for p in payments):
         raise MealError('本月已计入另一数据库的流水，请恢复原共享连接后核对，避免重复计入',409)
 
     report = {'checked_at':datetime.now().isoformat(timespec='seconds'),

@@ -166,3 +166,25 @@ class MealReconciliationTests(unittest.TestCase):
             'item_id':batch['items'][0]['id'],'kind':'recharge','amount':'16','date':'2026-09-10',
             'reference':'manual','request_key':'manual-after-db'})
         self.assertEqual(response.status_code,409)
+
+    def test_fully_reversed_manual_history_can_reconcile_without_double_counting(self):
+        batch=self.confirm(self.generate())
+        batch=self.post('/payments',{'batch_id':batch['id'],'version':batch['version'],
+            'item_id':batch['items'][0]['id'],'kind':'recharge','amount':'176','date':'2026-09-04',
+            'reference':'误登记全部充值','request_key':'manual-all'}).get_json()
+        original=batch['items'][0]['payments'][0]
+        batch=self.post('/payments',{'batch_id':batch['id'],'version':batch['version'],
+            'item_id':batch['items'][0]['id'],'kind':'reversal','amount':'176','date':'2026-09-04',
+            'reversal_id':original['id'],'reference':'改由数据库核对，撤销手工登记',
+            'request_key':'cancel-manual-all'}).get_json()
+        self.enable()
+        with patch('services.card_db_client.CardDBClient.meal_records',return_value=self.records()):
+            result=self.reconcile(batch)
+            self.assertEqual(result.status_code,200,result.get_json())
+            data=result.get_json()
+            self.assertEqual(data['items'][0]['paid_amount'],176)
+            self.assertEqual(data['items'][0]['difference'],0)
+            self.assertEqual(len(data['items'][0]['payments']),5)
+            again=self.reconcile(data)
+            self.assertEqual(again.status_code,200,again.get_json())
+            self.assertEqual(again.get_json()['reconciliation']['added'],0)

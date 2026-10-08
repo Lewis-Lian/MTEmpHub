@@ -65,3 +65,23 @@ it('原账结清但本次数据库读取失败时不显示本次核对成功',as
   expect(within(panel).queryByText('本月账目已结清')).not.toBeInTheDocument();
   expect(within(panel).getByText('数据库核对未完成')).toBeInTheDocument();
 });
+
+it('数据库模式合并到账与结清步骤，后续补扣也直接核对',async()=>{
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:batch));
+  page();
+  await screen.findByText('员工甲');
+  const flow=screen.getByRole('list',{name:'月度发放流程'});
+  expect(within(flow).getAllByRole('listitem').map(step=>within(step).getByRole('heading').textContent))
+    .toEqual(['生成草稿','补发 / 扣除','确认核算','导出充值表','核对到账与结清']);
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账与结清');
+  expect(within(flow).getByRole('button',{name:'核对到账与结清'})).toBeEnabled();
+});
+
+it('数据库模式后续补扣仅保留调整和到账结清两个步骤',async()=>{
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:batch));
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  await screen.findByText('员工甲');
+  const flow=screen.getByRole('list',{name:'后续补扣流程'});
+  expect(within(flow).getAllByRole('listitem').map(step=>within(step).getByRole('heading').textContent))
+    .toEqual(['补发 / 扣除','核对到账与结清']);
+});
