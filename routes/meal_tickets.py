@@ -14,7 +14,7 @@ from models.account_set import AccountSet
 from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
     MealError, begin_write, shift_month, generate, batch_for_write, confirm, adjustment,
-    payment, serialize_batch, source_snapshot, participation,
+    payment, serialize_batch, source_snapshot, participation, unconfirm,
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
 
@@ -83,6 +83,19 @@ def confirm_batch():
     batch = batch_for_write(body.get('batch_id'), body.get('version'))
     confirm(batch, operator)
     result = serialize_batch(batch)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/unconfirm')
+@admin_required
+@handled
+def unconfirm_batch():
+    body = request.get_json(silent=True) or {}
+    begin_write()
+    batch = batch_for_write(body.get('batch_id'), body.get('version'))
+    unconfirm(batch)
+    result = serialize_batch(batch, check_source=True)
     db.session.commit()
     return jsonify(result)
 

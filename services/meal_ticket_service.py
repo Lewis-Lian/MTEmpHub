@@ -180,6 +180,20 @@ def confirm(batch, operator):
     batch.version += 1
 
 
+def unconfirm(batch):
+    if batch.status != 'confirmed':
+        raise MealError('只有已确认的核算可以退回草稿', 409)
+    has_payments = MealTicketPayment.query.join(
+        MealTicketItem, MealTicketPayment.item_key == MealTicketItem.key
+    ).filter(MealTicketItem.batch_key == batch.key).first()
+    if has_payments:
+        raise MealError('已登记发放流水，不能退回草稿，请通过补扣或冲正处理', 409)
+    batch.status = 'draft'
+    batch.confirmed_by = None
+    batch.confirmed_at = None
+    batch.version += 1
+
+
 def item_for_batch(batch, identifier):
     if type(identifier) is not int:
         raise MealError('人员明细无效')

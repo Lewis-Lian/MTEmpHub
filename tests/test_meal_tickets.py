@@ -183,6 +183,103 @@ class MealTicketTests(unittest.TestCase):
         self.assertTrue(r.get_json()['source_changed'])
         self.assertEqual(r.get_json()['items'][0]['base_amount'], 184)
 
+    def test_unconfirm_restores_draft_without_losing_details(self):
+        batch = self.adjustment(self.generate(), '16')
+        batch = self.post('/participation', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][1]['id'], 'excluded':True, 'reason':'本月不发'}).get_json()
+        batch = self.confirm(batch)
+        response = self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        draft = response.get_json()
+        self.assertEqual(draft['status'], 'draft')
+        self.assertEqual(draft['version'], batch['version'] + 1)
+        self.assertIsNone(draft['confirmed_by'])
+        self.assertEqual(draft['items'], batch['items'])
+        with self.app.app_context():
+            from models.meal_ticket import MealTicketBatch
+            stored = db.session.get(MealTicketBatch, batch['id'])
+            self.assertIsNone(stored.confirmed_at)
+            self.assertTrue(AccountSet.query.first().is_locked)
+        self.assertEqual(self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09',
+            headers=self.headers).status_code, 409)
+        response = self.post('/payments', {'batch_id':draft['id'], 'version':draft['version'],
+            'item_id':draft['items'][0]['id'], 'amount':'8', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'未重新确认', 'request_key':'unconfirmed-payment'})
+        self.assertEqual(response.status_code, 400)
+        response = self.post('/participation', {'batch_id':draft['id'], 'version':draft['version'],
+            'item_id':draft['items'][1]['id'], 'excluded':False, 'reason':'恢复核算'})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()['items'][1]['excluded'])
+
+    def test_unconfirm_allows_recalculation_and_requires_fresh_confirmation(self):
+        batch = self.confirm(self.adjustment(self.generate(), '16'))
+        with self.app.app_context():
+            AccountSet.query.first().is_locked = False
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 23
+            db.session.commit()
+        response = self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        draft = response.get_json()
+        self.assertTrue(draft['source_changed'])
+        self.assertEqual(draft['items'][0]['base_amount'], 176)
+        rebuilt = self.generate()
+        self.assertEqual(rebuilt['items'][0]['base_amount'], 184)
+        self.assertEqual(rebuilt['items'][0]['adjustment_amount'], 16)
+        self.assertEqual(self.post('/confirm', {'batch_id':rebuilt['id'], 'version':rebuilt['version']}).status_code, 400)
+        with self.app.app_context():
+            AccountSet.query.first().is_locked = True
+            db.session.commit()
+        confirmed = self.confirm(rebuilt)
+        self.assertEqual(confirmed['items'][0]['due_amount'], 200)
+        self.assertEqual(self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09',
+            headers=self.headers).status_code, 200)
+
+    def test_unconfirm_rejects_draft_stale_version_and_readonly_user(self):
+        draft = self.generate()
+        self.assertEqual(self.post('/unconfirm', {'batch_id':draft['id'], 'version':draft['version']}).status_code, 409)
+        batch = self.confirm(draft)
+        self.assertEqual(self.post('/unconfirm', {'batch_id':batch['id'], 'version':draft['version']}).status_code, 409)
+        body = {'batch_id':batch['id'], 'version':batch['version']}
+        viewer = {'Authorization':'Bearer ' + self.viewer_token}
+        self.assertEqual(self.client.post('/api/meal-tickets/unconfirm', json=body, headers=viewer).status_code, 403)
+        self.assertEqual(self.client.post('/api/meal-tickets/unconfirm', json=body).status_code, 401)
+        current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual((current['status'], current['version']), ('confirmed', batch['version']))
+        self.assertEqual(self.post('/unconfirm', body).status_code, 200)
+        self.assertEqual(self.post('/unconfirm', body).status_code, 409)
+
+    def test_unconfirm_rejects_any_payment_history_even_after_reversal(self):
+        batch = self.confirm(self.generate())
+        body = {'batch_id':batch['id'], 'version':batch['version'], 'item_id':batch['items'][0]['id'],
+            'amount':'8', 'kind':'recharge', 'date':'2026-09-05', 'reference':'实际充值', 'request_key':'rollback-paid'}
+        paid = self.post('/payments', body)
+        self.assertEqual(paid.status_code, 200)
+        batch = paid.get_json()
+        self.assertEqual(self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']}).status_code, 409)
+        body.update(version=batch['version'], kind='reversal', reversal_id=batch['items'][0]['payments'][0]['id'],
+            request_key='rollback-reversed', reference='登记错误')
+        reversed_payment = self.post('/payments', body)
+        self.assertEqual(reversed_payment.status_code, 200)
+        batch = reversed_payment.get_json()
+        self.assertEqual(batch['items'][0]['paid_amount'], 0)
+        self.assertEqual(self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']}).status_code, 409)
+        current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(current['status'], 'confirmed')
+        self.assertEqual(current['version'], batch['version'])
+        self.assertEqual(current['items'][0]['payments'], batch['items'][0]['payments'])
+
+    def test_unconfirm_invalidates_inflight_payment_version(self):
+        batch = self.confirm(self.generate())
+        response = self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'8', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'旧页面', 'request_key':'rollback-stale-payment'})
+        self.assertEqual(response.status_code, 409)
+        current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(current['status'], 'draft')
+        self.assertEqual(current['items'][0]['payments'], [])
+
     def test_permissions_export_and_delete_guard(self):
         batch = self.generate()
         viewer = {'Authorization': 'Bearer ' + self.viewer_token}

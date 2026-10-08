@@ -7,6 +7,7 @@ import type { MealBatch, MealItem, MealDepartment, MealImport, MealImportRow, Me
 import QueryTable from "../components/query/QueryTable";
 import EmployeePicker from "../components/query/EmployeePicker";
 import DepartmentMultiPicker from "../components/query/DepartmentMultiPicker";
+import { useConfirm } from "../components/feedback/ConfirmDialog";
 import "./meal-ticket.css";
 
 const money = (n: number) => n.toFixed(2);
@@ -24,6 +25,7 @@ const today = () => {
 };
 
 export default function MealTicketPage({ view = "calculation" }: { view?: "calculation" | "payments" | "history" }) {
+  const confirmAction = useConfirm();
   const historical = view === "history";
   const paymentView = view === "payments";
   const location = useLocation();
@@ -151,6 +153,15 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       setBatch(next); setTarget(null);
     });
   }
+  async function returnToDraft() {
+    const accepted = await confirmAction({
+      title: "退回核算草稿",
+      message: "退回后可以重新修改核算，已有明细、补扣和本月不发选择会保留。已导出的充值表将失效，需重新确认并导出。如已在充值系统完成充值，请先登记实际充值，不要退回。",
+      confirmText: "确认退回",
+      type: "warning",
+    });
+    if (accepted) await mutate("unconfirm");
+  }
   function openForm(item: MealItem, endpoint: string, reversal?: number) {
     setBulk(false);
     setTarget(item); setAction(endpoint); setAmount(endpoint === "adjustments" ? "" : money(Math.abs(item.difference)));
@@ -235,6 +246,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const selectableRows = rows.filter(item => batch?.status === "draft" || !hasIssue(item));
   const allSelected = selectableRows.length > 0 && selectableRows.every(item => selected.includes(item.id));
   const confirmed = batch?.status === "confirmed";
+  const hasPaymentHistory = batch?.items.some(item => item.payments.length > 0) ?? false;
   const pendingCount = batch?.items.filter(i => i.difference > 0).length ?? 0;
   const refundCount = batch?.items.filter(i => i.difference < 0).length ?? 0;
   const errorCount = batch?.items.filter(hasIssue).length ?? 0;
@@ -258,7 +270,11 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     { title: "生成草稿", text: "按上月考勤生成本月应发名单。", control: admin && <button className="meal-ticket-button" disabled={busy || confirmed} onClick={() => mutate("generate", { recharge_month: month })}>生成 / 重算草稿</button> },
     { title: "补发 / 扣除", text: "核对人员，调整金额或登记本月不发。", control: <button className="meal-ticket-button" disabled={busy || !batch || confirmed} onClick={jumpToPeople}>核对人员与补扣</button> },
     { title: "确认核算", text: "处理异常后，锁定考勤账套并确认。", control: admin && <button className="meal-ticket-button is-primary" disabled={busy || !batch || confirmed || errorCount > 0} onClick={() => mutate("confirm")}>确认核算</button> },
-    { title: "导出充值表", text: "仅导出待充值余额，不受列表筛选影响。", control: confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button> },
+    { title: "导出充值表", text: "仅导出待充值余额，不受列表筛选影响。", control: <>
+      {confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button>}
+      {admin && confirmed && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory} onClick={returnToDraft}>退回上一步</button>}
+      {admin && confirmed && hasPaymentHistory && <small className="meal-ticket-step-hint">已登记发放流水，请通过补扣或冲正处理。</small>}
+    </> },
     { title: "登记充值", text: "实际充值成功后，登记金额与凭证。", control: <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={jumpToPeople}>登记实际充值</button> },
     { title: "核对结清", text: "按每个人的应发与已发金额检查结清。", control: <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={checkSettlement}>重新核对</button> },
   ];

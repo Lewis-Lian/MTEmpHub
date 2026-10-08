@@ -275,6 +275,74 @@ describe("菜票中心", () => {
     expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
   });
 
+  it("退回前确认影响，取消保留确认，确认退回后恢复草稿编辑", async () => {
+    let current = { ...batch, status: "confirmed", version: 2 };
+    request.mockImplementation((path: string, options?: { body?: { batch_id: number; version: number } }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/unconfirm") {
+        expect(options!.body).toEqual({ batch_id: 1, version: 2 });
+        current = { ...current, status: "draft", version: 3 };
+      }
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    const exportStep = within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem")[3];
+    fireEvent.click(within(exportStep).getByRole("button", { name: "退回上一步" }));
+    expect(screen.getByText(/已导出的充值表将失效/)).toBeInTheDocument();
+    expect(within(exportStep).getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(request.mock.calls.some(([path]) => path === "/api/meal-tickets/unconfirm")).toBe(false);
+    fireEvent.click(within(exportStep).getByRole("button", { name: "退回上一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认退回" }));
+    expect(await screen.findByRole("button", { name: "确认核算" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "生成 / 重算草稿" })).toBeEnabled();
+    screen.getAllByRole("button", { name: "本月不发" }).forEach(button => expect(button).toBeEnabled());
+    expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "核算后可导出" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "退回上一步" })).not.toBeInTheDocument();
+  });
+
+  it("已冲正且净已发为零的账目仍不能退回，人员筛选不影响限制", async () => {
+    const current = { ...batch, status: "confirmed", items: [batch.items[0], {
+      ...batch.items[0], id: 2, emp_id: 2, emp_no: "002", name: "员工乙", paid_amount: 0,
+      payments: [
+        { id: 1, kind: "recharge", amount: 8, date: "2026-09-05", reference: "充值", operator: "admin", reversed: true },
+        { id: 2, kind: "reversal", amount: -8, date: "2026-09-05", reference: "冲正", operator: "admin", reversed: false },
+      ],
+    }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    pickEmployee("001 - 员工甲");
+    expect(screen.queryByText("员工乙")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "退回上一步" })).toBeDisabled();
+    expect(screen.getByText(/已登记发放流水，请通过补扣或冲正处理/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();
+  });
+
+  it("查询账号不显示退回入口", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "readonly" } : { ...batch, status: "confirmed" }));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByRole("link", { name: "导出充值表（.xls）" });
+    expect(screen.queryByRole("button", { name: "退回上一步" })).not.toBeInTheDocument();
+  });
+
+  it("退回被后端拒绝时保留已确认状态并展示原因", async () => {
+    const current = { ...batch, status: "confirmed", version: 2 };
+    request.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/unconfirm") return Promise.reject(new Error("数据已变化，请刷新后操作"));
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "退回上一步" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认退回" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("数据已变化，请刷新后操作");
+    expect(screen.getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "确认核算" })).not.toBeInTheDocument();
+  });
+
   it("后续补扣产生差额，实际充值登记后再次结清", async () => {
     let current = { ...batch, status: "confirmed", items: [{ ...batch.items[0], paid_amount: 176, difference: 0 }] };
     request.mockImplementation((path: string) => {
