@@ -1083,6 +1083,9 @@ def reset_account_set_imported(account_set_id: int):
 
 def delete_account_set(account_set_id: int):
     row = _require_model(AccountSet, account_set_id)
+    from models.meal_ticket import MealTicketBatch
+    if MealTicketBatch.query.filter_by(account_set_id=row.id).first():
+        return jsonify({"error": "该账套关联菜票核算，不能删除"}), 409
     locked_error = _ensure_account_set_unlocked(row, "删除账套")
     if locked_error:
         return locked_error
@@ -2471,6 +2474,9 @@ def update_employee(employee_id: int):
 
 def delete_employee(employee_id: int):
     employee = _require_model(Employee, employee_id)
+    from services.meal_ticket_service import guard_employee_delete
+    if guard_employee_delete([employee.id]):
+        return jsonify({"error": "该人员关联菜票历史，请使用离职操作"}), 409
     db.session.delete(employee)
     db.session.commit()
     return jsonify({"status": "ok"})
@@ -2489,6 +2495,9 @@ def batch_operate_employees():
         return jsonify({"error": "employees not found"}), 404
 
     if action == "delete":
+        from services.meal_ticket_service import guard_employee_delete
+        if guard_employee_delete([employee.id for employee in employees]):
+            return jsonify({"error": "所选人员关联菜票历史，请使用离职操作"}), 409
         for employee in employees:
             db.session.delete(employee)
         db.session.commit()

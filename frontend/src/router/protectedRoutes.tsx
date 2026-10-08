@@ -27,6 +27,7 @@ const MessageDetailPage = lazy(() => import("../pages/query/MessageDetailPage"))
 const PunchRecordsPage = lazy(() => import("../pages/query/PunchRecordsPage"));
 const QueryHomePage = lazy(() => import("../pages/query/QueryHomePage"));
 const SummaryDownloadPage = lazy(() => import("../pages/query/SummaryDownloadPage"));
+const MealTicketPage = lazy(() => import("../pages/MealTicketPage"));
 
 export interface ProtectedRouteConfig {
   element: ReactElement;
@@ -42,6 +43,9 @@ function lazyPage(Page: LazyExoticComponent<ComponentType>): ReactElement {
 }
 
 export const protectedRoutes: ProtectedRouteConfig[] = [
+  { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="calculation" /></Suspense>, path: "/meal-tickets/calculation" },
+  { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="payments" /></Suspense>, path: "/meal-tickets/payments" },
+  { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="history" /></Suspense>, path: "/meal-tickets/history" },
   { element: lazyPage(QueryHomePage), path: "/employee/home" },
   { element: lazyPage(MessageDetailPage), path: "/employee/messages/:id" },
   { element: lazyPage(EmployeeDashboardPage), path: "/employee/dashboard" },

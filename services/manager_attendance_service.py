@@ -652,6 +652,7 @@ def build_manager_rows(
     include_daily_overrides: bool = True,
     sync_month_stats: bool = False,
     progress_cb: Callable[[int, int], None] | None = None,
+    include_resigned: bool = False,
 ) -> list[dict[str, object]]:
     """计算管理人员月度考勤及扣薪。
 
@@ -666,8 +667,10 @@ def build_manager_rows(
     """
     query = (
         Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.is_manager.is_(True), Employee.resigned_at.is_(None))
+        .filter(Employee.is_manager.is_(True))
     )
+    if not include_resigned:
+        query = query.filter(Employee.resigned_at.is_(None))
     if emp_ids is not None:
         if not emp_ids:
             return []

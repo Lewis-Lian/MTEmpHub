@@ -27,7 +27,12 @@ export default function IndividualAttendancePage() {
     fetchQueryBootstrap()
       .then((payload) => {
         setBootstrap(payload);
-        setMonth(payload.account_sets.find((item) => item.is_active)?.month ?? payload.account_sets[0]?.month ?? "");
+        const linked = new URLSearchParams(window.location.search);
+        const linkedMonth = linked.get("month");
+        const linkedEmployee = Number(linked.get("emp_id"));
+        setMonth(payload.account_sets.find((item) => item.month === linkedMonth)?.month
+          ?? payload.account_sets.find((item) => item.is_active)?.month ?? payload.account_sets[0]?.month ?? "");
+        if (payload.employees.some((employee) => employee.id === linkedEmployee)) setEmployeeId(linkedEmployee);
       })
       .catch((caughtError) => setError(caughtError instanceof ApiError ? caughtError.message : "单人考勤查询页初始化失败"))
       .finally(() => setIsLoading(false));

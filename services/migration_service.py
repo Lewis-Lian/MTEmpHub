@@ -32,6 +32,12 @@ MIGRATION_ORDER = [
     "manager_attendance_overrides",
     "employee_attendance_overrides",
     "attendance_override_histories",
+    "meal_ticket_batches",
+    "meal_ticket_items",
+    "meal_ticket_adjustments",
+    "meal_ticket_payments",
+    "meal_ticket_imports",
+    "meal_ticket_import_rows",
 ]
 
 BATCH_SIZE = 500
