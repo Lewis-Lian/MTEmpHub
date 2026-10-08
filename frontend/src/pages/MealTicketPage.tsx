@@ -11,6 +11,7 @@ import { useConfirm } from "../components/feedback/ConfirmDialog";
 import "./meal-ticket.css";
 
 const money = (n: number) => n.toFixed(2);
+const paymentRequestKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
 const hasError = (item: MealItem) => Boolean(item.error && !item.excluded);
 const hasIssue = (item: MealItem) => hasError(item) || item.due_amount < 0;
 const employmentLabel = (item: MealItem) => item.employment_status === "resigned" ? `已登记离职 · ${item.resigned_at}`
@@ -167,7 +168,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   function openForm(item: MealItem, endpoint: string, reversal?: number) {
     setBulk(false);
     setTarget(item); setAction(endpoint); setAmount(endpoint === "adjustments" ? "" : money(Math.abs(item.difference)));
-    setReason(""); setSupplementMonth(null); setError(""); setReversalId(reversal ?? null); requestKeys.current = { [item.id]: crypto.randomUUID() };
+    setReason(""); setSupplementMonth(null); setError(""); setReversalId(reversal ?? null); requestKeys.current = { [item.id]: paymentRequestKey() };
   }
   function bulkEligible(item: MealItem, endpoint: string) {
     if (endpoint === "exclude" || endpoint === "include") return batch?.status === "draft" && Boolean(item.excluded) === (endpoint === "include");
@@ -205,7 +206,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           : action === "adjustments" ? { amount, reason }
           : {
           amount: money(item.difference), kind: "recharge", date, reference: reason,
-          request_key: requestKeys.current[id] ?? (requestKeys.current[id] = crypto.randomUUID()) };
+          request_key: requestKeys.current[id] ?? (requestKeys.current[id] = paymentRequestKey()) };
         const next = await mutateMealBatch(participationForm ? "participation" : action === "adjustments" ? "adjustments" : "payments",
           { batch_id: current.id, version: current.version, item_id: id, ...values });
         current = next; setBatch(next); setSelected(s => s.filter(selectedId => selectedId !== id)); completed += 1;
