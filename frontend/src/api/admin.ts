@@ -584,3 +584,28 @@ export function fetchAdminLateOffsetLeaves(
     `/api/admin/late-offset/leaves?${query.toString()}`,
   );
 }
+
+
+export interface OvertimeRecordPayload {
+  month: string;
+  start_time: string;
+  end_time: string;
+  hours: number;
+  reason: string;
+  salary_option: string;
+  is_weekend: boolean;
+  is_holiday: boolean;
+}
+
+export function operateOvertimeRecord(
+  recordId: number,
+  month: string,
+  action: "revoke" | "restore" | "edit",
+  payload?: OvertimeRecordPayload,
+): Promise<{ calendar: AttendanceCalendarData; row: unknown }> {
+  const query = new URLSearchParams({ month });
+  return apiRequest(`/api/admin/overtime-records/${recordId}${action === "restore" ? "/restore" : ""}?${query}`, {
+    method: action === "edit" ? "PUT" : action === "restore" ? "POST" : "DELETE",
+    ...(payload ? { body: payload } : {}),
+  });
+}

@@ -7,6 +7,7 @@ const mockClear = vi.hoisted(() => vi.fn());
 const mockSaveBatch = vi.hoisted(() => vi.fn());
 const mockRevokeLeave = vi.hoisted(() => vi.fn());
 const mockRestoreLeave = vi.hoisted(() => vi.fn());
+const mockOvertimeOperation = vi.hoisted(() => vi.fn());
 const mockEditLeave = vi.hoisted(() => vi.fn());
 
 vi.mock("../../api/admin", () => ({
@@ -17,6 +18,7 @@ vi.mock("../../api/admin", () => ({
   revokeLeaveRecord: mockRevokeLeave,
   restoreLeaveRecord: mockRestoreLeave,
   editLeaveRecord: mockEditLeave,
+  operateOvertimeRecord: mockOvertimeOperation,
 }));
 
 import AttendanceOverrideCalendarModal from "./AttendanceOverrideCalendarModal";
@@ -652,6 +654,50 @@ describe("AttendanceOverrideCalendarModal", () => {
     expect(screen.getByRole("switch", { name: "多选模式" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
 
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByRole("button", { name: "作废" })).toBeDisabled();
+    expect(within(panel).getByRole("button", { name: "编辑" })).toBeDisabled();
+  });
+});
+
+
+describe("当日加班单", () => {
+  const entry = { date: "2026-07-15", id: 9, overtime_no: "OT009", start_time: "2026-07-15 08:00", end_time: "2026-07-15 17:00", hours: 9, reason: "核算工资", approval_status: "已审批", salary_option: "事后调休", is_weekend: false, is_holiday: false, is_revoked: false };
+  it("展示单据并支持作废、恢复与编辑", async () => {
+    const calendar = { ...calendarData(), overtime_entries: [entry] };
+    mockFetchCalendar.mockResolvedValue(calendar);
+    mockOvertimeOperation.mockResolvedValueOnce({ calendar: { ...calendar, overtime_entries: [{ ...entry, is_revoked: true }] } });
+    const onRowRefresh = vi.fn();
+    renderModal({ onRowRefresh });
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    const panel = screen.getByTestId("daily-override-panel");
+    expect(within(panel).getByText("当日加班单")).toBeInTheDocument();
+    expect(within(panel).getByText("OT009")).toBeInTheDocument();
+    fireEvent.click(within(panel).getByRole("button", { name: "作废" }));
+    await within(panel).findByText("已撤销");
+    mockOvertimeOperation.mockResolvedValueOnce({ calendar });
+    fireEvent.click(within(panel).getByRole("button", { name: "恢复" }));
+    await within(panel).findByRole("button", { name: "作废" });
+    fireEvent.click(within(panel).getByRole("button", { name: "编辑" }));
+    fireEvent.change(within(panel).getByLabelText("加班小时数"), { target: { value: "8" } });
+    mockOvertimeOperation.mockResolvedValueOnce({ row: { emp_id: 7 }, calendar: { ...calendar, overtime_entries: [{ ...entry, hours: 8 }] } });
+    fireEvent.click(within(panel).getByRole("button", { name: "保存加班单" }));
+    await waitFor(() => expect(within(panel).getByText("8 小时")).toBeInTheDocument());
+    expect(onRowRefresh).toHaveBeenCalledWith({ emp_id: 7 });
+  });
+  it("没有逐日考勤记录也能查看当天加班单", async () => {
+    mockFetchCalendar.mockResolvedValue({ ...calendarData(), days: [], overtime_entries: [entry] });
+    renderModal();
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
+    expect(screen.getByText("OT009")).toBeInTheDocument();
+  });
+  it("账套锁定时禁用加班单操作", async () => {
+    mockFetchCalendar.mockResolvedValue({ ...calendarData(), overtime_entries: [entry] });
+    renderModal({ isLocked: true });
+    await screen.findByText(/出勤 1 天/);
+    fireEvent.click(screen.getByRole("button", { name: "2026-07-15" }));
     const panel = screen.getByTestId("daily-override-panel");
     expect(within(panel).getByRole("button", { name: "作废" })).toBeDisabled();
     expect(within(panel).getByRole("button", { name: "编辑" })).toBeDisabled();

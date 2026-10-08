@@ -98,7 +98,7 @@ def evening_overtime_dates_by_emp(month: str, emp_ids: list[int]) -> dict[int, s
         return {}
     month_start, month_end = bounds
     rows = (
-        OvertimeRecord.query.filter(OvertimeRecord.emp_id.in_(emp_ids))
+        OvertimeRecord.query.filter(OvertimeRecord.emp_id.in_(emp_ids), OvertimeRecord.is_revoked.is_(False))
         .filter(
             OvertimeRecord.start_time < datetime.combine(month_end, time.min),
             OvertimeRecord.end_time >= datetime.combine(month_start, time.min),

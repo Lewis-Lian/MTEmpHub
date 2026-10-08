@@ -253,6 +253,9 @@ def validate_document(document):
                 # Backups made before source tracking keep their numeric fields as legacy corrections.
                 row.setdefault('automatic_values', None)
                 row.setdefault('manual_values', None)
+            if name == 'overtime_records' and isinstance(row, dict):
+                row.setdefault('is_revoked', False)
+                row.setdefault('is_manual_edited', False)
             if not isinstance(row, dict) or set(row) != expected:
                 raise BackupError('备份字段无效：%s' % name)
             for field in ds.fields:

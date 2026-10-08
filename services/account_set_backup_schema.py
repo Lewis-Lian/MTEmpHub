@@ -54,7 +54,7 @@ DATASETS = {
     'daily_records': spec(DailyRecord, 'record_date expected_hours actual_hours absent_hours check_in_times check_out_times leave_hours leave_type overtime_hours overtime_type late_minutes early_leave_minutes exception_reason raw_data employee_payload manager_payload', 'emp_no record_date', 'date'),
     'monthly_reports': Dataset(MonthlyReport, tuple(['report_month'] + ['agg_%02d' % n for n in range(1, 85)] + ['raw_data', 'employee_raw_data', 'manager_raw_data']), ('emp_no', 'report_month'), 'report_month'),
     'leave_records': spec(LeaveRecord, 'leave_no apply_date leave_type start_time end_time duration reason approval_status approval_comment is_revoked is_manual_edited', 'leave_no', 'interval'),
-    'overtime_records': spec(OvertimeRecord, 'overtime_no start_time end_time is_weekend is_holiday salary_option effective_hours reason approval_status approval_comment', 'overtime_no', 'interval'),
+    'overtime_records': spec(OvertimeRecord, 'overtime_no start_time end_time is_weekend is_holiday salary_option effective_hours reason approval_status approval_comment is_revoked is_manual_edited', 'overtime_no', 'interval'),
     'daily_overrides': spec(DailyAttendanceOverride, 'record_date status is_evening_overtime is_actual_attendance work_hours late_minutes early_leave_minutes remark', 'emp_no record_date', 'date'),
     'employee_overrides': spec(EmployeeAttendanceOverride, 'month attendance_days work_hours half_days actual_attendance_days late_early_minutes remark', 'emp_no month', 'month'),
     'manager_overrides': spec(ManagerAttendanceOverride, 'month attendance_days injury_days business_trip_days marriage_days funeral_days late_early_minutes remark', 'emp_no month', 'month'),

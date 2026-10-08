@@ -121,6 +121,21 @@ export interface AttendanceCalendarOvertime {
   hours: number;
 }
 
+export interface AttendanceCalendarOvertimeEntry {
+  date: string;
+  id: number;
+  overtime_no: string;
+  start_time: string;
+  end_time: string;
+  hours: number;
+  reason: string;
+  approval_status: string;
+  salary_option: string;
+  is_weekend: boolean;
+  is_holiday: boolean;
+  is_revoked: boolean;
+}
+
 export interface AttendanceCalendarLeave {
   date: string;
   leave_type: string;
@@ -153,6 +168,7 @@ export interface AttendanceCalendarData {
   attendance_source?: "daily" | "monthly_fallback";
   days: AttendanceCalendarDay[];
   overtimes: AttendanceCalendarOvertime[];
+  overtime_entries?: AttendanceCalendarOvertimeEntry[];
   leaves: AttendanceCalendarLeave[];
   summary: AttendanceCalendarSummary;
 }

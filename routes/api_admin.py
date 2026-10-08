@@ -83,6 +83,7 @@ from routes.admin_attendance_overrides import (
     save_daily_attendance_override_record_api,
     revoke_leave_record_api,
     restore_leave_record_api,
+    overtime_record_operation_api,
     edit_leave_record_api,
     late_offset_candidates_api,
     late_offset_clear_api,
@@ -705,6 +706,13 @@ def leave_record_restore(record_id: int):
 @admin_required
 def leave_record_edit(record_id: int):
     return edit_leave_record_api(record_id)
+
+
+@api_admin_bp.route("/overtime-records/<int:record_id>", methods=["DELETE", "PUT"])
+@api_admin_bp.post("/overtime-records/<int:record_id>/restore")
+@admin_required
+def overtime_record_operation(record_id: int):
+    return overtime_record_operation_api(record_id)
 
 
 @api_admin_bp.get("/late-offset/candidates")

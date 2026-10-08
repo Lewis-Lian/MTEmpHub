@@ -310,6 +310,9 @@ class ImportService:
                 db.session.add(record)
                 existing_records[overtime_no] = record
 
+            if record.is_revoked or record.is_manual_edited:
+                continue
+
             record.emp_id = emp.id
             record.start_time = parse_datetime(ImportService._get_row_value(row, ImportService._find_col(header_map, "开始时间")))
             record.end_time = parse_datetime(ImportService._get_row_value(row, ImportService._find_col(header_map, "结束时间")))

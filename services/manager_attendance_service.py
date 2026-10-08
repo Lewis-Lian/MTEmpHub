@@ -244,7 +244,7 @@ def _overtime_rows_by_employee(employee_ids: list[int], month: str) -> dict[int,
         return {employee_id: [] for employee_id in employee_ids}
     start_dt, end_dt = datetime_range
     rows = (
-        OvertimeRecord.query.filter(OvertimeRecord.emp_id.in_(employee_ids))
+        OvertimeRecord.query.filter(OvertimeRecord.emp_id.in_(employee_ids), OvertimeRecord.is_revoked.is_(False))
         .filter(OvertimeRecord.start_time >= start_dt, OvertimeRecord.start_time < end_dt)
         .filter((OvertimeRecord.approval_status.is_(None)) | (OvertimeRecord.approval_status != "已拒绝"))
         .all()

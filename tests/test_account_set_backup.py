@@ -175,3 +175,18 @@ def test_legacy_manager_stat_backup_without_source_metadata_is_supported(backup_
     assert validated['manual_values'] is None
     assert validated['automatic_values'] is None
     assert validated['m6'] == 1
+
+
+def test_legacy_overtime_backup_defaults_manual_flags(backup_app):
+    from models.overtime import OvertimeRecord
+    from services.account_set_backup_service import validate_document
+    db.session.add(OvertimeRecord(emp_id=1, overtime_no='OT1',
+        start_time=datetime(2026, 6, 3, 8), end_time=datetime(2026, 6, 3, 17)))
+    db.session.commit()
+    document = collect_backup(1)
+    row = document['datasets']['overtime_records'][0]
+    del row['is_revoked']
+    del row['is_manual_edited']
+    validate_document(document)
+    assert row['is_revoked'] is False
+    assert row['is_manual_edited'] is False

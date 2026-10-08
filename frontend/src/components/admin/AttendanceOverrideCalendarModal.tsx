@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import {
   clearAdminDailyOverride,
   editLeaveRecord,
+  operateOvertimeRecord,
   fetchAdminDailyOverrideCalendar,
   restoreLeaveRecord,
   revokeLeaveRecord,
@@ -19,6 +20,7 @@ import { useNotification } from "../feedback/Notification";
 import type {
   AttendanceCalendarData,
   AttendanceCalendarLeave,
+  AttendanceCalendarOvertimeEntry,
   DailyAttendanceOverrideValues,
 } from "../../types/query";
 
@@ -142,11 +144,20 @@ export default function AttendanceOverrideCalendarModal({
   const [batchActual, setBatchActual] = useState<BatchActualChoice>("keep");
   const [leaveEditForm, setLeaveEditForm] = useState<LeaveEditFormState | null>(null);
 
+  const [overtimeEditForm, setOvertimeEditForm] = useState<AttendanceCalendarOvertimeEntry | null>(null);
+  const selectedDayOvertimes = (calendar?.overtime_entries ?? []).filter((item) => item.date === selectedDate);
+
   const leaveStatuses = isManager ? MANAGER_LEAVE_STATUSES : EMPLOYEE_LEAVE_STATUSES;
   const batchStatusOptions = isManager ? MANAGER_DAILY_STATUS_OPTIONS : EMPLOYEE_DAILY_STATUS_OPTIONS;
   const hasBatchChanges = batchStatus !== "" || batchActual !== "keep";
   const selectedDay = useMemo(
-    () => calendar?.days.find((day) => day.date === selectedDate) ?? null,
+    () => calendar?.days.find((day) => day.date === selectedDate) ?? (
+      selectedDate && calendar?.overtime_entries?.some((item) => item.date === selectedDate) ? {
+        date: selectedDate, check_in_times: [], check_out_times: [], punch_count: 0,
+        actual_hours: 0, late_minutes: 0, early_leave_minutes: 0, is_half_day: false,
+        exception_reason: "", override: null,
+      } : null
+    ),
     [calendar, selectedDate],
   );
   const currentOverride = selectedDay?.override ?? null;
@@ -286,13 +297,14 @@ export default function AttendanceOverrideCalendarModal({
 
   // 请假单作废/恢复/编辑共用：成功用响应中的日历整体刷新（含作废标记）；返回是否成功
   async function runLeaveOperation(
-    operation: () => Promise<{ calendar: AttendanceCalendarData }>,
+    operation: () => Promise<{ calendar: AttendanceCalendarData; row?: unknown }>,
     successText: string,
   ): Promise<boolean> {
     setIsSaving(true);
     try {
       const response = await operation();
       setCalendar(response.calendar);
+      if (response.row !== undefined) onRowRefresh(response.row);
       notification.success(successText);
       return true;
     } catch (caughtError: unknown) {
@@ -344,6 +356,7 @@ export default function AttendanceOverrideCalendarModal({
   // 切换选中日时丢弃未提交的请假单编辑表单
   useEffect(() => {
     setLeaveEditForm(null);
+    setOvertimeEditForm(null);
   }, [selectedDate]);
 
   // 多选由开关控制；单选下再次点击同一格循环切换出勤状态
@@ -703,6 +716,68 @@ export default function AttendanceOverrideCalendarModal({
             )}
           </div>
         </div>
+
+        {selectedDayOvertimes.length > 0 ? (
+          <div className="daypanel-section daypanel-leaves">
+            <div className="daypanel-title">
+              <span>当日加班单</span>
+              <span className="daypanel-title-hint">作废后不参与考勤与调休口径</span>
+            </div>
+            {selectedDayOvertimes.map((overtime) => (
+              <div className={`daypanel-leave-item${overtime.is_revoked ? " is-revoked" : ""}`} key={overtime.id}>
+                <div className="daypanel-leave-row">
+                  <span className="daypanel-leave-type">{overtime.is_holiday ? "节假日加班" : overtime.is_weekend ? "周末加班" : "加班"}</span>
+                  {overtime.is_revoked ? <span className="daypanel-leave-badge">已撤销</span> : null}
+                  <span className="daypanel-leave-range">{overtime.start_time.slice(5)} ~ {overtime.end_time.slice(5)}</span>
+                  <span className="daypanel-leave-no">{overtime.overtime_no}</span>
+                </div>
+                <div className="daypanel-leave-reason">{overtime.hours} 小时</div>
+                <div className="daypanel-leave-reason">{[overtime.salary_option, overtime.approval_status, overtime.reason].filter(Boolean).join(" · ")}</div>
+                <div className="daypanel-leave-actions">
+                  <button className="account-action-button" disabled={isLocked || isSaving} type="button"
+                    onClick={() => void runLeaveOperation(
+                      () => operateOvertimeRecord(overtime.id, month, overtime.is_revoked ? "restore" : "revoke"),
+                      overtime.is_revoked ? "已恢复加班单" : "已作废加班单",
+                    )}>{overtime.is_revoked ? "恢复" : "作废"}</button>
+                  <button className="account-action-button" disabled={isLocked || isSaving || overtime.is_revoked} type="button"
+                    onClick={() => setOvertimeEditForm({ ...overtime })}>编辑</button>
+                </div>
+                {overtimeEditForm?.id === overtime.id ? (
+                  <div className="daypanel-leave-edit">
+                    <label className="daypanel-field"><span className="daypanel-field-label">开始时间</span>
+                      <input type="datetime-local" disabled={isLocked || isSaving} value={toDateTimeInput(overtimeEditForm.start_time)}
+                        onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, start_time: fromDateTimeInput(event.target.value) })} /></label>
+                    <label className="daypanel-field"><span className="daypanel-field-label">结束时间</span>
+                      <input type="datetime-local" disabled={isLocked || isSaving} value={toDateTimeInput(overtimeEditForm.end_time)}
+                        onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, end_time: fromDateTimeInput(event.target.value) })} /></label>
+                    <label className="daypanel-field"><span className="daypanel-field-label">加班小时数</span>
+                      <input type="number" min="0" step="0.01" disabled={isLocked || isSaving} value={overtimeEditForm.hours}
+                        onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, hours: Number(event.target.value) })} /></label>
+                    <label className="daypanel-field"><span className="daypanel-field-label">计薪选项</span>
+                      <input disabled={isLocked || isSaving} value={overtimeEditForm.salary_option}
+                        onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, salary_option: event.target.value })} /></label>
+                    <label className="daypanel-field"><span className="daypanel-field-label">加班事由</span>
+                      <input disabled={isLocked || isSaving} value={overtimeEditForm.reason}
+                        onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, reason: event.target.value })} /></label>
+                    <label><input type="checkbox" disabled={isLocked || isSaving} checked={overtimeEditForm.is_weekend}
+                      onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, is_weekend: event.target.checked })} />周末加班</label>
+                    <label><input type="checkbox" disabled={isLocked || isSaving} checked={overtimeEditForm.is_holiday}
+                      onChange={(event) => setOvertimeEditForm({ ...overtimeEditForm, is_holiday: event.target.checked })} />节假日加班</label>
+                    <div className="daypanel-leave-actions">
+                      <button className="account-action-button" disabled={isLocked || isSaving} type="button" onClick={() => {
+                        const { start_time, end_time, hours, reason, salary_option, is_weekend, is_holiday } = overtimeEditForm;
+                        void runLeaveOperation(() => operateOvertimeRecord(overtime.id, month, "edit", {
+                          month, start_time, end_time, hours, reason, salary_option, is_weekend, is_holiday,
+                        }), "已保存加班单").then((succeeded) => { if (succeeded) setOvertimeEditForm(null); });
+                      }}>保存加班单</button>
+                      <button className="account-action-button" disabled={isSaving} type="button" onClick={() => setOvertimeEditForm(null)}>取消</button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {selectedDayLeaves.length > 0 ? (
           <div className="daypanel-section daypanel-leaves">

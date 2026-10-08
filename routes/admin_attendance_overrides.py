@@ -686,3 +686,91 @@ def edit_leave_record_api(record_id: int):
     )
     admin_module.db.session.commit()
     return _leave_record_response(row, month)
+
+
+# 加班单人工修正：保留原单号与审批信息，重新导入不覆盖人工值。
+def _serialize_overtime_record(row):
+    return {
+        "id": row.id, "overtime_no": row.overtime_no,
+        "start_time": row.start_time.strftime("%Y-%m-%d %H:%M"),
+        "end_time": row.end_time.strftime("%Y-%m-%d %H:%M"),
+        "hours": round(float(row.effective_hours or 0) * 24, 2),
+        "reason": row.reason or "", "salary_option": row.salary_option or "",
+        "is_weekend": bool(row.is_weekend), "is_holiday": bool(row.is_holiday),
+        "approval_status": row.approval_status or "",
+        "is_revoked": bool(row.is_revoked), "is_manual_edited": bool(row.is_manual_edited),
+    }
+
+
+def overtime_record_operation_api(record_id: int):
+    import math
+    from models.overtime import OvertimeRecord
+    from routes import admin_core as admin_module
+    from routes.query_core import _build_attendance_calendar_payload
+
+    data = request.get_json(silent=True) or {}
+    month = admin_module._validate_month(data.get("month") if request.method == "PUT" else request.args.get("month"))
+    if not month:
+        return jsonify({"error": "请选择有效月份"}), 400
+    row = admin_module.db.session.get(OvertimeRecord, record_id)
+    if row is None:
+        return jsonify({"error": "加班单不存在"}), 404
+    start, end = row.start_time, row.end_time
+    if not (start.strftime("%Y-%m") <= month <= end.strftime("%Y-%m")):
+        return jsonify({"error": "加班单不属于所选月份"}), 400
+    before = _serialize_overtime_record(row)
+    if request.method == "PUT":
+        if row.is_revoked:
+            return jsonify({"error": "请先恢复加班单再编辑"}), 400
+        start, error = _parse_leave_datetime(str(data.get("start_time") or ""), "开始")
+        if error:
+            return error
+        end, error = _parse_leave_datetime(str(data.get("end_time") or ""), "结束")
+        if error:
+            return error
+        if end <= start:
+            return jsonify({"error": "结束时间必须晚于开始时间"}), 400
+        try:
+            hours = float(data.get("hours"))
+        except (ValueError, TypeError):
+            return jsonify({"error": "请输入有效加班小时数"}), 400
+        if not math.isfinite(hours) or hours < 0 or hours > (end - start).total_seconds() / 3600:
+            return jsonify({"error": "加班小时数不能为负或超过时段长度"}), 400
+        if any(not isinstance(data.get(key), bool) for key in ("is_weekend", "is_holiday")):
+            return jsonify({"error": "请选择有效的加班类型"}), 400
+    months = set()
+    for first, last in ((row.start_time, row.end_time), (start, end)):
+        year, number = first.year, first.month
+        while (year, number) <= (last.year, last.month):
+            months.add(f"{year:04d}-{number:02d}")
+            year, number = (year + 1, 1) if number == 12 else (year, number + 1)
+    for affected_month in sorted(months):
+        error = admin_module._ensure_account_set_unlocked(admin_module._account_set_for_month(affected_month), "修改加班单")
+        if error:
+            return error
+    if request.method == "PUT":
+        row.start_time, row.end_time = start, end
+        row.effective_hours = hours / 24
+        row.reason = str(data.get("reason") or "").strip()
+        row.salary_option = str(data.get("salary_option") or "").strip()
+        row.is_weekend, row.is_holiday = data["is_weekend"], data["is_holiday"]
+        row.is_manual_edited = True
+        action = "manual_edit"
+    else:
+        revoked = request.method == "DELETE"
+        if bool(row.is_revoked) == revoked:
+            return jsonify({"error": "该加班单已作废" if revoked else "该加班单未作废，无需恢复"}), 400
+        row.is_revoked = revoked
+        action = "revoke" if revoked else "restore"
+    admin_module._record_override_history("overtime_record", row.emp_id, month, action, before, _serialize_overtime_record(row))
+    admin_module.db.session.flush()
+    for affected_month in sorted(months):
+        admin_module.build_manager_rows(admin_module._manager_attendance_options(affected_month), sync_month_stats=True)
+    admin_module.db.session.commit()
+    employee = admin_module.db.session.get(admin_module.Employee, row.emp_id)
+    row_payload, _ = (
+        admin_module._manager_attendance_response(employee.id, month) if employee.is_manager
+        else admin_module._employee_override_response(employee.id, month)
+    )
+    return jsonify({"overtime": _serialize_overtime_record(row),
+                    "calendar": _build_attendance_calendar_payload(employee, month), "row": row_payload})

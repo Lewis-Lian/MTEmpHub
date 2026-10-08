@@ -219,6 +219,13 @@ def ensure_schema_compatibility() -> None:
             db.session.execute(text("ALTER TABLE leave_records ADD COLUMN is_manual_edited BOOLEAN NOT NULL DEFAULT 0"))
             db.session.commit()
 
+    overtime_columns = _get_column_names(inspector, "overtime_records")
+    if overtime_columns is not None:
+        for column in ("is_revoked", "is_manual_edited"):
+            if column not in overtime_columns:
+                db.session.execute(text(f"ALTER TABLE overtime_records ADD COLUMN {column} BOOLEAN NOT NULL DEFAULT 0"))
+                db.session.commit()
+
     manager_stat_columns = _get_column_names(inspector, "manager_month_stats")
     if manager_stat_columns is not None:
         for column in ("automatic_values", "manual_values"):

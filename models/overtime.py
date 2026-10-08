@@ -21,4 +21,7 @@ class OvertimeRecord(db.Model):
     approval_status = db.Column(db.String(50), nullable=True)
     approval_comment = db.Column(db.Text, nullable=True)
 
+    is_revoked = db.Column(db.Boolean, default=False, nullable=False)
+    is_manual_edited = db.Column(db.Boolean, default=False, nullable=False)
+
     employee = db.relationship("Employee", back_populates="overtime_records")

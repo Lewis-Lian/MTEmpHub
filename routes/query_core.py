@@ -1782,7 +1782,21 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
         .filter(OvertimeRecord.end_time >= datetime.combine(month_start, time.min))
         .all()
     )
-    overtime_rows = [r for r in overtime_rows if (r.approval_status or "") != "已拒绝"]
+    overtime_entries = []
+    for row in overtime_rows:
+        day = max(row.start_time.date(), month_start)
+        while day < month_end and day <= row.end_time.date():
+            overtime_entries.append({
+                "date": day.isoformat(), "id": row.id, "overtime_no": row.overtime_no,
+                "start_time": row.start_time.strftime("%Y-%m-%d %H:%M"),
+                "end_time": row.end_time.strftime("%Y-%m-%d %H:%M"),
+                "hours": round(float(row.effective_hours or 0) * 24, 2),
+                "reason": row.reason or "", "approval_status": row.approval_status or "",
+                "salary_option": row.salary_option or "", "is_weekend": bool(row.is_weekend),
+                "is_holiday": bool(row.is_holiday), "is_revoked": bool(row.is_revoked),
+            })
+            day += timedelta(days=1)
+    overtime_rows = [r for r in overtime_rows if not r.is_revoked and (r.approval_status or "") != "已拒绝"]
     overtimes = _split_overtime_by_day(overtime_rows, month)
 
     leave_rows = (
@@ -1978,6 +1992,7 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
         "attendance_source": "daily" if uses_daily_attendance else "monthly_fallback",
         "days": days,
         "overtimes": overtimes,
+        "overtime_entries": overtime_entries,
         "leaves": leaves,
         "summary": summary,
     }
