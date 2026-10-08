@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { fetchMe } from "../api/auth";
 import { apiRequest } from "../api/client";
 import { fetchMealBatch, mutateMealBatch, mealExportUrl, fetchMealImports, previewMealImport, confirmMealImport, compareMealImport } from "../api/mealTickets";
@@ -142,6 +143,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         {paymentView && admin && batch.status === "confirmed" && <button className="meal-ticket-button is-primary" disabled={busy || !selected.length} onClick={() => { setBulk(true); setReason(""); requestKeys.current = {}; }}>登记选中人员充值</button>}
       </div>
       <QueryTable headers={["工号","姓名","核算部门","实际打卡天数","基础金额","额外补扣","应发金额","净已发金额","差额","状态 / 操作"]}
+        sortRows={rows.map(i => [i.emp_no, i.name, i.dept_name, i.days, i.base_amount, i.adjustment_amount, i.due_amount, i.paid_amount, i.difference,
+          i.error || i.due_amount < 0 ? 0 : i.difference < 0 ? 1 : i.difference === 0 ? 4 : i.paid_amount > 0 ? 3 : 2])}
         rows={rows.map(i => [i.emp_no, i.name, i.dept_name, i.days, money(i.base_amount), money(i.adjustment_amount), money(i.due_amount), money(i.paid_amount), money(i.difference),
           <div className="meal-ticket-actions"><span className={`meal-ticket-badge ${i.error || i.difference < 0 ? "is-danger" : i.difference === 0 ? "is-success" : "is-warning"}`}>{i.error || (i.difference < 0 ? "待扣回" : i.difference === 0 ? "结清" : i.paid_amount > 0 ? "部分发放" : "未发")}</span>
             <button className="meal-ticket-button is-link" onClick={() => setDetail(i)}>明细</button>{admin && <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i,"adjustments")}>补扣</button>}
@@ -170,7 +173,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     {detail && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="菜票明细"><h2>{detail.emp_no} {detail.name}</h2>
       <p>实际打卡天数：{detail.days} · 基础金额：{money(detail.base_amount)} 元</p>
       <p>考勤来源：{detail.source.configured_source} {detail.source.remark}</p>
-      <a href={`/employee/individual-attendance?emp_id=${detail.emp_id}&month=${batch?.month}`}>查看考勤依据</a>
+      <Link to={`/employee/individual-attendance?emp_id=${detail.emp_id}&month=${batch?.month}`}>查看考勤依据</Link>
       <h3>补扣历史</h3>{detail.adjustments.map(a => <p key={a.id}>{money(a.amount)} 元 · {a.reason} · {a.operator} · {a.created_at}</p>)}
       <h3>充值 / 扣回历史</h3>{detail.payments.map(p => <p key={p.id}>{p.date} · {money(p.amount)} 元 · {p.reference} · {p.operator} {p.reversed && "（已冲正）"}
         {admin && p.kind !== "reversal" && !p.reversed && <button className="meal-ticket-button is-link" onClick={() => { setDetail(null); openForm(detail, "reversal", p.id); }}>冲正</button>}</p>)}

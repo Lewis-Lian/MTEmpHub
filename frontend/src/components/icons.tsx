@@ -39,6 +39,10 @@ export const SearchIcon = icon(
   "M8.5 3a5.5 5.5 0 014.23 9.02l3.64 3.64M13 8.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"
 );
 
+export const TicketIcon = icon(
+  "M3 5h14v3a2 2 0 000 4v3H3v-3a2 2 0 000-4V5zM12 5v2M12 9v2M12 13v2"
+);
+
 export const DatabaseIcon = icon(
   "M4 4h12v3H4zM4 7v3c0 .83 2.69 1.5 6 1.5s6-.67 6-1.5V7M4 10v3c0 .83 2.69 1.5 6 1.5s6-.67 6-1.5v-3"
 );
@@ -136,6 +140,7 @@ export const SlidersIcon = icon(
 const moduleIconMap: Record<string, React.FC<IconProps>> = {
   home: HomeIcon,
   query: SearchIcon,
+  "meal-tickets": TicketIcon,
   account: DatabaseIcon,
   "master-data": GridIcon,
   corrections: EditIcon,

@@ -1333,6 +1333,39 @@ describe("App smoke regression", () => {
     expect(screen.getByText("72")).toBeInTheDocument();
   });
 
+  it("菜票明细打开考勤页签后保留原页筛选和明细", async () => {
+    window.history.replaceState({}, "", "/meal-tickets/calculation");
+    fetchMock.mockImplementation((input) => {
+      const path = normalizePath(input);
+      if (path === "/api/query/navigation") return Promise.resolve(jsonResponse({ modules: [
+        { slug: "meal-tickets", label: "菜票中心", home_href: "/meal-tickets/calculation",
+          entries: [{ key: "meal_ticket_calculation", label: "月度核算", href: "/meal-tickets/calculation" }] },
+        { slug: "query", label: "查询中心", home_href: "/employee/individual-attendance",
+          entries: [{ key: "individual_attendance", label: "个人考勤查询", href: "/employee/individual-attendance" }] },
+      ] }));
+      if (path === "/api/meal-tickets") return Promise.resolve(jsonResponse({
+        id: 1, month: "2026-05", recharge_month: "2026-06", version: 1, status: "draft", source_changed: false, departments: [],
+        items: [{ id: 1, emp_id: 1, emp_no: "E001", name: "张三", dept_name: "研发部", days: 22, base_amount: 176,
+          adjustment_amount: 0, due_amount: 176, paid_amount: 0, difference: 176, error: "", source: {}, adjustments: [], payments: [] }],
+      }));
+      return mockEmployeeAppResponse(path);
+    });
+    const { default: App } = await import("./App");
+    render(<App />);
+    await screen.findByText("张三");
+    fireEvent.change(screen.getByLabelText("计划充值月份"), { target: { value: "2026-06" } });
+    await screen.findByText("张三");
+    fireEvent.change(screen.getByPlaceholderText("输入工号或姓名"), { target: { value: "E001" } });
+    fireEvent.click(screen.getByRole("button", { name: "明细" }));
+    fireEvent.click(screen.getByRole("link", { name: "查看考勤依据" }));
+    expect(await screen.findByRole("tab", { name: "个人考勤查询" })).toHaveAttribute("aria-selected", "true");
+    expect(window.location.search).toBe("?emp_id=1&month=2026-05");
+    fireEvent.click(screen.getByRole("tab", { name: "月度核算" }));
+    expect(screen.getByLabelText("计划充值月份")).toHaveValue("2026-06");
+    expect(screen.getByPlaceholderText("输入工号或姓名")).toHaveValue("E001");
+    expect(screen.getByRole("dialog", { name: "菜票明细" })).toBeInTheDocument();
+  });
+
   it("页签切换后会保留员工考勤查询状态", async () => {
     window.history.replaceState({}, "", "/employee/dashboard");
     fetchMock.mockImplementation((input) => mockEmployeeAppResponse(normalizePath(input)));

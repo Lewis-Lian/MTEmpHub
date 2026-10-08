@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import MealTicketPage from "./MealTicketPage";
@@ -32,6 +32,32 @@ describe("菜票中心", () => {
     await screen.findByText("员工甲");
     expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
+  });
+
+  it("状态排序将跨页的核算问题排到前面，再次点击反向排序", async () => {
+    const items = Array.from({ length: 100 }, (_, index) => ({ ...batch.items[0],
+      id: index + 1, emp_no: String(index + 1), name: `已结清${index + 1}`, paid_amount: 176, difference: 0 }));
+    items.push(
+      { ...batch.items[0], id: 101, name: "部分发放人员", paid_amount: 80, difference: 96 },
+      { ...batch.items[0], id: 102, name: "未发人员" },
+      { ...batch.items[0], id: 103, name: "待扣回人员", paid_amount: 180, difference: -4 },
+      { ...batch.items[0], id: 104, name: "负数应发人员", adjustment_amount: -180, due_amount: -4, difference: -4 },
+      { ...batch.items[0], id: 105, name: "考勤异常人员", error: "缺少考勤来源，请核对" },
+    );
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : { ...batch, items }));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("已结清1");
+    expect(screen.queryByText("考勤异常人员")).not.toBeInTheDocument();
+    const table = within(screen.getByRole("region", { name: "人员明细" })).getByRole("table");
+    const names = () => within(table).getAllByRole("row").slice(1).map(row => within(row).getAllByRole("cell")[1].textContent);
+    const sort = within(table).getByRole("button", { name: /状态 \/ 操作/ });
+    fireEvent.click(sort);
+    expect(names().slice(0, 5)).toEqual(["负数应发人员", "考勤异常人员", "待扣回人员", "未发人员", "部分发放人员"]);
+    fireEvent.click(within(within(table).getAllByRole("row")[1]).getByRole("button", { name: "明细" }));
+    expect(within(screen.getByRole("dialog", { name: "菜票明细" })).getByRole("heading", { name: /负数应发人员/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.click(sort);
+    expect(names()[0]).toBe("已结清1");
   });
 
   it("缓存页面保持独立模式，重挂载保留所选月份", async () => {
