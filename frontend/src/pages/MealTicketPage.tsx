@@ -8,6 +8,7 @@ import QueryTable from "../components/query/QueryTable";
 import "./meal-ticket.css";
 
 const money = (n: number) => n.toFixed(2);
+const hasError = (item: MealItem) => Boolean(item.error && !item.excluded);
 function thisMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -48,6 +49,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [people, setPeople] = useState<Array<{ id: number; emp_no: string; name: string }>>([]);
   const generation = useRef(0);
   const requestKeys = useRef<Record<number, string>>({});
+  const participationForm = action === "exclude" || action === "include";
+  const participationLabel = action === "exclude" ? "本月不发" : "恢复核算";
 
   useEffect(() => { fetchMe().then(u => setAdmin(u.role === "admin")).catch(e => setError(e.message)); }, []);
   useEffect(() => { setComparison([]); }, [preview]);
@@ -82,6 +85,10 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   }
   async function save() {
     if (!target || !batch) return;
+    if (participationForm) {
+      await mutate("participation", { item_id: target.id, excluded: action === "exclude", reason });
+      return;
+    }
     const values = { item_id: target.id, amount, reason, kind: action, date, reference: reason,
       reversal_id: reversalId, request_key: requestKeys.current[target.id] };
     await mutate(action === "adjustments" ? action : "payments", values);
@@ -115,7 +122,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   }
   const rows = (batch?.items ?? []).filter(i => (!keyword || `${i.emp_no} ${i.name}`.includes(keyword)) &&
     (!department || i.dept_name === department) && (!type || i.is_manager === (type === "manager")) &&
-    (!paymentStatus || (paymentStatus === "refund" ? i.difference < 0 : paymentStatus === "settled" ? i.difference === 0 : i.difference > 0)));
+    (!paymentStatus || (paymentStatus === "excluded" ? i.excluded && i.due_amount === 0
+      : paymentStatus === "refund" ? i.difference < 0 : paymentStatus === "settled" ? i.difference === 0 && !(i.excluded && i.due_amount === 0) : i.difference > 0)));
   const total = (field: "due_amount" | "paid_amount" | "difference") => rows.reduce((sum, i) => sum + i[field], 0);
 
   return <main className="meal-ticket-page">
@@ -125,7 +133,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <label>{historical ? "文件月份" : "计划充值月份"}<input type="month" value={month} disabled={busy} onChange={e => setMonth(e.target.value)} /></label>
       {batch && !historical && <span className="meal-ticket-period">考勤月份：{batch.month} · <span className={`meal-ticket-badge ${batch.status === "draft" ? "is-warning" : "is-success"}`}>{batch.status === "draft" ? "草稿" : "已确认"}</span></span>}
       {!historical && admin && <button className="meal-ticket-button" disabled={busy || batch?.status === "confirmed"} onClick={() => mutate("generate", { recharge_month: month })}>生成 / 重算草稿</button>}
-      {!historical && admin && batch?.status === "draft" && <button className="meal-ticket-button is-primary" disabled={busy || batch.items.some(i => i.error || i.due_amount < 0)} onClick={() => mutate("confirm")}>确认核算</button>}
+      {!historical && admin && batch?.status === "draft" && <button className="meal-ticket-button is-primary" disabled={busy || batch.items.some(i => hasError(i) || i.due_amount < 0)} onClick={() => mutate("confirm")}>确认核算</button>}
       {batch && !historical && <a className="meal-ticket-button meal-ticket-export" href={mealExportUrl(month)}>导出人员及部门报表</a>}
     </section>
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
@@ -139,16 +147,17 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         <label>工号 / 姓名<input placeholder="输入工号或姓名" value={keyword} onChange={e => setKeyword(e.target.value)} /></label>
         <label>核算部门<select value={department} onChange={e => setDepartment(e.target.value)}><option value="">全部部门</option>{batch.departments.map(d => <option key={d.dept_name}>{d.dept_name}</option>)}</select></label>
         <label>人员类型<select value={type} onChange={e => setType(e.target.value)}><option value="">全部人员</option><option value="employee">员工</option><option value="manager">管理人员</option></select></label>
-        <label>充值状态<select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}><option value="">全部</option><option value="pending">待发</option><option value="settled">结清</option><option value="refund">待扣回</option></select></label>
-        {paymentView && admin && batch.status === "confirmed" && <button className="meal-ticket-button is-primary" disabled={busy || !selected.length} onClick={() => { setBulk(true); setReason(""); requestKeys.current = {}; }}>登记选中人员充值</button>}
+        <label>充值状态<select value={paymentStatus} onChange={e => setPaymentStatus(e.target.value)}><option value="">全部</option><option value="pending">待发</option><option value="settled">结清</option><option value="refund">待扣回</option><option value="excluded">本月不发</option></select></label>
+        {paymentView && admin && batch.status === "confirmed" && <button className="meal-ticket-button is-primary" disabled={busy || !selected.length} onClick={() => { setBulk(true); setAction("recharge"); setReason(""); requestKeys.current = {}; }}>登记选中人员充值</button>}
       </div>
       <QueryTable headers={["工号","姓名","核算部门","实际打卡天数","基础金额","额外补扣","应发金额","净已发金额","差额","状态 / 操作"]}
         sortRows={rows.map(i => [i.emp_no, i.name, i.dept_name, i.days, i.base_amount, i.adjustment_amount, i.due_amount, i.paid_amount, i.difference,
-          i.error || i.due_amount < 0 ? 0 : i.difference < 0 ? 1 : i.difference === 0 ? 4 : i.paid_amount > 0 ? 3 : 2])}
+          hasError(i) || i.due_amount < 0 ? 0 : i.difference < 0 ? 1 : i.excluded && i.due_amount === 0 ? 5 : i.difference === 0 ? 4 : i.paid_amount > 0 ? 3 : 2])}
         rows={rows.map(i => [i.emp_no, i.name, i.dept_name, i.days, money(i.base_amount), money(i.adjustment_amount), money(i.due_amount), money(i.paid_amount), money(i.difference),
-          <div className="meal-ticket-actions"><span className={`meal-ticket-badge ${i.error || i.difference < 0 ? "is-danger" : i.difference === 0 ? "is-success" : "is-warning"}`}>{i.error || (i.difference < 0 ? "待扣回" : i.difference === 0 ? "结清" : i.paid_amount > 0 ? "部分发放" : "未发")}</span>
-            <button className="meal-ticket-button is-link" onClick={() => setDetail(i)}>明细</button>{admin && <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i,"adjustments")}>补扣</button>}
-            {paymentView && admin && batch.status === "confirmed" && !i.error && <>
+          <div className="meal-ticket-actions"><span className={`meal-ticket-badge ${hasError(i) || i.difference < 0 ? "is-danger" : i.difference === 0 ? "is-success" : "is-warning"}`}>{hasError(i) ? i.error : i.difference < 0 ? "待扣回" : i.excluded && i.due_amount === 0 ? "本月不发" : (i.difference === 0 ? "结清" : i.paid_amount > 0 ? "部分发放" : "未发")}</span>
+            <button className="meal-ticket-button is-link" onClick={() => setDetail(i)}>明细</button>{admin && !(batch.status === "draft" && i.excluded) && <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i,"adjustments")}>补扣</button>}
+            {admin && batch.status === "draft" && <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i, i.excluded ? "include" : "exclude")}>{i.excluded ? "恢复核算" : "本月不发"}</button>}
+            {paymentView && admin && batch.status === "confirmed" && !hasError(i) && <>
               {i.difference > 0 && <><input aria-label={`选择 ${i.emp_no}`} type="checkbox" checked={selected.includes(i.id)} onChange={e => setSelected(s => e.target.checked ? [...s,i.id] : s.filter(id => id !== i.id))} />
               <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i,"recharge")}>登记充值</button></>}
               {i.difference < 0 && <button className="meal-ticket-button is-link" disabled={busy} onClick={() => openForm(i,"refund")}>登记扣回</button>}
@@ -160,20 +169,24 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         rows={batch.departments.map(d => [<button className="meal-ticket-button is-link" onClick={() => setDepartment(d.dept_name)}>{d.dept_name}</button>,d.count,...[d.base_amount,d.adjustment_amount,d.due_amount,d.paid_amount,d.difference].map(money)])} />
       </section>
     </>}
-    {(target || bulk) && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label={bulk ? "批量充值" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
-      <h2>{bulk ? `登记 ${selected.length} 人实际充值` : `${target?.name} · ${action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2>
+    {(target || bulk) && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label={bulk ? "批量充值" : participationForm ? "核算处理" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
+      <h2>{bulk ? `登记 ${selected.length} 人实际充值` : `${target?.name} · ${participationForm ? participationLabel : action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2>
+      {participationForm && <p>{action === "exclude" ? "本月应发金额按 0 元核算，原考勤和补扣记录保留，缺少考勤来源不再阻止确认。" : "恢复按实际打卡天数和原补扣核算，考勤异常需核对后才能确认。"}</p>}
       <form onSubmit={e => { e.preventDefault(); void (bulk ? saveBulk() : save()); }}>
-        {!bulk && action !== "reversal" && <label>{action === "adjustments" ? "调整金额（元）" : "金额（元）"}<input type="number" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} /></label>}
-        {(bulk || action !== "adjustments") && <label>实际日期<input type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>}
-        <label>{action === "adjustments" && !bulk ? "调整原因" : "凭证 / 说明"}<textarea required value={reason} onChange={e => setReason(e.target.value)} /></label>
+        {!bulk && !participationForm && action !== "reversal" && <label>{action === "adjustments" ? "调整金额（元）" : "金额（元）"}<input type="number" step="0.01" required value={amount} onChange={e => setAmount(e.target.value)} /></label>}
+        {!participationForm && (bulk || action !== "adjustments") && <label>实际日期<input type="date" required value={date} onChange={e => setDate(e.target.value)} /></label>}
+        <label>{participationForm ? "处理原因" : action === "adjustments" && !bulk ? "调整原因" : "凭证 / 说明"}<textarea required value={reason} onChange={e => setReason(e.target.value)} /></label>
         {error && <p role="alert">{error}</p>}
-        <div className="meal-ticket-actions"><button className="meal-ticket-button is-primary" disabled={busy} type="submit">{action === "adjustments" && !bulk ? "保存补扣" : "确认登记"}</button><button className="meal-ticket-button" type="button" disabled={busy} onClick={() => { setTarget(null); setBulk(false); }}>取消</button></div>
+        <div className="meal-ticket-actions"><button className="meal-ticket-button is-primary" disabled={busy} type="submit">{participationForm ? `确认${participationLabel}` : action === "adjustments" && !bulk ? "保存补扣" : "确认登记"}</button><button className="meal-ticket-button" type="button" disabled={busy} onClick={() => { setTarget(null); setBulk(false); }}>取消</button></div>
       </form>
     </section></div>}
     {detail && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="菜票明细"><h2>{detail.emp_no} {detail.name}</h2>
       <p>实际打卡天数：{detail.days} · 基础金额：{money(detail.base_amount)} 元</p>
       <p>考勤来源：{detail.source.configured_source} {detail.source.remark}</p>
+      {detail.error && <p>原考勤核对提示：{detail.error}</p>}
+      {detail.excluded && <p>原基础金额：{money(detail.original_base_amount)} 元；本月基础金额按 0 元核算，确认后的补发另记补扣。</p>}
       <Link to={`/employee/individual-attendance?emp_id=${detail.emp_id}&month=${batch?.month}`}>查看考勤依据</Link>
+      {!!detail.participation_history?.length && <><h3>核算处理历史</h3>{detail.participation_history.map((p, index) => <p key={index}>{p.excluded ? "本月不发" : "恢复核算"} · {p.reason} · {p.operator} · {p.created_at}</p>)}</>}
       <h3>补扣历史</h3>{detail.adjustments.map(a => <p key={a.id}>{money(a.amount)} 元 · {a.reason} · {a.operator} · {a.created_at}</p>)}
       <h3>充值 / 扣回历史</h3>{detail.payments.map(p => <p key={p.id}>{p.date} · {money(p.amount)} 元 · {p.reference} · {p.operator} {p.reversed && "（已冲正）"}
         {admin && p.kind !== "reversal" && !p.reversed && <button className="meal-ticket-button is-link" onClick={() => { setDetail(null); openForm(detail, "reversal", p.id); }}>冲正</button>}</p>)}

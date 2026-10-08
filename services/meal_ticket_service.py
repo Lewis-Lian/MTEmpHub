@@ -139,7 +139,7 @@ def generate(recharge_month, operator):
     if batch and batch.status != 'draft':
         raise MealError('已确认的核算不能重算，请通过额外补扣处理', 409)
     rows = source_snapshot(month)
-    if not rows:
+    if not rows and not batch:
         raise MealError('没有可核算人员')
     if not batch:
         batch = MealTicketBatch(month=month, recharge_month=recharge_month, account_set_id=account.id,
@@ -155,6 +155,8 @@ def generate(recharge_month, operator):
         if item is None:
             db.session.add(MealTicketItem(batch_key=batch.key, month=month, **data))
         else:
+            if 'participation_history' in item.source:
+                data['source']['participation_history'] = item.source['participation_history']
             for name, value in data.items():
                 setattr(item, name, value)
     for removed in existing.values():
@@ -172,7 +174,7 @@ def confirm(batch, operator):
     if digest(source_snapshot(batch.month)) != batch.source_digest:
         raise MealError('考勤字段或人员资料已变化，请重算草稿', 409)
     rows = serialize_batch(batch)['items']
-    if any(row['error'] or row['due_amount'] < 0 for row in rows):
+    if any((row['error'] and not row['excluded']) or row['due_amount'] < 0 for row in rows):
         raise MealError('存在待核对人员或负数应发金额，不能确认')
     batch.status, batch.confirmed_by, batch.confirmed_at = 'confirmed', operator, datetime.utcnow()
     batch.version += 1
@@ -189,6 +191,8 @@ def item_for_batch(batch, identifier):
 
 def adjustment(batch, item_id, amount, reason, operator):
     item = item_for_batch(batch, item_id)
+    if batch.status == 'draft' and participation_state(item).get('excluded'):
+        raise MealError('本月不发人员请先恢复核算，再登记补扣')
     value = cents(amount)
     if value == 0:
         raise MealError('调整金额不能为零')
@@ -200,10 +204,35 @@ def adjustment(batch, item_id, amount, reason, operator):
     db.session.flush()
 
 
+def participation_state(item):
+    history = item.source.get('participation_history', [])
+    return history[-1] if history else {}
+
+
+def participation(batch, item_id, excluded, reason, operator):
+    if batch.status != 'draft':
+        raise MealError('已确认核算不能更改发放选择，请通过额外补扣处理', 409)
+    if type(excluded) is not bool:
+        raise MealError('发放选择必须为布尔值')
+    item = item_for_batch(batch, item_id)
+    reason = required_text(reason, '核算处理原因')
+    adjustments = MealTicketAdjustment.query.filter_by(item_key=item.key).all()
+    entry = {'excluded':excluded, 'reason':reason, 'operator':operator,
+             'created_at':datetime.utcnow().isoformat(),
+             'adjustment_cents':sum(a.amount_cents for a in adjustments)}
+    item.source = {**item.source, 'participation_history':[
+        *item.source.get('participation_history', []), entry]}
+    batch.version += 1
+    db.session.flush()
+
+
 def totals(item):
     adjustments = MealTicketAdjustment.query.filter_by(item_key=item.key).all()
     payments = MealTicketPayment.query.filter_by(item_key=item.key).order_by(MealTicketPayment.id).all()
     due = item.base_cents + sum(a.amount_cents for a in adjustments)
+    state = participation_state(item)
+    if state.get('excluded'):
+        due -= item.base_cents + state['adjustment_cents']
     paid = sum(p.amount_cents for p in payments)
     return due, paid, adjustments, payments
 
@@ -262,9 +291,13 @@ def serialize_batch(batch, accessible=None, check_source=False):
     items, departments = [], {}
     for item in query.all():
         due, paid, adjustments, payments = totals(item)
+        excluded = bool(participation_state(item).get('excluded'))
+        base = 0 if excluded else item.base_cents
         row = {'id':item.id, 'emp_id':item.emp_id, 'emp_no':item.emp_no_snapshot, 'name':item.name,
                'dept_name':item.dept_name, 'is_manager':item.is_manager, 'days':item.days,
-               'base_amount':item.base_cents / 100, 'adjustment_amount':(due-item.base_cents)/100,
+               'base_amount':base / 100, 'adjustment_amount':(due-base)/100,
+               'original_base_amount':item.base_cents / 100, 'excluded':excluded,
+               'participation_history':item.source.get('participation_history', []),
                'due_amount':due/100, 'paid_amount':paid/100, 'difference':(due-paid)/100,
                'error':item.error, 'source':item.source,
                'adjustments':[{'id':a.id, 'amount':a.amount_cents/100, 'reason':a.reason, 'operator':a.operator,

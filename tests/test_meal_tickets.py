@@ -149,6 +149,98 @@ class MealTicketTests(unittest.TestCase):
         self.assertTrue(any(i['error'] for i in batch['items']))
         self.assertEqual(self.post('/confirm', {'batch_id':batch['id'], 'version':batch['version']}).status_code, 400)
 
+    def exclude(self, batch, item, excluded=True, reason='实际已离职，本月不发'):
+        response = self.post('/participation', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':item['id'], 'excluded':excluded, 'reason':reason})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()
+
+    def test_no_issue_bypasses_missing_source_and_preserves_history_on_recalculation(self):
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).delete()
+            db.session.commit()
+        batch = self.generate()
+        self.assertTrue(batch['items'][0]['error'])
+        batch = self.exclude(batch, batch['items'][0])
+        batch = self.generate()
+        item = batch['items'][0]
+        self.assertTrue(item['excluded'])
+        self.assertEqual(item['due_amount'], 0)
+        self.assertTrue(item['error'])
+        self.assertEqual(item['participation_history'][0]['reason'], '实际已离职，本月不发')
+        self.assertEqual(item['participation_history'][0]['operator'], 'admin')
+        self.confirm(batch)
+
+    def test_no_issue_zeros_base_and_adjustments_and_restore_returns_original_amount(self):
+        batch = self.adjustment(self.generate(), '16')
+        batch = self.exclude(batch, batch['items'][0])
+        item = batch['items'][0]
+        self.assertEqual((item['base_amount'], item['adjustment_amount'], item['due_amount']), (0, 0, 0))
+        self.assertEqual(batch['departments'][0]['due_amount'], 0)
+        self.assertEqual(item['original_base_amount'], 176)
+        batch = self.exclude(batch, item, False, '核对后结算离职前出勤')
+        self.assertEqual(batch['items'][0]['due_amount'], 192)
+        self.assertEqual(len(batch['items'][0]['participation_history']), 2)
+
+    def test_participation_requires_reason_admin_current_version_and_draft(self):
+        batch = self.generate()
+        body = {'batch_id':batch['id'], 'version':batch['version'], 'item_id':batch['items'][0]['id'],
+                'excluded':True, 'reason':''}
+        self.assertEqual(self.post('/participation', body).status_code, 400)
+        body.update(reason='本月不发', excluded='true')
+        self.assertEqual(self.post('/participation', body).status_code, 400)
+        body['excluded'] = True
+        viewer = {'Authorization':'Bearer ' + self.viewer_token}
+        self.assertEqual(self.client.post('/api/meal-tickets/participation', json=body, headers=viewer).status_code, 403)
+        batch = self.exclude(batch, batch['items'][0])
+        self.assertEqual(self.post('/participation', body).status_code, 409)
+        batch = self.confirm(batch)
+        body.update(version=batch['version'], excluded=False)
+        self.assertEqual(self.post('/participation', body).status_code, 409)
+
+    def test_confirmed_no_issue_can_be_supplemented_without_reviving_old_adjustments(self):
+        batch = self.adjustment(self.generate(), '16')
+        batch = self.exclude(batch, batch['items'][0])
+        self.assertEqual(self.post('/adjustments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'8', 'reason':'先恢复核算'}).status_code, 400)
+        batch = self.adjustment(self.confirm(batch), '24')
+        self.assertEqual(batch['items'][0]['due_amount'], 24)
+        self.assertEqual(batch['items'][0]['adjustment_amount'], 24)
+
+    def test_no_issue_survives_removed_employee_scope_and_export_and_backup(self):
+        from datetime import date
+        from services.account_set_backup_service import collect_backup
+        batch = self.generate()
+        batch = self.exclude(batch, batch['items'][0])
+        with self.app.app_context():
+            db.session.get(Employee, self.emp_id).resigned_at = date(2026, 7, 31)
+            db.session.commit()
+        batch = self.generate()
+        self.assertTrue(batch['items'][0]['excluded'])
+        self.assertIn('移出', batch['items'][0]['error'])
+        self.confirm(batch)
+        exported = self.client.get('/api/meal-tickets/export?recharge_month=2026-09', headers=self.headers)
+        book = load_workbook(io.BytesIO(exported.data))
+        self.assertEqual(book['人员明细'].cell(4, 7).value, 0)
+        self.assertIn('本月不发', book['人员明细'].cell(4, 10).value)
+        with self.app.app_context():
+            document = collect_backup(AccountSet.query.first().id)
+            self.assertTrue(document['datasets']['meal_items'][0]['source']['participation_history'][0]['excluded'])
+
+    def test_recalculation_can_resolve_existing_draft_when_all_people_leave_scope(self):
+        from datetime import date
+        batch = self.generate()
+        for item in batch['items']:
+            batch = self.exclude(batch, item)
+        with self.app.app_context():
+            for employee in Employee.query.all():
+                employee.resigned_at = date(2026, 7, 31)
+            db.session.commit()
+        batch = self.generate()
+        self.assertTrue(all(item['excluded'] for item in batch['items']))
+        self.assertEqual(batch['departments'][0]['due_amount'], 0)
+        self.confirm(batch)
+
     def test_historical_preview_confirm_and_department_not_added(self):
         book = Workbook()
         s = book.active

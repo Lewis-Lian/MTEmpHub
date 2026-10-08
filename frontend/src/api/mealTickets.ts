@@ -4,6 +4,8 @@ export interface MealItem {
   id: number; emp_id: number; emp_no: string; name: string; dept_name: string; is_manager: boolean;
   days: number; base_amount: number; adjustment_amount: number; due_amount: number; paid_amount: number;
   difference: number; error: string; source: { field: string; configured_source: string; monthly_override?: number; remark?: string };
+  excluded: boolean; original_base_amount: number;
+  participation_history: Array<{ excluded: boolean; reason: string; operator: string; created_at: string }>;
   adjustments: Array<{ id: number; amount: number; reason: string; operator: string; created_at: string }>;
   payments: Array<{ id: number; kind: string; amount: number; date: string; reference: string; operator: string; reversed: boolean }>;
 }

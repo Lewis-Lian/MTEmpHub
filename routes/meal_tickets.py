@@ -13,7 +13,7 @@ from models.account_set import AccountSet
 from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
     MealError, begin_write, shift_month, generate, batch_for_write, confirm, adjustment,
-    payment, serialize_batch, source_snapshot,
+    payment, serialize_batch, source_snapshot, participation,
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
 
@@ -100,6 +100,20 @@ def add_adjustment():
     return jsonify(result)
 
 
+@meal_tickets_bp.post('/participation')
+@admin_required
+@handled
+def set_participation():
+    operator = g.current_user.username
+    body = request.get_json(silent=True) or {}
+    begin_write()
+    batch = batch_for_write(body.get('batch_id'), body.get('version'))
+    participation(batch, body.get('item_id'), body.get('excluded'), body.get('reason'), operator)
+    result = serialize_batch(batch)
+    db.session.commit()
+    return jsonify(result)
+
+
 @meal_tickets_bp.post('/payments')
 @admin_required
 @handled
@@ -124,7 +138,8 @@ def export_batch():
     book = Workbook()
     for index, (name, headers, rows) in enumerate((
         ('人员明细', ['工号','姓名','核算部门','实际打卡天数','基础金额','额外补扣','应发金额','净已发金额','差额','核对说明'],
-         [[i['emp_no'],i['name'],i['dept_name'],i['days'],i['base_amount'],i['adjustment_amount'],i['due_amount'],i['paid_amount'],i['difference'],i['error']] for i in data['items']]),
+         [[i['emp_no'],i['name'],i['dept_name'],i['days'],i['base_amount'],i['adjustment_amount'],i['due_amount'],i['paid_amount'],i['difference'],
+           '；'.join(filter(None, [i['error'], ('本月不发：' if i['excluded'] else '恢复核算：') + i['participation_history'][-1]['reason'] if i['participation_history'] else '']))] for i in data['items']]),
         ('部门汇总', ['部门','人数','基础金额','额外补扣','应发金额','净已发金额','差额'],
          [[d[k] for k in ('dept_name','count','base_amount','adjustment_amount','due_amount','paid_amount','difference')] for d in data['departments']]),
     )):

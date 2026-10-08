@@ -32,6 +32,40 @@ describe("菜票中心", () => {
     await screen.findByText("员工甲");
     expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "本月不发" })).not.toBeInTheDocument();
+  });
+
+  it("本月不发填写原因后解除确认阻塞，并可恢复核算", async () => {
+    let current = { ...batch, items: [{ ...batch.items[0], error: "缺少考勤来源，请核对", excluded: false,
+      original_base_amount: 176, participation_history: [] as Array<{ excluded: boolean; reason: string; operator: string; created_at: string }> }] };
+    request.mockImplementation((path: string, options?: { body?: { excluded: boolean; reason: string } }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/participation") {
+        const excluded = options!.body!.excluded;
+        current = { ...current, version: current.version + 1, items: [{ ...current.items[0], excluded,
+          base_amount: excluded ? 0 : 176, due_amount: excluded ? 0 : 176, difference: excluded ? 0 : 176,
+          participation_history: [...current.items[0].participation_history, { excluded, reason: options!.body!.reason, operator: "admin", created_at: "2026-09-01" }] }] };
+      }
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    expect(screen.getByRole("button", { name: "确认核算" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "本月不发" }));
+    const form = within(screen.getByRole("dialog", { name: "核算处理" }));
+    expect(form.queryByRole("spinbutton")).not.toBeInTheDocument();
+    fireEvent.change(form.getByLabelText("处理原因"), { target: { value: "实际八月离职，本月不发" } });
+    fireEvent.click(form.getByRole("button", { name: "确认本月不发" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "确认核算" })).toBeEnabled());
+    expect(screen.getByText("本月不发", { selector: "span" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "明细" }));
+    expect(screen.getByText(/实际八月离职，本月不发/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "关闭" }));
+    fireEvent.click(screen.getByRole("button", { name: "恢复核算" }));
+    fireEvent.change(screen.getByLabelText("处理原因"), { target: { value: "核对后决定结算" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认恢复核算" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "本月不发" })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: "确认核算" })).toBeDisabled();
   });
 
   it("状态排序将跨页的核算问题排到前面，再次点击反向排序", async () => {
