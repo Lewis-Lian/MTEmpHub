@@ -21,7 +21,7 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
-  it("人员和部门选择器使用本月账目，保留离职人员并支持组合筛选", async () => {
+  it("同一张表根据人员或部门选择切换，部门可进入人员明细", async () => {
     const current = { ...batch, departments: [], items: [
       { ...batch.items[0], employment_status: "resigned", resigned_at: "2026-09-01", dept_name: "原生产部" },
       { ...batch.items[0], id: 2, emp_id: 2, emp_no: "002", name: "员工乙", dept_name: "原生产部" },
@@ -43,8 +43,22 @@ describe("菜票中心", () => {
     const departments = within(screen.getByRole("dialog", { name: "选择核算部门" }));
     fireEvent.click(departments.getByRole("button", { name: "原生产部" }));
     fireEvent.click(departments.getByRole("button", { name: "确定" }));
-    expect(table.getByText("员工甲")).toBeInTheDocument();
-    expect(table.queryByText("员工丙")).not.toBeInTheDocument();
+    const summary = within(within(screen.getByRole("region", { name: "部门汇总" })).getByRole("table"));
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(summary.getByRole("button", { name: "原生产部" })).toBeInTheDocument();
+    expect(summary.getByText("2", { selector: "td" })).toBeInTheDocument();
+    expect(summary.getAllByRole("row")[1].children[4]).toHaveTextContent("352.00");
+    expect(summary.queryByText("员工甲")).not.toBeInTheDocument();
+    fireEvent.click(summary.getByRole("button", { name: "原生产部" }));
+    const detail = within(screen.getByRole("region", { name: "人员明细" }));
+    expect(detail.getByText("员工甲")).toBeInTheDocument();
+    expect(detail.getByText("员工乙")).toBeInTheDocument();
+    expect(detail.queryByText("员工丙")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    pickEmployee("003 - 员工丙");
+    expect(detail.getByText("员工丙")).toBeInTheDocument();
+    expect(detail.queryByText("员工甲")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("核算部门")).toHaveValue("");
     expect(request.mock.calls.every(([path]) => path !== "/api/admin/employees?status=all")).toBe(true);
   });
   it("筛选结果可全选，批量本月不发与恢复核算记录相同原因", async () => {

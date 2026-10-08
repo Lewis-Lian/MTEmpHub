@@ -106,6 +106,9 @@
 .meal-ticket-section-heading h2, .meal-ticket-preview h2 { margin: 0; font-size: 17px; font-weight: 700; }
 .meal-ticket-section-heading p, .meal-ticket-preview > p { margin: 5px 0 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.7; }
 .meal-ticket-count { padding: 4px 10px; border-radius: 6px; background: var(--ent-secondary-bg); color: var(--ent-text-secondary); font-size: 12px; white-space: nowrap; }
+.meal-ticket-view-switch { display: flex; gap: 4px; }
+.meal-ticket-view-switch .meal-ticket-button { min-height: 30px; padding: 4px 10px; font-size: 12px; }
+.meal-ticket-view-switch .meal-ticket-button[aria-pressed="true"] { border-color: var(--ent-blue); background: var(--ent-blue-light); color: var(--ent-blue); }
 .meal-ticket-filters { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid var(--ent-border-strong); }
 .meal-ticket-page .legacy-table-panel { min-width: 0; max-width: 100%; box-shadow: none; }
 .meal-ticket-page .legacy-table-wrap { max-height: 560px; }
