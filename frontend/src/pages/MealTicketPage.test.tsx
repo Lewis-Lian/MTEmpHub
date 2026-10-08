@@ -251,14 +251,14 @@ describe("菜票中心", () => {
     expect(within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem").map(item => within(item).getByRole("heading").textContent))
       .toEqual(["生成草稿", "补发 / 扣除", "确认核算", "导出充值表", "登记充值", "核对结清"]);
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
-    const exportStep = within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem")[3];
+    const exportStep = screen.getByRole("region", { name: "充值表导出" });
     expect(within(exportStep).getByRole("button", { name: "核算后可导出" })).toBeDisabled();
     expect(screen.queryByRole("button", { name: "登记充值" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认核算" }));
     expect(await screen.findByRole("link", { name: "导出充值表（.xls）" })).toHaveAttribute("href",
       expect.stringContaining("/api/meal-tickets/export-recharge?recharge_month="));
     expect(within(exportStep).getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();
-    expect(within(exportStep).getByText("员工编号 / 充值金额")).toBeInTheDocument();
+    expect(within(exportStep).getByText(/员工编号 \/ 充值金额/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "登记充值" }));
     fireEvent.change(screen.getByLabelText("凭证 / 说明"), { target: { value: "充值成功凭证" } });
     fireEvent.click(screen.getByRole("button", { name: "确认登记" }));
@@ -287,7 +287,7 @@ describe("菜票中心", () => {
     });
     render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
     await screen.findByText("员工甲");
-    const exportStep = within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem")[3];
+    const exportStep = screen.getByRole("region", { name: "充值表导出" });
     fireEvent.click(within(exportStep).getByRole("button", { name: "退回上一步" }));
     expect(screen.getByText(/已导出的充值表将失效/)).toBeInTheDocument();
     expect(within(exportStep).getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();

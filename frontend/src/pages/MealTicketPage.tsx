@@ -68,6 +68,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const requestKeys = useRef<Record<number, string>>({});
   const personnel = useRef<HTMLElement>(null);
   const settlement = useRef<HTMLElement>(null);
+  const rechargeExport = useRef<HTMLElement>(null);
   const participationForm = action === "exclude" || action === "include";
   const participationLabel = action === "exclude" ? "本月不发" : "恢复核算";
   const reasonPresets = action === "exclude" ? ["离职", "工资算菜票"]
@@ -289,11 +290,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     { title: "生成草稿", text: "按上月考勤生成本月应发名单。", control: admin && <button className="meal-ticket-button" disabled={busy || confirmed} onClick={() => mutate("generate", { recharge_month: month })}>生成 / 重算草稿</button> },
     { title: "补发 / 扣除", text: "核对人员，调整金额或登记本月不发。", control: <button className="meal-ticket-button" disabled={busy || !batch || confirmed} onClick={jumpToPeople}>核对人员与补扣</button> },
     { title: "确认核算", text: "处理异常后，锁定考勤账套并确认。", control: admin && <button className="meal-ticket-button is-primary" disabled={busy || !batch || confirmed || errorCount > 0} onClick={() => mutate("confirm")}>确认核算</button> },
-    { title: "导出充值表", text: "仅导出待充值余额，不受列表筛选影响。", control: <>
-      {confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button>}
-      {admin && confirmed && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory} onClick={returnToDraft}>退回上一步</button>}
-      {admin && confirmed && hasPaymentHistory && <small className="meal-ticket-step-hint">已登记发放流水，请通过补扣或冲正处理。</small>}
-    </> },
+    { title: "导出充值表", text: "两列 XLS，导出待充值余额。", control: <button className="meal-ticket-button" disabled={busy} onClick={() => rechargeExport.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>前往导出</button> },
     { title: databaseEnabled ? "核实实际到账" : "登记充值", text: databaseEnabled ? "首次补贴、后续充值与取款由数据库自动核对。" : "实际充值成功后，登记金额与凭证。", control: <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={databaseEnabled ? () => settlement.current?.scrollIntoView({ behavior: "smooth", block: "start" }) : jumpToPeople}>{databaseEnabled ? "前往到账核对" : "登记实际充值"}</button> },
     { title: "核对结清", text: "按每个人的应发与已发金额检查结清。", control: <button className="meal-ticket-button" disabled={busy || !confirmed || (databaseEnabled && admin && !databaseReady)} onClick={checkSettlement}>重新核对</button> },
   ];
@@ -312,10 +309,17 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         {steps.map((step, index) => <li key={step.title} className={index === currentStep ? "is-current" : !paymentView && ((index === 0 && batch) || ((index === 1 || index === 2) && confirmed)) ? "is-complete" : ""} aria-current={index === currentStep ? "step" : undefined}>
           <div className="meal-ticket-step-heading"><span className="meal-ticket-step-number">{index + 1}</span><h2>{step.title}</h2></div>
           <p className="meal-ticket-step-description">{step.text}</p>
-          {!paymentView && index === 3 && <div className="meal-ticket-file-info"><span>XLS</span><small>员工编号 / 充值金额</small></div>}
           <div className="meal-ticket-step-action">{(paymentView || index === 3 || (index < 3 ? !confirmed && (index === 0 || batch) : confirmed && (index !== 4 || !settled))) && step.control}</div>
         </li>)}
       </ol>
+      {!paymentView && <section ref={rechargeExport} className="meal-ticket-export-toolbar" aria-label="充值表导出">
+        <div className="meal-ticket-export-summary"><strong>充值表导出</strong><div className="meal-ticket-file-info"><span>XLS</span><small>员工编号 / 充值金额 · 不受列表筛选影响</small></div></div>
+        <div className="meal-ticket-actions meal-ticket-export-actions">
+          {confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button>}
+          {admin && confirmed && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory} onClick={returnToDraft}>退回上一步</button>}
+        </div>
+        {admin && confirmed && hasPaymentHistory && <p className="meal-ticket-export-hint">已登记发放流水，请通过补扣或冲正处理。</p>}
+      </section>}
     </div>}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
     {busy && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
