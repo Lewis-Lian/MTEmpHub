@@ -9,9 +9,11 @@ depends_on = None
 
 
 def upgrade():
+    existing_columns = {column['name'] for column in sa.inspect(op.get_bind()).get_columns('overtime_records')}
     with op.batch_alter_table('overtime_records') as batch:
         for name in ('is_revoked', 'is_manual_edited'):
-            batch.add_column(sa.Column(name, sa.Boolean(), nullable=False, server_default=sa.false()))
+            if name not in existing_columns:
+                batch.add_column(sa.Column(name, sa.Boolean(), nullable=False, server_default=sa.false()))
 
 
 def downgrade():
