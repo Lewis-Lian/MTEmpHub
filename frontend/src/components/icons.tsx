@@ -85,6 +85,14 @@ export const CalendarIcon = icon(
   "M3 5h14v11a1 1 0 01-1 1H4a1 1 0 01-1-1V5zM3 9h14M7 3v3M13 3v3"
 );
 
+export const CalculatorIcon = icon(
+  "M5 2.5h10a1 1 0 011 1v13a1 1 0 01-1 1H5a1 1 0 01-1-1v-13a1 1 0 011-1zM7 5h6v3H7zM7 11h.5M12.5 11h.5M7 14h.5M12.5 14h.5"
+);
+
+export const PaymentCardIcon = icon(
+  "M3 4.5h14a1 1 0 011 1v9a1 1 0 01-1 1H3a1 1 0 01-1-1v-9a1 1 0 011-1zM2 8h16M5 12h3M13 11v3M11.5 12.5h3"
+);
+
 export const DownloadIcon = icon(
   "M10 3v10M6 9l4 4 4-4M3 15v2h14v-2"
 );
@@ -150,6 +158,9 @@ const moduleIconMap: Record<string, React.FC<IconProps>> = {
 /* ── 页面 entry key → 图标映射 ── */
 
 const entryIconMap: Record<string, React.FC<IconProps>> = {
+  meal_ticket_calculation: CalculatorIcon,
+  meal_ticket_payments: PaymentCardIcon,
+  meal_ticket_history: LedgerBookIcon,
   query_home: HomeIcon,
   individual_attendance: UserCheckIcon,
   employee_dashboard: BarChartIcon,

@@ -1339,7 +1339,7 @@ describe("App smoke regression", () => {
       const path = normalizePath(input);
       if (path === "/api/query/navigation") return Promise.resolve(jsonResponse({ modules: [
         { slug: "meal-tickets", label: "菜票中心", home_href: "/meal-tickets/calculation",
-          entries: [{ key: "meal_ticket_calculation", label: "月度核算", href: "/meal-tickets/calculation" }] },
+          entries: [{ key: "meal_ticket_calculation", label: "月度发放", href: "/meal-tickets/calculation" }] },
         { slug: "query", label: "查询中心", home_href: "/employee/individual-attendance",
           entries: [{ key: "individual_attendance", label: "个人考勤查询", href: "/employee/individual-attendance" }] },
       ] }));
@@ -1360,7 +1360,7 @@ describe("App smoke regression", () => {
     fireEvent.click(screen.getByRole("link", { name: "查看考勤依据" }));
     expect(await screen.findByRole("tab", { name: "个人考勤查询" })).toHaveAttribute("aria-selected", "true");
     expect(window.location.search).toBe("?emp_id=1&month=2026-05");
-    fireEvent.click(screen.getByRole("tab", { name: "月度核算" }));
+    fireEvent.click(screen.getByRole("tab", { name: "月度发放" }));
     expect(screen.getByLabelText("计划充值月份")).toHaveValue("2026-06");
     expect(screen.getByPlaceholderText("输入工号或姓名")).toHaveValue("E001");
     expect(screen.getByRole("dialog", { name: "菜票明细" })).toBeInTheDocument();

@@ -67,6 +67,23 @@
 .meal-ticket-button:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
 .meal-ticket-button:focus-visible { outline: 2px solid var(--ent-blue); outline-offset: 3px; }
 .meal-ticket-export { margin-left: auto; }
+.meal-ticket-workflow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+.meal-ticket-workflow > li { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 20px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius-lg); background: var(--ent-bg); box-shadow: var(--ent-shadow-card); }
+.meal-ticket-step-number { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--ent-secondary-bg); color: var(--ent-text-tertiary); font-size: 12px; font-weight: 700; }
+.meal-ticket-workflow h2 { margin: 0; font-size: 16px; }
+.meal-ticket-workflow p { flex: 1; margin: 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.8; }
+.meal-ticket-workflow .meal-ticket-button { min-height: 32px; max-width: 100%; padding: 6px 10px; font-size: 12px; }
+.meal-ticket-workflow > .is-current { border-color: var(--ent-blue); background: linear-gradient(135deg, var(--ent-blue-light), var(--ent-bg)); }
+.meal-ticket-workflow > .is-current .meal-ticket-step-number { background: var(--ent-blue); color: #fff; }
+.meal-ticket-workflow > .is-complete .meal-ticket-step-number { background: rgba(5, 150, 105, .1); color: #047857; }
+.meal-ticket-settlement { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-left: 4px solid #d97706; scroll-margin-top: 20px; }
+.meal-ticket-settlement h2 { margin: 8px 0; font-size: 19px; }
+.meal-ticket-settlement p { margin: 5px 0 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.8; }
+.meal-ticket-settlement .meal-ticket-eyebrow { color: var(--ent-text-tertiary); font-size: 11px; font-weight: 600; }
+.meal-ticket-settlement.is-settled { border-left-color: #059669; background: linear-gradient(110deg, rgba(5, 150, 105, .06), var(--ent-bg)); }
+.meal-ticket-settlement.is-settled h2 { color: #047857; }
+.meal-ticket-page section[aria-label="人员明细"] { scroll-margin-top: 20px; }
+.meal-ticket-empty .meal-ticket-button { margin-top: 20px; }
 .meal-ticket-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .meal-ticket-stat { padding: 22px 24px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius-lg); background: var(--ent-bg); box-shadow: var(--ent-shadow-card); }
 .meal-ticket-stat > span { color: var(--ent-text-secondary); font-size: 13px; font-weight: 600; }
@@ -94,7 +111,16 @@
 .meal-ticket-badge.is-danger { background: rgba(225, 29, 72, .1); color: #be123c; }
 .meal-ticket-alert { margin: 0; padding: 12px 16px; border: 1px solid rgba(217, 119, 6, .25); border-radius: var(--ent-radius); background: rgba(217, 119, 6, .06); color: #b45309; font-size: 13px; line-height: 1.7; }
 .meal-ticket-alert.is-error { border-color: rgba(225, 29, 72, .25); background: rgba(225, 29, 72, .06); color: #be123c; }
-.meal-ticket-loading { margin: 0; color: var(--ent-blue); font-size: 13px; }
+.meal-ticket-loading { color: var(--ent-blue); background: linear-gradient(135deg, var(--ent-blue-light), var(--ent-bg)); font-size: 13px; }
+.meal-ticket-loading-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.meal-ticket-loading-heading > span { display: flex; align-items: center; gap: 9px; }
+.meal-ticket-loading-heading strong { flex-shrink: 0; font-size: 17px; font-variant-numeric: tabular-nums; }
+.meal-ticket-loading-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--ent-blue); box-shadow: 0 0 0 4px var(--ent-blue-light); }
+.meal-ticket-progress-track { height: 8px; overflow: hidden; margin-top: 16px; border-radius: 999px; background: var(--ent-border-strong); }
+.meal-ticket-progress-track > span { display: block; height: 100%; border-radius: inherit; background: var(--ent-blue); transition: width .2s ease; }
+.meal-ticket-progress-track.is-indeterminate > span { width: 35%; animation: meal-ticket-progress-wait 1.4s ease-in-out infinite; }
+.meal-ticket-loading p { margin: 10px 0 0; color: var(--ent-text-secondary); font-size: 12px; }
+@keyframes meal-ticket-progress-wait { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 .meal-ticket-empty { padding: 48px 24px; text-align: center; }
 .meal-ticket-empty h2 { margin: 0 0 10px; font-size: 17px; }
 .meal-ticket-empty p { margin: 0; color: var(--ent-text-secondary); font-size: 13px; line-height: 1.8; }
@@ -109,9 +135,14 @@
 .meal-ticket-modal a { color: var(--ent-blue); font-size: 13px; }
 .meal-ticket-modal form { display: flex; flex-direction: column; gap: 18px; }
 .meal-ticket-modal textarea { min-height: 96px; resize: vertical; }
+.meal-ticket-reason-presets { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.meal-ticket-reason-presets > span { color: var(--ent-text-secondary); font-size: 12px; }
+.meal-ticket-reason-presets .meal-ticket-button { min-height: 30px; padding: 4px 10px; border-radius: 999px; background: var(--ent-blue-light); color: var(--ent-blue); font-size: 12px; }
+.meal-ticket-modal .meal-ticket-reason-hint { margin: -10px 0 0; color: var(--ent-text-tertiary); font-size: 12px; }
 .meal-ticket-modal .meal-ticket-actions { justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--ent-border-strong); }
 [data-theme="dark"] .meal-ticket-page { color-scheme: dark; }
 [data-theme="dark"] .meal-ticket-stat.is-paid strong, [data-theme="dark"] .meal-ticket-badge.is-success { color: #34d399; }
+[data-theme="dark"] .meal-ticket-settlement.is-settled h2, [data-theme="dark"] .meal-ticket-workflow > .is-complete .meal-ticket-step-number { color: #34d399; }
 [data-theme="dark"] .meal-ticket-badge.is-warning, [data-theme="dark"] .meal-ticket-alert { color: #fbbf24; }
 [data-theme="dark"] .meal-ticket-badge.is-danger, [data-theme="dark"] .meal-ticket-alert.is-error { color: #fb7185; }
 @media (max-width: 900px) {
@@ -120,6 +151,9 @@
   .meal-ticket-export { margin-left: 0; }
 }
 @media (max-width: 600px) {
+  .meal-ticket-workflow { grid-template-columns: 1fr; gap: 10px; }
+  .meal-ticket-workflow > li { padding: 16px; }
+  .meal-ticket-settlement { flex-direction: column; align-items: flex-start; gap: 12px; }
   .meal-ticket-page { gap: 16px; padding: 16px 12px 28px; }
   .meal-ticket-heading h1 { font-size: 23px; }
   .meal-ticket-panel { padding: 16px; }
@@ -137,4 +171,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .meal-ticket-button, .meal-ticket-page input, .meal-ticket-page select, .meal-ticket-page textarea { transition: none; }
+  .meal-ticket-progress-track > span { transition: none; }
+  .meal-ticket-progress-track.is-indeterminate > span { animation: none; }
 }

@@ -129,8 +129,8 @@ MODULES: list[dict[str, Any]] = [
         "slug": "meal-tickets", "label": "菜票中心", "short_label": "菜票",
         "description": "核算次月菜票、登记充值并核对历史账。", "icon_key": "account-dashboard",
         "entries": [
-            {"key": "meal_ticket_calculation", "label": "月度核算", "href": "/meal-tickets/calculation", "permission_key": "meal_ticket_query"},
-            {"key": "meal_ticket_payments", "label": "充值与对账", "href": "/meal-tickets/payments", "permission_key": "meal_ticket_query"},
+            {"key": "meal_ticket_calculation", "label": "月度发放", "href": "/meal-tickets/calculation", "permission_key": "meal_ticket_query"},
+            {"key": "meal_ticket_payments", "label": "后续补扣与对账", "href": "/meal-tickets/payments", "permission_key": "meal_ticket_query"},
             {"key": "meal_ticket_history", "label": "历史台账", "href": "/meal-tickets/history", "admin_only": True},
         ],
     },
