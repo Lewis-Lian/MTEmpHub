@@ -46,6 +46,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [loadProgress, setLoadProgress] = useState<{ completed: number; total: number; text: string; label: string; phase?: boolean } | null>(null);
   const [error, setError] = useState("");
   const [reconciliationFailed, setReconciliationFailed] = useState(false);
+  const [refundSelected, setRefundSelected] = useState<number[]>([]);
   const [refundActions, setRefundActions] = useState<Record<string, string>>({});
   const [followupStage, setFollowupStage] = useState<"adjustments" | "payments" | "settlement">("adjustments");
   const [reconcileRange, setReconcileRange] = useState({ month: "", start: "", end: "" });
@@ -98,6 +99,11 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     name: item.name, dept_name: item.dept_name, is_manager: item.is_manager,
     dept_id: pickerDepartments.find(dept => dept.dept_name === item.dept_name)?.id ?? null })), [batch, pickerDepartments]);
 
+  useEffect(() => {
+    const pendingIds = new Set((batch?.reconciliation?.pending_refunds ?? []).map(row => row.id));
+    setRefundSelected(current => current.filter(id => pendingIds.has(id)));
+    setRefundActions(current => Object.fromEntries(Object.entries(current).filter(([id]) => pendingIds.has(Number(id)))));
+  }, [batch?.reconciliation]);
   useEffect(() => { setComparison([]); }, [preview]);
   useEffect(() => { setHistoryTab("person"); }, [preview?.id]);
   useEffect(() => {
@@ -113,7 +119,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     const controller = new AbortController();
     setBatch(null); setPreview(null); setAttendancePreview(null); setTarget(null); setDetail(null); setSelected([]); setError("");
     setSupplementReasons({});
-    setFilterEmployeeIds([]); setReconciliationFailed(false);
+    setFilterEmployeeIds([]); setReconciliationFailed(false); setRefundActions({}); setRefundSelected([]);
     setBusy(true); setAdmin(false); setPeople([]); setHistoryDepartments([]);
     let completed = 0;
     let total = 2;
@@ -392,7 +398,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         ? await mutateMealBatch("reconcile", { batch_id: batch?.id, version: batch?.version, start_date: rangeStart, end_date: rangeEnd, ...(actions && Object.keys(actions).length ? { refund_actions: actions } : {}) })
         : await fetchMealBatch(month);
       setBatch(next);
-      setRefundActions({});
+      setRefundActions({}); setRefundSelected([]);
       settlement.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       if (databaseEnabled && admin) setReconciliationFailed(true);
@@ -527,11 +533,27 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
             <span className={`meal-ticket-badge ${databaseReady ? "is-success" : "is-warning"}`}>{!databaseActive ? "数据库核对已暂停" : databaseReady ? "共享数据库已启用" : "共享数据库尚未配置"}</span>
           </div>
           <p className="meal-ticket-reconciliation-note">净已发 = 补贴发放 ＋ 充值 − 发放纠错扣回。新取款须确认分类，月末余额清零单独记录。跨月补发可延长结束日期，其他月份的补贴不会计入。</p>
-          {!!report?.pending_refunds?.length && <div className="meal-ticket-reconciliation-pending-refunds"><h3>取款流水待分类</h3><p>请选择实际用途，未分类流水尚未计入扣回或清零。</p>
-            {report.pending_refunds.map(row => <label key={row.id}>{row.date} · {row.emp_no} {row.name} · {money(row.amount)} 元 <select aria-label={`流水 ${row.id} 分类`} value={refundActions[String(row.id)] ?? ""} disabled={busy || !admin} onChange={e => setRefundActions(current => ({ ...current, [row.id]: e.target.value }))}>
-              <option value="">待确认</option><option value="refund">发放纠错扣回</option><option value="clearance">月末余额清零</option>
-            </select></label>)}
-            {admin && <button className="meal-ticket-button is-primary" disabled={busy || !databaseReady || !report.pending_refunds.every(row => refundActions[String(row.id)])} onClick={() => checkSettlement(refundActions)}>确认分类并重新核对</button>}
+          {!!report?.pending_refunds?.length && <div className="meal-ticket-reconciliation-pending-refunds">
+            <div className="meal-ticket-refund-header"><div><h3>取款流水待分类</h3><p>按实际用途分类，确认后计入扣回或清零。</p></div>
+              <span className="meal-ticket-badge is-warning">{report.pending_refunds.length} 条 · {money(report.pending_refunds.reduce((sum, row) => sum + row.amount, 0))} 元</span>
+            </div>
+            {admin && <div className="meal-ticket-refund-toolbar">
+              <span>已选 {refundSelected.length} 条 · {money(report.pending_refunds.filter(row => refundSelected.includes(row.id)).reduce((sum, row) => sum + row.amount, 0))} 元</span>
+              <div>{[['refund', '发放纠错扣回'], ['clearance', '月末余额清零']].map(([value, label]) => <button key={value} className="meal-ticket-button" aria-label={`批量设为${label}`} disabled={busy || !refundSelected.length} onClick={() => setRefundActions(current => ({ ...current, ...Object.fromEntries(refundSelected.map(id => [id, value])) }))}>设为{label}</button>)}</div>
+            </div>}
+            <div className="meal-ticket-refund-table-wrap"><table className="meal-ticket-refund-table" aria-label="待分类取款流水">
+              <thead><tr>{admin && <th className="meal-ticket-refund-check"><input type="checkbox" aria-label="全选待分类流水" disabled={busy} checked={refundSelected.length === report.pending_refunds.length} ref={node => { if (node) node.indeterminate = refundSelected.length > 0 && refundSelected.length < report.pending_refunds!.length; }} onChange={e => setRefundSelected(e.target.checked ? report.pending_refunds!.map(row => row.id) : [])} /></th>}<th>日期</th><th>工号</th><th>姓名</th><th className="is-amount">取款金额（元）</th><th>用途分类</th></tr></thead>
+              <tbody>{report.pending_refunds.map(row => <tr key={row.id} className={refundSelected.includes(row.id) ? 'is-selected' : ''}>
+                {admin && <td className="meal-ticket-refund-check"><input type="checkbox" aria-label={`选择流水 ${row.id}`} disabled={busy} checked={refundSelected.includes(row.id)} onChange={e => setRefundSelected(current => e.target.checked ? [...current, row.id] : current.filter(id => id !== row.id))} /></td>}
+                <td>{row.date}</td><td>{row.emp_no}</td><td>{row.name}</td><td className="is-amount">{money(row.amount)}</td>
+                <td><select aria-label={`流水 ${row.id} 分类`} className={refundActions[String(row.id)] ? 'is-classified' : ''} value={refundActions[String(row.id)] ?? ''} disabled={busy || !admin} onChange={e => setRefundActions(current => ({ ...current, [row.id]: e.target.value }))}>
+                  <option value="">待确认</option><option value="refund">发放纠错扣回</option><option value="clearance">月末余额清零</option>
+                </select></td>
+              </tr>)}</tbody>
+            </table></div>
+            <div className="meal-ticket-refund-footer"><p>已分类 {report.pending_refunds.filter(row => refundActions[String(row.id)]).length} / {report.pending_refunds.length} 条</p>
+              {admin && <button className="meal-ticket-button is-primary" disabled={busy || !databaseReady || !report.pending_refunds.every(row => refundActions[String(row.id)])} onClick={() => checkSettlement(refundActions)}>确认分类并重新核对</button>}
+            </div>
           </div>}
           {!databaseReady && admin && <p className="meal-ticket-reconciliation-note">{!databaseActive ? "请在“数据来源与同步”中重新开启菜票数据库核对。已有数据库流水的账目通过数据库继续核对。" : "请在“数据来源与同步”中配置共享数据库连接后核对。"}</p>}
           {reconciliationFailed && <p className="meal-ticket-reconciliation-note">本次核对未完成，金额保留上次登记结果，请排查后重试。</p>}

@@ -278,3 +278,44 @@ it('后续补扣保存成功仍停留调整阶段，切换月份重新从第一�
   await screen.findByText('员工甲');
   expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
 });
+it('多选流水批量分类，未选流水保持原分类，全选支持取消', async () => {
+  const pending_refunds = [12, 13, 14].map((id, index) => ({id, emp_no: `00${index + 1}`, name: `员工${index + 1}`, date: '2026-09-30', amount: 20}));
+  request.mockImplementation((path: string) => Promise.resolve(path === '/api/auth/me' ? {role:'admin'} : {...batch, reconciliation: {checked_at:'2026-10-08T16:00:00',start_date:'2026-09-01',end_date:'2026-09-30',added:0,existing:0,unmatched:0,zero_amount:0,outside_subsidy_month:0,sources:{subsidy:0,recharge:0,refund:0},pending_refunds}}));
+  page();
+  fireEvent.click(await screen.findByLabelText('选择流水 12'));
+  fireEvent.click(screen.getByLabelText('选择流水 13'));
+  expect(screen.getByText('已选 2 条 · 40.00 元')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'批量设为月末余额清零'}));
+  expect(screen.getByLabelText('流水 12 分类')).toHaveValue('clearance');
+  expect(screen.getByLabelText('流水 13 分类')).toHaveValue('clearance');
+  expect(screen.getByLabelText('流水 14 分类')).toHaveValue('');
+  expect(screen.getByRole('button',{name:'确认分类并重新核对'})).toBeDisabled();
+  const all = screen.getByLabelText('全选待分类流水');
+  expect(all).toBePartiallyChecked();
+  fireEvent.click(all);
+  expect(screen.getByText('已选 3 条 · 60.00 元')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button',{name:'批量设为发放纠错扣回'}));
+  expect(screen.getByLabelText('流水 14 分类')).toHaveValue('refund');
+  expect(screen.getByRole('button',{name:'确认分类并重新核对'})).toBeEnabled();
+  fireEvent.click(all);
+  expect(screen.getByRole('button',{name:'批量设为发放纠错扣回'})).toBeDisabled();
+});
+it('同月刷新移除已处理流水的选择和分类', async () => {
+  const rows = [12, 13].map(id => ({id,emp_no:'001',name:'员工甲',date:'2026-09-30',amount:20}));
+  let refreshed = false;
+  request.mockImplementation((path:string) => Promise.resolve(path === '/api/auth/me' ? {role:'admin'} : {...batch,reconciliation:{checked_at:'2026-10-08T16:00:00',start_date:'2026-09-01',end_date:'2026-09-30',added:0,existing:0,unmatched:0,zero_amount:0,outside_subsidy_month:0,sources:{subsidy:0,recharge:0,refund:0},pending_refunds:refreshed ? rows.slice(1) : rows}}));
+  function Navigation() {
+    const navigate = useNavigate();
+    return <button onClick={() => { refreshed = true; navigate('/meal-tickets/calculation?recharge_month=2026-09&refresh=1'); }}>刷新本月</button>;
+  }
+  render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><Navigation/><MealTicketPage/></MemoryRouter></ConfirmProvider>);
+  fireEvent.click(await screen.findByLabelText('选择流水 12'));
+  fireEvent.click(screen.getByRole('button',{name:'批量设为月末余额清零'}));
+  fireEvent.click(screen.getByRole('button',{name:'刷新本月'}));
+  await waitFor(() => expect(screen.queryByLabelText('选择流水 12')).not.toBeInTheDocument());
+  expect(screen.getByLabelText('全选待分类流水')).not.toBeChecked();
+  expect(screen.getByText('已选 0 条 · 0.00 元')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('流水 13 分类'),{target:{value:'refund'}});
+  fireEvent.click(screen.getByRole('button',{name:'确认分类并重新核对'}));
+  await waitFor(() => expect(request).toHaveBeenCalledWith('/api/meal-tickets/reconcile',expect.objectContaining({body:expect.objectContaining({refund_actions:{13:'refund'}})})));
+});
