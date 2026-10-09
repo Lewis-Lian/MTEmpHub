@@ -36,6 +36,7 @@ export interface MealImportRow {
   id: number; sheet: string; row: number; kind: string; emp_no: string; name: string; dept_name: string;
   emp_id: number | null; amount: number | null; error: string; skip: boolean; correction_reason: string;
   period_conflict: string; period_confirmed: boolean;
+  original_amount?: number | null; original_dept_name?: string; original_emp_id?: number | null;
 }
 export interface MealImport {
   id: number; filename: string; month: string; recharge_month: string; status: string; rows: MealImportRow[];

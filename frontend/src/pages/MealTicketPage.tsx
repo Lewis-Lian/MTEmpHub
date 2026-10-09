@@ -70,6 +70,12 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [monthKind, setMonthKind] = useState("recharge");
   const [file, setFile] = useState<File | null>(null);
   const [people, setPeople] = useState<Array<{ id: number; emp_no: string; name: string }>>([]);
+  const [historyDepartments, setHistoryDepartments] = useState<string[]>([]);
+  const [importIssuesOnly, setImportIssuesOnly] = useState(false);
+  const [importSelected, setImportSelected] = useState<number[]>([]);
+  const [importDepartment, setImportDepartment] = useState("");
+  const [importCustomDepartment, setImportCustomDepartment] = useState("");
+  const [importReason, setImportReason] = useState("");
   const generation = useRef(0);
   const requestKeys = useRef<Record<number, string>>({});
   const personnel = useRef<HTMLElement>(null);
@@ -90,6 +96,9 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     dept_id: pickerDepartments.find(dept => dept.dept_name === item.dept_name)?.id ?? null })), [batch, pickerDepartments]);
 
   useEffect(() => { setComparison([]); }, [preview]);
+  useEffect(() => {
+    setImportIssuesOnly(false); setImportSelected([]); setImportDepartment(""); setImportCustomDepartment(""); setImportReason("");
+  }, [preview?.id, preview?.status]);
   useEffect(() => { setFollowupStage("adjustments"); }, [month, view]);
   useEffect(() => {
     if (paymentView && followupStage === "settlement") settlement.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -100,7 +109,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     const controller = new AbortController();
     setBatch(null); setPreview(null); setAttendancePreview(null); setTarget(null); setDetail(null); setSelected([]); setError("");
     setFilterEmployeeIds([]); setReconciliationFailed(false);
-    setBusy(true); setAdmin(false); setPeople([]);
+    setBusy(true); setAdmin(false); setPeople([]); setHistoryDepartments([]);
     let completed = 0;
     let total = 2;
     let permissionsReady = false;
@@ -117,9 +126,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       completed += 1;
       updateProgress(historical ? "正在读取历史台账与人员名单" : "正在读取月度核算数据");
       if (historical && user.role === "admin") {
-        const result = await apiRequest<Array<{ id: number; emp_no: string; name: string }>>("/api/admin/employees?status=all");
+        const [result, departments] = await Promise.all([
+          apiRequest<Array<{ id: number; emp_no: string; name: string }>>("/api/admin/employees?status=all"),
+          apiRequest<Array<{ dept_name: string }>>("/api/admin/departments"),
+        ]);
         if (id !== generation.current) return;
         setPeople(result); completed += 1;
+        setHistoryDepartments([...new Set(["未分配部门", ...departments.map(row => row.dept_name).filter(name => typeof name === "string")])]);
         updateProgress("人员名单已读取，正在完成历史台账加载");
       }
     });
@@ -263,6 +276,42 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   function editRow(id: number, values: Partial<MealImportRow>) {
     setPreview(p => p && { ...p, rows: p.rows.map(r => r.id === id ? { ...r, ...values } : r) });
   }
+  function editSelectedImportRows(values: Partial<MealImportRow>) {
+    setPreview(p => p && { ...p, rows: p.rows.map(row => importSelected.includes(row.id) ? { ...row, ...values } : row) });
+  }
+  const importIssues = useMemo(() => {
+    const issues = new Map<number, string[]>();
+    if (!preview || preview.status !== "preview") return issues;
+    const employeeIds = new Set(people.map(person => person.id));
+    const existingIds = new Set(imports.filter(record => record.id !== preview.id && record.month === preview.month && record.status === "confirmed")
+      .flatMap(record => record.rows.filter(row => row.kind === "person" && !row.skip).map(row => row.emp_id)));
+    const counts = new Map<number, number>();
+    for (const row of preview.rows) {
+      if (row.kind === "person" && !row.skip && row.emp_id !== null) counts.set(row.emp_id, (counts.get(row.emp_id) ?? 0) + 1);
+    }
+    for (const row of preview.rows) {
+      const messages: string[] = [];
+      if (!row.skip) {
+        if (!row.dept_name.trim() || row.dept_name.trim().length > 100) messages.push("请填写部门名称，最多 100 字");
+        if (row.kind === "person" && (row.emp_id === null || !employeeIds.has(row.emp_id))) messages.push("人员未匹配，请选择人员");
+        if (row.amount === null || !Number.isFinite(row.amount) || Math.abs(row.amount) > 10000000 || Math.abs(row.amount * 100 - Math.round(row.amount * 100)) > .000001) messages.push("金额缺失或无效，最多两位小数");
+        if (row.kind === "person" && row.emp_id !== null && ((counts.get(row.emp_id) ?? 0) > 1 || existingIds.has(row.emp_id))) messages.push("同月人员重复，请核对后跳过重复行");
+        if (row.period_conflict && !row.period_confirmed) messages.push(row.period_conflict);
+        const changed = (row.original_amount !== undefined && row.amount !== row.original_amount)
+          || (row.original_dept_name !== undefined && row.dept_name !== row.original_dept_name)
+          || (row.kind === "person" && row.original_emp_id !== undefined && row.emp_id !== row.original_emp_id)
+          || Boolean(row.period_conflict && row.period_confirmed);
+        if (changed && !row.correction_reason.trim()) messages.push("请填写更正说明");
+        if (row.correction_reason.length > 500) messages.push("更正说明不能超过 500 字");
+      }
+      issues.set(row.id, messages);
+    }
+    return issues;
+  }, [preview, people, imports]);
+  const importRows = preview?.rows.filter(row => !importIssuesOnly || Boolean(importIssues.get(row.id)?.length)) ?? [];
+  const importIssueCount = [...importIssues.values()].filter(messages => messages.length > 0).length;
+  const allImportSelected = importRows.length > 0 && importRows.every(row => importSelected.includes(row.id));
+  const importDepartmentValue = importDepartment === "__historical__" ? importCustomDepartment.trim() : importDepartment;
   function confirmPeriod() {
     setPreview(p => p && {
       ...p,
@@ -582,13 +631,39 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         <p>人员原账 {money(preview.person_total)} 元 · 部门原账 {money(preview.department_total)} 元</p>
         {preview.status === "preview" && preview.rows.some(r => r.period_conflict && !r.period_confirmed && !r.skip) && <div className="meal-ticket-alert"><p>文件或页内年月与所选月份不一致，请核对上方考勤月和充值月。</p>
           <button className="meal-ticket-button" onClick={confirmPeriod}>已核对年月差异，按所选月份归档</button></div>}
-        <QueryTable headers={["页 / 行","类型","原工号 / 姓名","人员映射","部门","金额","核对说明","更正说明","跳过"]}
-          rows={preview.rows.map(r => [ `${r.sheet} / ${r.row}`,r.kind === "person" ? "人员" : "部门汇总",`${r.emp_no} ${r.name}`,
-            r.kind === "person" ? <select aria-label={`人员映射 ${r.id}`} disabled={preview.status === "confirmed"} value={r.emp_id ?? ""} onChange={e => editRow(r.id,{emp_id:Number(e.target.value) || null})}><option value="">未匹配</option>{people.map(p => <option key={p.id} value={p.id}>{p.emp_no} {p.name}</option>)}</select> : "—",
-            <input aria-label={`部门 ${r.id}`} disabled={preview.status === "confirmed"} value={r.dept_name} onChange={e => editRow(r.id,{dept_name:e.target.value})} />,
-            <input aria-label={`金额 ${r.id}`} type="number" step="0.01" disabled={preview.status === "confirmed"} value={r.amount ?? ""} onChange={e => editRow(r.id,{amount:e.target.value === "" ? null : Number(e.target.value)})} />,
-            [r.error,r.period_conflict].filter(Boolean).join("；"),<input aria-label={`更正说明 ${r.id}`} disabled={preview.status === "confirmed"} value={r.correction_reason} onChange={e => editRow(r.id,{correction_reason:e.target.value})} />,
-            <input aria-label={`跳过 ${r.id}`} type="checkbox" disabled={preview.status === "confirmed"} checked={r.skip} onChange={e => editRow(r.id,{skip:e.target.checked})} /> ])} />
+        {preview.status === "preview" && <>
+          <div className="meal-ticket-actions">
+            <button className="meal-ticket-button" aria-pressed={importIssuesOnly} onClick={() => setImportIssuesOnly(true)}>仅看问题行</button>
+            <button className="meal-ticket-button" aria-pressed={!importIssuesOnly} onClick={() => setImportIssuesOnly(false)}>显示全部</button>
+            <span>问题 {importIssueCount} 行 · 显示 {importRows.length} / {preview.rows.length} 行</span>
+          </div>
+          <div className="meal-ticket-toolbar">
+            <label>批量设置部门<select disabled={busy} value={importDepartment} onChange={e => setImportDepartment(e.target.value)}><option value="">请选择部门</option>{historyDepartments.map(name => <option key={name} value={name}>{name}</option>)}<option value="__historical__">填写历史部门（仅此原账）</option></select></label>
+            {importDepartment === "__historical__" && <label>批量历史部门名称<input disabled={busy} maxLength={100} value={importCustomDepartment} onChange={e => setImportCustomDepartment(e.target.value)} /></label>}
+            <label>批量更正说明<input disabled={busy} maxLength={500} value={importReason} onChange={e => setImportReason(e.target.value)} /></label>
+          </div>
+          <div className="meal-ticket-selection-bar">
+            <span>已选 {importSelected.length} 行；全选作用于当前筛选全部行，可跨页选择。</span>
+            <button className="meal-ticket-button" disabled={busy || !importSelected.length || !importDepartmentValue || !importReason.trim()} onClick={() => editSelectedImportRows({ dept_name: importDepartmentValue, correction_reason: importReason })}>批量设置部门</button>
+            <button className="meal-ticket-button" disabled={busy || !importSelected.length || !importReason.trim()} onClick={() => editSelectedImportRows({ correction_reason: importReason })}>批量填写说明</button>
+            <button className="meal-ticket-button" disabled={busy || !importSelected.length} onClick={() => editSelectedImportRows({ skip: true })}>批量跳过</button>
+            <button className="meal-ticket-button" disabled={busy || !importSelected.length} onClick={() => editSelectedImportRows({ skip: false })}>批量恢复</button>
+            <button className="meal-ticket-button" disabled={busy || !importSelected.length} onClick={() => setImportSelected([])}>清空选择</button>
+          </div>
+        </>}
+        <QueryTable paginationKey={JSON.stringify([preview.id, importIssuesOnly])} emptyText={importIssuesOnly ? "当前没有需要处理的问题行" : "当前没有导入行"}
+          headers={[...(preview.status === "preview" ? [{ label: <input type="checkbox" aria-label="全选导入筛选结果" disabled={busy || !importRows.length} checked={allImportSelected}
+            ref={node => { if (node) node.indeterminate = !allImportSelected && importRows.some(row => importSelected.includes(row.id)); }}
+            onChange={e => setImportSelected(current => e.target.checked ? [...new Set([...current, ...importRows.map(row => row.id)])] : current.filter(id => !importRows.some(row => row.id === id)))} />, sortable: false }] : []), "页 / 行","类型","原工号 / 姓名","人员映射","部门","金额","核对说明","更正说明","跳过"]}
+          rows={importRows.map(r => [ ...(preview.status === "preview" ? [<input type="checkbox" aria-label={`选择导入行 ${r.id}`} disabled={busy} checked={importSelected.includes(r.id)} onChange={e => setImportSelected(current => e.target.checked ? [...current, r.id] : current.filter(id => id !== r.id))} />] : []), `${r.sheet} / ${r.row}`,r.kind === "person" ? "人员" : "部门汇总",`${r.emp_no} ${r.name}`,
+            r.kind === "person" ? <select aria-label={`人员映射 ${r.id}`} disabled={busy || preview.status === "confirmed"} value={r.emp_id ?? ""} onChange={e => editRow(r.id,{emp_id:Number(e.target.value) || null})}><option value="">未匹配</option>{people.map(p => <option key={p.id} value={p.id}>{p.emp_no} {p.name}</option>)}</select> : "—",
+            <div><select aria-label={`部门 ${r.id}`} disabled={busy || preview.status === "confirmed"} value={historyDepartments.includes(r.dept_name) ? r.dept_name : "__historical__"} onChange={e => editRow(r.id,{dept_name:e.target.value === "__historical__" ? "" : e.target.value})}>
+              {historyDepartments.map(name => <option key={name} value={name}>{name}</option>)}
+              <option value="__historical__">填写历史部门（仅此原账）</option>
+            </select>{!historyDepartments.includes(r.dept_name) && <input aria-label={`历史部门名称 ${r.id}`} maxLength={100} disabled={busy || preview.status === "confirmed"} value={r.dept_name} placeholder="填写历史部门名称" onChange={e => editRow(r.id,{dept_name:e.target.value})} />}</div>,
+            <input aria-label={`金额 ${r.id}`} type="number" step="0.01" disabled={busy || preview.status === "confirmed"} value={r.amount ?? ""} onChange={e => editRow(r.id,{amount:e.target.value === "" ? null : Number(e.target.value)})} />,
+            preview.status === "preview" ? importIssues.get(r.id)?.join("；") || (r.skip ? "已跳过" : "核对通过") : [r.error,r.period_conflict].filter(Boolean).join("；"),<input aria-label={`更正说明 ${r.id}`} maxLength={500} disabled={busy || preview.status === "confirmed"} value={r.correction_reason} onChange={e => editRow(r.id,{correction_reason:e.target.value})} />,
+            <input aria-label={`跳过 ${r.id}`} type="checkbox" disabled={busy || preview.status === "confirmed"} checked={r.skip} onChange={e => editRow(r.id,{skip:e.target.checked})} /> ])} />
         {preview.status === "preview" && <div className="meal-ticket-actions">
           <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => { setPreview(await confirmMealImport(preview)); setImports(await fetchMealImports()); })}>确认导入原账</button>
           <button className="meal-ticket-button" disabled={busy} onClick={() => operate(async () => {

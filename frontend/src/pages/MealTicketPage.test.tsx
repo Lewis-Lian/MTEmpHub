@@ -711,6 +711,119 @@ describe("菜票中心", () => {
     expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
   });
 
+  it("历史导入筛出所有类型的问题，修正后实时移出问题列表", async () => {
+    const row = { id: 1, sheet: "员工充值", row: 2, kind: "person", emp_no: "001", name: "正常人员", emp_id: 1,
+      dept_name: "生产部", original_dept_name: "生产部", amount: 176, original_amount: 176, original_emp_id: 1,
+      error: "", skip: false, correction_reason: "", period_conflict: "", period_confirmed: false };
+    const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      person_total: 176, department_total: 0, departments: [], rows: [row,
+        { ...row, id: 2, kind: "department", name: "部门问题", dept_name: "", original_dept_name: "", error: "部门未匹配，请核对部门名称" },
+        { ...row, id: 3, emp_no: "003", name: "人员问题", emp_id: null, original_emp_id: null },
+        { ...row, id: 4, kind: "department", name: "金额问题", amount: null, original_amount: null },
+        { ...row, id: 5, kind: "department", name: "年月问题", period_conflict: "年月不一致" },
+        { ...row, id: 6, kind: "department", name: "说明问题", amount: 180 },
+        { ...row, id: 7, emp_id: 2, original_emp_id: 2, name: "重复甲" },
+        { ...row, id: 8, emp_id: 2, original_emp_id: 2, name: "重复乙" },
+        { ...row, id: 10, emp_id: 3, original_emp_id: 3, name: "历史重复" },
+        { ...row, id: 11, kind: "department", name: "已跳过问题", dept_name: "旧部门", skip: true }] };
+    const previous = { ...history, id: 8, status: "confirmed", rows: [{ ...row, id: 12, emp_id: 3 }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
+      : path === "/api/admin/employees?status=all" ? [1, 2, 3].map(id => ({ id, emp_no: String(id), name: `人员${id}` }))
+      : path === "/api/admin/departments" ? [{ dept_name: "生产部" }] : [history, previous]));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click((await screen.findAllByRole("button", { name: "查看" }))[0]);
+    expect(screen.getByRole("combobox", { name: "部门 2" })).toHaveValue("__historical__");
+    fireEvent.click(screen.getByRole("button", { name: "仅看问题行" }));
+    expect(screen.queryByLabelText("部门 1")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("部门 11")).not.toBeInTheDocument();
+    for (const id of [2, 3, 4, 5, 6, 7, 8, 10]) expect(screen.getByLabelText(`部门 ${id}`)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("部门 2"), { target: { value: "生产部" } });
+    expect(screen.getByLabelText("部门 2")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("更正说明 2"), { target: { value: "部门名称更正" } });
+    expect(screen.queryByLabelText("部门 2")).not.toBeInTheDocument();
+  });
+
+  it("历史导入多选只处理选中行，筛选后确认仍提交全部行", async () => {
+    const row = { id: 1, sheet: "充值", row: 2, kind: "department", emp_no: "", name: "部门一", emp_id: null,
+      dept_name: "", original_dept_name: "", amount: 176, original_amount: 176, error: "部门未匹配，请核对部门名称",
+      skip: false, correction_reason: "", period_conflict: "", period_confirmed: false };
+    const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      person_total: 0, department_total: 528, departments: [], rows: [row, { ...row, id: 2, name: "部门二" },
+        { ...row, id: 3, name: "正常部门", dept_name: "生产部", original_dept_name: "生产部", error: "" }] };
+    request.mockImplementation((path: string, options?: { body?: { rows: typeof history.rows } }) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
+      : path === "/api/admin/employees?status=all" ? []
+      : path === "/api/admin/departments" ? [{ dept_name: "生产部" }]
+      : path.endsWith("/confirm") ? { ...history, status: "confirmed", rows: options!.body!.rows } : [history]));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    fireEvent.click(screen.getByRole("button", { name: "仅看问题行" }));
+    fireEvent.click(screen.getByLabelText("全选导入筛选结果"));
+    fireEvent.change(screen.getByLabelText("批量设置部门"), { target: { value: "生产部" } });
+    fireEvent.change(screen.getByLabelText("批量更正说明"), { target: { value: "旧部门映射到生产部" } });
+    fireEvent.click(screen.getByRole("button", { name: "批量设置部门" }));
+    expect(screen.queryByLabelText("部门 1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "批量跳过" }));
+    fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    expect(screen.getByLabelText("跳过 1")).toBeChecked();
+    expect(screen.getByLabelText("跳过 2")).toBeChecked();
+    expect(screen.getByLabelText("跳过 3")).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "批量恢复" }));
+    expect(screen.getByLabelText("跳过 1")).not.toBeChecked();
+    fireEvent.click(screen.getByRole("button", { name: "仅看问题行" }));
+    fireEvent.click(screen.getByRole("button", { name: "确认导入原账" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "确认导入原账" })).not.toBeInTheDocument());
+    expect(request).toHaveBeenCalledWith("/api/meal-tickets/imports/9/confirm", expect.objectContaining({ body: { rows: [
+      { ...row, dept_name: "生产部", correction_reason: "旧部门映射到生产部" },
+      { ...row, id: 2, name: "部门二", dept_name: "生产部", correction_reason: "旧部门映射到生产部" }, history.rows[2]] } }));
+    expect(screen.queryByLabelText("全选导入筛选结果")).not.toBeInTheDocument();
+  });
+
+  it("历史导入全选筛选结果可跨页批量处理，不影响筛选外的正常行", async () => {
+    const rows = Array.from({ length: 102 }, (_, index) => ({ id: index + 1, sheet: "充值", row: index + 2,
+      kind: "department", emp_no: "", name: `部门${index + 1}`, emp_id: null, dept_name: "生产部", amount: index === 101 ? 176 : null,
+      original_amount: index === 101 ? 176 : null, original_dept_name: "生产部", error: "", skip: false,
+      correction_reason: "", period_conflict: "", period_confirmed: false }));
+    const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      person_total: 0, department_total: 176, departments: [], rows };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
+      : path === "/api/admin/employees?status=all" ? [] : path === "/api/admin/departments" ? [{ dept_name: "生产部" }] : [history]));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    fireEvent.click(screen.getByRole("button", { name: "仅看问题行" }));
+    fireEvent.click(screen.getByLabelText("全选导入筛选结果"));
+    expect(screen.getByText(/已选 101 行/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "批量跳过" }));
+    expect(screen.getByText("当前没有需要处理的问题行")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    const tablePanel = screen.getByLabelText("全选导入筛选结果").closest<HTMLElement>(".legacy-table-panel")!;
+    fireEvent.click(within(tablePanel).getByRole("button", { name: "下一页" }));
+    expect(screen.getByLabelText("跳过 101")).toBeChecked();
+    expect(screen.getByLabelText("跳过 102")).not.toBeChecked();
+  });
+
+  it("历史部门可单独填写，不加入系统部门且有效旧部门不算问题", async () => {
+    const row = { id: 1, sheet: "充值", row: 2, kind: "department", emp_no: "", name: "历史部门", emp_id: null,
+      dept_name: "旧车间", original_dept_name: "旧车间", amount: 176, original_amount: 176,
+      error: "部门未匹配，请核对部门名称", skip: false, correction_reason: "", period_conflict: "", period_confirmed: false };
+    const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      person_total: 0, department_total: 176, departments: [], rows: [row] };
+    request.mockImplementation((path: string, options?: { body?: { rows: typeof history.rows } }) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
+      : path === "/api/admin/employees?status=all" ? [] : path === "/api/admin/departments" ? [{ dept_name: "生产部" }]
+      : path.endsWith("/confirm") ? { ...history, status: "confirmed", rows: options!.body!.rows } : [history]));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    expect(screen.getByLabelText("历史部门名称 1")).toHaveValue("旧车间");
+    fireEvent.click(screen.getByRole("button", { name: "仅看问题行" }));
+    expect(screen.queryByLabelText("部门 1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "显示全部" }));
+    fireEvent.change(screen.getByLabelText("历史部门名称 1"), { target: { value: "已撤销车间" } });
+    fireEvent.change(screen.getByLabelText("更正说明 1"), { target: { value: "按历史名称登记" } });
+    fireEvent.click(screen.getByRole("button", { name: "确认导入原账" }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "确认导入原账" })).not.toBeInTheDocument());
+    expect(request).toHaveBeenCalledWith("/api/meal-tickets/imports/9/confirm", expect.objectContaining({ body: { rows: [{ ...row, dept_name: "已撤销车间", correction_reason: "按历史名称登记" }] } }));
+    expect(request.mock.calls.some(([path, options]) => path === "/api/admin/departments" && options?.method === "POST")).toBe(false);
+  });
+
   it("历史原账按需读取试算，分别展示金额且不登记充值", async () => {
     const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "confirmed",
       rows: [], person_total: 180, department_total: 180, departments: [] };

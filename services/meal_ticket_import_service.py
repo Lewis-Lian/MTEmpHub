@@ -11,7 +11,6 @@ from openpyxl import load_workbook
 
 from models import db
 from models.employee import Employee
-from models.department import Department
 from models.system_setting import SystemSetting
 from models.meal_ticket import MealTicketImport, MealTicketImportRow
 from services.meal_ticket_service import MealError, cents, shift_month, required_text
@@ -44,7 +43,7 @@ def import_rows(record):
 
 
 def serialize_import(record):
-    rows = [{'id':row.id, **row.data, 'emp_id':row.emp_id} for row in import_rows(record)]
+    rows = [{'id':row.id, **row.data, 'emp_id':row.emp_id, 'original_emp_id':row.emp_id} for row in import_rows(record)]
     person_total = sum(row['amount'] or 0 for row in rows if row['kind'] == 'person' and not row.get('skip'))
     department_total = sum(row['amount'] or 0 for row in rows if row['kind'] == 'department' and not row.get('skip'))
     grouped = {}
@@ -84,7 +83,6 @@ def preview(payload, filename, month, month_kind, operator):
     except (ValueError, OSError, zipfile.BadZipFile, KeyError) as exc:
         raise MealError('工作簿无法读取') from exc
     people = {e.emp_no:e for e in Employee.query.all()}
-    departments = {d.dept_name for d in Department.query.all()} | {'未分配部门'}
     parsed = []
     try:
         for sheet in formulas:
@@ -141,8 +139,8 @@ def preview(payload, filename, month, month_kind, operator):
                     emp = people.get(emp_no)
                     if kind == 'person' and not emp:
                         error = error or '工号未匹配，请选择人员或跳过'
-                    if dept_name not in departments:
-                        error = error or '部门未匹配，请核对部门名称'
+                    if len(dept_name) > 100:
+                        error = error or '历史部门名称不能超过 100 字'
                     name = person_name
                     if not dept_name:
                         dept_name = '未分配部门'
@@ -186,7 +184,6 @@ def confirm_import(record, submitted, operator):
     edits = {r.get('id'):r for r in submitted if isinstance(r,dict)}
     if len(edits) != len(existing) or set(edits) != {r.id for r in existing}:
         raise MealError('请完整提交预览行')
-    departments = {d.dept_name for d in Department.query.all()} | {'未分配部门'}
     previous = MealTicketImportRow.query.join(MealTicketImport, MealTicketImportRow.import_key == MealTicketImport.key).filter(
         MealTicketImport.month == record.month, MealTicketImport.status == 'confirmed').all()
     seen = {r.emp_id for r in previous if r.data['kind'] == 'person' and not r.data.get('skip')}
@@ -203,8 +200,6 @@ def confirm_import(record, submitted, operator):
                 data['correction_reason'] = required_text(edit.get('correction_reason'), '年月归属核对说明')
             amount = cents(edit.get('amount')) / 100
             department = required_text(edit.get('dept_name'), '部门', 100)
-            if department not in departments:
-                raise MealError('请将部门映射到现有部门名称')
             if amount != row.data['original_amount'] or department != row.data['original_dept_name']:
                 data['correction_reason'] = required_text(edit.get('correction_reason'), '更正说明')
             if row.data['kind'] == 'person':

@@ -603,6 +603,30 @@ class MealTicketTests(unittest.TestCase):
         with self.app.app_context():
             self.assertEqual(db.session.get(MealTicketImport, identifier).status, 'confirmed')
 
+    def test_historical_department_names_do_not_create_system_departments(self):
+        from models.department import Department
+        book = Workbook()
+        sheet = book.active
+        sheet.title = '员工充值记录'
+        sheet.append(['部门名称', '人员编号', '人员名称', '实际充值金额'])
+        sheet.append(['已撤销车间', '001', '员工甲', 176])
+        stream = io.BytesIO()
+        book.save(stream)
+        response = self.client.post('/api/meal-tickets/imports', data={
+            'file': (io.BytesIO(stream.getvalue()), 'historical.xlsx'),
+            'month': '2026-08', 'month_kind': 'attendance'}, headers=self.headers)
+        preview = response.get_json()
+        self.assertEqual(preview['rows'][0]['error'], '')
+        rows = preview['rows']
+        rows[0]['dept_name'] = '旧生产组'
+        rows[0]['correction_reason'] = '按历史归属更正'
+        result = self.post(f"/imports/{preview['id']}/confirm", {'rows': rows})
+        self.assertEqual(result.status_code, 200, result.get_json())
+        self.assertEqual(result.get_json()['rows'][0]['dept_name'], '旧生产组')
+        with self.app.app_context():
+            self.assertEqual(Department.query.count(), 0)
+            self.assertIsNone(db.session.get(Employee, self.emp_id).dept_id)
+
     def test_historical_preview_confirm_and_department_not_added(self):
         book = Workbook()
         s = book.active
