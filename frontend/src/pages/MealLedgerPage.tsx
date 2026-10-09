@@ -3,6 +3,7 @@ import { apiRequest } from "../api/client";
 import { businessMonth, fetchAnnual, fetchLedger, money, saveLedger, voidLedger,
   type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord } from "../api/mealLedgers";
 import QueryTable from "../components/query/QueryTable";
+import MonthPicker from "../components/common/MonthPicker";
 import LoadingState from "../components/feedback/LoadingState";
 import { LedgerBookIcon, AlertTriangleIcon } from "../components/icons";
 import "./meal-ticket.css";
@@ -104,45 +105,22 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
 
   return (
     <section className="meal-ticket-page meal-ledger-page">
-      <header className="meal-ticket-heading">
-        <div>
-          <p className="meal-ticket-eyebrow">菜票中心 · 台账登记</p>
+      <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
+        <div className="meal-ticket-header-title-group">
           <h1>{titles[kind]}</h1>
-          <p>{descriptions[kind]}</p>
+          <div className="meal-ticket-header-period-capsule" role="group" aria-label="台账时间范围">
+            {kind === "annual" ? <label className="meal-ledger-year-field">汇总年份
+              <input type="number" min="1" max="9999" value={year} onChange={e => setYear(e.target.value)} />
+            </label> : <div className="meal-ticket-month-picker-field">
+              <span className="meal-ticket-month-picker-label">{kind === "department" ? "充值月份" : "业务月份"}</span>
+              <MonthPicker ariaLabel={kind === "department" ? "充值月份" : "业务月份"} value={month}
+                disabled={busy} format="YYYY-MM" className="meal-ticket-month-picker"
+                onChange={value => { if (value !== month) { setMonth(value); setForm(f => ({...f, date:""})); } }} />
+            </div>}
+          </div>
         </div>
       </header>
-
-      {/* 检索与时间工具栏 */}
-      <div className="meal-ticket-panel meal-ledger-filter-panel">
-        <div className="meal-ledger-form">
-          {kind === "annual" && (
-            <label>
-              汇总年份
-              <input type="number" min="1" max="9999" value={year} onChange={e => setYear(e.target.value)} />
-            </label>
-          )}
-          <label>
-            {kind === "department" ? "充值月份" : kind === "annual" ? "消费录入月份" : "业务月份"}
-            <input type="month" value={month} onChange={e => { setMonth(e.target.value); setForm(f => ({ ...f, date: "" })); }} />
-          </label>
-          {(kind === "external" || kind === "clearance") && (
-            <label>
-              搜索记录
-              <input placeholder="工号、姓名、部门或卡号" value={search} onChange={e => setSearch(e.target.value)} />
-            </label>
-          )}
-          {kind === "external" && (
-            <label>
-              领用类别
-              <select value={category} onChange={e => setCategory(e.target.value)}>
-                <option value="">全部类别</option>
-                <option value="card">充卡</option>
-                <option value="paper">纸质</option>
-              </select>
-            </label>
-          )}
-        </div>
-      </div>
+      <p className="meal-ledger-description">{descriptions[kind]}</p>
 
       {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
       {message && <p role="status" className="meal-ticket-alert" style={{ borderColor: "#059669", background: "rgba(5, 150, 105, 0.08)", color: "#047857" }}>{message}</p>}
@@ -239,7 +217,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           )}
 
           {/* 表格数据展示区域 */}
-          <div className="meal-ticket-panel">
+          <div className={`meal-ticket-panel meal-ledger-list is-${kind}`}>
             {kind === "department" && department && (
               <>
                 <div className="meal-ticket-section-heading">
@@ -301,8 +279,14 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 <div className="meal-ticket-section-heading">
                   <div>
                     <h2>{kind === "external" ? "领用明细列表" : "取款记录列表"}</h2>
-                    <p>有效金额 {money(validTotalAmount)} 元 · {visible.length} 条（包含作废历史）</p>
+                    <p>当前筛选有效金额 {money(validTotalAmount)} 元 · {visible.length} 条（包含作废历史）</p>
                   </div>
+                </div>
+                <div className="meal-ticket-toolbar meal-ticket-filters meal-ledger-filters">
+                  <label className="meal-ledger-search">搜索记录<input placeholder="工号、姓名、部门或卡号" value={search} onChange={e => setSearch(e.target.value)} /></label>
+                  {kind === "external" && <label>领用类别<select value={category} onChange={e => setCategory(e.target.value)}>
+                    <option value="">全部类别</option><option value="card">充卡</option><option value="paper">纸质</option>
+                  </select></label>}
                 </div>
                 <QueryTable
                   headers={[
@@ -338,46 +322,44 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 <div>
                   <h2>
                     <LedgerBookIcon />
-                    {kind === "annual" ? "录入月度消费" : "登记记录"}
+                    {kind === "annual" ? "录入月度消费" : kind === "external" ? "登记外来人员领用" : "登记月末取款"}
                   </h2>
                   <p>已保存记录保留历史。月度消费再次保存时，会替代本月有效登记并保留旧版本。</p>
                 </div>
               </div>
               <form onSubmit={e => { e.preventDefault(); void save(); }}>
-                <div className="meal-ledger-grid">
-                  {(kind === "external" || kind === "clearance") && (
-                    <>
-                      {field("name", "姓名")}
-                      {field("emp_no", "人员编号")}
+                {kind !== "annual" && <fieldset className="meal-ledger-fieldset">
+                  <legend>人员信息</legend>
+                  <div className="meal-ledger-grid">
+                    {field("name", "姓名")}{field("emp_no", "人员编号")}
+                    {field("dept_name", kind === "external" ? "承担费用的部门" : "部门")}
+                    {field("card_no", "卡号")}
+                    {kind === "external" && field("unit", "外来单位/人员")}
+                  </div>
+                </fieldset>}
+                <fieldset className="meal-ledger-fieldset">
+                  <legend>{kind === "annual" ? "月度消费" : kind === "clearance" ? "取款信息" : "领用信息"}</legend>
+                  <div className="meal-ledger-grid">
+                    {kind === "annual" ? <>
+                      <div className="meal-ticket-month-picker-field meal-ledger-consumption-month">
+                        <span className="meal-ticket-month-picker-label">消费录入月份</span>
+                        <MonthPicker ariaLabel="消费录入月份" value={month} disabled={busy} format="YYYY-MM"
+                          onChange={setMonth} />
+                      </div>
+                      {field("floor2", "二楼消费金额", "number")}{field("floor3", "三楼消费金额", "number")}
+                    </> : <>
                       {field("date", "处理日期", "date")}
-                      {field("card_no", "卡号")}
+                      {kind === "external" && <label>类别<select value={form.category} onChange={e => setForm(f => ({...f,category:e.target.value}))}>
+                        <option value="card">充卡</option><option value="paper">纸质</option>
+                      </select></label>}
                       {field("amount", kind === "clearance" ? "清零取款金额" : "发放金额", "number")}
-                    </>
-                  )}
-                  {kind !== "annual" && field("dept_name", kind === "external" ? "承担费用的部门" : "部门")}
-                  {kind === "external" && (
-                    <>
-                      <label>
-                        类别
-                        <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-                          <option value="card">充卡</option>
-                          <option value="paper">纸质</option>
-                        </select>
-                      </label>
-                      {field("unit", "外来单位/人员")}
-                      {field("period", "服务期间")}
-                      {field("days", "天数")}
-                    </>
-                  )}
-                  {kind === "external" && field("registrar", "填表人")}
-                  {kind === "annual" && (
-                    <>
-                      {field("floor2", "二楼消费金额", "number")}
-                      {field("floor3", "三楼消费金额", "number")}
-                    </>
-                  )}
-                  {field("remark", "备注")}
-                </div>
+                      {kind === "external" && <>{field("period", "服务期间")}{field("days", "天数")}{field("registrar", "填表人")}</>}
+                    </>}
+                  </div>
+                </fieldset>
+                <fieldset className="meal-ledger-fieldset">
+                  <legend>补充说明</legend><div className="meal-ledger-grid">{field("remark", "备注")}</div>
+                </fieldset>
                 <div className="meal-ledger-form-footer">
                   <p>请核实填写的数据信息，确认无误后点击保存。</p>
                   <button className="meal-ticket-button is-primary" disabled={busy || loading}>

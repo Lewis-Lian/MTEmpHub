@@ -10,6 +10,26 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票查询与台账页面", () => {
   beforeEach(() => request.mockReset());
+  it("台账月份面板切换业务月份后重新读取记录并清空处理日期", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"} : []));
+    render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+    await screen.findByRole("button", {name:"保存记录"});
+    fireEvent.change(screen.getByLabelText("处理日期"), {target:{value:"2026-08-20"}});
+    const month = screen.getByRole("textbox", {name:"业务月份"});
+    fireEvent.click(month);
+    fireEvent.click(screen.getByRole("button", {name:"7月"}));
+    await waitFor(() => expect(month).toHaveValue(`${new Date().getFullYear()}-07`));
+    await waitFor(() => expect(screen.getByLabelText("处理日期")).toHaveValue(""));
+    expect(request).toHaveBeenCalledWith(`/api/meal-ledgers/external?month=${new Date().getFullYear()}-07`);
+  });
+  it("月份未更改时离开月份输入框保留处理日期", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"} : []));
+    render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
+    await screen.findByRole("button", {name:"保存记录"});
+    fireEvent.change(screen.getByLabelText("处理日期"), {target:{value:"2026-10-08"}});
+    fireEvent.blur(screen.getByRole("textbox", {name:"业务月份"}));
+    expect(screen.getByLabelText("处理日期")).toHaveValue("2026-10-08");
+  });
   it("菜票查询独立展示并按人员类型筛选，不提供发放操作", async () => {
     request.mockResolvedValue({ month: "2026-08", recharge_month: "2026-09", status: "confirmed", items: [
       { id: 1, emp_no: "001", name: "员工甲", dept_name: "生产部", is_manager: false, days: 22, base_amount: 176, adjustment_amount: 0, due_amount: 176, paid_amount: 176, difference: 0, adjustments: [], payments: [], error: "" },

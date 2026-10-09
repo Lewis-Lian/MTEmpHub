@@ -49,15 +49,15 @@
 }
 
 .meal-ledger-page .meal-ticket-panel {
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 /* KPI 统计指标卡片 */
 .meal-ledger-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 0;
 }
 
 .meal-ledger-stat-card {
@@ -65,18 +65,14 @@
   flex-direction: column;
   gap: 8px;
   padding: 18px 20px;
+  min-width: 0;
   border: 1px solid var(--ent-border-strong);
   border-radius: var(--ent-radius-lg);
   background: var(--ent-bg);
-  box-shadow: var(--ent-shadow-card);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .03);
   position: relative;
   overflow: hidden;
   transition: var(--ent-transition);
-}
-
-.meal-ledger-stat-card:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.05);
 }
 
 .meal-ledger-stat-card::before {
@@ -85,7 +81,7 @@
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background: var(--ent-border-strong);
 }
 
@@ -108,7 +104,8 @@
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-size: clamp(20px, 1.8vw, 28px);
+  font-size: clamp(22px, 1.8vw, 28px);
+  overflow-wrap: anywhere;
   font-weight: 700;
   color: var(--ent-text);
   font-variant-numeric: tabular-nums;
@@ -198,7 +195,7 @@
 
 .meal-ledger-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   align-items: end;
 }
@@ -348,4 +345,49 @@
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* 与月度发放共用标题、月份胶囊与明细工具栏 */
+.meal-ledger-page .meal-ticket-header-title-group { flex-wrap: wrap; min-width: 0; }
+.meal-ledger-page .meal-ticket-header-combined { flex-wrap: wrap; }
+.meal-ledger-description {
+  margin: -8px 2px 0;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.meal-ledger-page .meal-ledger-year-field { display: flex; flex-direction: row; align-items: center; gap: 8px; }
+.meal-ledger-year-field input { width: 90px; padding: 3px 8px; background: var(--ent-bg); }
+.meal-ledger-page .month-picker-input { padding: 0; border: 0; background: transparent; box-shadow: none; }
+.meal-ledger-page .meal-ticket-month-picker-label { white-space: nowrap; }
+.meal-ledger-list .meal-ticket-section-heading { margin-bottom: 16px; }
+.meal-ledger-filters { margin-bottom: 16px; }
+.meal-ledger-search { flex: 1 1 260px; max-width: 420px; }
+.meal-ledger-list .legacy-table-panel { border-radius: var(--ent-radius-lg); overflow: hidden; }
+.meal-ledger-list td { font-variant-numeric: tabular-nums; }
+.meal-ledger-list.is-department td:nth-child(n+2):nth-child(-n+7),
+.meal-ledger-list.is-department td:nth-child(10),
+.meal-ledger-list.is-annual td:nth-child(n+2),
+.meal-ledger-list.is-external td:nth-child(10),
+.meal-ledger-list.is-clearance td:nth-child(6) { text-align: right; white-space: nowrap; }
+.meal-ledger-list.is-department td:nth-child(7),
+.meal-ledger-list.is-annual td:nth-child(4) { font-weight: 600; }
+.meal-ledger-fieldset { margin: 0 0 20px; padding: 0; min-width: 0; border: 0; }
+.meal-ledger-fieldset legend { margin-bottom: 12px; padding: 0; color: var(--ent-text); font-size: 13px; font-weight: 600; }
+.meal-ledger-grid label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--ent-text-secondary); font-size: 12px; }
+.meal-ledger-grid input, .meal-ledger-grid select { width: 100%; }
+.meal-ledger-consumption-month { flex-direction: column; align-items: stretch; gap: 6px; }
+.meal-ledger-fieldset:last-of-type .meal-ledger-grid { grid-template-columns: 1fr; }
+@media (max-width: 900px) {
+  .meal-ledger-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .meal-ledger-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .meal-ledger-page .meal-ticket-header-title-group { gap: 12px; white-space: normal; }
+  .meal-ledger-page .meal-ticket-header-title-group h1 { font-size: 18px; }
+  .meal-ledger-stats, .meal-ledger-grid { grid-template-columns: 1fr; }
+  .meal-ledger-form-card { padding: 18px; }
+  .meal-ledger-search { max-width: none; }
+  .meal-ledger-filters label { width: 100%; min-width: 0; }
+  .meal-ledger-form-footer .meal-ticket-button { width: 100%; }
 }

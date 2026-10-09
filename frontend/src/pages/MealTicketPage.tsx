@@ -65,6 +65,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [detail, setDetail] = useState<MealItem | null>(null);
   const [imports, setImports] = useState<MealImport[]>([]);
   const [preview, setPreview] = useState<MealImport | null>(null);
+  const [historyTab, setHistoryTab] = useState<"person" | "department" | "comparison">("person");
   const [attendancePreview, setAttendancePreview] = useState<MealAttendanceRecalculation | null>(null);
   const [supplementReasons, setSupplementReasons] = useState<Record<number, string>>({});
   const [comparison, setComparison] = useState<MealComparison[]>([]);
@@ -97,6 +98,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     dept_id: pickerDepartments.find(dept => dept.dept_name === item.dept_name)?.id ?? null })), [batch, pickerDepartments]);
 
   useEffect(() => { setComparison([]); }, [preview]);
+  useEffect(() => { setHistoryTab("person"); }, [preview?.id]);
   useEffect(() => {
     setImportIssuesOnly(false); setImportSelected([]); setImportDepartment(""); setImportCustomDepartment(""); setImportReason("");
   }, [preview?.id, preview?.status]);
@@ -425,7 +427,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const showReconciliation = (!paymentView || followupStage === "settlement") && (confirmed || isError);
 
   return <main className={`meal-ticket-page${settlementComplete ? " is-settlement-complete" : ""}`}>
-    <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
+    {(!historical || !preview) && <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
       <div className="meal-ticket-header-title-group">
         <h1>{historical ? "菜票历史台账" : paymentView ? "后续补扣与对账" : "月度发放"}</h1>
         <div className="meal-ticket-header-period-capsule" role="group" aria-label="核算月份与周期">
@@ -469,14 +471,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           </div>
         </div>
       )}
-      {!historical && confirmed && (
-        <div className="meal-ticket-header-actions">
-          <Link className="meal-ticket-button meal-ticket-export" to={`/meal-tickets/${paymentView ? "calculation" : "payments"}?recharge_month=${month}`}>
-            {paymentView ? "查看月度发放" : "前往后续补扣与对账"}
-          </Link>
-        </div>
-      )}
-    </header>
+    </header>}
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
         {steps.map((step, index) => <li key={step.id} className={step.id === activeStage ? "is-current" : step.complete ? "is-complete" : ""} aria-current={step.id === activeStage ? "step" : undefined}>
@@ -652,6 +647,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         {admin && !p.database_record && p.kind !== "reversal" && !p.reversed && <button className="meal-ticket-button is-link" onClick={() => { setDetail(null); openForm(detail, "reversal", p.id); }}>冲正</button>}</p>)}
       <button className="meal-ticket-button" onClick={() => setDetail(null)}>关闭</button></section></div>}
     {historical && admin && <>
+      {!preview && <>
       <section className="meal-ticket-toolbar meal-ticket-panel"><label>文件月份含义<select value={monthKind} onChange={e => setMonthKind(e.target.value)}><option value="recharge">充值月份</option><option value="attendance">考勤月份</option></select></label>
         <label>历史充值表<input ref={historyFile} type="file" accept=".xlsx" onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
         <button className="meal-ticket-button is-primary" disabled={busy || !file} onClick={() => operate(async () => {
@@ -662,8 +658,44 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <QueryTable headers={["文件","考勤月","充值月","状态","人员总额","部门登记总额","操作"]}
         rows={imports.map(r => [r.filename,r.month,r.recharge_month,r.status === "preview" ? "待确认" : "已导入",money(r.person_total),money(r.department_total),<button className="meal-ticket-button is-link" onClick={() => setPreview(r)}>查看</button>])} />
       </section>
-      {preview && <section className="meal-ticket-panel meal-ticket-preview"><h2>{preview.filename} · 考勤 {preview.month} / 充值 {preview.recharge_month}</h2>
-        <p>人员原账 {money(preview.person_total)} 元 · 部门原账 {money(preview.department_total)} 元</p>
+      </>}
+      {preview && <section className="meal-ticket-panel meal-ticket-preview meal-history-detail" aria-label="历史文件详情">
+        <div className="meal-history-detail-heading">
+          <div><p className="meal-history-eyebrow">历史原账 · 文件详情</p><h2>{preview.filename}</h2>
+            <p className="meal-history-period">考勤 {preview.month} <span aria-hidden="true">/</span> 充值 {preview.recharge_month}</p></div>
+          <div className="meal-ticket-actions">
+            <span className={`meal-ticket-badge ${preview.status === "preview" ? "is-warning" : "is-success"}`}>{preview.status === "preview" ? "待确认" : "已导入"}</span>
+            <button className="meal-ticket-button" disabled={busy} onClick={() => {
+              setImports(records => records.some(record => record.id === preview.id)
+                ? records.map(record => record.id === preview.id ? preview : record) : [preview, ...records]);
+              setPreview(null); setError("");
+            }}>返回台账列表</button>
+          </div>
+        </div>
+        <div className="meal-history-summary" aria-label="原账概览">
+          <div><span>人员原账</span><strong>{money(preview.person_total)}<small>元</small></strong><p>{preview.rows.filter(row => row.kind === "person" && !row.skip).length} 条有效人员记录</p></div>
+          <div><span>部门原账</span><strong>{money(preview.department_total)}<small>元</small></strong><p>{preview.rows.filter(row => row.kind === "department" && !row.skip).length} 条有效部门记录</p></div>
+          <div className={preview.person_total === preview.department_total ? "is-balanced" : "is-difference"}><span>人员与部门差额</span><strong>{money(preview.person_total - preview.department_total)}<small>元</small></strong><p>人员原账减部门原账</p></div>
+        </div>
+        <div className="meal-history-tabs" role="tablist" aria-label="历史原账详情">
+          {(["person", "department", "comparison"] as const).map(tab => <button key={tab} id={`history-tab-${tab}`}
+            role="tab" aria-selected={historyTab === tab} aria-controls={`history-panel-${tab}`} disabled={busy}
+            onClick={() => setHistoryTab(tab)}>{tab === "person" ? preview.status === "preview" ? "原账明细" : "人员原账" : tab === "department" ? "部门对账" : "考勤试算"}</button>)}
+        </div>
+        {historyTab === "person" && <div className="meal-history-tab-panel" role="tabpanel" id="history-panel-person" aria-labelledby="history-tab-person">
+        {preview.status === "confirmed" ? <>
+          <div className="meal-history-panel-heading"><h3>人员原账明细</h3><p>保留原账人员信息，人员归属为核对后对应的员工。</p></div>
+          <QueryTable tableClassName="meal-history-readonly-table meal-history-person-table" headers={["原工号", "原姓名", "部门", "原账金额（元）", "来源页 / 行", "人员归属", "核对说明", "状态"]}
+            rows={preview.rows.filter(row => row.kind === "person").map(row => {
+              const employee = people.find(person => person.id === row.emp_id);
+              return [row.emp_no, row.name, row.dept_name,
+              row.amount === null ? "—" : money(row.amount), `${row.sheet} / ${row.row}`,
+              employee ? `${employee.emp_no} ${employee.name}` : row.emp_id ? `员工 ID ${row.emp_id}` : "未匹配",
+              [row.correction_reason, row.error, row.period_conflict].filter(Boolean).join("；") || "—",
+              <span className={`meal-ticket-badge ${row.skip ? "" : "is-success"}`}>{row.skip ? "已跳过" : "已导入"}</span>];
+            })} />
+        </> : <>
+
         {preview.status === "preview" && preview.rows.some(r => r.period_conflict && !r.period_confirmed && !r.skip) && <div className="meal-ticket-alert"><p>文件或页内年月与所选月份不一致，请核对上方考勤月和充值月。</p>
           <button className="meal-ticket-button" onClick={confirmPeriod}>已核对年月差异，按所选月份归档</button></div>}
         {preview.status === "preview" && <>
@@ -709,11 +741,25 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
             setImports(await fetchMealImports());
           })}>取消</button>
         </div>}
-        <h3>历史部门对账</h3><QueryTable headers={["部门","人员原账合计","部门原登记","差额"]} rows={preview.departments.map(d => [d.dept_name,money(d.person_amount),money(d.historical_amount),money(d.difference)])} />
-        <h3>原账与新规则试算</h3><p>按现有考勤字段 × 8 元试算，未包含额外补扣；仅用于核对，不改变原账或生成充值记录。</p>
-        <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => setComparison(await compareMealImport(preview.id)))}>读取考勤试算对比</button>
-        {comparison.length > 0 && <QueryTable headers={["工号","姓名","原账金额","实际打卡天数","基础试算金额","原账减试算","核对说明"]}
-          rows={comparison.map(r => [r.emp_no,r.name,r.historical_amount === null ? "—" : money(r.historical_amount),r.days ?? "—",r.base_amount === null ? "—" : money(r.base_amount),r.difference === null ? "—" : money(r.difference),r.error])} />}
+        </>}
+        </div>}
+        {historyTab === "department" && <div className="meal-history-tab-panel" role="tabpanel" id="history-panel-department" aria-labelledby="history-tab-department">
+          <div className="meal-history-panel-heading"><h3>历史部门对账</h3><p>对照人员原账与部门原登记，差额为人员合计减部门登记金额。</p></div>
+          <QueryTable tableClassName="meal-history-readonly-table meal-history-department-table" headers={["部门", "人员原账合计", "部门原登记", "差额"]}
+            rows={preview.departments.map(d => [d.dept_name, money(d.person_amount),
+              money(d.historical_amount),
+              money(d.difference)])} />
+        </div>}
+        {historyTab === "comparison" && <div className="meal-history-tab-panel" role="tabpanel" id="history-panel-comparison" aria-labelledby="history-tab-comparison">
+          <div className="meal-history-panel-heading"><div><h3>原账与考勤试算</h3><p>按现有考勤字段 × 8 元试算，未包含额外补扣；仅供核对，不改变原账。</p></div>
+            <button className="meal-ticket-button" disabled={busy} onClick={() => operate(async () => setComparison(await compareMealImport(preview.id)))}>读取考勤试算对比</button>
+          </div>
+          {comparison.length > 0 ? <QueryTable tableClassName="meal-history-readonly-table meal-history-comparison-table" headers={["工号", "姓名", "原账金额", "实际打卡天数", "基础试算金额", "原账减试算", "核对说明"]}
+            rows={comparison.map(r => [r.emp_no, r.name, r.historical_amount === null ? "—" : money(r.historical_amount), r.days ?? "—",
+              r.base_amount === null ? "—" : money(r.base_amount),
+              r.difference === null ? "—" : money(r.difference), r.error || "—"])} />
+            : <div className="meal-history-empty"><strong>按需查看考勤试算</strong><p>点击上方按钮，读取该考勤月份的数据并与原账比较。</p></div>}
+        </div>}
       </section>}
     </>}
   </main>;

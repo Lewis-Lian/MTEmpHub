@@ -1402,6 +1402,139 @@
   align-self: flex-start;
 }
 
+.meal-history-detail {
+  gap: 24px;
+  padding: 28px;
+}
+
+.meal-history-detail-heading,
+.meal-history-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.meal-history-detail-heading h2 {
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+
+.meal-history-eyebrow {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--ent-text-secondary);
+  letter-spacing: .08em;
+}
+
+.meal-history-period {
+  margin: 10px 0 0;
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+}
+
+.meal-history-period span {
+  padding: 0 12px;
+  color: var(--ent-border-strong);
+}
+
+.meal-history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.meal-history-summary > div {
+  padding: 20px;
+  border: 1px solid var(--ent-border);
+  border-radius: var(--ent-radius-lg);
+  background: var(--ent-bg);
+}
+
+.meal-history-summary span,
+.meal-history-summary p {
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+}
+
+.meal-history-summary strong {
+  display: block;
+  margin: 12px 0 8px;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.meal-history-summary small {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.meal-history-summary p { margin: 0; }
+.meal-history-summary .is-balanced strong { color: #059669; }
+.meal-history-summary .is-difference strong { color: #b45309; }
+
+.meal-history-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--ent-border);
+}
+
+.meal-history-tabs button {
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--ent-text-secondary);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.meal-history-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--ent-blue);
+  color: var(--ent-blue);
+  font-weight: 600;
+}
+
+.meal-history-tabs button:focus-visible {
+  outline: 2px solid var(--ent-blue);
+  outline-offset: 3px;
+}
+
+.meal-history-tabs button:disabled { cursor: wait; opacity: .6; }
+.meal-history-tab-panel { display: grid; gap: 18px; min-width: 0; }
+.meal-history-panel-heading h3 { margin: 0; font-size: 15px; }
+.meal-history-panel-heading p { margin: 6px 0 0; font-size: 12px; color: var(--ent-text-secondary); line-height: 1.7; }
+.meal-history-detail .legacy-table-panel { border-radius: var(--ent-radius-lg); overflow: hidden; }
+
+.meal-history-person-table td:nth-child(4),
+.meal-history-department-table td:nth-child(n+2),
+.meal-history-comparison-table td:nth-child(n+3):nth-child(-n+6) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-history-empty {
+  padding: 48px 20px;
+  border: 1px dashed var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  text-align: center;
+  color: var(--ent-text-secondary);
+}
+
+.meal-history-empty strong { font-size: 14px; color: var(--ent-text); }
+.meal-history-empty p { margin: 10px 0 0; font-size: 12px; }
+
+@media (max-width: 680px) {
+  .meal-history-detail { padding: 18px; }
+  .meal-history-summary { grid-template-columns: 1fr; gap: 10px; }
+  .meal-history-summary > div { padding: 16px; }
+  .meal-history-tabs { gap: 20px; }
+}
+
 /* 模态弹窗 */
 .meal-ticket-modal {
   position: fixed;

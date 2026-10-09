@@ -416,6 +416,7 @@ describe("菜票中心", () => {
       return Promise.resolve(current);
     });
     render(<MemoryRouter initialEntries={["/meal-tickets/calculation?recharge_month=2026-09"]}>
+      <Link to="/meal-tickets/payments?recharge_month=2026-09">进入后续补扣页面</Link>
       <MealTicketPage /><MealTicketPage view="payments" />
     </MemoryRouter>);
     const initial = within(screen.getByRole("heading", { name: "月度发放" }).closest("main")!);
@@ -423,7 +424,9 @@ describe("菜票中心", () => {
     await initial.findByText("员工甲");
     await followup.findByText("请先完成月度核算");
     fireEvent.click(initial.getByRole("button", { name: "确认核算" }));
-    fireEvent.click(await initial.findByRole("link", { name: "前往后续补扣与对账" }));
+    await initial.findByRole("link", { name: "导出充值表（.xls）" });
+    expect(initial.queryByRole("link", { name: "前往后续补扣与对账" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "进入后续补扣页面" }));
     expect(await followup.findByText("员工甲")).toBeInTheDocument();
     expect(followup.getByLabelText("计划充值月份")).toHaveValue("2026-09");
     expect(followup.getByRole("button", { name: "补扣" })).toBeInTheDocument();
@@ -707,7 +710,7 @@ describe("菜票中心", () => {
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("删除失败，请重试");
     expect(screen.getByRole("button", { name: "确认导入原账" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "查看" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回台账列表" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
   });
 
@@ -833,10 +836,62 @@ describe("菜票中心", () => {
       : [history]));
     render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
     fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    fireEvent.click(screen.getByRole("tab", { name: "考勤试算" }));
     fireEvent.click(screen.getByRole("button", { name: "读取考勤试算对比" }));
     await screen.findByText("员工甲");
     expect(screen.getByText("176.00")).toBeInTheDocument();
     expect(screen.getByText("4.00")).toBeInTheDocument();
     expect(request.mock.calls.every(([, options]) => !options || options.method !== "POST")).toBe(true);
+  });
+
+  it("历史文件详情一次展示一个页签，已导入原账只读并可返回列表", async () => {
+    const history = { id: 9, filename: "八月原账.xlsx", month: "2026-08", recharge_month: "2026-09", status: "confirmed",
+      person_total:180,department_total:176,
+      departments:[{dept_name:"生产部",person_amount:180,historical_amount:176,difference:4}],
+      rows:[{id:1,sheet:"员工充值",row:2,kind:"person",emp_no:"001",name:"员工甲",emp_id:1,
+        dept_name:"生产部",amount:180,error:"",skip:false,correction_reason:"已核对",period_conflict:"",period_confirmed:true}]
+    };
+    request.mockImplementation((path:string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"}
+      : path === "/api/admin/employees?status=all" ? [{id:1,emp_no:"002",name:"员工乙"}]
+      : path === "/api/admin/departments" ? [{dept_name:"生产部"}]
+      : path.endsWith("/comparison") ? [] : [history]));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button",{name:"查看"}));
+    expect(screen.queryByRole("region",{name:"导入记录"})).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("历史充值表")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.getByRole("tab",{name:"人员原账"})).toHaveAttribute("aria-selected","true");
+    expect(screen.getByText("员工甲")).toBeInTheDocument();
+    expect(screen.getByText("002 员工乙")).toBeInTheDocument();
+    expect(screen.queryByLabelText("金额 1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab",{name:"部门对账"}));
+    expect(screen.getAllByRole("table")).toHaveLength(1);
+    expect(screen.queryByText("员工甲")).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader",{name:/人员原账合计/})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab",{name:"考勤试算"}));
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByRole("button",{name:"读取考勤试算对比"})).toBeEnabled();
+    fireEvent.click(screen.getByRole("button",{name:"返回台账列表"}));
+    expect(screen.getByRole("region",{name:"导入记录"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button",{name:"查看"}));
+    expect(screen.getByRole("tab",{name:"人员原账"})).toHaveAttribute("aria-selected","true");
+  });
+
+  it("上传后的待确认原账返回列表仍可查看并保留修改", async () => {
+    const history = { id: 9, filename: "新原账.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      person_total:180,department_total:0,departments:[],
+      rows:[{id:1,sheet:"充值",row:2,kind:"person",emp_no:"001",name:"员工甲",emp_id:1,
+        dept_name:"生产部",amount:180,error:"",skip:false,correction_reason:"",period_conflict:"",period_confirmed:true}] };
+    request.mockImplementation((path:string, options?:{method?:string}) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"}
+      : path === "/api/admin/employees?status=all" ? [{id:1,emp_no:"001",name:"员工甲"}]
+      : path === "/api/admin/departments" ? [{dept_name:"生产部"}]
+      : options?.method === "POST" ? history : []));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.change(await screen.findByLabelText("历史充值表"), {target:{files:[new File(["test"],"新原账.xlsx")]}});
+    fireEvent.click(screen.getByRole("button",{name:"预览导入"}));
+    fireEvent.change(await screen.findByLabelText("更正说明 1"), {target:{value:"已人工核对"}});
+    fireEvent.click(screen.getByRole("button",{name:"返回台账列表"}));
+    fireEvent.click(screen.getByRole("button",{name:"查看"}));
+    expect(screen.getByLabelText("更正说明 1")).toHaveValue("已人工核对");
   });
 });
