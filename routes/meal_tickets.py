@@ -1,6 +1,7 @@
 from functools import wraps
 from io import BytesIO
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, g, jsonify, request, send_file
 from openpyxl import Workbook
@@ -9,7 +10,7 @@ import xlwt
 from sqlalchemy.exc import IntegrityError
 
 from models import db
-from models.meal_ticket import MealTicketBatch, MealTicketImport
+from models.meal_ticket import MealTicketBatch, MealTicketImport, MealTicketImportRow
 from models.account_set import AccountSet
 from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
@@ -311,6 +312,24 @@ def import_comparison(identifier):
             'base_amount':amount, 'difference':round(old - amount, 2) if old is not None and amount is not None else None,
             'error':error})
     return jsonify(result)
+
+
+@meal_tickets_bp.delete('/imports/<int:identifier>')
+@admin_required
+@handled
+def import_cancel(identifier):
+    begin_write()
+    record = MealTicketImport.query.filter_by(id=identifier).with_for_update().first()
+    if not record:
+        raise MealError('导入预览不存在', 404)
+    if record.status != 'preview':
+        raise MealError('已确认入账的历史记录不能取消', 409)
+    path = Path(record.stored_path)
+    MealTicketImportRow.query.filter_by(import_key=record.key).delete(synchronize_session=False)
+    db.session.delete(record)
+    db.session.commit()
+    path.unlink(missing_ok=True)
+    return jsonify({'deleted': identifier})
 
 
 @meal_tickets_bp.post('/imports/<int:identifier>/confirm')

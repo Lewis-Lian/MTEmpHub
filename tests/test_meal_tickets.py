@@ -549,6 +549,60 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(batch['departments'][0]['due_amount'], 0)
         self.confirm(batch)
 
+    def test_cancel_historical_preview_removes_record_rows_file_and_allows_reupload(self):
+        from pathlib import Path
+        from models.meal_ticket import MealTicketImport, MealTicketImportRow
+        book = Workbook()
+        sheet = book.active
+        sheet.title = '员工充值记录'
+        sheet.append(['部门名称', '人员编号', '人员名称', '实际充值金额'])
+        sheet.append(['未分配部门', '001', '员工甲', 176])
+        stream = io.BytesIO()
+        book.save(stream)
+        def upload():
+            return self.client.post('/api/meal-tickets/imports', data={
+                'file': (io.BytesIO(stream.getvalue()), 'wrong.xlsx'),
+                'month': '2026-08', 'month_kind': 'attendance'}, headers=self.headers)
+        response = upload()
+        self.assertEqual(response.status_code, 200, response.get_json())
+        preview = response.get_json()
+        url = f"/api/meal-tickets/imports/{preview['id']}"
+        with self.app.app_context():
+            record = db.session.get(MealTicketImport, preview['id'])
+            key, path = record.key, Path(record.stored_path)
+            self.assertTrue(path.exists())
+        denied = self.client.delete(url, headers={'Authorization': 'Bearer ' + self.viewer_token})
+        self.assertEqual(denied.status_code, 403)
+        response = self.client.delete(url, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertFalse(path.exists())
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(MealTicketImport, preview['id']))
+            self.assertEqual(MealTicketImportRow.query.filter_by(import_key=key).count(), 0)
+        self.assertEqual(self.client.get('/api/meal-tickets/imports', headers=self.headers).get_json(), [])
+        self.assertEqual(self.client.get(url + '/comparison', headers=self.headers).status_code, 404)
+        self.assertEqual(self.post(f"/imports/{preview['id']}/confirm", {'rows': preview['rows']}).status_code, 404)
+        self.assertEqual(self.client.delete(url, headers=self.headers).status_code, 404)
+        self.assertEqual(upload().status_code, 200)
+
+    def test_cancel_cannot_delete_confirmed_historical_import(self):
+        from pathlib import Path
+        from models.meal_ticket import MealTicketImport
+        path = Path(self.tmp.name) / 'confirmed.xlsx'
+        path.write_bytes(b'confirmed file')
+        with self.app.app_context():
+            record = MealTicketImport(month='2026-08', recharge_month='2026-09',
+                source_filename='confirmed.xlsx', file_digest='confirmed', stored_path=str(path),
+                status='confirmed', operator='admin')
+            db.session.add(record)
+            db.session.commit()
+            identifier = record.id
+        response = self.client.delete(f'/api/meal-tickets/imports/{identifier}', headers=self.headers)
+        self.assertEqual(response.status_code, 409, response.get_json())
+        self.assertTrue(path.exists())
+        with self.app.app_context():
+            self.assertEqual(db.session.get(MealTicketImport, identifier).status, 'confirmed')
+
     def test_historical_preview_confirm_and_department_not_added(self):
         book = Workbook()
         s = book.active

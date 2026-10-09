@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchMe } from "../api/auth";
 import { apiRequest } from "../api/client";
-import { fetchMealBatch, mutateMealBatch, mealRechargeExportUrl, fetchMealImports, previewMealImport, confirmMealImport, compareMealImport } from "../api/mealTickets";
+import { fetchMealBatch, mutateMealBatch, mealRechargeExportUrl, fetchMealImports, previewMealImport, confirmMealImport, cancelMealImport, compareMealImport } from "../api/mealTickets";
 import type { MealBatch, MealItem, MealDepartment, MealImport, MealImportRow, MealComparison, MealAttendanceRecalculation } from "../api/mealTickets";
 import QueryTable from "../components/query/QueryTable";
 import EmployeePicker from "../components/query/EmployeePicker";
@@ -591,10 +591,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
             <input aria-label={`跳过 ${r.id}`} type="checkbox" disabled={preview.status === "confirmed"} checked={r.skip} onChange={e => editRow(r.id,{skip:e.target.checked})} /> ])} />
         {preview.status === "preview" && <div className="meal-ticket-actions">
           <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => { setPreview(await confirmMealImport(preview)); setImports(await fetchMealImports()); })}>确认导入原账</button>
-          <button className="meal-ticket-button" disabled={busy} onClick={() => {
+          <button className="meal-ticket-button" disabled={busy} onClick={() => operate(async () => {
+            await cancelMealImport(preview.id);
+            setImports(current => current.filter(record => record.id !== preview.id));
             setPreview(null); setFile(null); setError("");
             if (historyFile.current) historyFile.current.value = "";
-          }}>取消</button>
+            setImports(await fetchMealImports());
+          })}>取消</button>
         </div>}
         <h3>历史部门对账</h3><QueryTable headers={["部门","人员原账合计","部门原登记","差额"]} rows={preview.departments.map(d => [d.dept_name,money(d.person_amount),money(d.historical_amount),money(d.difference)])} />
         <h3>原账与新规则试算</h3><p>按现有考勤字段 × 8 元试算，未包含额外补扣；仅用于核对，不改变原账或生成充值记录。</p>

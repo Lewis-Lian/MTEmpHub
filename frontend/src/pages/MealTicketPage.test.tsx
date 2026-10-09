@@ -666,11 +666,17 @@ describe("菜票中心", () => {
     await screen.findByText("员工甲");
   });
 
-  it("历史台账预览导入后可以取消，清空文件且不确认入账", async () => {
+  it("历史台账取消导入会删除待确认记录，清空文件且不确认入账", async () => {
     const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
       rows: [], person_total: 180, department_total: 180, departments: [] };
-    request.mockImplementation((path: string, options?: { method?: string }) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
-      : path === "/api/meal-tickets/imports" && options?.method === "POST" ? history : []));
+    let records = [history];
+    request.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/imports/9" && options?.method === "DELETE") {
+        records = []; return Promise.resolve({ deleted: 9 });
+      }
+      return Promise.resolve(path === "/api/meal-tickets/imports" ? options?.method === "POST" ? history : records : []);
+    });
     render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
     const upload = await screen.findByLabelText("历史充值表");
     await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
@@ -678,11 +684,31 @@ describe("菜票中心", () => {
     fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
     await screen.findByRole("button", { name: "确认导入原账" });
     fireEvent.click(screen.getByRole("button", { name: "取消" }));
-    expect(screen.queryByRole("button", { name: "确认导入原账" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "确认导入原账" })).not.toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "查看" })).not.toBeInTheDocument();
+    expect(screen.queryByText("历史.xlsx")).not.toBeInTheDocument();
+    expect(request).toHaveBeenCalledWith("/api/meal-tickets/imports/9", { method: "DELETE" });
     expect(screen.queryByRole("button", { name: "读取考勤试算对比" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "预览导入" })).toBeDisabled();
     expect(upload).toHaveValue("");
     expect(request.mock.calls.some(([path]) => path.endsWith("/confirm"))).toBe(false);
+  });
+
+  it("取消导入失败时保留预览与记录，显示错误并允许重试", async () => {
+    const history = { id: 9, filename: "上传错了.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      rows: [], person_total: 180, department_total: 180, departments: [] };
+    request.mockImplementation((path: string, options?: { method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (options?.method === "DELETE") return Promise.reject(new Error("删除失败，请重试"));
+      return Promise.resolve(path === "/api/meal-tickets/imports" ? [history] : []);
+    });
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "查看" }));
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("删除失败，请重试");
+    expect(screen.getByRole("button", { name: "确认导入原账" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "查看" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "取消" })).toBeEnabled();
   });
 
   it("历史原账按需读取试算，分别展示金额且不登记充值", async () => {

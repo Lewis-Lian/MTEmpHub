@@ -78,6 +78,7 @@ export const mutateMealBatch = (action: string, body: object) => apiRequest<Meal
 export const mealRechargeExportUrl = (month: string) => buildApiUrl(`/api/meal-tickets/export-recharge?recharge_month=${month}`);
 export const fetchMealImports = () => apiRequest<MealImport[]>("/api/meal-tickets/imports");
 export const previewMealImport = (body: FormData) => apiRequest<MealImport>("/api/meal-tickets/imports", { method: "POST", body });
+export const cancelMealImport = (id: number) => apiRequest<{ deleted: number }>(`/api/meal-tickets/imports/${id}`, { method: "DELETE" });
 export const confirmMealImport = (record: MealImport) => apiRequest<MealImport>(`/api/meal-tickets/imports/${record.id}/confirm`, {
   method: "POST", body: { rows: record.rows },
 });
