@@ -294,11 +294,11 @@ it('多选流水批量分类，未选流水保持原分类，全选支持取消'
   expect(all).toBePartiallyChecked();
   fireEvent.click(all);
   expect(screen.getByText('已选 3 条 · 60.00 元')).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button',{name:'批量设为发放纠错扣回'}));
+  fireEvent.click(screen.getByRole('button',{name:'批量设为菜票扣回'}));
   expect(screen.getByLabelText('流水 14 分类')).toHaveValue('refund');
   expect(screen.getByRole('button',{name:'确认分类并重新核对'})).toBeEnabled();
   fireEvent.click(all);
-  expect(screen.getByRole('button',{name:'批量设为发放纠错扣回'})).toBeDisabled();
+  expect(screen.getByRole('button',{name:'批量设为菜票扣回'})).toBeDisabled();
 });
 it('同月刷新移除已处理流水的选择和分类', async () => {
   const rows = [12, 13].map(id => ({id,emp_no:'001',name:'员工甲',date:'2026-09-30',amount:20}));
