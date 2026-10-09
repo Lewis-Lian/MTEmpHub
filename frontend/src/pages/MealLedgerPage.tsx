@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../api/client";
-import { businessMonth, confirmLedger, fetchAnnual, fetchLedger, fetchLedgerImports, money, previewLedger, saveLedger, voidLedger,
-  type AnnualLedger, type DepartmentLedger, type LedgerImport, type LedgerImportRow, type LedgerKind, type LedgerRecord } from "../api/mealLedgers";
+import { businessMonth, fetchAnnual, fetchLedger, money, saveLedger, voidLedger,
+  type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord } from "../api/mealLedgers";
 import QueryTable from "../components/query/QueryTable";
 import LoadingState from "../components/feedback/LoadingState";
 import { LedgerBookIcon, AlertTriangleIcon } from "../components/icons";
@@ -11,7 +11,7 @@ import "./meal-ledger.css";
 type View = "department" | "external" | "clearance" | "annual";
 
 const titles = {
-  department: "部门菜票登记",
+  department: "部门菜票发放汇总",
   external: "外来人员领用",
   clearance: "月末取款记录",
   annual: "全年菜票汇总",
@@ -47,9 +47,6 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const [category, setCategory] = useState("");
   const [voidTarget, setVoidTarget] = useState<LedgerRecord | null>(null);
   const [voidReason, setVoidReason] = useState("");
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<LedgerImport | null>(null);
-  const [history, setHistory] = useState<LedgerImport[]>([]);
   const request = useRef({ signature: "", key: "" });
 
   useEffect(() => {
@@ -67,7 +64,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     return () => { cancelled = true; };
   }, [kind, month, year, refresh]);
 
-  useEffect(() => { setForm(initialForm()); setPreview(null); setHistory([]); setFile(null); setMessage(""); }, [kind]);
+  useEffect(() => { setForm(initialForm()); setMessage(""); }, [kind]);
 
   const field = (key: keyof ReturnType<typeof initialForm>, label: string, type = "text") => (
     <label>
@@ -98,17 +95,6 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       setForm(initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
     });
   }
-
-  async function upload() {
-    await operate(async () => {
-      if (!file) throw new Error("请选择 xlsx 文件");
-      const body = new FormData(); body.set("file", file); body.set("kind", recordKind); body.set("month", month);
-      setPreview(await previewLedger(body));
-    });
-  }
-
-  const editImport = (index: number, changes: Partial<LedgerImportRow>) =>
-    setPreview(p => p ? { ...p, rows: p.rows.map(r => r.index === index ? { ...r, ...changes } : r) } : p);
 
   const visible = records.filter(r => (!search || `${r.emp_no}${r.name}${r.dept_name}${r.card_no}`.includes(search)) && (!category || r.category === category));
 
@@ -167,7 +153,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
         <>
           {/* KPI 指标概览卡片 */}
           {kind === "department" && department && (
-            <section className="meal-ledger-stats" aria-label="部门登记统计">
+            <section className="meal-ledger-stats" aria-label="部门发放统计">
               <div className="meal-ledger-stat-card is-blue">
                 <span className="meal-ledger-stat-label">部门数</span>
                 <strong className="meal-ledger-stat-value">{department.items.length}<small>个</small></strong>
@@ -258,7 +244,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               <>
                 <div className="meal-ticket-section-heading">
                   <div>
-                    <h2>部门登记列表</h2>
+                    <h2>部门发放汇总列表</h2>
                     <p>{department.status === "draft" ? "员工核算为草稿；客人金额取已登记有效领用" : department.status === "no_batch" ? "本月没有员工核算；客人有效领用仍计入部门统计" : "员工核算已确认；客人金额取已登记有效领用"}</p>
                   </div>
                   <span className={`meal-ledger-status-tag ${department.status === "draft" ? "is-draft" : "is-active"}`}>
@@ -346,15 +332,15 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           </div>
 
           {/* 管理员登记表单 */}
-          {admin && (
+          {admin && kind !== "department" && (
             <div className="meal-ticket-panel meal-ledger-form-card">
               <div className="meal-ledger-card-header">
                 <div>
                   <h2>
                     <LedgerBookIcon />
-                    {kind === "annual" ? "录入月度消费" : kind === "department" ? "保存登记信息" : "登记记录"}
+                    {kind === "annual" ? "录入月度消费" : "登记记录"}
                   </h2>
-                  <p>已保存记录保留历史。月度消费和部门登记再次保存时，会替代本月有效登记并保留旧版本。</p>
+                  <p>已保存记录保留历史。月度消费再次保存时，会替代本月有效登记并保留旧版本。</p>
                 </div>
               </div>
               <form onSubmit={e => { e.preventDefault(); void save(); }}>
@@ -383,7 +369,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                       {field("days", "天数")}
                     </>
                   )}
-                  {(kind === "department" || kind === "external") && field("registrar", kind === "department" ? "登记人" : "填表人")}
+                  {kind === "external" && field("registrar", "填表人")}
                   {kind === "annual" && (
                     <>
                       {field("floor2", "二楼消费金额", "number")}
@@ -402,101 +388,6 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
             </div>
           )}
         </>
-      )}
-
-      {/* 历史表格导入 */}
-      {admin && (
-        <div className="meal-ticket-panel">
-          <div className="meal-ticket-section-heading">
-            <div>
-              <h2>历史表格导入</h2>
-              <p>先预览，逐行确认年月和处理日期。导入不会执行充值或清零。</p>
-            </div>
-          </div>
-          <div className="meal-ledger-form" style={{ marginBottom: "16px" }}>
-            <label>
-              导入文件
-              <input type="file" accept=".xlsx" onChange={e => setFile(e.target.files?.[0] ?? null)} />
-            </label>
-            <button className="meal-ticket-button is-primary" disabled={busy || !file} onClick={upload}>
-              预览导入
-            </button>
-            <button
-              className="meal-ticket-button"
-              disabled={busy}
-              onClick={() => operate(async () => setHistory((await fetchLedgerImports()).filter(r => r.kind === recordKind)))}
-            >
-              查看导入历史
-            </button>
-          </div>
-
-          {history.length > 0 && (
-            <div className="meal-ledger-history-list">
-              {history.map(h => (
-                <button key={h.id} className="meal-ledger-history-item" onClick={() => setPreview(h)}>
-                  <span>{h.filename}</span>
-                  <span className={`meal-ledger-status-tag ${h.status === "confirmed" ? "is-active" : "is-draft"}`}>
-                    {h.status === "confirmed" ? "已导入" : "待确认"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {preview && (
-            <div className="meal-ledger-import">
-              <div className="meal-ledger-import-header">
-                <h3>{preview.filename} · {preview.rows.length} 行 · {preview.status === "confirmed" ? "已导入" : "预览未入账"}</h3>
-                <p>页名或标题年份可能与文件名不一致，请按实际业务逐行确认。导入年度表的充值与收回原额不叠加到正式资金记录。</p>
-              </div>
-              <QueryTable
-                headers={[
-                  "来源", "工号/姓名/部门", "月份", "日期",
-                  recordKind === "consumption" ? "二楼消费" : "金额",
-                  ...(recordKind === "consumption" ? ["三楼消费"] : recordKind === "external" ? ["领用类别"] : []),
-                  "说明", "跳过", "确认另一笔"
-                ]}
-                rows={preview.rows.map(r => [
-                  `${r.sheet}:${r.row}`,
-                  <div>
-                    {r.emp_no}
-                    <input aria-label={`第${r.index + 1}行姓名`} value={r.name} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { name: e.target.value })} />
-                    <input aria-label={`第${r.index + 1}行部门`} value={r.dept_name} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { dept_name: e.target.value })} />
-                  </div>,
-                  <input aria-label={`第${r.index + 1}行月份`} type="month" value={r.month} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { month: e.target.value })} />,
-                  <input aria-label={`第${r.index + 1}行日期`} type="date" value={r.date} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { date: e.target.value })} />,
-                  <input
-                    aria-label={`第${r.index + 1}行金额`}
-                    value={(recordKind === "consumption" ? r.floor2 : recordKind === "department" ? r.historical_amount : r.amount) ?? ""}
-                    disabled={preview.status === "confirmed"}
-                    onChange={e => editImport(r.index, recordKind === "consumption" ? { floor2: e.target.value } : recordKind === "department" ? { historical_amount: e.target.value } : { amount: e.target.value })}
-                  />,
-                  ...(recordKind === "consumption"
-                    ? [<input aria-label={`第${r.index + 1}行三楼消费`} value={r.floor3 ?? ""} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { floor3: e.target.value })} />]
-                    : recordKind === "external"
-                    ? [<select aria-label={`第${r.index + 1}行领用类别`} value={r.category} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { category: e.target.value })}><option value="">请选择</option><option value="card">充卡</option><option value="paper">纸质</option></select>]
-                    : []),
-                  `${r.error} ${r.warning}`,
-                  <input aria-label={`跳过第${r.index + 1}行`} type="checkbox" checked={r.skip ?? false} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { skip: e.target.checked })} />,
-                  recordKind === "external" || recordKind === "clearance" ? (
-                    <input aria-label={`确认第${r.index + 1}行为另一笔`} type="checkbox" checked={r.accept_duplicate ?? false} disabled={preview.status === "confirmed"} onChange={e => editImport(r.index, { accept_duplicate: e.target.checked })} />
-                  ) : "—",
-                ])}
-              />
-              {preview.status !== "confirmed" && (
-                <div style={{ marginTop: "16px" }}>
-                  <button
-                    className="meal-ticket-button is-primary"
-                    disabled={busy}
-                    onClick={() => operate(async () => { setPreview(await confirmLedger(preview)); setRefresh(n => n + 1); setMessage("导入已完成"); })}
-                  >
-                    确认导入
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
       )}
 
       {/* 作废确认弹窗 */}

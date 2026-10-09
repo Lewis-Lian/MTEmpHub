@@ -113,7 +113,7 @@ def export(report, month=None, year=None, accessible=None, filters=None):
                 rows = [entries[index] + [''] + (entries[index + split] if index + split < len(entries) else ['', '', '', ''])
                         for index in range(split)]
                 rows.append(['合计', round(sum(r['total_paid_amount'] for r in items), 2), '', '员工净发放＋客人充卡＋纸质菜票；不含月底清零'])
-                ws = sheet(book, selected[5:] + '月', f'{selected}月份部门菜票登记', ['部门', '金额', '登记人', '备注', '', '部门', '金额', '登记人', '备注'], rows,
+                ws = sheet(book, selected[5:] + '月', f'{selected}月份部门菜票发放汇总', ['部门', '金额', '登记人', '备注', '', '部门', '金额', '登记人', '备注'], rows,
                     '草稿' if data['status'] == 'draft' else '无核算数据' if data['status'] == 'no_batch' else '已确认核算')
                 ws.column_dimensions['E'].width = 3
                 ws.auto_filter.ref = None

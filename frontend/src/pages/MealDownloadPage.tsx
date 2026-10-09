@@ -7,7 +7,7 @@ import "./meal-ledger.css";
 
 const reports = [
   { key: "recharge", label: "月度充值记录", permission: "meal_ticket_query", desc: "包含员工异常、员工充值与管理人员充值，供上传菜票软件或对账存档。" },
-  { key: "department", label: "部门菜票登记", permission: "meal_ticket_query", desc: "按部门汇总净实际发放金额与历史原账对照。" },
+  { key: "department", label: "部门菜票发放汇总", permission: "meal_ticket_query", desc: "按权限范围汇总员工净实际发放、客人充卡与纸质菜票，并保留历史原账对照。" },
   { key: "external", label: "外来人员领用", permission: "meal_ledger_query", desc: "外来人员充卡与纸质领用完整明细。" },
   { key: "annual", label: "全年菜票汇总", permission: "meal_ledger_query", desc: "按业务月份汇总全年充值、二楼/三楼消费与月末收回明细。" },
   { key: "clearance", label: "月末取款明细", permission: "meal_ledger_query", desc: "月末菜票清零取款登记及历史流水记录。" },
@@ -117,7 +117,7 @@ export default function MealDownloadPage() {
           </div>
         </div>
         <p>月度充值记录包含员工异常、员工充值和管理人员三个工作表。异常次数仅作为依据展示，金额采用当前菜票规则及实际登记结果。</p>
-        <p>部门登记、外来人员领用、全年汇总、取款明细分别下载。纸质领用单列，未录入消费保留空值。</p>
+        <p>部门菜票发放汇总、外来人员领用、全年汇总、取款明细分别下载。纸质领用单列，未录入消费保留空值。</p>
       </div>
     </section>
   );

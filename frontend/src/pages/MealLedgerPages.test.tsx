@@ -91,6 +91,24 @@ describe("菜票查询与台账页面", () => {
     expect(screen.getAllByText(category === "card" ? "充卡" : "纸质").length).toBeGreaterThan(2);
   });
 
+  it("管理员查看部门汇总时没有手工登记和历史导入入口，保留已有历史数据", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"} : {
+      month:"2026-09",status:"confirmed",items:[{dept_name:"接待部",count:1,due_amount:1000,paid_amount:1000,
+        external_card_amount:200,external_paper_amount:100,total_paid_amount:1300,
+        registrar:"历史经办人",remark:"历史说明",historical_amount:1300}]
+    }));
+    render(<MemoryRouter><MealLedgerPage kind="department" /></MemoryRouter>);
+    await screen.findByText("接待部");
+    expect(screen.getByRole("heading",{name:"部门菜票发放汇总"})).toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"保存记录"})).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("登记人")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("备注")).not.toBeInTheDocument();
+    expect(screen.getByText("历史经办人")).toBeInTheDocument();
+    expect(screen.queryByLabelText("导入文件")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading",{name:"历史表格导入"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"查看导入历史"})).not.toBeInTheDocument();
+  });
+
   it("部门统计展示员工及两类客人金额，合计包含纸质菜票", async () => {
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"readonly"} : {
       month:"2026-09",status:"confirmed",items:[{dept_name:"接待部",count:1,due_amount:1000,paid_amount:1000,
@@ -108,29 +126,22 @@ describe("菜票查询与台账页面", () => {
     expect(screen.getByText("¥1300.00")).toBeInTheDocument();
   });
 
-  it("历史导入先预览并将修改后的年月与重复确认提交", async () => {
-    const preview = { id: 7, kind: "clearance", month: "2026-09", filename: "取款.xlsx", status: "preview", rows: [
-      { index: 0, sheet: "8月", row: 4, emp_no: "0001", name: "客人卡", dept_name: "客人", month: "2026-08", date: "2026-08-31", amount: 20, error: "", warning: "疑似重复" },
-    ] };
-    request.mockImplementation((path: string, options?: { body?: { rows?: unknown[] }; method?: string }) => {
-      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
-      if (path === "/api/meal-ledgers/imports/preview") return Promise.resolve(preview);
-      if (path === "/api/meal-ledgers/imports/7/confirm") return Promise.resolve({ ...preview, status: "confirmed", rows: options?.body?.rows });
-      return Promise.resolve([]);
+  it.each(["external", "annual", "clearance"] as const)("%s 页面没有历史导入入口，保留业务登记", async kind => {
+    request.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
+      return Promise.resolve(kind === "annual" ? {
+        year:2026,months:[],consumption_months:0,
+        totals:{employee_amount:0,external_card_amount:0,recharge_amount:0,paper_amount:0,
+          floor2_amount:0,floor3_amount:0,consumption_amount:0,recovered_amount:0}
+      } : []);
     });
-    render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
-    const upload = await screen.findByLabelText("导入文件");
-    fireEvent.change(upload, { target: { files: [new File(["test"], "取款.xlsx")] } });
-    fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
-    await screen.findByText(/预览未入账/);
-    expect(request.mock.calls.some(([p]) => String(p).endsWith("/confirm"))).toBe(false);
-    fireEvent.change(screen.getByLabelText("第1行月份"), { target: { value: "2025-08" } });
-    fireEvent.change(screen.getByLabelText("第1行日期"), { target: { value: "2025-08-15" } });
-    fireEvent.click(screen.getByLabelText("确认第1行为另一笔"));
-    fireEvent.click(screen.getByRole("button", { name: "确认导入" }));
-    await screen.findByText("导入已完成");
-    const submission = request.mock.calls.find(([p]) => p === "/api/meal-ledgers/imports/7/confirm")?.[1];
-    expect(submission.body.rows[0]).toMatchObject({ month: "2025-08", date: "2025-08-15", accept_duplicate: true });
+    render(<MemoryRouter><MealLedgerPage kind={kind} /></MemoryRouter>);
+    await screen.findByRole("button",{name:"保存记录"});
+    expect(screen.queryByLabelText("导入文件")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading",{name:"历史表格导入"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"预览导入"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("button",{name:"查看导入历史"})).not.toBeInTheDocument();
+    expect(screen.getByLabelText(kind === "annual" ? "二楼消费金额" : "姓名")).toBeInTheDocument();
   });
 
   it("台账只读账号可以查记录但没有登记、导入或作废按钮", async () => {
