@@ -18,8 +18,8 @@ const titles = {
 };
 
 const descriptions = {
-  department: "部门金额取对应人员的净实际发放合计，登记信息不产生额外发放。",
-  external: "外来人员独立登记，区分充卡与纸质领用。",
+  department: "部门发放合计包含员工净实际发放、客人卡充值和纸质菜票，外来领用自动计入承担费用的部门。",
+  external: "完成客人卡充值或发放纸质菜票后登记，按实际发放月份计入承担费用的部门；纸质金额填写票面总额。",
   clearance: "在菜票软件完成余额清零后登记，卡余额即当次取款金额，不影响菜票发放结清。",
   annual: "按实际业务月份汇总。纸质领用单列，收回取实际清零记录，消费未录入保持空值。",
 };
@@ -75,7 +75,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       <input
         type={type}
         step={type === "number" ? "0.01" : undefined}
-        required={type === "date"}
+        required={type === "date" || (kind === "external" && key === "dept_name")}
         value={form[key]}
         onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
       />
@@ -174,19 +174,19 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 <p className="meal-ledger-stat-sub">当前核算月份登记部门</p>
               </div>
               <div className="meal-ledger-stat-card is-blue">
-                <span className="meal-ledger-stat-label">涉及人数</span>
+                <span className="meal-ledger-stat-label">员工人数</span>
                 <strong className="meal-ledger-stat-value">{department.items.reduce((s, r) => s + r.count, 0)}<small>人</small></strong>
-                <p className="meal-ledger-stat-sub">参与菜票人员合计</p>
+                <p className="meal-ledger-stat-sub">不含客人领用记录</p>
               </div>
               <div className="meal-ledger-stat-card is-amber">
-                <span className="meal-ledger-stat-label">应发合计</span>
+                <span className="meal-ledger-stat-label">员工应发合计</span>
                 <strong className="meal-ledger-stat-value">¥{money(department.items.reduce((s, r) => s + r.due_amount, 0))}</strong>
                 <p className="meal-ledger-stat-sub">应发金额总计</p>
               </div>
               <div className="meal-ledger-stat-card is-green">
-                <span className="meal-ledger-stat-label">实际发放合计</span>
-                <strong className="meal-ledger-stat-value">¥{money(department.items.reduce((s, r) => s + r.paid_amount, 0))}</strong>
-                <p className="meal-ledger-stat-sub">净实际发放总计</p>
+                <span className="meal-ledger-stat-label">部门发放合计</span>
+                <strong className="meal-ledger-stat-value">¥{money(department.items.reduce((s, r) => s + r.total_paid_amount, 0))}</strong>
+                <p className="meal-ledger-stat-sub">员工净发放＋客人充卡＋纸质菜票</p>
               </div>
             </section>
           )}
@@ -259,19 +259,22 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 <div className="meal-ticket-section-heading">
                   <div>
                     <h2>部门登记列表</h2>
-                    <p>{department.status === "draft" ? "草稿" : department.status === "no_batch" ? "本月没有人员核算；历史登记仅供对照" : "已确认核算"}</p>
+                    <p>{department.status === "draft" ? "员工核算为草稿；客人金额取已登记有效领用" : department.status === "no_batch" ? "本月没有员工核算；客人有效领用仍计入部门统计" : "员工核算已确认；客人金额取已登记有效领用"}</p>
                   </div>
                   <span className={`meal-ledger-status-tag ${department.status === "draft" ? "is-draft" : "is-active"}`}>
                     {department.status === "draft" ? "草稿" : department.status === "no_batch" ? "未建立批次" : "已确认"}
                   </span>
                 </div>
                 <QueryTable
-                  headers={["部门", "人数", "应发合计", "实际发放合计", "登记人", "备注", "历史原账金额"]}
+                  headers={["部门", "员工人数", "员工应发合计", "员工净实际发放", "客人卡充值", "客人纸质菜票", "部门发放合计", "登记人", "备注", "历史原账金额"]}
                   rows={department.items.map(r => [
                     r.dept_name,
                     r.count,
                     money(r.due_amount),
                     money(r.paid_amount),
+                    money(r.external_card_amount),
+                    money(r.external_paper_amount),
+                    money(r.total_paid_amount),
                     r.registrar || "—",
                     r.remark || "—",
                     r.historical_amount == null ? "—" : money(r.historical_amount)
@@ -365,7 +368,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                       {field("amount", kind === "clearance" ? "清零取款金额" : "发放金额", "number")}
                     </>
                   )}
-                  {kind !== "annual" && field("dept_name", "部门")}
+                  {kind !== "annual" && field("dept_name", kind === "external" ? "承担费用的部门" : "部门")}
                   {kind === "external" && (
                     <>
                       <label>

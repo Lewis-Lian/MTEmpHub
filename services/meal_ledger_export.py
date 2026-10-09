@@ -108,16 +108,22 @@ def export(report, month=None, year=None, accessible=None, filters=None):
             for selected in periods:
                 data = ledger.departments(selected, accessible)
                 items = [r for r in data['items'] if not filters.get('dept_name') or r['dept_name'] == filters['dept_name']]
-                entries = [[r['dept_name'], r['paid_amount'], r['registrar'], r['remark']] for r in items]
+                entries = [[r['dept_name'], r['total_paid_amount'], r['registrar'], r['remark']] for r in items]
                 split = (len(entries) + 1) // 2
                 rows = [entries[index] + [''] + (entries[index + split] if index + split < len(entries) else ['', '', '', ''])
                         for index in range(split)]
-                rows.append(['合计', round(sum(r['paid_amount'] for r in items), 2), '', '人员净发放汇总；不含月底清零'])
+                rows.append(['合计', round(sum(r['total_paid_amount'] for r in items), 2), '', '员工净发放＋客人充卡＋纸质菜票；不含月底清零'])
                 ws = sheet(book, selected[5:] + '月', f'{selected}月份部门菜票登记', ['部门', '金额', '登记人', '备注', '', '部门', '金额', '登记人', '备注'], rows,
                     '草稿' if data['status'] == 'draft' else '无核算数据' if data['status'] == 'no_batch' else '已确认核算')
                 ws.column_dimensions['E'].width = 3
                 ws.auto_filter.ref = None
                 ws.freeze_panes = 'A4'
+                details = [[r['dept_name'], r['paid_amount'], r['external_card_amount'],
+                    r['external_paper_amount'], r['total_paid_amount']] for r in items]
+                details.append(['合计', *[round(sum(r[key] for r in items), 2) for key in
+                    ('paid_amount', 'external_card_amount', 'external_paper_amount', 'total_paid_amount')]])
+                sheet(book, selected[5:] + '月明细', f'{selected}月份部门菜票发放明细',
+                    ['部门', '员工净实际发放', '客人卡充值', '客人纸质菜票', '部门发放合计'], details)
         elif report in ('external', 'clearance'):
             rows = [r for r in ledger.records(report, month=None if yearly else month, year=period if yearly else None) if not r.voided]
             if report == 'external':

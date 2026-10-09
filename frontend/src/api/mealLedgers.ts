@@ -9,7 +9,9 @@ export interface LedgerRecord {
 }
 export interface DepartmentLedger {
   month: string; status: string;
-  items: Array<{ dept_name: string; count: number; due_amount: number; paid_amount: number; registrar: string; remark: string; historical_amount: number | null }>;
+  items: Array<{ dept_name: string; count: number; due_amount: number; paid_amount: number;
+    external_card_amount: number; external_paper_amount: number; total_paid_amount: number;
+    registrar: string; remark: string; historical_amount: number | null }>;
 }
 export interface AnnualMonth {
   month: string; employee_amount: number; external_card_amount: number; recharge_amount: number;

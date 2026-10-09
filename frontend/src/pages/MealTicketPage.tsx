@@ -66,6 +66,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [imports, setImports] = useState<MealImport[]>([]);
   const [preview, setPreview] = useState<MealImport | null>(null);
   const [attendancePreview, setAttendancePreview] = useState<MealAttendanceRecalculation | null>(null);
+  const [supplementReasons, setSupplementReasons] = useState<Record<number, string>>({});
   const [comparison, setComparison] = useState<MealComparison[]>([]);
   const [monthKind, setMonthKind] = useState("recharge");
   const [file, setFile] = useState<File | null>(null);
@@ -108,6 +109,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     const id = ++generation.current;
     const controller = new AbortController();
     setBatch(null); setPreview(null); setAttendancePreview(null); setTarget(null); setDetail(null); setSelected([]); setError("");
+    setSupplementReasons({});
     setFilterEmployeeIds([]); setReconciliationFailed(false);
     setBusy(true); setAdmin(false); setPeople([]); setHistoryDepartments([]);
     let completed = 0;
@@ -219,6 +221,23 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       if (id !== generation.current || locationKey !== currentLocation.current) return;
       setBatch(next);
       setAttendancePreview(null); setFollowupStage("adjustments");
+    });
+  }
+  async function supplementPerson(empId: number) {
+    if (!attendancePreview || !supplementReasons[empId]?.trim()) return;
+    const id = generation.current;
+    const locationKey = currentLocation.current;
+    await operate(async () => {
+      const next = await mutateMealBatch("supplement-person", {
+        batch_id: attendancePreview.batch_id, version: attendancePreview.version,
+        source_digest: attendancePreview.source_digest, emp_id: empId, reason: supplementReasons[empId],
+      });
+      if (id !== generation.current || locationKey !== currentLocation.current) return;
+      setBatch(next); setAttendancePreview(null); setSupplementReasons({});
+      const preview = await apiRequest<MealAttendanceRecalculation>("/api/meal-tickets/attendance-recalculation/preview", {
+        method: "POST", body: { batch_id: next.id, version: next.version },
+      });
+      if (id === generation.current && locationKey === currentLocation.current) setAttendancePreview(preview);
     });
   }
   function openForm(item: MealItem, endpoint: string, reversal?: number) {
@@ -473,7 +492,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           {admin && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory || hasAttendanceRecalculation} onClick={returnToDraft}>退回上一步</button>}
         </div>
         {admin && hasPaymentHistory && <p className="meal-ticket-export-hint">已登记发放流水，请通过补扣或冲正处理。</p>}
-        {admin && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算，请继续通过后续补扣处理。</p>}
+        {admin && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算或人员补入，请继续通过后续补扣处理。</p>}
       </section>}
     </div>}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
@@ -597,6 +616,21 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         rows={attendancePreview.rows.map(row => [row.emp_no, row.name, row.previous_days, row.days, row.excluded ? "本月不发 · 0.00" : money(row.amount)])} />
       <p>本次合计调整 {money(attendancePreview.total_amount)} 元；正数补发，负数扣除。确认后仍需完成实际补发或扣回并核对结清。</p>
       {attendancePreview.issues.length > 0 && <div className="meal-ticket-alert is-error"><p>以下人员需核对，暂不能登记本次重算：</p><ul>{attendancePreview.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
+      {!!attendancePreview.new_people?.length && <>
+        <h3>新增人员核对</h3>
+        <p>核对考勤和部门，填写原因后逐人补入。补入后仍需完成实际充值并核对到账。</p>
+        <QueryTable headers={["工号", "姓名", "部门", "实际打卡天数", "应发金额", "核对 / 操作"]}
+          rows={attendancePreview.new_people.map(person => [person.emp_no, person.name, person.dept_name,
+            person.days, money(person.base_amount), <div className="meal-ticket-row-actions">
+              <Link to={`/employee/individual-attendance?emp_id=${person.emp_id}&month=${batch?.month}`}>查看考勤依据</Link>
+              {person.error && <span>{person.error}</span>}
+              <label>补入原因<input aria-label={`${person.emp_no} 补入原因`} disabled={busy}
+                value={supplementReasons[person.emp_id] ?? ""}
+                onChange={e => setSupplementReasons(reasons => ({...reasons, [person.emp_id]:e.target.value}))} /></label>
+              <button className="meal-ticket-button" disabled={busy || !!person.error || !supplementReasons[person.emp_id]?.trim()}
+                onClick={() => supplementPerson(person.emp_id)}>核对并补入本月核算</button>
+            </div>])} />
+      </>}
       {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
       <div className="meal-ticket-actions">
         <button className="meal-ticket-button is-primary" disabled={busy || attendancePreview.issues.length > 0} onClick={applyAttendance}>确认登记考勤补扣</button>
@@ -607,6 +641,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     {detail && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="菜票明细"><h2>{detail.emp_no} {detail.name}</h2>
       <p>实际打卡天数：{detail.days} · 基础金额：{money(detail.base_amount)} 元</p>
       <p>考勤来源：{detail.source.configured_source} {detail.source.remark}</p>
+      {detail.source.supplement_confirmation && <p>补入核算：{detail.source.supplement_confirmation.reason} · {detail.source.supplement_confirmation.operator} · {detail.source.supplement_confirmation.created_at}</p>}
       {employmentLabel(detail) && <p>员工档案核对：{employmentLabel(detail)}</p>}
       {detail.error && <p>原考勤核对提示：{detail.error}</p>}
       {detail.excluded && <p>原基础金额：{money(detail.original_base_amount)} 元；本月基础金额按 0 元核算，确认后的补发另记补扣。</p>}

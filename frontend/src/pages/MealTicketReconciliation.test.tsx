@@ -47,6 +47,35 @@ it('后续补扣预览考勤差额，确认后保留基础金额和已发金额'
   expect(within(row).getByText('184.00')).toBeInTheDocument();
   expect(within(row).getAllByText('176.00')).toHaveLength(2);
 });
+it('新增人员需核对原因才能补入，补入后刷新预览并可继续重算', async () => {
+  const newPerson = {...item,id:3,emp_id:3,emp_no:'003',name:'新增员工',days:5,
+    base_amount:40,original_base_amount:40,due_amount:40,difference:40};
+  let current = batch;
+  request.mockImplementation((path:string) => {
+    if (path === '/api/auth/me') return Promise.resolve({role:'admin'});
+    if (path === '/api/meal-tickets/supplement-person') current = {...batch,version:3,items:[item,newPerson]};
+    if (path === '/api/meal-tickets/attendance-recalculation/preview') return Promise.resolve({
+      batch_id:1,version:current.version,source_digest:'new-source',total_amount:0,rows:[],
+      issues:current.version === 2 ? ['003 新增员工 不在原核算名单，请人工核对'] : [],
+      new_people:current.version === 2 ? [{emp_id:3,emp_no:'003',name:'新增员工',dept_name:'生产部',days:5,base_amount:40,error:''}] : []});
+    return Promise.resolve(current);
+  });
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'重算考勤数据'}));
+  const dialog = await screen.findByRole('dialog',{name:'考勤重算差额'});
+  const add = within(dialog).getByRole('button',{name:'核对并补入本月核算'});
+  expect(add).toBeDisabled();
+  expect(within(dialog).getByRole('button',{name:'确认登记考勤补扣'})).toBeDisabled();
+  expect(within(dialog).getByText('40.00')).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('003 补入原因'),{target:{value:'核对后补入'}});
+  fireEvent.click(add);
+  await waitFor(() => expect(within(screen.getByRole('dialog',{name:'考勤重算差额'}))
+    .getByRole('button',{name:'确认登记考勤补扣'})).toBeEnabled());
+  const refreshed = screen.getByRole('dialog',{name:'考勤重算差额'});
+  expect(within(refreshed).queryByRole('button',{name:'核对并补入本月核算'})).not.toBeInTheDocument();
+  fireEvent.click(within(refreshed).getByRole('button',{name:'取消'}));
+  expect(screen.getByText('新增员工')).toBeInTheDocument();
+});
 function page() {
   render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><MealTicketPage/></MemoryRouter></ConfirmProvider>);
 }

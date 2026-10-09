@@ -204,7 +204,7 @@ def unconfirm(batch):
         raise MealError('已登记发放流水，不能退回草稿，请通过补扣或冲正处理', 409)
     if any('attendance_recalculation' in item.source for item in
            MealTicketItem.query.filter_by(batch_key=batch.key).all()):
-        raise MealError('已完成后续考勤重算，不能退回草稿，请继续通过后续补扣处理', 409)
+        raise MealError('已完成后续考勤重算或人员补入，不能退回草稿，请继续通过后续补扣处理', 409)
     batch.status = 'draft'
     batch.confirmed_by = None
     batch.confirmed_at = None
@@ -262,7 +262,37 @@ def attendance_recalculation_preview(batch, source_rows=None):
     for data in current.values():
         issues.append(f'{data["emp_no_snapshot"]} {data["name"]} 不在原核算名单，请人工核对')
     return {'batch_id':batch.id, 'version':batch.version, 'source_digest':digest(source_rows),
-            'rows':rows, 'issues':issues, 'total_amount':sum(cents(row['amount']) for row in rows) / 100}
+            'rows':rows, 'issues':issues, 'total_amount':sum(cents(row['amount']) for row in rows) / 100,
+            'new_people':[{'emp_id':data['emp_id'], 'emp_no':data['emp_no_snapshot'],
+                'name':data['name'], 'dept_name':data['dept_name'], 'days':data['days'],
+                'base_amount':data['base_cents'] / 100, 'error':data['error']} for data in current.values()]}
+
+
+def supplement_person(batch, emp_id, source_digest, reason, operator):
+    if batch.status != 'confirmed':
+        raise MealError('草稿请通过生成 / 重算草稿更新人员名单', 409)
+    if type(emp_id) is not int:
+        raise MealError('人员明细无效')
+    reason = required_text(reason, '补入原因')
+    if MealTicketItem.query.filter_by(batch_key=batch.key, emp_id=emp_id).first():
+        raise MealError('该人员已在本月核算名单中，请刷新后核对', 409)
+    rows = source_snapshot(batch.month)
+    if source_digest != digest(rows):
+        raise MealError('考勤或人员资料已变化，请重新预览后补入', 409)
+    data = next((row for row in rows if row['emp_id'] == emp_id), None)
+    if data is None:
+        raise MealError('人员不在当前考勤范围，请重新核对', 409)
+    if data['error']:
+        raise MealError(data['error'])
+    timestamp = datetime.utcnow().isoformat()
+    data['source'] = {**data['source'],
+        'supplement_confirmation':{'reason':reason, 'operator':operator, 'created_at':timestamp},
+        'attendance_recalculation':{'days':data['days'], 'base_cents':data['base_cents'],
+            'operator':operator, 'created_at':timestamp}}
+    db.session.add(MealTicketItem(batch_key=batch.key, month=batch.month, **data))
+    # Other personnel may still need attendance corrections; retain the batch digest.
+    batch.version += 1
+    db.session.flush()
 
 
 def recalculate_attendance(batch, source_digest, operator):

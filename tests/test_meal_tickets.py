@@ -333,6 +333,91 @@ class MealTicketTests(unittest.TestCase):
         self.assertTrue(preview['issues'])
         self.assertEqual(self.post('/attendance-recalculation', {**body,
             'source_digest':preview['source_digest']}).status_code, 409)
+    def test_supplement_person_preserves_original_account_and_supports_followup(self):
+        batch = self.confirm(self.adjustment(self.generate(), '16'))
+        batch = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'192', 'kind':'recharge',
+            'date':'2026-09-01', 'reference':'原充值', 'request_key':'supplement-original'}).get_json()
+        original = batch['items']
+        with self.app.app_context():
+            emp = Employee(emp_no='003', name='补入员工')
+            db.session.add(emp)
+            db.session.flush()
+            emp_id = emp.id
+            db.session.add(EmployeeAttendanceOverride(emp_id=emp.id, month='2026-08', actual_attendance_days=5))
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).first().actual_attendance_days = 23
+            db.session.commit()
+        body = {'batch_id':batch['id'], 'version':batch['version']}
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        self.assertEqual(preview['new_people'][0]['emp_id'], emp_id)
+        self.assertEqual(preview['new_people'][0]['base_amount'], 40)
+        response = self.post('/supplement-person', {**body, 'emp_id':emp_id,
+            'source_digest':preview['source_digest'], 'reason':'核对考勤后补入'})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        updated = response.get_json()
+        self.assertEqual(updated['status'], 'confirmed')
+        self.assertEqual(updated['items'][:2], original)
+        self.assertTrue(updated['source_changed'])
+        added = updated['items'][2]
+        self.assertEqual((added['due_amount'], added['paid_amount'], added['difference']), (40, 0, 40))
+        self.assertEqual(added['source']['supplement_confirmation']['reason'], '核对考勤后补入')
+        self.assertEqual(added['source']['supplement_confirmation']['operator'], 'admin')
+        export = self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09', headers=self.headers)
+        sheet = xlrd.open_workbook(file_contents=export.data).sheet_by_index(0)
+        self.assertEqual(sheet.row_values(0), ['003', 40])
+        body['version'] = updated['version']
+        duplicate = self.post('/supplement-person', {**body, 'emp_id':emp_id,
+            'source_digest':preview['source_digest'], 'reason':'重复'})
+        self.assertEqual(duplicate.status_code, 409)
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        self.assertEqual(preview['issues'], [])
+        self.assertEqual(preview['new_people'], [])
+        self.assertEqual(preview['total_amount'], 8)
+        recalculated = self.post('/attendance-recalculation', {**body,
+            'source_digest':preview['source_digest']}).get_json()
+        added = recalculated['items'][2]
+        self.assertEqual(added['due_amount'], 40)
+        adjusted = self.post('/adjustments', {'batch_id':updated['id'], 'version':recalculated['version'],
+            'item_id':added['id'], 'amount':8, 'reason':'补发'}).get_json()
+        paid = self.post('/payments', {'batch_id':updated['id'], 'version':adjusted['version'],
+            'item_id':added['id'], 'amount':48, 'kind':'recharge', 'date':'2026-09-02',
+            'reference':'补发凭证', 'request_key':'supplement-new'})
+        self.assertEqual(paid.status_code, 200, paid.get_json())
+        export = self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09', headers=self.headers)
+        sheet = xlrd.open_workbook(file_contents=export.data).sheet_by_index(0)
+        self.assertEqual(sheet.row_values(0), ['001', 8])
+
+    def test_supplement_person_requires_current_preview_valid_attendance_and_admin(self):
+        draft = self.generate()
+        body = {'batch_id':draft['id'], 'version':draft['version'], 'emp_id':self.emp_id,
+                'source_digest':'stale', 'reason':'核对'}
+        self.assertEqual(self.post('/supplement-person', body).status_code, 409)
+        batch = self.confirm(draft)
+        with self.app.app_context():
+            emp = Employee(emp_no='003', name='缺考勤员工')
+            db.session.add(emp)
+            db.session.commit()
+            emp_id = emp.id
+        body.update(version=batch['version'], emp_id=emp_id)
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        self.assertEqual(self.post('/supplement-person', body).status_code, 409)
+        body['source_digest'] = preview['source_digest']
+        self.assertEqual(self.post('/supplement-person', body).status_code, 400)
+        with self.app.app_context():
+            db.session.add(EmployeeAttendanceOverride(emp_id=emp_id, month='2026-08', actual_attendance_days=2))
+            db.session.commit()
+        self.assertEqual(self.post('/supplement-person', body).status_code, 409)
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        body['source_digest'] = preview['source_digest']
+        self.assertEqual(self.post('/supplement-person', {**body, 'reason':' '}).status_code, 400)
+        self.assertEqual(self.client.post('/api/meal-tickets/supplement-person', json=body,
+            headers={'Authorization':'Bearer ' + self.viewer_token}).status_code, 403)
+        updated = self.post('/supplement-person', body)
+        self.assertEqual(updated.status_code, 200, updated.get_json())
+        self.assertEqual(self.post('/supplement-person', body).status_code, 409)
+        data = updated.get_json()
+        self.assertEqual(self.post('/unconfirm', {'batch_id':data['id'], 'version':data['version']}).status_code, 409)
+
     def test_unconfirm_allows_recalculation_and_requires_fresh_confirmation(self):
         batch = self.confirm(self.adjustment(self.generate(), '16'))
         with self.app.app_context():

@@ -42,6 +42,61 @@ class MealLedgerTests(unittest.TestCase):
         self.assertEqual(data['months'][8]['consumption_amount'], 12.5)
         self.assertIsNone(data['months'][7]['consumption_amount'])
 
+    def test_department_includes_guest_card_and_paper_once_and_excludes_voids(self):
+        batch = self.confirm(self.generate())
+        self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':176, 'kind':'recharge',
+            'date':'2026-09-01', 'reference':'员工充值', 'request_key':'dept-employee'})
+        values = dict(name='客人', dept_name='未分配部门', category='card', amount='200')
+        self.assertEqual(self.ledger('external', **values).status_code, 200)
+        self.assertEqual(self.ledger('external', **values).status_code, 200)
+        paper = self.ledger('external', name='客人', dept_name='未分配部门', category='paper',
+            amount='100', request_key='dept-paper').get_json()
+        self.ledger('external', name='客人乙', dept_name='行政部', category='card',
+            amount='50', request_key='dept-other')
+        self.ledger('external', name='次月客人', dept_name='行政部', category='paper', amount='99',
+            month='2026-10', date='2026-10-01', request_key='dept-next')
+        data = self.client.get('/api/meal-ledgers/department?month=2026-09', headers=self.headers).get_json()
+        rows = {r['dept_name']:r for r in data['items']}
+        self.assertEqual(rows['未分配部门']['paid_amount'], 176)
+        self.assertEqual(rows['未分配部门']['external_card_amount'], 200)
+        self.assertEqual(rows['未分配部门']['external_paper_amount'], 100)
+        self.assertEqual(rows['未分配部门']['total_paid_amount'], 476)
+        self.assertEqual(rows['行政部']['total_paid_amount'], 50)
+        export = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09', headers=self.headers)
+        book = load_workbook(io.BytesIO(export.data))
+        self.assertEqual(book.active.cell(book.active.max_row, 2).value, 526)
+        detail = book['09月明细']
+        self.assertEqual([detail.cell(3, n).value for n in range(1, 6)],
+            ['部门', '员工净实际发放', '客人卡充值', '客人纸质菜票', '部门发放合计'])
+        self.assertEqual(detail.cell(detail.max_row, 5).value, 526)
+        restricted = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09',
+            headers={'Authorization':'Bearer ' + self.viewer_token})
+        self.assertEqual(restricted.status_code, 200)
+        restricted_book = load_workbook(io.BytesIO(restricted.data))
+        restricted_detail = restricted_book['09月明细']
+        self.assertEqual(list(restricted_detail.values)[3], ('未分配部门', 176, 0, 0, 176))
+        self.assertEqual(restricted_detail.max_row, 5)
+        self.client.post(f'/api/meal-ledgers/records/{paper["id"]}/void',
+            json={'reason':'重复纸票'}, headers=self.headers)
+        data = self.client.get('/api/meal-ledgers/department?month=2026-09', headers=self.headers).get_json()
+        row = next(r for r in data['items'] if r['dept_name'] == '未分配部门')
+        self.assertEqual(row['total_paid_amount'], 376)
+        from services.meal_ledger_service import departments
+        with self.app.app_context():
+            limited = departments('2026-09', [self.emp_id])
+        self.assertEqual(len(limited['items']), 1)
+        self.assertEqual(limited['items'][0]['total_paid_amount'], 176)
+
+    def test_guest_only_department_is_visible_without_employee_batch_and_requires_department(self):
+        response = self.ledger('external', name='客人', category='paper', amount='100')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.ledger('external', name='客人', dept_name='接待部', category='paper', amount='100').status_code, 200)
+        data = self.client.get('/api/meal-ledgers/department?month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(data['items'][0]['dept_name'], '接待部')
+        self.assertEqual(data['items'][0]['total_paid_amount'], 100)
+        self.assertEqual(data['items'][0]['count'], 0)
+
     def test_retry_and_void_preserve_history_without_double_counting(self):
         values = dict(emp_no='guest', name='客人卡', amount='20')
         one = self.ledger('clearance', **values)

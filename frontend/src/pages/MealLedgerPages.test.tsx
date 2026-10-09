@@ -65,6 +65,49 @@ describe("菜票查询与台账页面", () => {
     expect(screen.queryByRole("option", { name: "外来人员领用" })).not.toBeInTheDocument();
   });
 
+  it.each(["card", "paper"])("客人 %s 发放登记需承担费用的部门并保存所选类别", async category => {
+    let rows: object[] = [];
+    request.mockImplementation((path: string, options?: { body?: Record<string, unknown>; method?: string }) => {
+      if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
+      if (path === "/api/meal-ledgers/external" && options?.method === "POST") {
+        const record = {id:1,...options.body,amount:200,voided:false};
+        rows = [record]; return Promise.resolve(record);
+      }
+      return Promise.resolve(rows);
+    });
+    render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+    await screen.findByRole("button",{name:"保存记录"});
+    expect(screen.getByLabelText("承担费用的部门")).toBeRequired();
+    fireEvent.change(screen.getByLabelText("姓名"),{target:{value:"访客甲"}});
+    fireEvent.change(screen.getByLabelText("承担费用的部门"),{target:{value:"接待部"}});
+    fireEvent.change(screen.getByLabelText("类别"),{target:{value:category}});
+    fireEvent.change(screen.getByLabelText("发放金额"),{target:{value:"200"}});
+    const now = new Date();
+    fireEvent.change(screen.getByLabelText("处理日期"),{target:{value:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-20`}});
+    fireEvent.click(screen.getByRole("button",{name:"保存记录"}));
+    await screen.findByText("记录已保存");
+    expect(screen.getByText("访客甲")).toBeInTheDocument();
+    expect(screen.getByText("接待部")).toBeInTheDocument();
+    expect(screen.getAllByText(category === "card" ? "充卡" : "纸质").length).toBeGreaterThan(2);
+  });
+
+  it("部门统计展示员工及两类客人金额，合计包含纸质菜票", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"readonly"} : {
+      month:"2026-09",status:"confirmed",items:[{dept_name:"接待部",count:1,due_amount:1000,paid_amount:1000,
+        external_card_amount:200,external_paper_amount:100,total_paid_amount:1300,
+        registrar:"",remark:"",historical_amount:null}]
+    }));
+    render(<MemoryRouter><MealLedgerPage kind="department" /></MemoryRouter>);
+    await screen.findByText("接待部");
+    expect(screen.getByRole("columnheader",{name:"员工净实际发放"})).toBeInTheDocument();
+    expect(screen.getByRole("columnheader",{name:"客人卡充值"})).toBeInTheDocument();
+    expect(screen.getByRole("columnheader",{name:"客人纸质菜票"})).toBeInTheDocument();
+    expect(screen.getByText("200.00")).toBeInTheDocument();
+    expect(screen.getByText("100.00")).toBeInTheDocument();
+    expect(screen.getByText("1300.00")).toBeInTheDocument();
+    expect(screen.getByText("¥1300.00")).toBeInTheDocument();
+  });
+
   it("历史导入先预览并将修改后的年月与重复确认提交", async () => {
     const preview = { id: 7, kind: "clearance", month: "2026-09", filename: "取款.xlsx", status: "preview", rows: [
       { index: 0, sheet: "8月", row: 4, emp_no: "0001", name: "客人卡", dept_name: "客人", month: "2026-08", date: "2026-08-31", amount: 20, error: "", warning: "疑似重复" },

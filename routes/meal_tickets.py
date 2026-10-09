@@ -16,7 +16,7 @@ from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
     MealError, begin_write, shift_month, generate, batch_for_write, confirm, adjustment,
     payment, serialize_batch, source_snapshot, participation, unconfirm,
-    attendance_recalculation_preview, recalculate_attendance,
+    attendance_recalculation_preview, recalculate_attendance, supplement_person,
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
 from services.meal_ticket_reconciliation import reconcile
@@ -168,6 +168,20 @@ def apply_attendance_recalculation():
     begin_write()
     batch = batch_for_write(body.get('batch_id'), body.get('version'))
     recalculate_attendance(batch, body.get('source_digest'), g.current_user.username)
+    result = serialize_batch(batch, check_source=True)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/supplement-person')
+@admin_required
+@handled
+def supplement_batch_person():
+    body = request.get_json(silent=True) or {}
+    begin_write()
+    batch = batch_for_write(body.get('batch_id'), body.get('version'))
+    supplement_person(batch, body.get('emp_id'), body.get('source_digest'),
+                      body.get('reason'), g.current_user.username)
     result = serialize_batch(batch, check_source=True)
     db.session.commit()
     return jsonify(result)

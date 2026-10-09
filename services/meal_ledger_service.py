@@ -45,6 +45,7 @@ def validated(kind, body):
         if amount <= 0:
             raise MealError('金额必须大于零')
         if kind == 'external':
+            data['dept_name'] = required_text(body.get('dept_name'), '承担费用的部门', 100)
             if body.get('category') not in ('card', 'paper'):
                 raise MealError('领用类别须为充卡或纸质')
             data['category'] = body['category']
@@ -134,8 +135,23 @@ def departments(month, accessible=None):
         known = {r['dept_name'] for r in rows}
         for name in notes.keys() - known:
             rows.append({'dept_name': name, 'count': 0, 'due_amount': 0, 'paid_amount': 0})
+    guests = {}
+    if accessible is None:
+        for record in records('external', month):
+            if record.voided:
+                continue
+            name = record.data.get('dept_name') or '未分配部门'
+            amounts = guests.setdefault(name, {'card':0, 'paper':0})
+            amounts[record.data['category']] += record.amount_cents
+        known = {r['dept_name'] for r in rows}
+        for name in guests.keys() - known:
+            rows.append({'dept_name':name, 'count':0, 'due_amount':0, 'paid_amount':0})
     for row in rows:
         note = notes.get(row['dept_name'])
+        amounts = guests.get(row['dept_name'], {'card':0, 'paper':0})
+        row.update({'external_card_amount':amounts['card'] / 100,
+            'external_paper_amount':amounts['paper'] / 100,
+            'total_paid_amount':(cents(row['paid_amount']) + amounts['card'] + amounts['paper']) / 100})
         row.update({'registrar': note.data.get('registrar', '') if note else '',
             'remark': note.data.get('remark', '') if note else '',
             'historical_amount': note.data.get('historical_cents', 0) / 100 if note and 'historical_cents' in note.data else None})
