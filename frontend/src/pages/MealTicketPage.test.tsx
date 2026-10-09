@@ -21,6 +21,20 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it("月度发放点击月份箭头展开面板并可选择月份", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : batch));
+    render(<MemoryRouter initialEntries={["/meal-tickets/calculation?recharge_month=2026-09"]}><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    const input = screen.getByRole("textbox", { name: "计划充值月份" });
+    const trigger = input.closest(".month-picker-split-trigger")!;
+    fireEvent.click(trigger.querySelector(".month-picker-chevron")!);
+    expect(trigger).toHaveClass("is-open");
+    fireEvent.click(screen.getByRole("button", { name: "7月" }));
+    await waitFor(() => expect(input).toHaveValue("2026-07"));
+    expect(trigger).not.toHaveClass("is-open");
+    fireEvent.click(input);
+    expect(trigger).toHaveClass("is-open");
+  });
   it("核算部门支持多选，汇总和人员视图采用同一部门范围", async () => {
     const current = { ...batch, items: [
       batch.items[0],
@@ -253,7 +267,10 @@ describe("菜票中心", () => {
     render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
     await screen.findByText("员工甲");
     expect(within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem").map(item => within(item).getByRole("heading").textContent))
-      .toEqual(["生成草稿", "补发 / 扣除", "确认核算", "导出充值表", "登记充值", "核对结清"]);
+      .toEqual(["生成草稿", "补扣与确认核算", "导出充值表", "登记充值", "核对结清"]);
+    const activeStep = screen.getByRole("list", { name: "月度发放流程" }).querySelector('[aria-current="step"]') as HTMLElement;
+    expect(within(activeStep).getByRole("button", { name: "确认核算" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "核对人员与补扣" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "充值表导出" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "前往导出" })).not.toBeInTheDocument();
@@ -472,17 +489,20 @@ describe("菜票中心", () => {
     })));
   });
 
-  it("加载进度只随实际权限和账目请求完成而推进", async () => {
+  it("月度加载显示后台实际处理人数，权限完成不会虚增进度", async () => {
     let finishAuth!: (value: object) => void;
     let finishBatch!: (value: object) => void;
-    request.mockImplementation((path: string) => new Promise(resolve => {
+    request.mockImplementation((path: string) => path.startsWith("/api/meal-tickets/progress?")
+      ? Promise.resolve({ status: "running", stage: "逐人核对考勤来源", completed: 3, total: 10 }) : new Promise(resolve => {
       if (path === "/api/auth/me") finishAuth = resolve; else finishBatch = resolve;
     }));
     render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
-    expect(screen.getByRole("progressbar", { name: "页面加载进度" })).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByRole("progressbar", { name: "页面加载进度" })).not.toHaveAttribute("aria-valuenow");
     await act(async () => finishAuth({ role: "admin" }));
-    expect(screen.getByRole("progressbar", { name: "页面加载进度" })).toHaveAttribute("aria-valuenow", "50");
-    expect(screen.getByText("已完成 1 / 2 项请求")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "页面加载进度" })).not.toHaveAttribute("aria-valuenow");
+    await waitFor(() => expect(screen.getByRole("progressbar", { name: "页面加载进度" })).toHaveAttribute("aria-valuenow", "30"));
+    expect(screen.getByText("逐人核对考勤来源")).toBeInTheDocument();
+    expect(screen.getByText("当前阶段已完成 3 / 10 人")).toBeInTheDocument();
     await act(async () => finishBatch(batch));
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     expect(screen.getByText("员工甲")).toBeInTheDocument();
@@ -639,7 +659,7 @@ describe("菜票中心", () => {
     expect(await screen.findByRole("heading", { name: "后续补扣与对账" })).toBeInTheDocument();
     await screen.findByText("员工甲");
     fireEvent.change(screen.getByLabelText("计划充值月份"), { target: { value: "2026-09" } });
-    await waitFor(() => expect(request).toHaveBeenCalledWith("/api/meal-tickets?recharge_month=2026-09"));
+    await waitFor(() => expect(request).toHaveBeenCalledWith("/api/meal-tickets?recharge_month=2026-09", expect.objectContaining({ headers: expect.objectContaining({ "X-Meal-Progress-Token": expect.any(String) }) })));
     first.unmount();
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
     expect(screen.getByLabelText("计划充值月份")).toHaveValue("2026-09");

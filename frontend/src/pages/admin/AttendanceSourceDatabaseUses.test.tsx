@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AttendanceSourceSettingsPage from "./AttendanceSourceSettingsPage";
 import { NotificationProvider } from "../../components/feedback/Notification";
@@ -27,10 +27,16 @@ describe("共享数据库用途", () => {
     render(<NotificationProvider><AttendanceSourceSettingsPage /></NotificationProvider>);
     const toggle = await screen.findByRole("switch", { name: "菜票数据库核对" });
     expect(toggle).toHaveAttribute("aria-checked", "false");
+    const switches = screen.getByRole("region", { name: "同步用途开关" });
+    expect(within(switches).getByRole("heading", { name: "菜票充值与核对" })).toBeInTheDocument();
+    expect(within(switches).getAllByRole("switch")).toHaveLength(3);
+    const database = screen.getByRole("region", { name: "共享数据库设置" });
+    expect(switches.compareDocumentPosition(database) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(database).queryByRole("switch")).not.toBeInTheDocument();
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
     expect(screen.getByLabelText("考勤机地址")).toHaveValue("192.0.2.10");
-    expect(screen.getByRole("button", { name: "数据库同步" })).toHaveClass("is-active");
+    expect(screen.getByRole("switch", { name: "员工数据库同步" })).toHaveAttribute("aria-checked", "true");
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "false"));
   });

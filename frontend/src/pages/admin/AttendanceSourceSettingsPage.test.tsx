@@ -62,14 +62,14 @@ describe("AttendanceSourceSettingsPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "连接测试" }));
     await waitFor(() => expect(apiMock.testAttendanceConnection).toHaveBeenCalledWith());
     await waitFor(() => expect(notificationMock.success).toHaveBeenCalledWith("钉钉连接成功"));
-    fireEvent.click(screen.getByRole("button", { name: "钉钉" }));
+    fireEvent.click(screen.getByRole("switch", { name: "管理人员钉钉同步" }));
     await waitFor(() => expect(apiMock.saveAttendanceSettings).toHaveBeenCalledWith("dingtalk"));
   });
 
   it("syncs selected account set and renders partial unmatched records", async () => {
     setup();
     await screen.findAllByText("2026年08月");
-    fireEvent.click(screen.getByRole("button", { name: "钉钉" }));
+    fireEvent.click(screen.getByRole("switch", { name: "管理人员钉钉同步" }));
     await waitFor(() => expect(apiMock.saveAttendanceSettings).toHaveBeenCalled());
     fireEvent.click(screen.getByRole("button", { name: "同步管理人员考勤" }));
     expect(await screen.findByText("同步完成，但有 2 条未匹配记录")).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe("AttendanceSourceSettingsPage", () => {
   it("hides admin controls when sync history returns an admin expiry", async () => {
     setup(() => apiMock.fetchManagerAttendanceSyncHistory.mockRejectedValue(Object.assign(new Error("登录已过期"), { status: 403 })));
     await waitFor(() => expect(screen.getByText("管理人员同步需要管理员登录，请先登录后再使用同步与账套控制。")).toBeInTheDocument());
-    expect(screen.getByText("更多设置")).toBeInTheDocument();
+    expect(screen.getByText("数据来源与同步")).toBeInTheDocument();
   });
 
   it("shows history loading and ignores an older account response after switching", async () => {
@@ -151,7 +151,7 @@ describe("AttendanceSourceSettingsPage", () => {
     setup();
     apiMock.syncManagerAttendance.mockRejectedValue(Object.assign(new Error("admin expired"), { status: 401 }));
     await screen.findByText("钉钉凭证已配置");
-    fireEvent.click(screen.getByRole("button", { name: "钉钉" }));
+    fireEvent.click(screen.getByRole("switch", { name: "管理人员钉钉同步" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "同步管理人员考勤" })).not.toBeDisabled());
     fireEvent.click(screen.getByRole("button", { name: "同步管理人员考勤" }));
     await waitFor(() => expect(notificationMock.warning).toHaveBeenCalledWith("管理员登录已过期，请重新登录"));
@@ -180,7 +180,7 @@ describe("AttendanceSourceSettingsPage", () => {
     const delayed = new Promise<any[]>((resolve) => { resolveHistory = resolve; });
     setup(() => apiMock.fetchManagerAttendanceSyncHistory.mockReturnValue(delayed as never));
     await screen.findByText("钉钉凭证已配置");
-    fireEvent.click(screen.getByRole("button", { name: "钉钉" }));
+    fireEvent.click(screen.getByRole("switch", { name: "管理人员钉钉同步" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "同步管理人员考勤" })).not.toBeDisabled());
     fireEvent.click(screen.getByRole("button", { name: "同步管理人员考勤" }));
     await screen.findByText("同步完成，但有 2 条未匹配记录");
@@ -198,11 +198,11 @@ describe("AttendanceSourceSettingsPage", () => {
   it("renders the employee panel above the manager panel and switches the employee source", async () => {
     setup();
     await screen.findByText("钉钉凭证已配置");
-    const employeeKicker = screen.getByText("考勤与菜票");
-    const managerKicker = screen.getByText("管理人员考勤");
+    const employeeKicker = screen.getByRole("heading", { name: "员工考勤同步" });
+    const managerKicker = screen.getByRole("heading", { name: "管理人员钉钉同步" });
     expect(employeeKicker.compareDocumentPosition(managerKicker) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "数据库同步" }));
+    fireEvent.click(screen.getByRole("switch", { name: "员工数据库同步" }));
     await waitFor(() =>
       expect(apiMock.saveAttendanceSettings).toHaveBeenCalledWith("local", { employee_attendance_source: "card_db" }),
     );
@@ -211,7 +211,7 @@ describe("AttendanceSourceSettingsPage", () => {
 
   it("saves the card database form and tests the connection with the typed values", async () => {
     setup();
-    await screen.findByText("考勤机数据库未配置");
+    await screen.findByText("共享数据库未配置");
     fireEvent.change(screen.getByLabelText("考勤机地址"), { target: { value: "192.0.2.10" } });
     fireEvent.change(screen.getByLabelText("考勤机端口"), { target: { value: "1433" } });
     fireEvent.change(screen.getByLabelText("考勤机库名"), { target: { value: "STCard_Test" } });
@@ -244,7 +244,7 @@ describe("AttendanceSourceSettingsPage", () => {
         card_db_configured: true,
       }),
     );
-    await screen.findByText("考勤机数据库已配置");
+    await screen.findByText("共享数据库已配置");
 
     apiMock.testCardDbConnection.mockRejectedValue(Object.assign(new Error("Bad Gateway"), {
       status: 502,
@@ -277,7 +277,7 @@ describe("AttendanceSourceSettingsPage", () => {
         card_db_configured: true,
       }),
     );
-    await screen.findByText("考勤机数据库已配置");
+    await screen.findByText("共享数据库已配置");
     fireEvent.click(screen.getByRole("button", { name: "同步员工考勤" }));
     expect(await screen.findByText("同步完成，但有 2 条未匹配记录")).toBeInTheDocument();
     expect(screen.getByText(/C1 外部人员 2026-08-02/)).toBeInTheDocument();
@@ -309,7 +309,7 @@ describe("AttendanceSourceSettingsPage", () => {
       });
       apiMock.syncEmployeeAttendance.mockReturnValue(pendingSync as never);
     });
-    await screen.findByText("考勤机数据库已配置");
+    await screen.findByText("共享数据库已配置");
     fireEvent.click(screen.getByRole("button", { name: "同步员工考勤" }));
 
     // 进度条即时渲染

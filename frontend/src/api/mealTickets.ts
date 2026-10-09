@@ -47,7 +47,33 @@ export interface MealComparison {
   base_amount: number | null; difference: number | null; error: string;
 }
 export const compareMealImport = (id: number) => apiRequest<MealComparison[]>(`/api/meal-tickets/imports/${id}/comparison`);
-export const fetchMealBatch = (month: string) => apiRequest<MealBatch | null>(`/api/meal-tickets?recharge_month=${month}`);
+export interface MealReadProgress {
+  status: "idle" | "running" | "completed" | "failed";
+  stage: string;
+  completed: number;
+  total: number;
+}
+export async function fetchMealBatch(month: string, onProgress?: (progress: MealReadProgress) => void, signal?: AbortSignal): Promise<MealBatch | null> {
+  const path = `/api/meal-tickets?recharge_month=${month}`;
+  if (!onProgress) return apiRequest<MealBatch | null>(path);
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("");
+  let finished = false;
+  let timer: ReturnType<typeof setTimeout>;
+  const poll = async () => {
+    try {
+      const progress = await apiRequest<MealReadProgress>(`/api/meal-tickets/progress?token=${token}`, { signal });
+      if (!finished && !signal?.aborted && progress.status !== "idle") onProgress(progress);
+    } catch { /* The data response remains authoritative if a progress request fails. */ }
+    if (!finished && !signal?.aborted) timer = setTimeout(() => void poll(), 400);
+  };
+  timer = setTimeout(() => void poll(), 400);
+  try {
+    return await apiRequest<MealBatch | null>(path, { headers: { "X-Meal-Progress-Token": token }, signal });
+  } finally {
+    finished = true;
+    clearTimeout(timer);
+  }
+}
 export const mutateMealBatch = (action: string, body: object) => apiRequest<MealBatch>(`/api/meal-tickets/${action}`, { method: "POST", body });
 export const mealRechargeExportUrl = (month: string) => buildApiUrl(`/api/meal-tickets/export-recharge?recharge_month=${month}`);
 export const fetchMealImports = () => apiRequest<MealImport[]>("/api/meal-tickets/imports");

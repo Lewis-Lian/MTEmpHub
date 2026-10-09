@@ -880,6 +880,7 @@ def _build_final_rows(
     emp_ids: list[int],
     include_overrides: bool = True,
     include_daily_overrides: bool = True,
+    progress_cb=None,
 ) -> list[list[object]]:
     employees = (
         Employee.query.options(joinedload(Employee.department))
@@ -988,6 +989,9 @@ def _build_final_rows(
             "",
         ]
         rows.append(row)
+
+        if progress_cb is not None:
+            progress_cb(len(rows), len(employees))
 
     return rows
 

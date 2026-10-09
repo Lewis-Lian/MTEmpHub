@@ -85,6 +85,48 @@ class MealTicketTests(unittest.TestCase):
         self.generate()
         self.assertEqual(self.client.get(url, headers=self.headers).status_code, 409)
 
+    def test_monthly_read_reports_real_person_counts_and_preserves_result(self):
+        batch = self.generate()
+        from services.meal_ticket_service import serialize_batch
+        from models.meal_ticket import MealTicketBatch
+        events = []
+        with self.app.app_context():
+            result = serialize_batch(db.session.get(MealTicketBatch, batch['id']), check_source=True,
+                                     progress=lambda **event: events.append(event))
+            self.assertEqual(result, serialize_batch(db.session.get(MealTicketBatch, batch['id']), check_source=True))
+        self.assertEqual(len(result['items']), 2)
+        for stage in ('汇总人员补扣与充值', '计算员工考勤', '逐人核对考勤来源'):
+            counts = [(e['completed'], e['total']) for e in events if e['stage'] == stage and e['total']]
+            self.assertEqual(counts[-1], (2, 2), stage)
+            self.assertIn((1, 2), counts, stage)
+
+    def test_monthly_read_progress_is_scoped_to_request_and_user(self):
+        self.generate()
+        token = 'a' * 32
+        url = '/api/meal-tickets/progress?token=' + token
+        self.assertEqual(self.client.get(url, headers=self.headers).get_json()['status'], 'idle')
+        response = self.client.get('/api/meal-tickets?recharge_month=2026-09',
+                                   headers={**self.headers, 'X-Meal-Progress-Token': token})
+        self.assertEqual(response.status_code, 200)
+        progress = self.client.get(url, headers=self.headers).get_json()
+        self.assertEqual(progress['status'], 'completed')
+        self.assertEqual(progress['stage'], '月度核算数据已加载')
+        viewer = self.client.get(url, headers={'Authorization': 'Bearer ' + self.viewer_token})
+        self.assertEqual(viewer.get_json()['status'], 'idle')
+        self.assertEqual(self.client.get('/api/meal-tickets/progress?token=../bad', headers=self.headers).status_code, 400)
+        failed_token = 'b' * 32
+        self.assertEqual(self.client.get('/api/meal-tickets?recharge_month=bad',
+            headers={**self.headers, 'X-Meal-Progress-Token': failed_token}).status_code, 400)
+        failure = self.client.get('/api/meal-tickets/progress?token=' + failed_token, headers=self.headers).get_json()
+        self.assertEqual(failure['status'], 'failed')
+
+    def test_monthly_progress_header_is_allowed_for_configured_frontend(self):
+        response = self.client.options('/api/meal-tickets?recharge_month=2026-09', headers={
+            'Origin': 'http://localhost:5173', 'Access-Control-Request-Method': 'GET',
+            'Access-Control-Request-Headers': 'X-Meal-Progress-Token',
+        })
+        self.assertIn('X-Meal-Progress-Token', response.headers.get('Access-Control-Allow-Headers', ''))
+
     def test_recharge_export_is_two_column_xls_with_remaining_amount(self):
         batch = self.confirm(self.adjustment(self.generate(), '16.50'))
         response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
@@ -96,14 +138,25 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(response.mimetype, 'application/vnd.ms-excel')
         self.assertIn('.xls', response.headers['Content-Disposition'])
         self.assertTrue(response.data.startswith(bytes.fromhex('d0cf11e0a1b11ae1')))
-        book = xlrd.open_workbook(file_contents=response.data)
+        book = xlrd.open_workbook(file_contents=response.data, formatting_info=True)
         self.assertEqual(book.nsheets, 1)
         sheet = book.sheet_by_index(0)
-        self.assertEqual((sheet.nrows, sheet.ncols), (2, 2))
-        self.assertEqual(sheet.row_values(0), ['员工编号', '充值金额'])
-        self.assertEqual(sheet.row_values(1), ['001', 16.5])
-        self.assertEqual(sheet.cell_type(1, 0), xlrd.XL_CELL_TEXT)
-        self.assertEqual(sheet.cell_type(1, 1), xlrd.XL_CELL_NUMBER)
+        self.assertEqual((sheet.nrows, sheet.ncols), (1, 2))
+        self.assertEqual(sheet.row_values(0), ['001', 16.5])
+        self.assertEqual(sheet.cell_type(0, 0), xlrd.XL_CELL_TEXT)
+        self.assertEqual(sheet.cell_type(0, 1), xlrd.XL_CELL_NUMBER)
+        self.assertEqual(sheet.colinfo_map, {})
+        for col in range(2):
+            style = book.xf_list[sheet.cell_xf_index(0, col)]
+            self.assertEqual(book.format_map[style.format_key].format_str, 'General')
+            self.assertEqual(style.background.fill_pattern, 0)
+            self.assertEqual(style.border.left_line_style, 0)
+            self.assertEqual(style.border.right_line_style, 0)
+            self.assertEqual(style.border.top_line_style, 0)
+            self.assertEqual(style.border.bottom_line_style, 0)
+            font = book.font_list[style.font_index]
+            self.assertEqual(font.bold, 0)
+            self.assertEqual(font.italic, 0)
         current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
         self.assertEqual(len(current['items'][0]['payments']), 1)
 
@@ -119,7 +172,7 @@ class MealTicketTests(unittest.TestCase):
                 self.adjustment(response.get_json(), amount)
             exported = self.client.get(url, headers=self.headers)
             self.assertEqual(exported.status_code, 200)
-            self.assertEqual(xlrd.open_workbook(file_contents=exported.data).sheet_by_index(0).nrows, 1)
+            self.assertEqual(xlrd.open_workbook(file_contents=exported.data).sheet_by_index(0).nrows, 0)
 
     def test_recharge_export_respects_personnel_permissions(self):
         batch = self.confirm(self.generate())
@@ -131,7 +184,7 @@ class MealTicketTests(unittest.TestCase):
         exported = self.client.get(url, headers=viewer)
         self.assertEqual(exported.status_code, 200)
         sheet = xlrd.open_workbook(file_contents=exported.data).sheet_by_index(0)
-        self.assertEqual(sheet.col_values(0), ['员工编号', '001'])
+        self.assertEqual(sheet.col_values(0), ['001'])
         self.assertEqual(self.client.get(url).status_code, 401)
 
     def test_final_field_next_month_and_no_rounding(self):

@@ -31,7 +31,7 @@ def configure_api_cors(app):
         app,
         resources={r"/api/*": {"origins": _resolve_allowed_origins(app)}},
         supports_credentials=True,
-        allow_headers=["Authorization", "Content-Type"],
+        allow_headers=["Authorization", "Content-Type", "X-Meal-Progress-Token"],
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     )
 

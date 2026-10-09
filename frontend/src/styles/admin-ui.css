@@ -523,9 +523,17 @@
   background: currentColor;
 }
 
-.settings-database-use { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 16px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius); background: var(--ent-secondary-bg); }
-.settings-database-use strong { color: var(--ent-text); font-size: 13px; }
-.settings-database-use p { margin: 5px 0 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.7; }
+.attendance-source-page { min-width: 0; }
+.app-workspace-frame:has(.attendance-source-page),
+.app-content:has(.attendance-source-page) { grid-template-columns: minmax(0, 1fr); }
+.app-tab-pane:has(> .attendance-source-page) { min-width: 0; }
+.attendance-source-page > .account-page-stack { grid-template-columns: minmax(0, 1fr); }
+.settings-source-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.settings-source-card { padding: 20px; justify-content: space-between; gap: 20px; }
+.settings-source-switch-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; color: var(--ent-text-secondary); font-size: 12px; }
+.settings-connection-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 1100px) { .settings-connection-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) { .settings-source-grid { grid-template-columns: minmax(0, 1fr); } }
 .settings-database-switch { display: inline-flex; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius); background: var(--ent-bg); color: var(--ent-text-secondary); font: inherit; font-size: 12px; cursor: pointer; }
 .settings-database-switch > span { position: relative; width: 30px; height: 18px; border-radius: 999px; background: var(--ent-border-strong); }
 .settings-database-switch > span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #fff; }

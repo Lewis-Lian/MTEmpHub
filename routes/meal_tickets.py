@@ -56,10 +56,30 @@ def selected_batch():
 @page_permission_required('meal_ticket_query')
 @handled
 def get_batch():
-    batch = selected_batch()
-    if not batch:
-        return jsonify(None)
-    return jsonify(serialize_batch(batch, accessible(), check_source=g.current_user.role == 'admin'))
+    from services.meal_ticket_progress_service import start_progress
+    token = request.headers.get('X-Meal-Progress-Token')
+    progress = start_progress(token, g.current_user.id) if token else None
+    try:
+        batch = selected_batch()
+        result = serialize_batch(batch, accessible(), check_source=g.current_user.role == 'admin', progress=progress) if batch else None
+        response = jsonify(result)
+        if progress:
+            progress('月度核算数据已加载', 1, 1, status='completed')
+        return response
+    except Exception:
+        if progress:
+            progress('月度核算数据读取失败', status='failed')
+        raise
+
+
+@meal_tickets_bp.get('/progress')
+@page_permission_required('meal_ticket_query')
+@handled
+def get_read_progress():
+    from services.meal_ticket_progress_service import read_progress
+    response = jsonify(read_progress(request.args.get('token'), g.current_user.id))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
 
 
 @meal_tickets_bp.post('/generate')
@@ -188,19 +208,14 @@ def export_recharge():
     data = serialize_batch(batch, accessible())
     book = xlwt.Workbook()
     sheet = book.add_sheet('充值表')
-    sheet.write(0, 0, '员工编号')
-    sheet.write(0, 1, '充值金额')
-    amount_style = xlwt.easyxf(num_format_str='0.00')
-    row = 1
+    row = 0
     for item in data['items']:
         amount = round(item['difference'], 2)
         if amount <= 0:
             continue
         sheet.write(row, 0, item['emp_no'])
-        sheet.write(row, 1, amount, amount_style)
+        sheet.write(row, 1, amount)
         row += 1
-    sheet.col(0).width = 20 * 256
-    sheet.col(1).width = 20 * 256
     output = BytesIO()
     book.save(output)
     output.seek(0)

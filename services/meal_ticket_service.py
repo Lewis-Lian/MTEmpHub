@@ -78,22 +78,34 @@ def batch_for_write(identifier, version):
     return batch
 
 
-def source_snapshot(month):
+def source_snapshot(month, progress=None):
     # These are the very same final result builders used by the query pages.
     from routes.query_core import _build_final_rows
     first = date.fromisoformat(month + '-01')
+    if progress:
+        progress(stage='读取考勤人员名单', completed=0, total=0)
     employees = Employee.query.filter(or_(Employee.resigned_at.is_(None), Employee.resigned_at >= first)).order_by(Employee.emp_no).all()
     ordinary = [e for e in employees if not e.is_manager]
     managers = [e for e in employees if e.is_manager]
-    employee_values = {str(row[1]): row[4] for row in _build_final_rows(month, [e.id for e in ordinary])}
+    if progress:
+        progress(stage='计算员工考勤', completed=0, total=0)
+    employee_progress = {'progress_cb': lambda done, total: progress(stage='计算员工考勤', completed=done, total=total)} if progress else {}
+    employee_values = {str(row[1]): row[4] for row in _build_final_rows(month, [e.id for e in ordinary], **employee_progress)}
+    if progress:
+        progress(stage='计算管理人员考勤', completed=0, total=0)
+    manager_progress = {'progress_cb': lambda done, total: progress(stage='计算管理人员考勤', completed=done, total=total)} if progress else {}
     manager_values = {row['emp_id']: row['punch_days'] for row in build_manager_rows(
-        ManagerAttendanceOptions(month=month), [e.id for e in managers], include_resigned=True)}
+        ManagerAttendanceOptions(month=month), [e.id for e in managers], include_resigned=True, **manager_progress)}
+    if progress:
+        progress(stage='读取考勤修正与打卡依据', completed=0, total=0)
     overrides = {r.emp_id:r for r in EmployeeAttendanceOverride.query.filter_by(month=month).all()}
     daily = daily_override_maps(month, [e.id for e in employees])
     views = {}
     for group, context in ((ordinary, EMPLOYEE_STATS_CONTEXT), (managers, MANAGER_STATS_CONTEXT)):
         views.update(attendance_views_by_employee(month, group, context))
     result = []
+    if progress:
+        progress(stage='逐人核对考勤来源', completed=0, total=len(employees))
     for emp in employees:
         context = MANAGER_STATS_CONTEXT if emp.is_manager else EMPLOYEE_STATS_CONTEXT
         value = manager_values.get(emp.id) if emp.is_manager else employee_values.get(emp.emp_no)
@@ -127,6 +139,8 @@ def source_snapshot(month):
             'dept_name':emp.department.dept_name if emp.department else '未分配部门',
             'is_manager':bool(emp.is_manager), 'days':float(days), 'base_cents':base,
             'source':source, 'error':error})
+        if progress:
+            progress(stage='逐人核对考勤来源', completed=len(result), total=len(employees))
     return result
 
 
@@ -363,9 +377,11 @@ def payment(body, operator):
     return batch
 
 
-def serialize_batch(batch, accessible=None, check_source=False):
+def serialize_batch(batch, accessible=None, check_source=False, progress=None):
     from models.meal_ledger import MealLedgerRecord
     clearances = {}
+    if progress:
+        progress(stage='读取清零记录与核算明细', completed=0, total=0)
     for record in MealLedgerRecord.query.filter_by(kind='clearance', month=batch.recharge_month).all():
         clearances.setdefault(record.data.get('emp_no'), []).append({'date':record.record_date.isoformat(),
             'amount':record.amount_cents/100, 'remark':record.data.get('remark', ''), 'voided':record.voided})
@@ -373,9 +389,12 @@ def serialize_batch(batch, accessible=None, check_source=False):
     if accessible is not None:
         query = query.filter(MealTicketItem.emp_id.in_(accessible))
     items, departments = [], {}
-    for item, employee_id, resigned_at in query.with_entities(
+    records = query.with_entities(
             MealTicketItem, Employee.id, Employee.resigned_at).outerjoin(
-                Employee, Employee.id == MealTicketItem.emp_id).all():
+                Employee, Employee.id == MealTicketItem.emp_id).all()
+    if progress:
+        progress(stage='汇总人员补扣与充值', completed=0, total=len(records))
+    for item, employee_id, resigned_at in records:
         due, paid, adjustments, payments = totals(item)
         excluded = bool(participation_state(item).get('excluded'))
         base = 0 if excluded else item.base_cents
@@ -401,11 +420,18 @@ def serialize_batch(batch, accessible=None, check_source=False):
         department['count'] += 1
         for name in ('base_amount','adjustment_amount','due_amount','paid_amount','difference'):
             department[name] = round(department[name] + row[name], 2)
+        if progress:
+            progress(stage='汇总人员补扣与充值', completed=len(items), total=len(records))
     changed = False
     if check_source:
         account = db.session.get(AccountSet, batch.account_set_id)
-        changed = (batch.status == 'confirmed' and not account.is_locked) or digest(source_snapshot(batch.month)) != batch.source_digest
+        changed = batch.status == 'confirmed' and not account.is_locked
+        if not changed:
+            sources = source_snapshot(batch.month, progress=progress) if progress else source_snapshot(batch.month)
+            changed = digest(sources) != batch.source_digest
     from services.meal_ticket_reconciliation import database_status
+    if progress:
+        progress(stage='读取数据库核对配置', completed=0, total=0)
     return {'id':batch.id, 'month':batch.month, 'recharge_month':batch.recharge_month, 'status':batch.status,
             'reconciliation':batch.reconciliation if accessible is None else None,
             'database':database_status(),

@@ -379,13 +379,13 @@ export default function AttendanceSourceSettingsPage() {
   }, [authUser?.role, selectedEmployeeAccount]);
 
   return (
-    <main className="account-center-page">
+    <main className="account-center-page attendance-source-page">
       <section className="account-page-stack">
         <header className="settings-header-panel">
           <div className="settings-header-title-group">
-            <h2 className="settings-header-title">更多设置</h2>
+            <h2 className="settings-header-title">数据来源与同步</h2>
             <p className="settings-header-desc">
-              管理考勤与菜票共用的 SQL Server 连接，以及管理人员钉钉数据源。
+              分别启用考勤同步和菜票核对，在下方维护数据库与钉钉设置。
             </p>
           </div>
         </header>
@@ -403,13 +403,50 @@ export default function AttendanceSourceSettingsPage() {
           </div>
         )}
 
-        {/* 员工考勤设置 */}
-        <section className="settings-card">
+        {attendanceSettings && <section className="settings-source-grid" aria-label="同步用途开关">
+          <section className="settings-card settings-source-card" aria-labelledby="employee-source-title">
+            <div><h3 id="employee-source-title" className="settings-card-title">员工考勤同步</h3><p className="settings-card-desc">从共享数据库读取员工打卡记录。</p></div>
+            <div className="settings-source-switch-row">
+              <span>{attendanceSettings.employee_attendance_source === "card_db" ? "数据库同步" : "本地上传"}</span>
+              <button type="button" role="switch" aria-label="员工数据库同步" aria-checked={attendanceSettings.employee_attendance_source === "card_db"}
+                disabled={attendanceSaving} onClick={() => handleEmployeeSourceChange(attendanceSettings.employee_attendance_source === "card_db" ? "local" : "card_db")}
+                className={`settings-database-switch${attendanceSettings.employee_attendance_source === "card_db" ? " is-enabled" : ""}`}>
+                <span aria-hidden="true" />{attendanceSettings.employee_attendance_source === "card_db" ? "已启用" : "未启用"}
+              </button>
+            </div>
+          </section>
+          <section className="settings-card settings-source-card" aria-labelledby="meal-source-title">
+            <div><h3 id="meal-source-title" className="settings-card-title">菜票充值与核对</h3><p className="settings-card-desc">读取菜票充值、补贴与取款流水，核对实际到账。</p></div>
+            <div className="settings-source-switch-row">
+              <span>{attendanceSettings.meal_ticket_db_enabled ? "数据库核对" : "手工登记"}</span>
+              <button type="button" role="switch" aria-label="菜票数据库核对" aria-checked={Boolean(attendanceSettings.meal_ticket_db_enabled)}
+                disabled={attendanceSaving || cardDbSaving} onClick={handleMealDbToggle}
+                className={`settings-database-switch${attendanceSettings.meal_ticket_db_enabled ? " is-enabled" : ""}`}>
+                <span aria-hidden="true" />{attendanceSettings.meal_ticket_db_enabled ? "已启用" : "未启用"}
+              </button>
+            </div>
+          </section>
+          <section className="settings-card settings-source-card" aria-labelledby="manager-source-title">
+            <div><h3 id="manager-source-title" className="settings-card-title">管理人员钉钉同步</h3><p className="settings-card-desc">从钉钉读取管理人员考勤记录。</p></div>
+            <div className="settings-source-switch-row">
+              <span>{attendanceSettings.manager_attendance_source === "dingtalk" ? "钉钉同步" : "本地导入"}</span>
+              <button type="button" role="switch" aria-label="管理人员钉钉同步" aria-checked={attendanceSettings.manager_attendance_source === "dingtalk"}
+                disabled={attendanceSaving} onClick={() => handleAttendanceSourceChange(attendanceSettings.manager_attendance_source === "dingtalk" ? "local" : "dingtalk")}
+                className={`settings-database-switch${attendanceSettings.manager_attendance_source === "dingtalk" ? " is-enabled" : ""}`}>
+                <span aria-hidden="true" />{attendanceSettings.manager_attendance_source === "dingtalk" ? "已启用" : "未启用"}
+              </button>
+            </div>
+          </section>
+        </section>}
+
+        <div className="settings-connection-grid">
+        {/* 共享数据库设置 */}
+        <section className="settings-card" aria-label="共享数据库设置">
           <div className="settings-card-head">
             <div>
-              <span className="settings-card-badge">考勤与菜票</span>
-              <h3 className="settings-card-title">共享数据库连接与用途</h3>
-              <p className="settings-card-desc">一套连接参数，分别控制考勤同步和菜票核对。数据库密码保存后不再回显。</p>
+              <span className="settings-card-badge">SQL Server</span>
+              <h3 className="settings-card-title">共享数据库设置</h3>
+              <p className="settings-card-desc">员工考勤同步与菜票核对共用此连接。密码保存后不再回显。</p>
             </div>
             {attendanceSettings && (
               <span
@@ -420,43 +457,13 @@ export default function AttendanceSourceSettingsPage() {
                 }`}
               >
                 <span className="settings-status-dot" aria-hidden="true" />
-                {attendanceSettings.card_db_configured ? "考勤机数据库已配置" : "考勤机数据库未配置"}
+                {attendanceSettings.card_db_configured ? "共享数据库已配置" : "共享数据库未配置"}
               </span>
             )}
           </div>
 
           {attendanceSettings && (
             <div className="settings-card-body">
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <span className="admin-text-sm" style={{ color: "var(--ent-text-secondary)", fontWeight: 600 }}>
-                  数据源：
-                </span>
-                <div className="settings-segmented-group" role="group" aria-label="员工考勤数据源选择">
-                  {(["local", "card_db"] as const).map((source) => (
-                    <button
-                      key={source}
-                      type="button"
-                      disabled={attendanceSaving}
-                      onClick={() => handleEmployeeSourceChange(source)}
-                      className={`settings-segmented-btn ${
-                        attendanceSettings.employee_attendance_source === source ? "is-active" : ""
-                      }`}
-                    >
-                      {source === "local" ? "本地上传" : "数据库同步"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="settings-database-use">
-                <div><strong>菜票充值核对</strong><p>与考勤共用下方连接参数，用于菜票中心核对实际到账。</p></div>
-                <button type="button" role="switch" aria-label="菜票数据库核对" aria-checked={Boolean(attendanceSettings.meal_ticket_db_enabled)}
-                  disabled={attendanceSaving || cardDbSaving} onClick={handleMealDbToggle}
-                  className={`settings-database-switch${attendanceSettings.meal_ticket_db_enabled ? " is-enabled" : ""}`}>
-                  <span aria-hidden="true" />{attendanceSettings.meal_ticket_db_enabled ? "已启用" : "未启用"}
-                </button>
-              </div>
-
               {/* 考勤机数据库连接参数表单 */}
               <div className="settings-form-panel">
                 <div className="settings-form-panel-header">
@@ -697,13 +704,13 @@ export default function AttendanceSourceSettingsPage() {
           )}
         </section>
 
-        {/* 管理人员考勤设置 */}
-        <section className="settings-card">
+        {/* 钉钉设置 */}
+        <section className="settings-card" aria-label="钉钉设置">
           <div className="settings-card-head">
             <div>
-              <span className="settings-card-badge">管理人员考勤</span>
-              <h3 className="settings-card-title">管理人员考勤数据源配置</h3>
-              <p className="settings-card-desc">选择本地导入或钉钉同步。系统不会在页面显示任何钉钉密钥。</p>
+              <span className="settings-card-badge">钉钉</span>
+              <h3 className="settings-card-title">钉钉设置</h3>
+              <p className="settings-card-desc">测试钉钉连接并同步管理人员考勤。系统不会在页面显示任何钉钉密钥。</p>
             </div>
             {attendanceSettings && (
               <span
@@ -721,25 +728,7 @@ export default function AttendanceSourceSettingsPage() {
 
           {attendanceSettings && (
             <div className="settings-card-body">
-              <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                <span className="admin-text-sm" style={{ color: "var(--ent-text-secondary)", fontWeight: 600 }}>
-                  数据源：
-                </span>
-                <div className="settings-segmented-group" role="group" aria-label="管理人员考勤数据源选择">
-                  {(["local", "dingtalk"] as const).map((source) => (
-                    <button
-                      key={source}
-                      type="button"
-                      disabled={attendanceSaving}
-                      onClick={() => handleAttendanceSourceChange(source)}
-                      className={`settings-segmented-btn ${
-                        attendanceSettings.manager_attendance_source === source ? "is-active" : ""
-                      }`}
-                    >
-                      {source === "local" ? "本地导入" : "钉钉"}
-                    </button>
-                  ))}
-                </div>
+              <div>
                 <button
                   type="button"
                   onClick={handleAttendanceConnectionTest}
@@ -905,6 +894,7 @@ export default function AttendanceSourceSettingsPage() {
             </div>
           )}
         </section>
+        </div>
       </section>
     </main>
   );

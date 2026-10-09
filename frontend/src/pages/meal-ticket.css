@@ -383,6 +383,15 @@
   flex-wrap: nowrap;
 }
 
+.meal-ticket-picker-field .input-group > .form-control {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.meal-ticket-picker-field .input-group > .btn {
+  border-color: var(--ent-border-strong);
+}
+
 .meal-ticket-picker-field input:not([type="checkbox"]) {
   flex: 1;
   width: 0;
@@ -770,13 +779,13 @@
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
-  padding: 16px 0;
-  border-top: 1px solid var(--ent-border-strong);
-  border-bottom: 1px solid var(--ent-border-strong);
+  padding: 14px 16px;
+  border: 1px solid rgba(217, 119, 6, .3);
+  border-left-width: 4px;
   scroll-margin-top: 20px;
   color: var(--ent-text);
-  background: transparent;
-  border-radius: 0;
+  background: rgba(217, 119, 6, .06);
+  border-radius: var(--ent-radius);
   box-shadow: none;
 }
 
@@ -796,13 +805,9 @@
   font-size: 13px;
 }
 
-.meal-ticket-settlement-message > span:first-child {
-  font-weight: 700;
-  font-size: 14px;
-  color: var(--ent-text);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.meal-ticket-notice-icon {
+  flex-shrink: 0;
+  color: #d97706;
 }
 
 .meal-ticket-settlement-message strong {
@@ -822,12 +827,22 @@
   color: #059669;
 }
 
+.meal-ticket-settlement.is-settled {
+  border-color: rgba(5, 150, 105, .3);
+  background: rgba(5, 150, 105, .06);
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-notice-icon {
+  color: #059669;
+}
+
 .meal-ticket-settlement.is-error {
-  border-top-color: rgba(239, 68, 68, .35);
-  border-bottom-color: rgba(239, 68, 68, .35);
-  background: rgba(239, 68, 68, .04);
-  padding: 12px 16px;
-  border-radius: var(--ent-radius);
+  border-color: rgba(239, 68, 68, .35);
+  background: rgba(239, 68, 68, .06);
+}
+
+.meal-ticket-settlement.is-error .meal-ticket-notice-icon {
+  color: #dc2626;
 }
 
 .meal-ticket-settlement.is-error .meal-ticket-settlement-message strong {
@@ -872,6 +887,7 @@
 
 .meal-ticket-settlement-message > span:last-child {
   font-size: 13px;
+  line-height: 1.6;
   color: var(--ent-text-secondary);
 }
 
@@ -882,6 +898,7 @@
 }
 
 .meal-ticket-reconciliation {
+  display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 14px;
@@ -1584,10 +1601,21 @@
   color: #fbbf24;
 }
 
+[data-theme="dark"] .meal-ticket-notice-icon {
+  color: #fbbf24;
+}
+
 [data-theme="dark"] .meal-ticket-settlement.is-error {
-  border-top-color: rgba(239, 68, 68, .4);
-  border-bottom-color: rgba(239, 68, 68, .4);
+  border-color: rgba(239, 68, 68, .4);
   background: rgba(239, 68, 68, .08);
+}
+
+[data-theme="dark"] .meal-ticket-settlement.is-error .meal-ticket-notice-icon {
+  color: #f87171;
+}
+
+[data-theme="dark"] .meal-ticket-settlement.is-settled .meal-ticket-notice-icon {
+  color: #34d399;
 }
 
 [data-theme="dark"] .meal-ticket-settlement.is-error .meal-ticket-settlement-message strong {
