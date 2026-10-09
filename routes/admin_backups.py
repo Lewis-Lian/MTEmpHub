@@ -13,9 +13,10 @@ import time
 import uuid
 
 from flask import current_app, g, jsonify, request, send_file
-from services.account_set_backup_service import MAX_UPLOAD, export_backup, read_backup
+from services.account_set_backup_service import MAX_UPLOAD, export_backup, export_multi_backup, read_backup
 from services.account_set_backup_schema import BackupError, BackupTargetChanged, options_checked
-from services.account_set_restore_service import build_preview, restore_backup, validate_selection, private_backup_root
+from services.account_set_restore_service import (build_preview, restore_backup, validate_selection, private_backup_root,
+                                                  build_multi_preview, restore_multi_backup)
 
 TTL = 3600
 
@@ -56,6 +57,9 @@ def task_locked(token):
             raise BackupError('预览已过期，请重新上传')
         if metadata.get('completed'):
             raise BackupError('该备份已处理，请重新上传以再次比较')
+        from models.account_set_backup_restore import AccountSetBackupRestore
+        if any(row.counts.get('status') == 'success' for row in AccountSetBackupRestore.query.filter_by(task_id=token).all()):
+            raise BackupError('该备份已处理，请重新上传以再次比较')
         yield path, metadata
 
 
@@ -85,6 +89,135 @@ def register_admin_backup_routes(bp, admin_required):
             except BackupError as exc:
                 return jsonify({'error': str(exc)}), 400
         return wrapped
+
+    @bp.post('/backups/export')
+    @admin_required
+    @handled
+    def multi_backup_download():
+        from services.account_set_export_progress_service import start_export_progress
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or 'account_set_ids' not in body:
+            raise BackupError('导出请求无效')
+        token = body.get('export_token')
+        update = start_export_progress(token, None, g.current_user.id, account_set_ids=body['account_set_ids']) if token is not None else None
+        try:
+            data = export_multi_backup(body['account_set_ids'], body.get('categories'), progress=update)
+        except Exception as exc:
+            if update:
+                update(status='failed', phase='failed', percent=0,
+                       stage=str(exc) if isinstance(exc, BackupError) else '备份导出失败')
+            raise
+        response = send_file(BytesIO(data), mimetype='application/zip', as_attachment=True,
+                             download_name='多月份备份.zip')
+        if update:
+            total = len(data)
+            update(phase='download', completed=0, total=total, percent=0, stage='发送备份文件')
+            source = response.response
+            def download():
+                completed = 0
+                try:
+                    for chunk in source:
+                        yield chunk
+                        completed += len(chunk)
+                        update(phase='download', completed=completed, total=total,
+                               percent=completed * 100 // total, stage='发送备份文件')
+                    update(status='ready', phase='download', completed=completed, total=total,
+                           percent=100, stage='备份文件发送完成')
+                except BaseException:
+                    update(status='failed', phase='download', completed=completed, total=total,
+                           percent=completed * 100 // total, stage='备份文件发送中断')
+                    raise
+                finally:
+                    if hasattr(source, 'close'):
+                        source.close()
+            response.response = download()
+        return response
+
+    @bp.get('/backups/export/progress')
+    @admin_required
+    @handled
+    def multi_backup_progress():
+        from services.account_set_export_progress_service import get_export_progress
+        return jsonify(get_export_progress(request.args.get('export_token'), None, g.current_user.id))
+
+    @bp.post('/backups/preview')
+    @admin_required
+    @handled
+    def multi_backup_upload():
+        if request.content_length and request.content_length > MAX_UPLOAD + 1024 * 1024:
+            return jsonify({'error': '上传文件超过 100 MiB'}), 413
+        uploaded = request.files.get('file')
+        if not uploaded:
+            raise BackupError('请选择 ZIP 备份文件')
+        data = uploaded.stream.read(MAX_UPLOAD + 1)
+        if len(data) > MAX_UPLOAD:
+            return jsonify({'error': '上传文件超过 100 MiB'}), 413
+        document = read_backup(data, normalized=True)
+        from services.account_set_backup_schema import DATASET_CATEGORIES, FILE_DATASETS
+        included = {scope.split('/')[-1] for scope, coverage in document['coverage'].items() if coverage['included']}
+        categories = {DATASET_CATEGORIES[name] for name in included} - {'monthly_references'}
+        if included & (FILE_DATASETS | {'meal_import_rows'}):
+            categories.add('archives')
+        selection = dict(months=document['months'], categories=sorted(categories), cross_month_keys=[], annual_keys=[])
+        preview = build_multi_preview(document, selection)
+        clean_expired()
+        token = uuid.uuid4().hex
+        path = preview_root() / token
+        path.mkdir(mode=0o700)
+        try:
+            (path / 'backup.zip').write_bytes(data)
+            atomic_json(path / 'metadata.json', dict(owner_id=g.current_user.id, created_at=time.time(), format='multi'))
+        except Exception:
+            shutil.rmtree(path)
+            raise
+        return jsonify(dict(token=token, selection=selection, **preview))
+
+    @bp.post('/backups/<token>/preview')
+    @admin_required
+    @handled
+    def multi_backup_preview(token):
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or not isinstance(body.get('selection'), dict):
+            raise BackupError('预览请求无效')
+        with task_locked(token) as (path, metadata):
+            document = read_backup((path / 'backup.zip').read_bytes(), normalized=True)
+            preview = build_multi_preview(document, body['selection'], body.get('choices', {}))
+            return jsonify(dict(token=token, selection=body['selection'], **preview))
+
+    @bp.post('/backups/<token>/restore')
+    @admin_required
+    @handled
+    def multi_backup_restore(token):
+        body = request.get_json(silent=True)
+        if (not isinstance(body, dict) or not isinstance(body.get('fingerprint'), str)
+                or not isinstance(body.get('selection'), dict)):
+            raise BackupError('确认请求无效')
+        with task_locked(token) as (path, metadata):
+            document = read_backup((path / 'backup.zip').read_bytes(), normalized=True)
+            try:
+                result = restore_multi_backup(document, body['selection'], body.get('choices', {}),
+                                              body['fingerprint'], g.current_user.id, task_id=token)
+            except BackupError:
+                raise
+            except Exception:
+                current_app.logger.error('多月份恢复失败，业务事务已撤销')
+                return jsonify({'error': '恢复失败，数据未保存，请重新预览后重试'}), 500
+            # DB audit is authoritative if task-file cleanup fails after commit.
+            try:
+                metadata['completed'] = True
+                atomic_json(path / 'metadata.json', metadata)
+                (path / 'backup.zip').unlink()
+            except OSError:
+                result['warnings'].append('恢复已保存，预览临时文件将在过期后清理')
+            return jsonify(result)
+
+    @bp.delete('/backups/<token>')
+    @admin_required
+    @handled
+    def multi_backup_cancel(token):
+        with task_locked(token) as (path, metadata):
+            shutil.rmtree(path)
+        return jsonify({'status': 'ok'})
 
     @bp.get('/account-sets/<int:account_set_id>/backup')
     @admin_required

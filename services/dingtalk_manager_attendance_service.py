@@ -7,6 +7,7 @@ from collections import defaultdict
 from datetime import date, datetime, timezone, timedelta
 
 from models import db
+from services.monthly_reference_service import month_employees, capture_business_month
 from models.account_set import AccountSet
 from models.daily_record import DailyRecord
 from models.dingtalk_sync_run import DingTalkSyncRun
@@ -274,7 +275,7 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
         update_sync_progress(account_set_id, "manager", 100, "账套不存在", "failed")
         raise ValueError("Account set does not exist")
     start_date, end_date = month_bounds(month)
-    managers = Employee.query.filter_by(is_manager=True).order_by(Employee.id).all()
+    managers = month_employees(month, is_manager=True, include_resigned=False)
     user_ids = list(dict.fromkeys(str(employee.dingtalk_user_id).strip() for employee in managers if employee.dingtalk_user_id and str(employee.dingtalk_user_id).strip()))
     employees_by_no = {normalize_employee_no(employee.emp_no): employee for employee in managers}
     employees_by_user_id = {
@@ -423,6 +424,7 @@ def sync_dingtalk_manager_attendance(account_set_id: int, month: str, client) ->
             finished_at=datetime.utcnow(),
         )
         db.session.add(run)
+        capture_business_month(month)
         db.session.commit()
         update_sync_progress(account_set_id, "manager", 100, "管理人员考勤同步完成", "finished")
         return _result(run)

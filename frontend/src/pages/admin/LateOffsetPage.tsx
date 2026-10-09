@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
@@ -83,6 +84,8 @@ export default function LateOffsetPage() {
   const [loadingText, setLoadingText] = useState("正在查询迟到冲抵数据...");
 
   // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useMonthQueryBootstrap(selectedMonth, setBootstrap);
+
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     let fadeTimer: ReturnType<typeof setTimeout>;

@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 from models import db
 from models.department import Department
+from services.monthly_reference_service import month_employees, month_employee, reference_status, reference_key_in_use, month_business_sources
 from models.employee import Employee
 from models.employee import (
     ATTENDANCE_SOURCE_AUTO_FALLBACK,
@@ -137,7 +138,7 @@ def _requested_emp_ids() -> list[int]:
 
 
 def _manager_scope_employees(emp_ids: list[int] | None = None):
-    query = Employee.query.filter(Employee.is_manager.is_(True))
+    query = Employee.query.filter(Employee.is_manager.is_(True), Employee.is_active.is_(True))
     if emp_ids is not None:
         if not emp_ids:
             return []
@@ -185,13 +186,13 @@ def _accessible_dept_ids_set() -> set[int]:
     return result_ids
 
 
-def _accessible_emp_ids_set() -> set[int]:
+def _accessible_emp_ids_set(month: str | None = None, current: bool = False) -> set[int]:
     # 可见范围计算的唯一实现在 query_core._accessible_emp_ids（含部门树展开），
     # 双份实现易漂移导致越权/漏数据；此处仅按 set 口径薄包装。
     # 函数内 import 以维持两路由模块间零模块级依赖（避免循环导入）。
     from routes.query_core import _accessible_emp_ids
 
-    return set(_accessible_emp_ids())
+    return set(_accessible_emp_ids(month, current=current))
 
 
 
@@ -343,6 +344,7 @@ def _serialize_employee(employee: Employee) -> dict:
         "shift_no": shift.shift_no if shift else "",
         "shift_name": shift.shift_name if shift else "",
         "resigned_at": employee.resigned_at.isoformat() if employee.resigned_at else None,
+        **({'reference': reference_status(employee)} if getattr(employee, '_reference_month', None) else {}),
     }
 
 
@@ -929,7 +931,7 @@ def _resolve_shift(shift_no: str | None) -> Shift | None:
     key = (shift_no or "").strip()
     if not key:
         return None
-    return Shift.query.filter_by(shift_no=key).first()
+    return Shift.query.filter_by(shift_no=key, is_active=True).first()
 
 
 def _assign_employee_shift(employee: Employee, shift: Shift | None) -> None:
@@ -1131,11 +1133,11 @@ def calculate_account_set(account_set_id: int):
     if locked_error:
         return locked_error
     mode = (request.args.get("mode") or "all").strip()
-    from models.system_setting import SystemSetting
+    sources = month_business_sources(row.month)
 
     uses_dingtalk_manager_attendance = (
         mode in {"manager", "all"}
-        and SystemSetting.get_value("manager_attendance_source", "local") == "dingtalk"
+        and sources["manager_attendance_source"] == "dingtalk"
     )
     dingtalk_sync = None
     if uses_dingtalk_manager_attendance:
@@ -1150,7 +1152,7 @@ def calculate_account_set(account_set_id: int):
 
     uses_card_employee_attendance = (
         mode in {"employee", "all"}
-        and SystemSetting.get_value("employee_attendance_source", "local") == "card_db"
+        and sources["employee_attendance_source"] == "card_db"
     )
     card_sync = None
     if uses_card_employee_attendance:
@@ -1304,15 +1306,13 @@ def create_shift():
         return jsonify({"error": "shift_no and shift_name are required"}), 400
 
     shift = Shift.query.filter_by(shift_no=shift_no).first()
-    if shift:
+    if shift and shift.is_active:
         return jsonify({"error": "shift_no already exists"}), 400
-
-    shift = Shift(
-        shift_no=shift_no,
-        shift_name=shift_name,
-        time_slots=time_slots,
-        is_cross_day=is_cross_day,
-    )
+    shift = shift or Shift(shift_no=shift_no)
+    shift.shift_name = shift_name
+    shift.time_slots = time_slots
+    shift.is_cross_day = is_cross_day
+    shift.is_active = True
     db.session.add(shift)
 
     db.session.commit()
@@ -1320,7 +1320,7 @@ def create_shift():
 
 
 def list_shifts():
-    rows = Shift.query.order_by(Shift.shift_no.asc()).all()
+    rows = Shift.query.filter_by(is_active=True).order_by(Shift.shift_no.asc()).all()
     return jsonify(
         [
             {
@@ -1350,6 +1350,8 @@ def update_shift(shift_id: int):
     if duplicate:
         return jsonify({"error": "shift_no already exists"}), 400
 
+    if shift.shift_no != shift_no and reference_key_in_use('shift', shift.shift_no):
+        return jsonify({"error": "该编号已关联月度历史资料，暂不允许更改"}), 409
     shift.shift_no = shift_no
     shift.shift_name = shift_name
     shift.time_slots = time_slots
@@ -1365,6 +1367,8 @@ def delete_shift(shift_id: int):
     if shift.daily_records:
         return jsonify({"error": "该班次已有关联考勤记录，无法删除"}), 400
 
+    if reference_key_in_use('shift', shift.shift_no):
+        return jsonify({"error": "该资料已关联月度历史，不能物理删除"}), 409
     db.session.delete(shift)
     db.session.commit()
     return jsonify({"status": "ok"})
@@ -1448,8 +1452,8 @@ def reinstate_employee(employee_id: int):
 
 
 def employees_list():
-    allowed_ids = _accessible_emp_ids_set()
-    query = Employee.query
+    allowed_ids = _accessible_emp_ids_set(current=True)
+    query = Employee.query.filter_by(is_active=True)
     if getattr(g, "current_user", None) and g.current_user.role != "admin":
         if not allowed_ids:
             return jsonify([])
@@ -1465,7 +1469,7 @@ def employees_list():
 
 def departments_list():
     allowed_ids = _accessible_dept_ids_set()
-    query = Department.query
+    query = Department.query.filter_by(is_active=True)
     if getattr(g, "current_user", None) and g.current_user.role != "admin":
         if not allowed_ids:
             return jsonify([])
@@ -1504,7 +1508,8 @@ def _manager_export_months(year: int) -> list[tuple[str, str]]:
 
 
 def _manager_base_month_values(emp_ids: list[int] | None = None) -> dict[str, dict[str, object]]:
-    employees = _manager_scope_employees(emp_ids)
+    from routes.query_core import _resolve_query_month
+    employees = month_employees(_resolve_query_month(), emp_ids, is_manager=True)
     return {
         employee.name: {
             "emp_id": employee.id,
@@ -1583,19 +1588,12 @@ def _stat_col_keys(stat_type: str) -> list[tuple[str, str]]:
 
 
 def _apply_saved_manager_stats(values_by_name: dict[str, dict[str, object]], year: int, stat_type: str) -> None:
-    rows = (
-        ManagerMonthStat.query.join(Employee, ManagerMonthStat.emp_id == Employee.id)
-        .filter(
-            ManagerMonthStat.year == year,
-            ManagerMonthStat.stat_type == stat_type,
-            Employee.is_manager.is_(True),
-        )
-        .all()
-    )
+    rows = ManagerMonthStat.query.filter_by(year=year, stat_type=stat_type).all()
+    values_by_id = {values['emp_id']: values for values in values_by_name.values()}
     for row in rows:
-        if not row.employee or row.employee.name not in values_by_name:
+        values = values_by_id.get(row.emp_id)
+        if values is None:
             continue
-        values = values_by_name[row.employee.name]
         for key in _stat_value_keys(stat_type):
             values[key] = getattr(row, key)
         if stat_type == "annual_leave":
@@ -1758,7 +1756,7 @@ def _manager_attendance_row(
 
 
 def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, object], int]:
-    employee = db.session.get(Employee, emp_id)
+    employee = month_employee(db.session.get(Employee, emp_id), month)
     if not employee or not employee.is_manager:
         return {"error": "employee is not manager"}, 400
     # 系统值为纯系统口径（不含逐日/月度修正），最终应用为全部口径
@@ -1778,15 +1776,12 @@ def _manager_attendance_response(emp_id: int, month: str) -> tuple[dict[str, obj
 
 def _manager_attendance_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
     if not emp_ids:
-        emp_ids = list(_accessible_emp_ids_set())
+        emp_ids = list(_accessible_emp_ids_set(month))
         if not emp_ids:
             return {"rows": [], "month": month}, 200
     employees = {
         employee.id: employee
-        for employee in Employee.query.filter(
-            Employee.id.in_(emp_ids),
-            Employee.is_manager.is_(True),
-        ).all()
+        for employee in month_employees(month, emp_ids, is_manager=True)
     }
     overrides = {
         row.emp_id: row
@@ -1893,7 +1888,7 @@ def _sync_manager_stats_from_manager_rows(month: str, manager_rows: list[dict[st
     but no longer writes to the stat tables to avoid double-writing.
     """
     year, key = _stat_key_for_month(month)
-    employees_by_name = {employee.name: employee for employee in _manager_scope_employees()}
+    employees_by_name = {employee.name: employee for employee in month_employees(month, is_manager=True)}
     errors: list[str] = []
 
     for item in manager_rows:
@@ -2195,18 +2190,18 @@ def create_department():
         return jsonify({"error": "dept_no and dept_name are required"}), 400
     if parent_id == -1:
         return jsonify({"error": "parent_id must be integer"}), 400
-    if Department.query.filter_by(dept_no=dept_no).first():
+    department = Department.query.filter_by(dept_no=dept_no).first()
+    if department and department.is_active:
         return jsonify({"error": "dept_no already exists"}), 400
     parent, err = _validate_parent_department(parent_id)
     if err:
         return jsonify({"error": err}), 400
 
-    department = Department(
-        dept_no=dept_no,
-        dept_name=dept_name,
-        parent_id=parent.id if parent else None,
-        is_locked=is_locked,
-    )
+    department = department or Department(dept_no=dept_no)
+    department.dept_name = dept_name
+    department.parent_id = parent.id if parent else None
+    department.is_locked = is_locked
+    department.is_active = True
     db.session.add(department)
     db.session.commit()
     return jsonify({"status": "ok", "id": department.id})
@@ -2231,6 +2226,8 @@ def update_department(dept_id: int):
     if err:
         return jsonify({"error": err}), 400
 
+    if department.dept_no != dept_no and reference_key_in_use('department', department.dept_no):
+        return jsonify({"error": "该编号已关联月度历史资料，暂不允许更改"}), 409
     department.dept_no = dept_no
     department.dept_name = dept_name
     department.parent_id = parent.id if parent else None
@@ -2248,6 +2245,8 @@ def delete_department(dept_id: int):
     if department.user_assignments:
         return jsonify({"error": "该部门已绑定账号权限，无法删除"}), 400
 
+    if reference_key_in_use('department', department.dept_no):
+        return jsonify({"error": "该资料已关联月度历史，不能物理删除"}), 409
     db.session.delete(department)
     db.session.commit()
     return jsonify({"status": "ok"})
@@ -2279,6 +2278,8 @@ def batch_operate_departments():
         if blocked:
             return jsonify({"error": f"以下部门不可删除：{', '.join(blocked)}"}), 400
 
+        if any(reference_key_in_use('department', d.dept_no) for d in departments):
+            return jsonify({"error": "所选部门关联月度历史，不能物理删除"}), 409
         for department in departments:
             db.session.delete(department)
         db.session.commit()
@@ -2319,6 +2320,7 @@ def delete_unbound_departments():
     skipped_locked = 0
     skipped_employee_bound = 0
     skipped_account_bound = 0
+    skipped_history_bound = 0
 
     for department in all_departments:
         if department.children:
@@ -2332,6 +2334,9 @@ def delete_unbound_departments():
         if department.user_assignments:
             skipped_account_bound += 1
             continue
+        if reference_key_in_use('department', department.dept_no):
+            skipped_history_bound += 1
+            continue
         db.session.delete(department)
         deleted += 1
 
@@ -2343,6 +2348,7 @@ def delete_unbound_departments():
             "skipped_locked": skipped_locked,
             "skipped_employee_bound": skipped_employee_bound,
             "skipped_account_bound": skipped_account_bound,
+            "skipped_history_bound": skipped_history_bound,
         }
     )
 
@@ -2402,23 +2408,23 @@ def create_employee():
 
     if not emp_no or not name:
         return jsonify({"error": "emp_no and name are required"}), 400
-    if Employee.query.filter_by(emp_no=emp_no).first():
+    employee = Employee.query.filter_by(emp_no=emp_no).first()
+    if employee and employee.is_active:
         return jsonify({"error": "emp_no already exists"}), 400
-    if _card_no_conflict(card_no):
+    if _card_no_conflict(card_no, employee.id if employee else None):
         return jsonify({"error": "card_no already exists"}), 400
 
     department = _resolve_department(dept_name) if dept_name else None
-    employee = Employee(
-        emp_no=emp_no,
-        name=name,
-        card_no=card_no,
-        dept_id=department.id if department else None,
-        is_manager=is_manager,
-        is_nursing=is_nursing,
-        meal_ticket_as_manager=bool(data.get("meal_ticket_as_manager", False)),
-        employee_stats_attendance_source=employee_stats_attendance_source,
-        manager_stats_attendance_source=manager_stats_attendance_source,
-    )
+    employee = employee or Employee(emp_no=emp_no)
+    employee.name = name
+    employee.card_no = card_no
+    employee.dept_id = department.id if department else None
+    employee.is_manager = is_manager
+    employee.is_nursing = is_nursing
+    employee.meal_ticket_as_manager = bool(data.get("meal_ticket_as_manager", False))
+    employee.employee_stats_attendance_source = employee_stats_attendance_source
+    employee.manager_stats_attendance_source = manager_stats_attendance_source
+    employee.is_active = True
     db.session.add(employee)
     db.session.flush()
     _assign_employee_shift(employee, _resolve_shift(shift_no))
@@ -2451,6 +2457,8 @@ def update_employee(employee_id: int):
     if _card_no_conflict(card_no, exclude_employee_id=employee_id):
         return jsonify({"error": "card_no already exists"}), 400
 
+    if employee.emp_no != emp_no and reference_key_in_use('employee', employee.emp_no):
+        return jsonify({"error": "该编号已关联月度历史资料，暂不允许更改"}), 409
     employee.emp_no = emp_no
     employee.name = name
     employee.card_no = card_no
@@ -2481,6 +2489,8 @@ def delete_employee(employee_id: int):
     from services.meal_ticket_service import guard_employee_delete
     if guard_employee_delete([employee.id]):
         return jsonify({"error": "该人员关联菜票历史，请使用离职操作"}), 409
+    if reference_key_in_use('employee', employee.emp_no):
+        return jsonify({"error": "该资料已关联月度历史，不能物理删除"}), 409
     db.session.delete(employee)
     db.session.commit()
     return jsonify({"status": "ok"})
@@ -2499,6 +2509,8 @@ def batch_operate_employees():
         return jsonify({"error": "employees not found"}), 404
 
     if action == "delete":
+        if any(reference_key_in_use('employee', e.emp_no) for e in employees):
+            return jsonify({"error": "所选人员关联月度历史，不能物理删除"}), 409
         from services.meal_ticket_service import guard_employee_delete
         if guard_employee_delete([employee.id for employee in employees]):
             return jsonify({"error": "所选人员关联菜票历史，请使用离职操作"}), 409
@@ -2570,6 +2582,8 @@ def batch_operate_employees():
         duplicate = Employee.query.filter(Employee.emp_no == emp_no, Employee.id != employees[0].id).first()
         if duplicate:
             return jsonify({"error": "emp_no already exists"}), 400
+        if employees[0].emp_no != emp_no and reference_key_in_use('employee', employees[0].emp_no):
+            return jsonify({"error": "该工号已关联月度历史资料，暂不允许更改"}), 409
         employees[0].emp_no = emp_no
         db.session.commit()
         return jsonify({"status": "ok", "action": action, "affected": 1})
@@ -2679,7 +2693,7 @@ def _employee_override_payload(row: EmployeeAttendanceOverride | None) -> dict[s
 
 
 def _employee_override_response(emp_id: int, month: str) -> tuple[dict[str, object], int]:
-    employee = db.session.get(Employee, emp_id)
+    employee = month_employee(db.session.get(Employee, emp_id), month)
     if not employee or employee.is_manager:
         return {"error": "employee is a manager, not a regular employee"}, 400
     # 系统值为纯系统口径；applied 以「系统+逐日」为底，再叠加月度修正（历史只读）
@@ -2704,15 +2718,12 @@ def _employee_override_response(emp_id: int, month: str) -> tuple[dict[str, obje
 
 def _employee_override_list_response(emp_ids: list[int], month: str) -> tuple[dict[str, object], int]:
     if not emp_ids:
-        emp_ids = list(_accessible_emp_ids_set())
+        emp_ids = list(_accessible_emp_ids_set(month))
         if not emp_ids:
             return {"rows": [], "month": month}, 200
     employees = {
         employee.id: employee
-        for employee in Employee.query.filter(
-            Employee.id.in_(emp_ids),
-            Employee.is_manager.is_(False),
-        ).all()
+        for employee in month_employees(month, emp_ids, is_manager=False)
     }
     overrides = {
         row.emp_id: row

@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useEffect, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { buildDownloadUrl, fetchQueryBootstrap } from "../../api/query";
@@ -139,6 +140,8 @@ export default function SummaryDownloadPage() {
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
+
+  useMonthQueryBootstrap(selectedMonth, setBootstrap, setError);
 
   useEffect(() => {
     let mounted = true;

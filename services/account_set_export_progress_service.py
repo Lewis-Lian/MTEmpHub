@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import tempfile
 import time
@@ -32,7 +33,7 @@ def get_export_progress(token, account_set_id, owner_id):
     return {key: value for key, value in payload.items() if key not in ('owner_id', 'updated_at')}
 
 
-def start_export_progress(token, account_set_id, owner_id):
+def start_export_progress(token, account_set_id, owner_id, *, account_set_ids=None):
     path = progress_path(token)
     if path.exists():
         # Check ownership before allowing a request to reuse any existing token.
@@ -43,17 +44,30 @@ def start_export_progress(token, account_set_id, owner_id):
         if time.time() - old.stat().st_mtime > 3600:
             old.unlink(missing_ok=True)
     base = {'owner_id': owner_id, 'account_set_id': account_set_id}
-    def update(status='running', **work):
+    if account_set_ids is not None:
+        base['account_set_ids'] = account_set_ids
+    def update(status='running', _create=False, **work):
         payload = {**base, 'status': status, 'updated_at': time.time(), **work}
         pending = None
         try:
             with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False, encoding='utf-8') as stream:
                 pending = Path(stream.name)
                 json.dump(payload, stream, ensure_ascii=False)
-            pending.replace(path)
+            if _create:
+                # Atomic creation: concurrent workers cannot claim the same token.
+                os.link(pending, path)
+                pending.unlink()
+            else:
+                pending.replace(path)
+        except FileExistsError as exc:
+            if pending:
+                pending.unlink(missing_ok=True)
+            raise BackupError('导出任务标识已使用，请重新导出') from exc
         except OSError:
             if pending:
                 pending.unlink(missing_ok=True)
+            if _create:
+                raise BackupError('无法创建导出进度')
             logger.warning('导出进度写入失败', exc_info=True)
-    update(phase='data', percent=0, completed=0, total=0, stage='准备读取账套')
+    update(_create=True, phase='data', percent=0, completed=0, total=0, stage='准备读取账套')
     return update

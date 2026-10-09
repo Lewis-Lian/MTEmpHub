@@ -10,11 +10,11 @@ from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from flask import jsonify, request, g, send_file
-from sqlalchemy.orm import joinedload
 import openpyxl
 from openpyxl.utils import get_column_letter
 
 from models import db
+from services.monthly_reference_service import month_employees, month_employee, month_reference_views, reference_status
 from models.employee import Employee
 from models.department import Department
 from models.daily_record import DailyRecord
@@ -688,55 +688,24 @@ def _calc_record_work_hours(record) -> tuple[float, int]:
     return round(total_hours, 2), unmatched
 
 
-def _accessible_emp_ids() -> list[int]:
+def _accessible_emp_ids(month: str | None = None, current: bool = False) -> list[int]:
     if getattr(g, "current_user", None) is None:
         return []
+    month = month or _resolve_query_month()
+    references = {'departments': Department.query.all()} if current else month_reference_views(month)
+    employees = (Employee.query.filter_by(is_active=True, resigned_at=None).all() if current
+                 else month_employees(month, include_resigned=False))
     if g.current_user.role == "admin":
-        return [
-            e.id
-            for e in Employee.query.with_entities(Employee.id).filter(Employee.resigned_at.is_(None)).all()
-        ]
-        
-    emp_rows = UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id).all()
-    dept_rows = UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id).all()
-        
-    ids = {r.emp_id for r in emp_rows}
-    assigned_dept_ids = {r.dept_id for r in dept_rows}
-    
-    if assigned_dept_ids:
-        # Find all descendant departments
-        all_departments = Department.query.with_entities(Department.id, Department.parent_id).all()
-        children_map = {}
-        for d in all_departments:
-            children_map.setdefault(d.parent_id, []).append(d.id)
-            
-        expanded_dept_ids = set(assigned_dept_ids)
-        queue = list(assigned_dept_ids)
-        while queue:
-            curr = queue.pop(0)
-            for child_id in children_map.get(curr, []):
-                if child_id not in expanded_dept_ids:
-                    expanded_dept_ids.add(child_id)
-                    queue.append(child_id)
-                    
-        dept_emp_ids = (
-            Employee.query.with_entities(Employee.id)
-            .filter(Employee.dept_id.in_(expanded_dept_ids), Employee.resigned_at.is_(None))
-            .all()
-        )
-        ids.update(row.id for row in dept_emp_ids)
-
-    # 出口统一过滤：直接绑定的员工同样不得包含已离职（部门来源已过滤，此处幂等）
-    if ids:
-        active_ids = {
-            row.id
-            for row in Employee.query.with_entities(Employee.id)
-            .filter(Employee.id.in_(ids), Employee.resigned_at.is_(None))
-            .all()
-        }
-        ids &= active_ids
-
-    return list(ids)
+        return [e.id for e in employees]
+    ids = {r.emp_id for r in UserEmployeeAssignment.query.filter_by(user_id=g.current_user.id)}
+    assigned = {r.dept_id for r in UserDepartmentAssignment.query.filter_by(user_id=g.current_user.id)}
+    expanded = set(assigned)
+    while True:
+        children = {d.id for d in references['departments'] if d.parent_id in expanded and d.id is not None}
+        if children <= expanded:
+            break
+        expanded.update(children)
+    return [e.id for e in employees if e.id in ids or (e.dept_id is not None and e.dept_id in expanded)]
 
 
 def _can_access_query_center() -> bool:
@@ -748,24 +717,12 @@ def _can_access_query_center() -> bool:
 def _non_manager_emp_ids(emp_ids: list[int]) -> list[int]:
     if not emp_ids:
         return []
-    rows = (
-        Employee.query.with_entities(Employee.id)
-        .filter(Employee.id.in_(emp_ids), Employee.is_manager.is_(False))
-        .all()
-    )
-    allowed = {row.id for row in rows}
+    allowed = {e.id for e in month_employees(_resolve_query_month(), emp_ids, is_manager=False)}
     return [emp_id for emp_id in emp_ids if emp_id in allowed]
 
 
 def _manager_emp_ids(emp_ids: list[int]) -> list[int]:
-    if not emp_ids:
-        return []
-    rows = (
-        Employee.query.with_entities(Employee.id)
-        .filter(Employee.id.in_(emp_ids), Employee.is_manager.is_(True))
-        .all()
-    )
-    allowed = {row.id for row in rows}
+    allowed = {e.id for e in month_employees(_resolve_query_month(), emp_ids, is_manager=True)}
     return [emp_id for emp_id in emp_ids if emp_id in allowed]
 
 
@@ -773,7 +730,7 @@ def _accessible_manager_emp_ids() -> list[int]:
     manager_ids = set(_manager_emp_ids(_accessible_emp_ids()))
     profile_emp_no = (g.current_user.profile_emp_no or "").strip()
     if profile_emp_no:
-        profile_manager = Employee.query.with_entities(Employee.id).filter_by(emp_no=profile_emp_no, is_manager=True).first()
+        profile_manager = next((e for e in month_employees(_resolve_query_month(), is_manager=True) if e.emp_no == profile_emp_no), None)
         if profile_manager:
             manager_ids.add(profile_manager.id)
     return list(manager_ids)
@@ -838,17 +795,8 @@ def _keyword_filtered_emp_ids(base_ids: list[int]) -> list[int]:
     if not base_ids:
         return []
 
-    like_kw = f"%{keyword}%"
-    rows = (
-        Employee.query.with_entities(Employee.id)
-        .filter(Employee.id.in_(base_ids))
-        .filter((Employee.emp_no.like(like_kw)) | (Employee.name.like(like_kw)))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
-    matched = [row.id for row in rows]
-    if not matched:
-        return []
+    matched = [e.id for e in month_employees(_resolve_query_month(), base_ids)
+               if keyword.lower() in e.emp_no.lower() or keyword.lower() in e.name.lower()]
     matched_set = set(matched)
     # keep base_ids order
     return [emp_id for emp_id in base_ids if emp_id in matched_set]
@@ -882,12 +830,7 @@ def _build_final_rows(
     include_daily_overrides: bool = True,
     progress_cb=None,
 ) -> list[list[object]]:
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     rows: list[list[object]] = []
     date_range = _month_date_range(month)
     datetime_range = _month_datetime_range(month)
@@ -997,12 +940,7 @@ def _build_final_rows(
 
 
 def _build_abnormal_rows(month: str, emp_ids: list[int]) -> list[dict[str, object]]:
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     data: list[dict[str, object]] = []
     date_range = _month_date_range(month)
     daily_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT) if date_range else {}
@@ -1026,12 +964,7 @@ def _build_abnormal_rows(month: str, emp_ids: list[int]) -> list[dict[str, objec
 
 
 def _build_leave_detail_rows(month: str, emp_ids: list[int], leave_type: str | None) -> list[dict[str, object]]:
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     employee_by_id = {employee.id: employee for employee in employees}
     datetime_range = _month_datetime_range(month)
     if not datetime_range or not employees:
@@ -1069,12 +1002,7 @@ def _build_leave_detail_rows(month: str, emp_ids: list[int], leave_type: str | N
 
 
 def _build_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[str, object]]:
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     totals: dict[str, float] = {}
     dept_member_counts: dict[str, int] = {}
     overrides = {
@@ -1130,12 +1058,7 @@ def _top_level_department_name(department: Department | None) -> str:
 
 
 def _build_manager_department_hours_rows(month: str, emp_ids: list[int]) -> list[dict[str, object]]:
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     totals: dict[str, float] = {}
     dept_member_counts: dict[str, int] = {}
 
@@ -1197,31 +1120,17 @@ def departments_api():
     if not emp_ids:
         return jsonify([])
 
-    dept_ids = {
-        row.dept_id
-        for row in Employee.query.with_entities(Employee.dept_id)
-        .filter(Employee.id.in_(emp_ids), Employee.dept_id.isnot(None))
-        .all()
-    }
-    if not dept_ids:
-        return jsonify([])
-
-    all_ids = set(dept_ids)
-    cursor_ids = set(dept_ids)
-    while cursor_ids:
-        parents = (
-            Department.query.with_entities(Department.parent_id)
-            .filter(Department.id.in_(cursor_ids), Department.parent_id.isnot(None))
-            .all()
-        )
-        next_ids = {row.parent_id for row in parents if row.parent_id and row.parent_id not in all_ids}
-        all_ids.update(next_ids)
-        cursor_ids = next_ids
-
-    depts = Department.query.filter(Department.id.in_(all_ids)).order_by(Department.dept_name.asc()).all()
-    return jsonify(
-        [{"id": d.id, "dept_no": d.dept_no, "dept_name": d.dept_name, "parent_id": d.parent_id} for d in depts]
-    )
+    references = month_reference_views(_resolve_query_month())
+    departments = {d.id: d for d in references['departments'] if d.id is not None}
+    ids = {e.dept_id for e in month_employees(_resolve_query_month(), emp_ids) if e.dept_id is not None}
+    pending = list(ids)
+    while pending:
+        department = departments.get(pending.pop())
+        if department and department.parent_id is not None and department.parent_id not in ids:
+            ids.add(department.parent_id)
+            pending.append(department.parent_id)
+    return jsonify([{'id': d.id, 'dept_no': d.dept_no, 'dept_name': d.dept_name, 'parent_id': d.parent_id}
+                    for d in sorted(departments.values(), key=lambda d: d.dept_name) if d.id in ids])
 
 
 def home_manager_summary_api():
@@ -1252,7 +1161,7 @@ def home_manager_summary_api():
             }
         )
 
-    manager = Employee.query.options(joinedload(Employee.department)).filter_by(emp_no=profile_emp_no).first()
+    manager = next((e for e in month_employees(month) if e.emp_no == profile_emp_no), None)
     if not manager or not manager.is_manager:
         return jsonify(
             {
@@ -1361,7 +1270,7 @@ def punch_records_api():
     dept_id = request.args.get("dept_id", type=int)
     if dept_id:
         dept_emp_ids = {
-            e.id for e in Employee.query.with_entities(Employee.id).filter(Employee.dept_id == dept_id).all()
+            e.id for e in month_employees(_resolve_query_month()) if e.dept_id == dept_id
         }
         emp_ids = [x for x in emp_ids if x in dept_emp_ids]
     if not emp_ids:
@@ -1372,7 +1281,7 @@ def punch_records_api():
         start_date, end_date = _punch_query_date_range(month)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
+    employees = month_employees(month, emp_ids)
     rows = []
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
     for employee in employees:
@@ -1406,7 +1315,7 @@ def punch_records_export_api():
     dept_id = request.args.get("dept_id", type=int)
     if dept_id:
         dept_emp_ids = {
-            e.id for e in Employee.query.with_entities(Employee.id).filter(Employee.dept_id == dept_id).all()
+            e.id for e in month_employees(_resolve_query_month()) if e.dept_id == dept_id
         }
         emp_ids = [x for x in emp_ids if x in dept_emp_ids]
     if not emp_ids:
@@ -1417,7 +1326,7 @@ def punch_records_export_api():
         start_date, end_date = _punch_query_date_range(month)
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
-    employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
+    employees = month_employees(month, emp_ids)
     rows = []
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
     for employee in employees:
@@ -1485,12 +1394,7 @@ def punch_records_modal_export_api():
         return jsonify({"error": "No employee assigned"}), 400
 
     month = _resolve_query_month()
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
 
     wb = openpyxl.Workbook()
@@ -1530,12 +1434,7 @@ def manager_punch_records_api():
         return jsonify([])
 
     month = _resolve_query_month()
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     rows = []
     rows_by_emp = attendance_views_by_employee(month, employees, MANAGER_STATS_CONTEXT)
     for employee in employees:
@@ -1578,12 +1477,7 @@ def manager_leave_records_api():
 
     month = _resolve_query_month()
     leave_bucket = request.args.get("leave_bucket")
-    employees = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.id.in_(emp_ids))
-        .order_by(Employee.emp_no.asc())
-        .all()
-    )
+    employees = month_employees(month, emp_ids)
     employee_by_id = {employee.id: employee for employee in employees}
     datetime_range = _month_datetime_range(month)
     if not datetime_range:
@@ -1768,6 +1662,9 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
     """
     bounds = _month_date_range(month)
     if not bounds:
+        return {}
+    employee = month_employee(employee, month)
+    if employee is None:
         return {}
     month_start, month_end = bounds
     emp_id = employee.id
@@ -1993,6 +1890,7 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
             "dept_name": employee.department.dept_name if employee.department else "",
         },
         "month": month,
+        "reference": reference_status(employee),
         "attendance_source": "daily" if uses_daily_attendance else "monthly_fallback",
         "days": days,
         "overtimes": overtimes,
@@ -2003,6 +1901,9 @@ def _build_attendance_calendar_payload(employee: Employee, month: str) -> dict:
 
 
 def attendance_calendar_api():
+    month = request.args.get("month") or ""
+    if not _month_date_range(month):
+        return jsonify({"error": "无效的月份"}), 400
     emp_id = request.args.get("emp_id", type=int)
     if (
         g.current_user.can_access_page("employee_dashboard")
@@ -2014,9 +1915,8 @@ def attendance_calendar_api():
         if g.current_user.can_access_page("manager_query") or g.current_user.can_access_page("individual_attendance"):
             profile_emp_no = (g.current_user.profile_emp_no or "").strip()
             profile_manager = (
-                Employee.query.with_entities(Employee.id)
-                .filter_by(emp_no=profile_emp_no, is_manager=True)
-                .first()
+                next((e for e in month_employees(_resolve_query_month(), is_manager=True)
+                      if e.emp_no == profile_emp_no), None)
                 if profile_emp_no
                 else None
             )
@@ -2026,7 +1926,7 @@ def attendance_calendar_api():
         # 仅首页权限的账号只能在首页查看绑定管理人员本人的考勤日历
         profile_emp_no = (g.current_user.profile_emp_no or "").strip()
         profile_emp = (
-            Employee.query.with_entities(Employee.id).filter_by(emp_no=profile_emp_no, is_manager=True).first()
+            next((e for e in month_employees(_resolve_query_month(), is_manager=True) if e.emp_no == profile_emp_no), None)
             if profile_emp_no
             else None
         )
@@ -2124,7 +2024,7 @@ def summary_download_export_api():
 
     # 2. punch：员工打卡数据查询
     if "punch" in sheets_list:
-        employees = Employee.query.options(joinedload(Employee.department)).filter(Employee.id.in_(emp_ids)).order_by(Employee.emp_no.asc()).all()
+        employees = month_employees(month, emp_ids)
         punch_rows = []
         rows_by_emp = attendance_views_by_employee(month, employees, EMPLOYEE_STATS_CONTEXT)
         for employee in employees:
@@ -2482,7 +2382,7 @@ def _manager_export_rows_with_top_level_departments(rows: list[dict[str, object]
     for item in rows:
         next_item = dict(item)
         emp_id = item.get("emp_id")
-        employee = db.session.get(Employee, emp_id) if emp_id else None
+        employee = month_employee(db.session.get(Employee, emp_id), _resolve_query_month()) if emp_id else None
         next_item["dept_name"] = _top_level_department_name(employee.department) if employee and employee.department else ""
         normalized_rows.append(next_item)
     return normalized_rows

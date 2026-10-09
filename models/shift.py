@@ -6,6 +6,7 @@ class Shift(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     shift_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    is_active = db.Column(db.Boolean, default=True, server_default=db.true(), nullable=False)
     shift_name = db.Column(db.String(100), nullable=False)
     time_slots = db.Column(db.JSON, nullable=False, default=list)
     is_cross_day = db.Column(db.Boolean, default=False, nullable=False)

@@ -53,6 +53,7 @@ export default function AttendanceCalendarGrid({ data, selectedDate, multiSelect
 
   return (
     <div className="attendance-calendar">
+      {data.reference?.warnings.map((warning) => <p role="status" key={warning}>{warning}</p>)}
       <div className="attendance-calendar-summary">
         <span className="cal-badge cal-badge-attendance">出勤 {data.summary.attendance_days} 天</span>
         {data.attendance_source === "monthly_fallback" ? <span className="cal-badge">月报兜底</span> : null}

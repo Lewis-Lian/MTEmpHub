@@ -16,6 +16,7 @@ class Employee(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     emp_no = db.Column(db.String(50), unique=True, nullable=False, index=True)
+    is_active = db.Column(db.Boolean, default=True, server_default=db.true(), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     card_no = db.Column(db.String(50), unique=True, nullable=True)
     dingtalk_user_id = db.Column(db.String(100), nullable=True, index=True)

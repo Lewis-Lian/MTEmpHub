@@ -62,6 +62,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="readonly")
     page_permissions = db.Column(db.JSON, nullable=True)
+    is_active = db.Column(db.Boolean, nullable=False, default=True, server_default=db.true())
+    auth_version = db.Column(db.Integer, nullable=False, default=0, server_default='0')
     login_failed_attempts = db.Column(db.Integer, nullable=False, default=0)
     login_locked_until = db.Column(db.DateTime, nullable=True)
     login_disabled_until_admin_unlock = db.Column(db.Boolean, nullable=False, default=False)
@@ -78,6 +80,15 @@ class User(db.Model):
 
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+
+    def revoke_tokens(self) -> None:
+        # Local state only: never import the source account's token version.
+        self.auth_version = int(self.auth_version or 0) + 1
+
+    def archive(self) -> None:
+        if self.is_active:
+            self.is_active = False
+            self.revoke_tokens()
 
     def check_password(self, password: str) -> bool:
         try:

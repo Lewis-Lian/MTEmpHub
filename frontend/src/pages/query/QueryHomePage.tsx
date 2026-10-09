@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useEffect, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAttendanceCalendar, fetchHomeSummary, fetchQueryBootstrap } from "../../api/query";
@@ -46,6 +47,8 @@ export default function QueryHomePage() {
   const [calendarData, setCalendarData] = useState<AttendanceCalendarData | null>(null);
   const [calendarError, setCalendarError] = useState("");
   const [calendarForbidden, setCalendarForbidden] = useState(false);
+
+  useMonthQueryBootstrap(month, setBootstrap, setError);
 
   useEffect(() => {
     let mounted = true;

@@ -29,6 +29,7 @@ from models.dingtalk_sync_run import DingTalkSyncRun
 from models.message import Message
 from models.meal_ticket import MEAL_MODELS
 from models.meal_ledger import LEDGER_MODELS
+from services.monthly_reference_service import register_monthly_reference_commands
 from routes import configure_api_cors, register_routes
 
 _compat_app: Flask | None = None
@@ -68,6 +69,7 @@ def create_app() -> Flask:
 
     db.init_app(app)
     Migrate(app, db)
+    register_monthly_reference_commands(app)
     configure_api_cors(app)
     register_routes(app)
     _configure_error_log(app)

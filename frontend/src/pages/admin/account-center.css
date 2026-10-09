@@ -1577,3 +1577,19 @@
 
 .backup-modal .backup-steps, .backup-modal .backup-month-badge, .backup-modal .backup-options, .backup-modal .backup-scope-note, .backup-modal .backup-summary, .backup-modal .backup-toolbar:not(.backup-footer) { margin-top: 0; margin-bottom: 0; }
 .backup-modal ul:empty { display: none; }
+
+.backup-differences > .backup-difference-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px 14px; margin: 8px 0; background: #fff; }
+.backup-differences .backup-difference-card > details { border: 0; box-shadow: none; padding: 0; }
+.backup-row-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.backup-difference-card > p { font-size: 12px; color: var(--acm-text-secondary); overflow-wrap: anywhere; }
+.backup-difference-card > details { margin-top: 12px; }
+.backup-coverage { padding: 12px; background: #fff; border: 1px solid #e5eaf2; border-radius: 10px; }
+.backup-coverage li { margin-top: 6px; overflow-wrap: anywhere; }
+.backup-modal .backup-toolbar input { min-width: 120px; padding: 7px 9px; border: 1px solid #e5eaf2; border-radius: 7px; }
+.backup-modal .backup-options label { overflow-wrap: anywhere; }
+.backup-modal .backup-options input[type="checkbox"], .backup-row-controls input[type="checkbox"] { flex-shrink: 0; }
+.backup-modal .backup-confirm-counts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 540px) {
+  .backup-modal .backup-confirm-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .backup-modal .backup-toolbar label { width: 100%; }
+}

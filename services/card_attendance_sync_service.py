@@ -6,6 +6,7 @@ from collections import defaultdict
 from datetime import date, datetime
 
 from models import db
+from services.monthly_reference_service import month_employees, capture_business_month
 from models.account_set import AccountSet
 from models.daily_record import DailyRecord
 from models.dingtalk_sync_run import DingTalkSyncRun
@@ -105,7 +106,7 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
         raise ValueError("Account set does not exist")
     start_date, end_date = month_bounds(month)
 
-    employees = Employee.query.order_by(Employee.id).all()
+    employees = month_employees(month, include_resigned=False)
     writable = [employee for employee in employees if ImportService._can_receive_employee_source(employee)]
     employees_by_no = {normalize_employee_no(employee.emp_no): employee for employee in writable}
     employees_by_card = {
@@ -240,6 +241,7 @@ def sync_card_attendance(account_set_id: int, month: str, client) -> dict:
             finished_at=datetime.utcnow(),
         )
         db.session.add(run)
+        capture_business_month(month)
         db.session.commit()
         update_sync_progress(account_set_id, "employee", 100, "员工考勤同步完成", "finished")
         return _result(run)

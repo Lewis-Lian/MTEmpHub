@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { ApiError } from "../../api/client";
@@ -73,6 +74,8 @@ export default function EmployeeDashboardPage() {
   const [loadingText, setLoadingText] = useState("正在为您查询考勤数据...");
 
   // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
+  useMonthQueryBootstrap(selectedMonth, setBootstrap, setError);
+
   useEffect(() => {
     let timer: ReturnType<typeof setInterval>;
     let fadeTimer: ReturnType<typeof setTimeout>;

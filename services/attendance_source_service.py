@@ -7,6 +7,7 @@ from datetime import date
 
 from sqlalchemy.orm import joinedload
 
+from services.monthly_reference_service import month_employee, month_employees
 from models.daily_record import DailyRecord
 from models.employee import (
     ATTENDANCE_SOURCE_AUTO_FALLBACK,
@@ -105,7 +106,12 @@ def attendance_source_for_context(employee: Employee, context: str) -> str:
 
 
 
-def build_attendance_record_view(record: DailyRecord, employee: Employee, context: str) -> AttendanceRecordView | None:
+def build_attendance_record_view(record: DailyRecord, employee: Employee, context: str, references_resolved: bool = False) -> AttendanceRecordView | None:
+    month = record.record_date.strftime('%Y-%m')
+    if not references_resolved:
+        employee = month_employee(employee, month)
+    if employee is None:
+        return None
     configured_source = attendance_source_for_context(employee, context)
     default_source = ATTENDANCE_SOURCE_MANAGER if context == MANAGER_STATS_CONTEXT else ATTENDANCE_SOURCE_EMPLOYEE
     selected_source = None
@@ -188,8 +194,9 @@ def build_attendance_record_view(record: DailyRecord, employee: Employee, contex
         exception_reason = payload.get("exception_reason")
 
     return AttendanceRecordView(
-        employee=record.employee,
-        shift=record.shift,
+        employee=employee,
+        shift=(getattr(employee, '_reference_shifts', {}).get(record.shift.shift_no)
+               if getattr(employee, '_reference_month', None) == month and record.shift else record.shift),
         record_date=record.record_date,
         source=selected_source,
         expected_hours=expected_hours,
@@ -242,13 +249,13 @@ def attendance_views_by_employee(month: str, employees: list[Employee], context:
         .order_by(DailyRecord.record_date.asc())
         .all()
     )
-    employees_by_id = {employee.id: employee for employee in employees}
+    employees_by_id = {employee.id: employee for employee in month_employees(month, emp_ids)}
     result: dict[int, list[AttendanceRecordView]] = {employee.id: [] for employee in employees}
     for row in rows:
         employee = employees_by_id.get(row.emp_id)
         if not employee:
             continue
-        view = build_attendance_record_view(row, employee, context)
+        view = build_attendance_record_view(row, employee, context, references_resolved=True)
         if view is None:
             continue
         result.setdefault(row.emp_id, []).append(view)

@@ -6,6 +6,7 @@ import shutil
 from typing import Any, Callable
 
 from models import db
+from services.monthly_reference_service import capture_business_month, month_employees
 from services.import_pipeline import classify_import_file, normalize_import_rows
 from models.department import Department
 from models.employee import ATTENDANCE_SOURCE_EMPLOYEE, ATTENDANCE_SOURCE_MANAGER, Employee
@@ -30,7 +31,7 @@ from services.manager_attendance_service import manager_raw_score
 class ImportService:
     @staticmethod
     def _can_receive_manager_source(employee: Employee | None) -> bool:
-        if not employee:
+        if not employee or not employee.is_active:
             return False
         return bool(employee.is_manager) or (
             employee.employee_stats_attendance_source == ATTENDANCE_SOURCE_MANAGER
@@ -38,7 +39,7 @@ class ImportService:
 
     @staticmethod
     def _can_receive_employee_source(employee: Employee | None) -> bool:
-        if not employee:
+        if not employee or not employee.is_active:
             return False
         return (not bool(employee.is_manager)) or (
             employee.manager_stats_attendance_source == ATTENDANCE_SOURCE_EMPLOYEE
@@ -153,7 +154,7 @@ class ImportService:
 
     @staticmethod
     def _bulk_lookup_managers(
-        emp_nos: list[str], names: list[str]
+        emp_nos: list[str], names: list[str], month: str | None = None
     ) -> tuple[dict[str, Employee], dict[str, Employee]]:
         """批量预查管理人员，返回 {emp_no: Employee} 和 {name: Employee}。
 
@@ -163,9 +164,10 @@ class ImportService:
         unique_emp_nos = {n for n in emp_nos if n}
         unique_names = {n for n in names if n}
         query_filter = db.or_(Employee.emp_no.in_(unique_emp_nos), Employee.name.in_(unique_names))
-        candidates = Employee.query.filter(query_filter).order_by(
+        candidates = (month_employees(month) if month else Employee.query.filter(query_filter).order_by(
             Employee.is_manager.desc(), Employee.emp_no.asc()
-        ).all()
+        ).all())
+        candidates = sorted(candidates, key=lambda e: (not e.is_manager, e.emp_no))
 
         emp_by_no: dict[str, Employee] = {}
         emp_by_name: dict[str, Employee] = {}
@@ -477,6 +479,7 @@ class ImportService:
         header_idx = ImportService._find_header_row(rows, ["人员编号", "人员名称", "考勤日期"])
         header_map = ImportService._build_header_map(rows[header_idx])
         imported = 0
+        imported_months = set()
         scanned = 0
         skipped_no_key = 0
         skipped_unknown_employee = 0
@@ -519,7 +522,7 @@ class ImportService:
         # 预查 DailyRecord：需先确定 emp_id + record_date 才能精确预查，
         # 但 record_date 在循环内解析。改为按 emp_id 批量预查该批的所有记录。
         resolved_emp_ids: set[int] = {
-            e.id for e in emp_by_no.values() if ImportService._can_receive_employee_source(e)
+            e.id for e in emp_by_no.values()
         }
         existing_records: dict[tuple[int, Any], DailyRecord] = {}
         if resolved_emp_ids:
@@ -527,6 +530,9 @@ class ImportService:
                 existing_records[(r.emp_id, r.record_date)] = r
 
         data_rows = rows[header_idx + 1 :]
+        months = {day.strftime('%Y-%m') for row in data_rows
+                  if (day := parse_date(ImportService._get_row_value(row, date_idx)))}
+        employees_by_month = {month: {e.id: e for e in month_employees(month)} for month in months}
         total_rows = len(data_rows)
         for row_idx, row in enumerate(data_rows):
             if progress_cb is not None:
@@ -537,17 +543,17 @@ class ImportService:
                 continue
             scanned += 1
             emp = emp_by_no.get(emp_no)
-            if not emp or not ImportService._can_receive_employee_source(emp):
+            record_date = parse_date(ImportService._get_row_value(row, date_idx))
+            if not record_date:
+                continue
+            historical_employee = employees_by_month[record_date.strftime('%Y-%m')].get(emp.id) if emp else None
+            if not historical_employee or not historical_employee.is_active or not ImportService._can_receive_employee_source(historical_employee):
                 skipped_unknown_employee += 1
                 continue
 
             shift_no = clean_text(ImportService._get_row_value(row, shift_no_idx))
             shift_name = clean_text(ImportService._get_row_value(row, shift_name_idx))
             shift = all_shifts.get(shift_no) or all_shifts.get(shift_name)
-
-            record_date = parse_date(ImportService._get_row_value(row, date_idx))
-            if not record_date:
-                continue
 
             record = existing_records.get((emp.id, record_date))
             if not record:
@@ -601,7 +607,10 @@ class ImportService:
             record.raw_data = employee_payload["raw_data"]
             record.employee_payload = employee_payload
             imported += 1
+            imported_months.add(record_date.strftime("%Y-%m"))
 
+        for month in sorted(imported_months):
+            capture_business_month(month)
         db.session.commit()
         return {
             "total_rows": max(len(rows) - header_idx - 1, 0),
@@ -645,7 +654,7 @@ class ImportService:
                 emp_nos.append(en)
             if nm:
                 names.append(nm)
-        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
+        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names, report_month)
         resolved_emp_ids: set[int] = {e.id for e in emp_by_no.values()} | {e.id for e in emp_by_name.values()}
         existing_reports: dict[int, MonthlyReport] = {}
         if resolved_emp_ids:
@@ -687,6 +696,8 @@ class ImportService:
             report.manager_raw_data = raw_data
             imported += 1
 
+        if imported:
+            capture_business_month(report_month)
         db.session.commit()
         return {
             "total_rows": max(len(rows) - header_idx - 2, 0),
@@ -701,6 +712,7 @@ class ImportService:
     def _import_manager_daily_records(rows: list[list[Any]], progress_cb: Callable[[int, int], None] | None = None) -> dict[str, int]:
         header_idx, header_map = ImportService._build_manager_header_map(rows)
         imported = 0
+        imported_months = set()
         scanned = 0
         skipped_no_key = 0
         skipped_unknown_employee = 0
@@ -728,7 +740,11 @@ class ImportService:
                 emp_nos.append(en)
             if nm:
                 names.append(nm)
-        emp_by_no, emp_by_name = ImportService._bulk_lookup_managers(emp_nos, names)
+        months = {day.strftime('%Y-%m') for row in rows[header_idx + 2 :]
+                  if (day := ImportService._parse_manager_record_date(ImportService._get_row_value(row, date_idx)))}
+        managers_by_month = {month: ImportService._bulk_lookup_managers(emp_nos, names, month) for month in months}
+        emp_by_no = {key: value for by_no, _ in managers_by_month.values() for key, value in by_no.items()}
+        emp_by_name = {key: value for _, by_name in managers_by_month.values() for key, value in by_name.items()}
         resolved_emp_ids: set[int] = {e.id for e in emp_by_no.values()} | {e.id for e in emp_by_name.values()}
         existing_records: dict[tuple[int, Any], DailyRecord] = {}
         if resolved_emp_ids:
@@ -748,9 +764,10 @@ class ImportService:
                 continue
             scanned += 1
 
-            emp = emp_by_no.get(emp_no) if emp_no else None
+            by_no, by_name = managers_by_month[record_date.strftime('%Y-%m')]
+            emp = by_no.get(emp_no) if emp_no else None
             if not emp and name:
-                emp = emp_by_name.get(name)
+                emp = by_name.get(name)
             if not emp:
                 skipped_unknown_employee += 1
                 continue
@@ -786,7 +803,10 @@ class ImportService:
             record.raw_data = raw_data
             record.manager_payload = manager_payload
             imported += 1
+            imported_months.add(record_date.strftime("%Y-%m"))
 
+        for month in sorted(imported_months):
+            capture_business_month(month)
         db.session.commit()
         return {
             "total_rows": max(len(rows) - header_idx - 2, 0),
@@ -834,7 +854,7 @@ class ImportService:
             if val:
                 emp_nos.append(val)
         emp_by_no: dict[str, Employee] = (
-            {e.emp_no: e for e in Employee.query.filter(Employee.emp_no.in_(emp_nos)).all()}
+            {e.emp_no: e for e in month_employees(report_month)}
             if emp_nos
             else {}
         )
@@ -891,6 +911,8 @@ class ImportService:
             report.employee_raw_data = employee_raw_data
             imported += 1
 
+        if imported:
+            capture_business_month(report_month)
         db.session.commit()
         return {
             "total_rows": max(len(rows) - header_idx - 1, 0),

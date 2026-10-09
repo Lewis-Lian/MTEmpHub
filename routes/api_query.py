@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from flask import Blueprint, Response, g, jsonify
-from sqlalchemy.orm import joinedload
 
 from models.employee import Employee
 from routes.auth_helpers import any_page_permission_required, login_required, page_permission_required
 from routes.query_core import (
     _accessible_emp_ids,
+    _resolve_query_month,
+    _month_date_range,
     _can_access_query_center,
     account_sets_api,
     abnormal_attendance_api,
@@ -37,6 +38,7 @@ from routes.query_core import (
     summary_download_export_api,
 )
 from utils.app_navigation import nav_payload
+from services.monthly_reference_service import month_employees
 
 
 api_query_bp = Blueprint("api_query", __name__, url_prefix="/api/query")
@@ -63,35 +65,22 @@ def _coerce_response(response: Response | tuple[Response, int]) -> tuple[Respons
 @api_query_bp.get("/bootstrap")
 @login_required
 def bootstrap():
+    month = _resolve_query_month()
+    if not _month_date_range(month):
+        return jsonify({"message": "月份格式无效"}), 400
     if g.current_user.role == "admin":
-        employees = (
-            Employee.query.options(joinedload(Employee.department))
-            .filter(Employee.resigned_at.is_(None))
-            .order_by(Employee.emp_no.asc())
-            .all()
-        )
+        employees = month_employees(month, include_resigned=False)
     else:
-        emp_ids = _accessible_emp_ids()
+        emp_ids = _accessible_emp_ids(month)
         if g.current_user.can_access_page("manager_query") or g.current_user.can_access_page("individual_attendance"):
             profile_emp_no = (g.current_user.profile_emp_no or "").strip()
-            profile_manager = (
-                Employee.query.with_entities(Employee.id)
-                .filter_by(emp_no=profile_emp_no, is_manager=True)
-                .first()
-                if profile_emp_no
-                else None
+            profile_manager = next(
+                (employee for employee in month_employees(month, is_manager=True, include_resigned=False)
+                 if employee.emp_no == profile_emp_no), None
             )
             if profile_manager:
                 emp_ids = list(set(emp_ids) | {profile_manager.id})
-        if emp_ids:
-            employees = (
-                Employee.query.options(joinedload(Employee.department))
-                .filter(Employee.id.in_(emp_ids), Employee.resigned_at.is_(None))
-                .order_by(Employee.emp_no.asc())
-                .all()
-            )
-        else:
-            employees = []
+        employees = month_employees(month, emp_ids, include_resigned=False) if emp_ids else []
 
     # 账套是首页摘要定位数据的依据，对所有登录用户返回；
     # departments 仅查询中心需要，受其权限约束，无权限时留空。

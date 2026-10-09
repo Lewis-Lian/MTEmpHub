@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiRequest } from "../../api/client";
@@ -89,6 +90,8 @@ export default function AttendanceOverridesPage({
   const [progressVisible, setProgressVisible] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
+
+  useMonthQueryBootstrap(selectedMonth, setBootstrap);
 
   useEffect(() => {
     let mounted = true;

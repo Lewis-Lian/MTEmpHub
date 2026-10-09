@@ -6,6 +6,7 @@ from flask import jsonify, request
 
 from routes.auth_helpers import admin_required
 from models.daily_attendance_override import DailyAttendanceOverride
+from services.monthly_reference_service import month_employee
 
 
 def _requested_emp_ids() -> list[int]:
@@ -147,7 +148,7 @@ def daily_attendance_override_calendar_api():
     month = admin_module._validate_month(request.args.get("month"))
     if not emp_id or not month:
         return jsonify({"error": "请选择员工和有效月份"}), 400
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, emp_id), month)
     if not employee:
         return jsonify({"error": "员工不存在"}), 400
     return jsonify(_build_attendance_calendar_payload(employee, month))
@@ -174,7 +175,7 @@ def save_daily_attendance_override_record_api():
     locked_error = admin_module._ensure_account_set_unlocked(account_set, "保存逐日考勤修正")
     if locked_error:
         return locked_error
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, emp_id), month)
     if not employee:
         return jsonify({"error": "员工不存在"}), 400
 
@@ -220,7 +221,7 @@ def save_daily_attendance_override_batch_api():
     month = admin_module._validate_month(data.get("month"))
     if not emp_id or not month:
         return jsonify({"error": "请选择员工和有效月份"}), 400
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, emp_id), month)
     if not employee:
         return jsonify({"error": "员工不存在"}), 400
 
@@ -311,7 +312,7 @@ def delete_daily_attendance_override_record_api():
     locked_error = admin_module._ensure_account_set_unlocked(account_set, "清除逐日考勤修正")
     if locked_error:
         return locked_error
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, emp_id), month)
     if not employee:
         return jsonify({"error": "员工不存在"}), 400
 
@@ -357,7 +358,7 @@ def late_offset_leaves_api():
     emp_id = request.args.get("emp_id", type=int) or 0
     if not month or not emp_id:
         return jsonify({"error": "请选择管理人员和有效月份"}), 400
-    employee = admin_module.db.session.get(admin_module.Employee, emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, emp_id), month)
     if not employee:
         return jsonify({"error": "员工不存在"}), 400
     return jsonify(
@@ -550,7 +551,7 @@ def _leave_record_response(row, month: str):
     from routes import admin_core as admin_module
     from routes.query_core import _build_attendance_calendar_payload
 
-    employee = admin_module.db.session.get(admin_module.Employee, row.emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, row.emp_id), month)
     return jsonify(
         {
             "leave": _serialize_leave_record(row),
@@ -767,7 +768,7 @@ def overtime_record_operation_api(record_id: int):
     for affected_month in sorted(months):
         admin_module.build_manager_rows(admin_module._manager_attendance_options(affected_month), sync_month_stats=True)
     admin_module.db.session.commit()
-    employee = admin_module.db.session.get(admin_module.Employee, row.emp_id)
+    employee = month_employee(admin_module.db.session.get(admin_module.Employee, row.emp_id), month)
     row_payload, _ = (
         admin_module._manager_attendance_response(employee.id, month) if employee.is_manager
         else admin_module._employee_override_response(employee.id, month)

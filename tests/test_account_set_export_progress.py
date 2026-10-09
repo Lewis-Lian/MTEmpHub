@@ -51,3 +51,32 @@ def test_successful_export_progress_is_ready_and_private(backup_app):
     with pytest.raises(BackupError, match='无权'):
         get_export_progress(token, 1, 99)
     assert client.get('/api/admin/account-sets/1/backup?export_token=' + token).status_code == 400
+
+
+def test_simultaneous_start_cannot_overwrite_task_owner(backup_app, monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from pathlib import Path
+    from services.account_set_export_progress_service import start_export_progress, get_export_progress
+    from services.account_set_backup_schema import BackupError
+    barrier = threading.Barrier(2)
+    token = '9' * 32
+    original = Path.exists
+    def exists(path):
+        result = original(path)
+        if path.name == token + '.json' and not result:
+            barrier.wait(timeout=5)
+        return result
+    monkeypatch.setattr(Path, 'exists', exists)
+    def start(owner):
+        with backup_app.app_context():
+            try:
+                start_export_progress(token, None, owner)
+                return owner
+            except BackupError:
+                return None
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        owners = list(executor.map(start, [1, 99]))
+    assert len([owner for owner in owners if owner is not None]) == 1
+    owner = next(owner for owner in owners if owner is not None)
+    assert get_export_progress(token, None, owner)['status'] == 'running'

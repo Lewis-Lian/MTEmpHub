@@ -71,6 +71,31 @@ def ensure_schema_compatibility() -> None:
     AccountSetBackupOrigin.__table__.create(bind=db.engine, checkfirst=True)
     AccountSetBackupRestore.__table__.create(bind=db.engine, checkfirst=True)
 
+    audit_columns = _get_column_names(inspector, "account_set_backup_restores")
+    if audit_columns is not None:
+        if "operator_username" not in audit_columns:
+            db.session.execute(text("ALTER TABLE account_set_backup_restores ADD COLUMN operator_username VARCHAR(80)"))
+        if "task_id" not in audit_columns:
+            db.session.execute(text("ALTER TABLE account_set_backup_restores ADD COLUMN task_id VARCHAR(64)"))
+        if "ix_account_set_backup_restores_task_id" not in {
+            index['name'] for index in inspector.get_indexes('account_set_backup_restores')
+        }:
+            db.session.execute(text("CREATE INDEX ix_account_set_backup_restores_task_id ON account_set_backup_restores(task_id)"))
+        if "users" in table_names:
+            db.session.execute(text("""UPDATE account_set_backup_restores
+                SET operator_username = (SELECT username FROM users WHERE users.id = account_set_backup_restores.operator_id)
+                WHERE operator_username IS NULL"""))
+        db.session.commit()
+
+    from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
+
+    MonthlyReferenceSnapshot.__table__.create(bind=db.engine, checkfirst=True)
+    for table_name in ('employees', 'departments', 'shifts'):
+        columns = _get_column_names(inspector, table_name)
+        if columns is not None and 'is_active' not in columns:
+            db.session.execute(text(f'ALTER TABLE {table_name} ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1'))
+            db.session.commit()
+
     department_columns = _get_column_names(inspector, "departments")
     if department_columns is not None:
         if "parent_id" not in department_columns:
@@ -157,6 +182,12 @@ def ensure_schema_compatibility() -> None:
 
     user_columns = _get_column_names(inspector, "users")
     if user_columns is not None:
+        if "is_active" not in user_columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT 1"))
+            db.session.commit()
+        if "auth_version" not in user_columns:
+            db.session.execute(text("ALTER TABLE users ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 0"))
+            db.session.commit()
         if "page_permissions" not in user_columns:
             db.session.execute(text("ALTER TABLE users ADD COLUMN page_permissions JSON"))
             db.session.commit()

@@ -20,6 +20,13 @@ class MigrationServiceTests(unittest.TestCase):
             with source.begin() as connection:
                 connection.execute(text('CREATE TABLE system_settings (id INTEGER PRIMARY KEY, "key" TEXT, value TEXT)'))
                 connection.execute(text("INSERT INTO system_settings VALUES (1, 'manager_attendance_source', 'dingtalk')"))
+                connection.execute(text('''CREATE TABLE monthly_reference_snapshots (
+                    id INTEGER PRIMARY KEY, month TEXT, kind TEXT, business_key TEXT,
+                    payload TEXT, provenance TEXT, quality TEXT, schema_version INTEGER,
+                    created_at DATETIME, updated_at DATETIME)'''))
+                connection.execute(text('''INSERT INTO monthly_reference_snapshots VALUES
+                    (9, '2026-06', 'employee', 'E1', '{"name":"History"}',
+                     '{"source":"archive"}', 'verified', 1, '2026-06-01', '2026-06-01')'''))
             source.dispose()
 
             read_db, write_db = SQLAlchemy(), SQLAlchemy()
@@ -47,10 +54,14 @@ class MigrationServiceTests(unittest.TestCase):
                 results = migrate_sqlite_to_mysql(source_url, target_url)
 
             self.assertIn({"table": "system_settings", "rows": 1, "status": "ok"}, results)
+            self.assertIn({"table": "monthly_reference_snapshots", "rows": 1, "status": "ok"}, results)
             target = create_engine(target_url)
             with target.connect() as connection:
                 self.assertEqual(
                     connection.execute(text('SELECT "key", value FROM system_settings')).one(),
                     ("manager_attendance_source", "dingtalk"),
                 )
+                self.assertEqual(connection.execute(text(
+                    'SELECT business_key, payload, quality FROM monthly_reference_snapshots')).one(),
+                    ('E1', '{"name":"History"}', 'verified'))
             target.dispose()

@@ -17,6 +17,7 @@ from models.account_set import AccountSet
 from models.employee import Employee
 from models.department import Department
 from models.shift import Shift
+from models.user import User
 from models.account_set_backup_restore import AccountSetBackupOrigin, AccountSetBackupRestore
 from services.account_set_backup_schema import (
     DATASETS, REFS, HISTORY, DELETE_ALLOWED, ACCOUNT_FIELDS, BackupError,
@@ -305,6 +306,8 @@ def cleanup_old_files(root):
         return warnings
     pending = json.loads(journal.read_text())
     referenced = {str(Path(row.stored_path).resolve()) for name in FILE_DATASETS for row in DATASETS[name].model.query.all()}
+    referenced.update(str((Path(current_app.config['UPLOAD_FOLDER']) / 'avatars' / Path(row.avatar).name).resolve())
+                      for row in User.query.all() if row.avatar and row.avatar.startswith('/api/auth/avatar/'))
     remaining = []
     for filename in pending:
         try:
@@ -426,7 +429,9 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                     else:
                         origin.local_id = target.id
                         origin.provenance = provenance
+            operator = db.session.get(User, operator_id)
             db.session.add(AccountSetBackupRestore(month=document['month'], operator_id=operator_id,
+                                                  operator_username=operator.username if operator else None, task_id=uuid.uuid4().hex,
                                                   backup_digest=digest({key: value for key, value in document.items() if key != '_files'}), counts=counts))
             # Journal before commit: cleanup verifies DB references before deleting.
             journal = root / 'cleanup.json'
@@ -448,3 +453,14 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                 db.session.rollback()
                 if destination.exists():
                     shutil.rmtree(destination)
+
+
+def build_multi_preview(document, selection, choices=None):
+    """V2 read-only preview; legacy single-month restore remains separate."""
+    from services.multi_month_restore_preview import build_multi_preview as build
+    return build(document, selection, choices)
+
+
+def restore_multi_backup(document, selection, choices, fingerprint, operator_id, *, task_id=None):
+    from services.multi_month_restore import restore_multi_backup as restore
+    return restore(document, selection, choices, fingerprint, operator_id, task_id=task_id)

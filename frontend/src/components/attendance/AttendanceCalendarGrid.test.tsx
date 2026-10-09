@@ -507,3 +507,10 @@ describe("AttendanceCalendarGrid 隐藏修正角点（showOverrideDot）", () =>
     expect(screen.getByText("手工修正")).toBeInTheDocument(); // 图例项
   });
 });
+
+describe("月度资料质量提示", () => {
+  it("显示未核对历史资料的限制", () => {
+    render(<AttendanceCalendarGrid data={{ ...DATA, reference: { quality: "baseline", warnings: ["月度资料为基线，不能证明完整历史。"] } }} />);
+    expect(screen.getByText("月度资料为基线，不能证明完整历史。")).toBeInTheDocument();
+  });
+});

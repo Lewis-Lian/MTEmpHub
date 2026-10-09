@@ -102,6 +102,20 @@ class ApiAuthTests(unittest.TestCase):
         self.assertEqual(payload["role"], "admin")
         self.assertTrue(payload["page_permissions"]["query_home"])
 
+    def test_existing_token_expiration_and_signature_checks_remain_required(self) -> None:
+        import jwt
+        from datetime import datetime, timezone
+
+        with self.app.app_context():
+            user_id = User.query.filter_by(username="admin").one().id
+        for secret, expiry in [
+            ("test-secret", datetime.now(timezone.utc) - timedelta(seconds=1)),
+            ("wrong-secret", datetime.now(timezone.utc) + timedelta(hours=1)),
+        ]:
+            token = jwt.encode({"sub": str(user_id), "auth_version": 0, "exp": expiry}, secret, algorithm="HS256")
+            response = self.client.get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+            self.assertEqual(response.status_code, 401)
+
     def test_legacy_login_endpoint_is_not_available(self) -> None:
         response = self.client.post(
             "/login",

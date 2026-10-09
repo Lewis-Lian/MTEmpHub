@@ -48,6 +48,7 @@ def generate_token(user: User, *, remember_me: bool = False) -> str:
         "sub": str(user.id),
         "username": user.username,
         "role": user.role,
+        "auth_version": int(user.auth_version or 0),
         "iat": int(now.timestamp()),
         "exp": int(expires_at.timestamp()),
     }
@@ -200,6 +201,9 @@ def login_required(fn):
         user = db.session.get(User, user_id) if user_id else None
         if not user:
             return jsonify({"error": "User not found"}), 401
+        version = payload.get("auth_version", 0)
+        if not user.is_active or type(version) is not int or version != user.auth_version:
+            return jsonify({"error": "Invalid token"}), 401
         g.current_user = user
         return fn(*args, **kwargs)
 

@@ -18,6 +18,8 @@ class AccountSetBackupRestore(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     month = db.Column(db.String(7), nullable=False)
     operator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    operator_username = db.Column(db.String(80), nullable=True)
+    task_id = db.Column(db.String(64), nullable=True, index=True)
     backup_digest = db.Column(db.String(64), nullable=False)
     counts = db.Column(db.JSON, nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

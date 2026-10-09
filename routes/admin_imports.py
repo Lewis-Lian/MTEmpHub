@@ -379,6 +379,10 @@ def import_departments_xlsx():
 
     for department, dept_no, _dept_name, _parent_no in staged_rows:
         current_dept_no = (department.dept_no or "").strip()
+        from services.monthly_reference_service import reference_key_in_use
+        if current_dept_no != dept_no and reference_key_in_use('department', current_dept_no):
+            admin_module.db.session.rollback()
+            return jsonify({"error": "该部门编号已关联月度历史资料，暂不允许更改"}), 409
         if current_dept_no == dept_no or current_dept_no.startswith(admin_module._DEPARTMENT_IMPORT_TEMP_PREFIX):
             continue
         while True:
@@ -393,6 +397,7 @@ def import_departments_xlsx():
     for department, dept_no, dept_name, parent_no in staged_rows:
         department.dept_no = dept_no
         department.dept_name = dept_name
+        department.is_active = True
         pending_parent_links.append((department, parent_no))
 
     admin_module.db.session.flush()
@@ -434,7 +439,7 @@ def download_departments_template():
 @admin_required
 def export_departments_xlsx():
     from routes import admin_core as admin_module
-    departments = admin_module.Department.query.order_by(
+    departments = admin_module.Department.query.filter_by(is_active=True).order_by(
         admin_module.Department.dept_no.asc(), admin_module.Department.dept_name.asc()
     ).all()
     rows = [
@@ -573,6 +578,7 @@ def import_employees_xlsx():
             employee.is_nursing = is_nursing
             employee.employee_stats_attendance_source = employee_stats_attendance_source
             employee.manager_stats_attendance_source = manager_stats_attendance_source
+        employee.is_active = True
         admin_module._assign_employee_shift(employee, shift)
         imported += 1
 
@@ -649,7 +655,7 @@ def export_employees_xlsx():
                     values.append(int(text))
         return values
 
-    query = admin_module.Employee.query
+    query = admin_module.Employee.query.filter_by(is_active=True)
 
     employee_ids = requested_ids()
     if employee_ids:

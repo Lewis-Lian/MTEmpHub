@@ -10,7 +10,7 @@ from routes.auth_helpers import admin_required
 def users_list_api():
     from routes import admin_core as admin_module
 
-    users = admin_module._user_list_query().all()
+    users = admin_module._user_list_query().filter(admin_module.User.is_active.is_(True)).all()
     profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
     profile_departments_by_id = {}
     if profile_dept_ids:
@@ -29,7 +29,7 @@ def disabled_users_list_api():
     from routes import admin_core as admin_module
 
     now = datetime.utcnow()
-    users = admin_module._user_list_query().all()
+    users = admin_module._user_list_query().filter(admin_module.User.is_active.is_(True)).all()
     profile_dept_ids = sorted({user.profile_dept_id for user in users if user.profile_dept_id})
     profile_departments_by_id = {}
     if profile_dept_ids:
@@ -52,6 +52,8 @@ def unlock_disabled_user_api(user_id: int):
     from routes import admin_core as admin_module
 
     user = admin_module._require_model(admin_module.User, user_id)
+    if not user.is_active:
+        return jsonify({"error": "该账号已退出当前账号集合，不能通过解锁恢复"}), 400
     if user.login_disabled_reason == admin_module.RESIGN_DISABLE_REASON:
         return jsonify({"error": "该账号因员工离职被禁用，请先在员工管理页恢复对应员工在职"}), 400
     user.clear_login_lockout()
@@ -246,8 +248,8 @@ def register_admin_account_routes(admin_bp) -> None:
             if role != "admin":
                 if any(user.id == g.current_user.id for user in users):
                     return jsonify({"error": "cannot downgrade current admin"}), 400
-                current_admin_count = admin_module.User.query.filter_by(role="admin").count()
-                target_admin_count = sum(1 for user in users if user.role == "admin")
+                current_admin_count = admin_module.User.query.filter_by(role="admin", is_active=True).count()
+                target_admin_count = sum(1 for user in users if user.role == "admin" and user.is_active)
                 if current_admin_count - target_admin_count <= 0:
                     return jsonify({"error": "cannot downgrade last admin"}), 400
 
@@ -280,13 +282,13 @@ def register_admin_account_routes(admin_bp) -> None:
         if action == "delete":
             if any(user.id == g.current_user.id for user in users):
                 return jsonify({"error": "cannot delete current user"}), 400
-            current_admin_count = admin_module.User.query.filter_by(role="admin").count()
-            target_admin_count = sum(1 for user in users if user.role == "admin")
+            current_admin_count = admin_module.User.query.filter_by(role="admin", is_active=True).count()
+            target_admin_count = sum(1 for user in users if user.role == "admin" and user.is_active)
             if current_admin_count - target_admin_count <= 0:
                 return jsonify({"error": "cannot delete last admin"}), 400
 
             for user in users:
-                admin_module.db.session.delete(user)
+                user.archive()
             admin_module.db.session.commit()
             return jsonify({"status": "ok", "updated_count": len(users)})
 
@@ -378,10 +380,10 @@ def register_admin_account_routes(admin_bp) -> None:
         if user.id == g.current_user.id:
             return jsonify({"error": "cannot delete current user"}), 400
 
-        admin_count = admin_module.User.query.filter_by(role="admin").count()
+        admin_count = admin_module.User.query.filter_by(role="admin", is_active=True).count()
         if user.role == "admin" and admin_count <= 1:
             return jsonify({"error": "cannot delete last admin"}), 400
 
-        admin_module.db.session.delete(user)
+        user.archive()
         admin_module.db.session.commit()
         return jsonify({"status": "ok"})

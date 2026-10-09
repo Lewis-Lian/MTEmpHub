@@ -199,6 +199,8 @@ def api_login():
         return jsonify({"error": "请先完成滑块验证"}), 403
 
     user = User.query.filter_by(username=username).first()
+    if user and not user.is_active:
+        return jsonify({"error": "该账号已退出当前账号集合，无法登录"}), 423
     if user and user.is_login_disabled():
         return jsonify({"error": "该账号已被禁用，请联系管理员解锁"}), 423
     if user and user.is_temporarily_login_locked(now):
@@ -260,6 +262,8 @@ def api_change_password():
 
     now = datetime.utcnow()
     user = User.query.filter_by(username=username).first()
+    if user and not user.is_active:
+        return jsonify({"error": "该账号已退出当前账号集合，无法登录"}), 423
     if user and user.is_login_disabled():
         return jsonify({"error": "该账号已被禁用，请联系管理员解锁"}), 423
     if user and user.is_temporarily_login_locked(now):

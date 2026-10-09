@@ -164,6 +164,7 @@ export interface AttendanceCalendarSummary {
 export interface AttendanceCalendarData {
   employee: AttendanceCalendarEmployee;
   month: string;
+  reference?: { quality: "verified" | "baseline" | "partial" | "missing"; warnings: string[] };
   /** 管理人员逐日记录未覆盖整月时，为兼容历史账套回退月报口径。 */
   attendance_source?: "daily" | "monthly_fallback";
   days: AttendanceCalendarDay[];

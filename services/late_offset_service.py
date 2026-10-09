@@ -15,6 +15,7 @@ import re
 from datetime import date
 
 from models import db
+from services.monthly_reference_service import month_employees, month_employee
 from models.daily_attendance_override import DailyAttendanceOverride
 from models.employee import Employee
 from models.leave import LeaveRecord
@@ -145,15 +146,7 @@ def _day_offset_target(
 
 def late_offset_candidates(month: str, emp_ids: list[int] | None = None) -> list[dict[str, object]]:
     """管理人员当月所有迟到日的冲抵候选；emp_ids 为 None 查全部管理人员，空列表返回空。"""
-    query = (
-        Employee.query.filter(Employee.is_manager.is_(True), Employee.resigned_at.is_(None))
-        .order_by(Employee.emp_no.asc(), Employee.name.asc())
-    )
-    if emp_ids is not None:
-        if not emp_ids:
-            return []
-        query = query.filter(Employee.id.in_(emp_ids))
-    employees = query.all()
+    employees = month_employees(month, emp_ids, is_manager=True, include_resigned=False)
     if not employees:
         return []
     employee_ids = [employee.id for employee in employees]
@@ -240,7 +233,8 @@ def confirm_late_offset(
     条件不满足时抛 ValueError（候选可能已过期）。
     只 flush 不 commit，由调用方（路由层）在同一事务内记录历史后统一提交。
     """
-    employee = db.session.get(Employee, emp_id)
+    month = record_date.strftime("%Y-%m")
+    employee = month_employee(db.session.get(Employee, emp_id), month)
     if not employee or not employee.is_manager:
         raise ValueError("员工不存在或不是管理人员")
     month = record_date.strftime("%Y-%m")

@@ -287,7 +287,7 @@ def test_attendance_settings():
 @admin_required
 def bootstrap():
     allowed_ids = _accessible_dept_ids_set()
-    query = Department.query
+    query = Department.query.filter_by(is_active=True)
     if getattr(g, "current_user", None) and g.current_user.role != "admin":
         if not allowed_ids:
             departments = []
@@ -315,7 +315,7 @@ def bootstrap():
                     "time_slots": row.time_slots or [],
                     "is_cross_day": row.is_cross_day,
                 }
-                for row in Shift.query.order_by(Shift.shift_no.asc()).all()
+                for row in Shift.query.filter_by(is_active=True).order_by(Shift.shift_no.asc()).all()
             ],
         }
     )

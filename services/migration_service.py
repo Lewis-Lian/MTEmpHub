@@ -15,6 +15,7 @@ MIGRATION_ORDER = [
     "users",
     "shifts",
     "employees",
+    "monthly_reference_snapshots",
     "system_settings",
     "user_employee_assignments",
     "user_department_assignments",

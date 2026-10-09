@@ -115,3 +115,84 @@ def options_checked(options):
     if any(type(value) is not bool for value in options.values()):
         raise BackupError('导入选项必须是布尔值')
     return {key: options.get(key, False) for key in OPTION_KEYS}
+
+
+# V1 stays frozen for existing single-month collectors/restorers. V2 declares
+# portable fields separately; declaring a dataset does not enable its restore.
+from dataclasses import replace
+from models.account_set import AccountSet
+from models.user import User, UserEmployeeAssignment, UserDepartmentAssignment
+from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
+
+V2_DATASETS = dict(DATASETS)
+for _name in ('employees', 'departments', 'shifts'):
+    V2_DATASETS[_name] = replace(DATASETS[_name], fields=DATASETS[_name].fields + ('is_active',))
+V2_DATASETS.update({
+    'account_set': spec(AccountSet, 'month name factory_rest_days monthly_benefit_days', 'month', 'month', 'account_settings'),
+    'users': spec(User, 'username profile_emp_no profile_name password_hash role page_permissions is_active login_disabled_until_admin_unlock login_disabled_reason created_at', 'username', 'shared', 'accounts'),
+    'user_employee_assignments': spec(UserEmployeeAssignment, '', 'username emp_no', 'shared', 'accounts'),
+    'user_department_assignments': spec(UserDepartmentAssignment, '', 'username dept_no', 'shared', 'accounts'),
+    'snapshots': spec(MonthlyReferenceSnapshot, 'month kind business_key payload provenance quality schema_version created_at updated_at', 'month kind business_key', 'month'),
+})
+V2_REFS = {name: dict(refs) for name, refs in REFS.items()}
+for _name, _dataset in V2_DATASETS.items():
+    if hasattr(_dataset.model, 'emp_id'):
+        V2_REFS.setdefault(_name, {})['emp_id'] = ('emp_no', Employee, 'emp_no')
+    if hasattr(_dataset.model, 'account_set_id'):
+        V2_REFS.setdefault(_name, {})['account_set_id'] = ('account_month', AccountSet, 'month')
+V2_REFS.update({
+    'users': {'profile_dept_id': ('profile_dept_no', Department, 'dept_no')},
+    'user_employee_assignments': {'user_id': ('username', User, 'username'), 'emp_id': ('emp_no', Employee, 'emp_no')},
+    'user_department_assignments': {'user_id': ('username', User, 'username'), 'dept_id': ('dept_no', Department, 'dept_no')},
+})
+# Archive paths are allocated locally, never copied from the source machine.
+FILE_REFS = {name: {'stored_path': 'file_key'} for name in FILE_DATASETS}
+FILE_REFS['users'] = {'avatar': 'avatar_file_key'}
+# Optional portable metadata keeps built-in avatar choices without inventing a
+# file. Earlier V2 documents that omit it retain their original row shape.
+V2_OPTIONAL_FIELDS = {'users': ('avatar_preset',)}
+DATASET_CATEGORIES = {
+    **{name: 'attendance' for name in DATASETS},
+    'account_set': 'account_settings', 'factory_rest': 'account_settings',
+    'departments': 'departments', 'employees': 'employees',
+    'shifts': 'shifts', 'employee_shift_assignments': 'shifts',
+    'users': 'accounts', 'user_employee_assignments': 'accounts', 'user_department_assignments': 'accounts',
+    'leave_records': 'cross_month', 'overtime_records': 'cross_month',
+    'annual_leave': 'annual_stats', 'manager_stats': 'annual_stats',
+    'snapshots': 'monthly_references',
+    **{name: ('meal_ledgers' if name.startswith('meal_ledger') else 'meal_tickets') for name in MEAL_DATASETS},
+}
+DATASET_VERSIONS = {name: 1 for name in V2_DATASETS}
+DELETION_POLICIES = {name: ('exit_current' if name in ('employees', 'departments', 'shifts', 'users') else 'selected_complete')
+                     for name, ds in V2_DATASETS.items()}
+
+# Every exclusion is field-specific. New columns on even an excluded table
+# must receive a new decision rather than disappearing behind a table wildcard.
+FIELD_EXCLUSIONS = {}
+
+def _exclude(table, fields, reason):
+    FIELD_EXCLUSIONS.setdefault(table, {}).update({field: reason for field in fields.split()})
+
+# Explicit table list: a new ORM table with only an ID still fails coverage.
+for _table in '''account_sets account_set_factory_rest_days account_set_imports
+annual_leave attendance_override_histories daily_attendance_overrides daily_records
+departments dingtalk_sync_runs employee_attendance_overrides employee_shift_assignments
+employees leave_records manager_attendance_overrides manager_month_stats meal_ledger_imports
+meal_ledger_records meal_ticket_adjustments meal_ticket_batches meal_ticket_import_rows
+meal_ticket_imports meal_ticket_items meal_ticket_payments monthly_reference_snapshots
+monthly_reports overtime_records shifts users user_employee_assignments user_department_assignments'''.split():
+    _exclude(_table, 'id', '目标本地 ID；通过业务键重建，不能导入源 ID')
+_exclude('account_sets', 'is_active is_locked locked_at locked_by', '目标账套选择与锁定状态；恢复不得覆盖')
+_exclude('account_sets', 'created_at updated_at', '目标账套生命周期时间')
+_exclude('account_set_factory_rest_days', 'created_at', '目标行创建时间')
+_exclude('employees', 'created_at', '目标人员行创建时间')
+_exclude('users', 'auth_version', '目标本地令牌撤销版本；恢复仅递增，永不从包导入')
+_exclude('users', 'login_failed_attempts login_locked_until', '目标临时登录失败与短期锁定状态')
+for _table in ('daily_attendance_overrides', 'employee_attendance_overrides', 'manager_attendance_overrides'):
+    _exclude(_table, 'updated_by updated_at', '目标最近编辑元数据；业务差异通过 override_history 保留')
+_exclude('attendance_override_histories', 'operator_user_id', '源操作者信息随 provenance 保存，不作为目标用户外键导入')
+_exclude('account_set_backup_origins', 'id local_id', '目标来源映射身份；由恢复重建')
+_exclude('account_set_backup_origins', 'dataset origin_key provenance', '随 imports/sync_history/override_history 行携带，不整体覆盖映射表')
+_exclude('account_set_backup_restores', 'id month operator_id operator_username task_id backup_digest counts created_at', '目标本地恢复审计；不属于可覆盖业务内容')
+_exclude('messages', 'id sender_id recipient_id title content created_at read_at', '独立消息与已读状态，不在确认的月度备份范围')
+_exclude('system_settings', 'id key value', '安装级配置可能包含凭证，不整表导出；业务使用的月度配置已冻结在 snapshots.payload')

@@ -634,7 +634,7 @@ describe("App smoke regression", () => {
     fetchMock.mockImplementation((input) => mockAdminAppResponse(normalizePath(input)));
     const backupApi = await import("./api/accountSetBackup");
     let finishExport!: () => void;
-    const download = vi.spyOn(backupApi, "downloadAccountSetBackup").mockImplementation((_id, _month, report) => {
+    const download = vi.spyOn(backupApi, "downloadMonthlyBackup").mockImplementation((_ids, _categories, report) => {
       report({status: "running", phase: "packing", percent: 37, completed: 37, total: 100, stage: "打包原始文件"});
       return new Promise<void>(resolve => { finishExport = () => { report({status: "completed", phase: "download", percent: 100, stage: "备份下载完成"}); resolve(); }; });
     });
@@ -642,10 +642,54 @@ describe("App smoke regression", () => {
     render(<App />);
     fireEvent.click(await screen.findByRole("button", {name: /账套设置/}));
     fireEvent.click(screen.getByRole("button", {name: /导出.*账套/}));
+    expect(await screen.findByRole("dialog", {name: "导出多月份备份"})).toBeInTheDocument();
+    expect(screen.getByLabelText("账号、密码与权限")).toBeChecked();
+    fireEvent.click(screen.getByRole("button", {name: "开始导出"}));
     expect(await screen.findByRole("progressbar", {name: "账套导出当前阶段进度"})).toHaveAttribute("aria-valuenow", "37");
     await act(async () => { finishExport(); });
     await waitFor(() => expect(screen.getByRole("progressbar", {name: "账套导出当前阶段进度"})).toHaveAttribute("aria-valuenow", "100"));
     download.mockRestore();
+  });
+
+  it.each([false, true])("多月恢复结果保留，重新登录需求=%s 时按契约刷新缓存", async reauthentication => {
+    window.history.replaceState({}, "", "/admin/dashboard");
+    let restored = false;
+    const scope = {months:["2026-05"],categories:["attendance"],cross_month_keys:[],annual_keys:[]};
+    fetchMock.mockImplementation((input, init) => {
+      const path = normalizePath(input);
+      if (path === "/api/admin/backups/preview") return Promise.resolve(jsonResponse({token:"task",selection:scope,months:scope.months,coverage:{},rows:[],summary:{new:0,changed:0,system_only:0,same:0},blockers:[],fingerprint:"fp"}));
+      if (path === "/api/admin/backups/task/restore") {
+        expect(JSON.parse(String(init?.body))).toEqual({selection:scope,choices:{},fingerprint:"fp"});
+        restored = true;
+        return Promise.resolve(jsonResponse({task_id:"task",months:scope.months,counts:{new:0,updated:0,deleted:0,skipped:0},category_counts:{},warnings:["旧文件清理稍后重试"],reauthentication_required:reauthentication}));
+      }
+      if (restored && reauthentication) throw new Error(`恢复结果展示前不应认证请求：${path}`);
+      return mockAdminAppResponse(path);
+    });
+    const query = await import("./api/query"); query.clearQueryBootstrapCache();
+    await query.fetchQueryBootstrap();
+    const {default: App} = await import("./App"); render(<App />);
+    fireEvent.click(await screen.findByRole("button",{name:/账套设置/}));
+    fireEvent.click(screen.getByRole("button",{name:"导入月度账套"}));
+    fireEvent.change(screen.getByLabelText("选择账套备份"),{target:{files:[new File(["zip"],"backup.zip")]}});
+    await screen.findByText("识别到的月份");
+    const monthFetches = fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets").length;
+    const importFetches = fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets/1/imports").length;
+    fireEvent.click(screen.getByRole("button",{name:"查看导入确认"})); fireEvent.click(screen.getByRole("button",{name:"确认导入"}));
+    await screen.findByText("账套恢复完成"); expect(screen.getByText("旧文件清理稍后重试")).toBeInTheDocument();
+    if (reauthentication) {
+      expect(screen.getByRole("button",{name:"重新登录"})).toBeInTheDocument();
+      expect(fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets")).toHaveLength(monthFetches);
+      expect(fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets/1/imports")).toHaveLength(importFetches);
+    } else {
+      await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets").length).toBeGreaterThan(monthFetches));
+      await waitFor(() => expect(fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets/1/imports").length).toBeGreaterThan(importFetches));
+      const cachedRequests = fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/query/bootstrap").length;
+      await query.fetchQueryBootstrap();
+      expect(fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/query/bootstrap")).toHaveLength(cachedRequests + 1);
+      expect(screen.getByText("账套恢复完成")).toBeInTheDocument();
+    }
+    query.clearQueryBootstrapCache();
   });
 
   it("账套中心会挂载旧版账套工作台", async () => {

@@ -9,7 +9,7 @@ class DownloadXHR {
   responseType = ''; withCredentials = false;
   onprogress?: (event: {lengthComputable: boolean; loaded: number; total: number}) => void;
   onload?: () => void; onerror?: () => void; onabort?: () => void;
-  open = vi.fn(); send = vi.fn(); getResponseHeader = vi.fn(() => 'application/zip');
+  open = vi.fn(); send = vi.fn(); setRequestHeader = vi.fn(); getResponseHeader = vi.fn(() => 'application/zip');
   constructor() { DownloadXHR.instance = this; }
 }
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();});
@@ -42,4 +42,32 @@ it('surfaces server errors without reporting successful completion', async () =>
   await failure;
   expect(progress).not.toHaveBeenCalledWith(expect.objectContaining({status:'completed'}));
   expect(vi.getTimerCount()).toBe(0);
+});
+
+it('posts multi-month export scope and polls its task-bound progress', async () => {
+  const { downloadMonthlyBackup } = await import('./accountSetBackup');
+  vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
+  vi.stubGlobal('URL', {createObjectURL: vi.fn(() => 'blob:test'), revokeObjectURL: vi.fn()});
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  request.mockResolvedValue({status:'running', phase:'data', percent:20, stage:'收集数据'});
+  const task = downloadMonthlyBackup([1, 2], ['attendance', 'accounts'], vi.fn());
+  expect(DownloadXHR.instance.open).toHaveBeenCalledWith('POST', expect.stringContaining('/api/admin/backups/export'));
+  expect(JSON.parse(DownloadXHR.instance.send.mock.calls[0][0])).toEqual({account_set_ids:[1,2],categories:['attendance','accounts'],export_token: expect.any(String)});
+  await vi.advanceTimersByTimeAsync(600);
+  expect(request).toHaveBeenCalledWith(expect.stringContaining('/api/admin/backups/export/progress?export_token='));
+  DownloadXHR.instance.onload?.(); await task;
+});
+it('uses the multi-month endpoints and sends only selection, choices and fingerprint', async () => {
+  const api = await import('./accountSetBackup');
+  const file = new File(['zip'], 'backup.zip');
+  const selection = {months:['2026-06'],categories:['attendance'],cross_month_keys:[],annual_keys:[]};
+  await api.uploadMonthlyBackup(file);
+  const [path, options] = request.mock.calls[request.mock.calls.length - 1];
+  expect(path).toBe('/api/admin/backups/preview'); expect(options.body.get('file')).toBe(file);
+  await api.refreshMonthlyBackupPreview('task', selection, {'month/2026-06/daily_records/["E1"]':'backup'});
+  expect(request).toHaveBeenLastCalledWith('/api/admin/backups/task/preview', {method:'POST',body:{selection,choices:{'month/2026-06/daily_records/["E1"]':'backup'}}});
+  await api.confirmMonthlyBackupRestore('task', {selection, choices:{}, fingerprint:'fp'});
+  expect(request).toHaveBeenLastCalledWith('/api/admin/backups/task/restore', {method:'POST',body:{selection,choices:{},fingerprint:'fp'}});
+  await api.cancelMonthlyBackupPreview('task');
+  expect(request).toHaveBeenLastCalledWith('/api/admin/backups/task', {method:'DELETE'});
 });

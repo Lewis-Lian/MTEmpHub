@@ -1,3 +1,4 @@
+import { useMonthQueryBootstrap } from "../../hooks/useMonthQueryBootstrap";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "../../api/client";
 import { fetchAttendanceCalendar, fetchHeaderRows, fetchQueryBootstrap } from "../../api/query";
@@ -23,8 +24,10 @@ export default function IndividualAttendancePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isQuerying, setIsQuerying] = useState(false);
 
+  useMonthQueryBootstrap(month, setBootstrap, setError);
+
   useEffect(() => {
-    fetchQueryBootstrap()
+    fetchQueryBootstrap(new URLSearchParams(window.location.search).get("month") ?? undefined)
       .then((payload) => {
         setBootstrap(payload);
         const linked = new URLSearchParams(window.location.search);
@@ -58,7 +61,7 @@ export default function IndividualAttendancePage() {
       setSummary(payload);
       const calendarPayload = await fetchAttendanceCalendar(selectedEmployee.id, month);
       if (selectedEmployee.is_manager) {
-        const annualQuery = new URLSearchParams({ year: month.slice(0, 4), emp_ids: String(selectedEmployee.id) });
+        const annualQuery = new URLSearchParams({ month, year: month.slice(0, 4), emp_ids: String(selectedEmployee.id) });
         const [overtime, benefit] = await Promise.all([
           fetchHeaderRows("/api/query/manager-overtime", annualQuery),
           fetchHeaderRows("/api/query/manager-annual-leave", annualQuery),

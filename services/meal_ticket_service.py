@@ -11,6 +11,7 @@ from sqlalchemy import or_, text
 from models import db
 from models.account_set import AccountSet
 from models.system_setting import SystemSetting
+from services.monthly_reference_service import month_employees, month_employee
 from models.employee import Employee
 from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketAdjustment, MealTicketPayment
@@ -85,7 +86,7 @@ def source_snapshot(month, progress=None):
     first = date.fromisoformat(month + '-01')
     if progress:
         progress(stage='读取考勤人员名单', completed=0, total=0)
-    employees = Employee.query.filter(or_(Employee.resigned_at.is_(None), Employee.resigned_at >= first)).order_by(Employee.emp_no).all()
+    employees = [e for e in month_employees(month) if e.is_active and (not e.resigned_at or e.resigned_at >= first)]
     ordinary = [e for e in employees if not e.is_manager]
     managers = [e for e in employees if e.is_manager]
     if progress:

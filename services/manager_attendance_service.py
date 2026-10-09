@@ -10,6 +10,7 @@ from typing import Callable
 from models import db
 from models.account_set import AccountSet
 from models.dingtalk_sync_run import DingTalkSyncRun
+from services.monthly_reference_service import month_employees
 from models.employee import Employee
 from models.leave import LeaveRecord
 from models.manager_attendance_override import ManagerAttendanceOverride
@@ -31,7 +32,6 @@ from services.daily_override_service import (
     evening_overtime_dates_by_emp,
     status_attendance_days,
 )
-from sqlalchemy.orm import joinedload
 from utils.helpers import overlap_duration_days
 
 
@@ -665,26 +665,17 @@ def build_manager_rows(
       工伤不进考勤天数，因而被当作缺勤处理：缺勤天数 = 本月天数 − 出勤天数，
       按「加班额度 → 年假额度 → 事/病假」顺序扣减（厂休重叠不减免工伤天数）。
     """
-    query = (
-        Employee.query.options(joinedload(Employee.department))
-        .filter(Employee.is_manager.is_(True))
-    )
-    if not include_resigned:
-        query = query.filter(Employee.resigned_at.is_(None))
-    if emp_ids is not None:
-        if not emp_ids:
-            return []
-        query = query.filter(Employee.id.in_(emp_ids))
-    employees = query.order_by(Employee.dept_id.asc(), Employee.emp_no.asc(), Employee.name.asc()).all()
+    employees = month_employees(options.month, emp_ids, is_manager=True, include_resigned=include_resigned)
+    employees.sort(key=lambda e: (e.dept_id or 0, e.emp_no, e.name))
     rows: list[dict[str, object]] = []
     month_days = _month_days(options.month)
     employee_ids = [employee.id for employee in employees]
     attendance_rows_by_employee = attendance_views_by_employee(options.month, employees, MANAGER_STATS_CONTEXT)
     # DingTalk returns punch dates, so a completed sync need not cover every
     # calendar day to replace the Excel monthly summary.
-    use_dingtalk_daily = (
-        SystemSetting.get_value("manager_attendance_source", "local") == "dingtalk"
-        and DingTalkSyncRun.query.filter(
+    current_manager_source = SystemSetting.get_value("manager_attendance_source", "local")
+    has_dingtalk_daily = (
+        DingTalkSyncRun.query.filter(
             DingTalkSyncRun.month == options.month,
             DingTalkSyncRun.source == "dingtalk",
             DingTalkSyncRun.status.in_(["success", "partial"]),
@@ -708,6 +699,8 @@ def build_manager_rows(
     for emp_idx, employee in enumerate(employees):
         if progress_cb is not None:
             progress_cb(emp_idx + 1, total_employees)
+        use_dingtalk_daily = (has_dingtalk_daily and
+                              getattr(employee, 'manager_attendance_source', current_manager_source) == 'dingtalk')
         raw = {} if use_dingtalk_daily else _monthly_report_raw(employee, options.month)
         raw_attendance_days = _raw_float(raw, "出勤天数")
         attendance_rows = attendance_rows_by_employee.get(employee.id, [])
