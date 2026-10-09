@@ -16,6 +16,10 @@
 
 
 /* 页面标题区 */
+.meal-ticket-page.is-settlement-complete {
+  max-width: none;
+}
+
 .meal-ticket-heading {
   display: flex;
   align-items: flex-start;
@@ -826,17 +830,33 @@
   padding: 0;
   background: transparent;
   color: #059669;
-  font-size: 17px;
+  font-size: 20px;
+  letter-spacing: .02em;
 }
 
 .meal-ticket-settlement.is-settled {
-  min-height: 88px;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
+  align-self: stretch;
+  min-height: 112px;
   justify-content: center;
-  padding: 20px 24px;
+  padding: 24px 32px;
   border-left-width: 1px;
   border-color: rgba(5, 150, 105, .3);
-  background: linear-gradient(100deg, rgba(5, 150, 105, .1), rgba(5, 150, 105, .025));
+  background: linear-gradient(100deg, rgba(5, 150, 105, .12), rgba(5, 150, 105, .035));
   animation: meal-ticket-settled-enter .45s ease-out both;
+}
+
+.meal-ticket-settlement.is-settled::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, .24) 50%, transparent 65%);
+  animation: meal-ticket-settled-sheen 1.2s .3s ease-out both;
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-reconciliation-header,
@@ -846,7 +866,7 @@
 
 .meal-ticket-settlement.is-settled .meal-ticket-settlement-message {
   flex-wrap: nowrap;
-  gap: 16px;
+  gap: 20px;
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-settlement-message::after {
@@ -855,18 +875,39 @@
   height: 1px;
   background: linear-gradient(90deg, rgba(5, 150, 105, .35), rgba(5, 150, 105, 0));
   transform-origin: left;
-  animation: meal-ticket-settled-line .7s .1s ease-out both;
+  animation: meal-ticket-settled-line .8s .55s ease-out both;
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-notice-icon {
-  width: 40px;
-  height: 40px;
+  width: 56px;
+  height: 56px;
   color: #059669;
+  filter: drop-shadow(0 3px 8px rgba(5, 150, 105, .15));
+  animation: meal-ticket-settled-pop .45s .8s ease-out both;
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-check-ring {
+  stroke-dasharray: 1;
+  transform: rotate(-90deg);
+  transform-origin: 12px 12px;
+  animation: meal-ticket-settled-check .55s .1s ease-out both;
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-checkmark {
   stroke-dasharray: 1;
-  animation: meal-ticket-settled-check .4s .15s ease-out both;
+  animation: meal-ticket-settled-check .35s .55s ease-out both;
+}
+
+@keyframes meal-ticket-settled-pop {
+  0%, 100% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  75% { transform: scale(.97); }
+}
+
+@keyframes meal-ticket-settled-sheen {
+  from { transform: translateX(-100%); opacity: 0; }
+  30% { opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
 }
 
 @keyframes meal-ticket-settled-enter {
@@ -1764,6 +1805,16 @@
     align-items: flex-start;
     gap: 12px;
   }
+  .meal-ticket-settlement.is-settled {
+    padding: 20px;
+  }
+  .meal-ticket-settlement.is-settled .meal-ticket-settlement-message strong {
+    font-size: 17px;
+  }
+  .meal-ticket-settlement.is-settled .meal-ticket-notice-icon {
+    width: 44px;
+    height: 44px;
+  }
   .meal-ticket-page {
     gap: 16px;
     padding: 16px 12px 28px;
@@ -1816,6 +1867,9 @@
 
 @media (prefers-reduced-motion: reduce) {
   .meal-ticket-settlement.is-settled,
+  .meal-ticket-settlement.is-settled::before,
+  .meal-ticket-settlement.is-settled .meal-ticket-notice-icon,
+  .meal-ticket-settlement.is-settled .meal-ticket-check-ring,
   .meal-ticket-settlement.is-settled .meal-ticket-settlement-message::after,
   .meal-ticket-settlement.is-settled .meal-ticket-checkmark {
     animation: none;

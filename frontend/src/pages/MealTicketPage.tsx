@@ -355,7 +355,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const isError = errorCount > 0 || reconciliationFailed;
   const showReconciliation = (!paymentView || followupStage === "settlement") && (confirmed || isError);
 
-  return <main className="meal-ticket-page">
+  return <main className={`meal-ticket-page${settlementComplete ? " is-settlement-complete" : ""}`}>
     <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
       <div className="meal-ticket-header-title-group">
         <h1>{historical ? "菜票历史台账" : paymentView ? "后续补扣与对账" : "月度发放"}</h1>
@@ -441,7 +441,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <section ref={settlement} className={`meal-ticket-settlement${isError ? " is-error" : settled ? " is-settled" : ""}`} aria-label="整月结清检查" aria-live="polite" title="按整月全部人员检查，不受列表筛选影响。结清结果以实际发放记录为依据。">
         <div className="meal-ticket-reconciliation-header">
         <div className="meal-ticket-settlement-message">
-          <svg className="meal-ticket-notice-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" />{settled ? <path className="meal-ticket-checkmark" d="m7 12 3 3 7-7" pathLength="1" /> : <><path d="M12 7v6" /><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" /></>}</svg>
+          <svg className="meal-ticket-notice-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle className={settled ? "meal-ticket-check-ring" : undefined} cx="12" cy="12" r="9" pathLength={settled ? 1 : undefined} />{settled ? <path className="meal-ticket-checkmark" d="m7 12 3 3 7-7" pathLength="1" /> : <><path d="M12 7v6" /><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" /></>}</svg>
           <strong>{!confirmed ? "草稿待核算" : reconciliationFailed ? "数据库核对未完成" : settled ? "本月账目已结清" : "还有差额需要处理"}</strong>
           {!settled && <span>{!confirmed ? `异常 ${errorCount} 人；完成核对并处理全部异常后，方可点击“确认核算”。` : `待充值 ${pendingCount} 人 · 待扣回 ${refundCount} 人 · 异常 ${errorCount} 人`}</span>}
         </div>
