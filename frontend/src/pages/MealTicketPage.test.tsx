@@ -666,6 +666,25 @@ describe("菜票中心", () => {
     await screen.findByText("员工甲");
   });
 
+  it("历史台账预览导入后可以取消，清空文件且不确认入账", async () => {
+    const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "preview",
+      rows: [], person_total: 180, department_total: 180, departments: [] };
+    request.mockImplementation((path: string, options?: { method?: string }) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" }
+      : path === "/api/meal-tickets/imports" && options?.method === "POST" ? history : []));
+    render(<MemoryRouter><MealTicketPage view="history" /></MemoryRouter>);
+    const upload = await screen.findByLabelText("历史充值表");
+    await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+    fireEvent.change(upload, { target: { files: [new File(["content"], "历史.xlsx")] } });
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
+    await screen.findByRole("button", { name: "确认导入原账" });
+    fireEvent.click(screen.getByRole("button", { name: "取消" }));
+    expect(screen.queryByRole("button", { name: "确认导入原账" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "读取考勤试算对比" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "预览导入" })).toBeDisabled();
+    expect(upload).toHaveValue("");
+    expect(request.mock.calls.some(([path]) => path.endsWith("/confirm"))).toBe(false);
+  });
+
   it("历史原账按需读取试算，分别展示金额且不登记充值", async () => {
     const history = { id: 9, filename: "历史.xlsx", month: "2026-08", recharge_month: "2026-09", status: "confirmed",
       rows: [], person_total: 180, department_total: 180, departments: [] };

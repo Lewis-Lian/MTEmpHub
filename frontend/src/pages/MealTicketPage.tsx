@@ -75,6 +75,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const personnel = useRef<HTMLElement>(null);
   const settlement = useRef<HTMLElement>(null);
   const rechargeExport = useRef<HTMLElement>(null);
+  const historyFile = useRef<HTMLInputElement>(null);
   const participationForm = action === "exclude" || action === "include";
   const participationLabel = action === "exclude" ? "本月不发" : "恢复核算";
   const reasonPresets = action === "exclude" ? ["离职", "工资算菜票"]
@@ -568,7 +569,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <button className="meal-ticket-button" onClick={() => setDetail(null)}>关闭</button></section></div>}
     {historical && admin && <>
       <section className="meal-ticket-toolbar meal-ticket-panel"><label>文件月份含义<select value={monthKind} onChange={e => setMonthKind(e.target.value)}><option value="recharge">充值月份</option><option value="attendance">考勤月份</option></select></label>
-        <label>历史充值表<input type="file" accept=".xlsx" onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
+        <label>历史充值表<input ref={historyFile} type="file" accept=".xlsx" onChange={e => setFile(e.target.files?.[0] ?? null)} /></label>
         <button className="meal-ticket-button is-primary" disabled={busy || !file} onClick={() => operate(async () => {
           const form = new FormData(); form.append("file", file!); form.append("month",month); form.append("month_kind",monthKind);
           setPreview(await previewMealImport(form));
@@ -588,7 +589,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
             <input aria-label={`金额 ${r.id}`} type="number" step="0.01" disabled={preview.status === "confirmed"} value={r.amount ?? ""} onChange={e => editRow(r.id,{amount:e.target.value === "" ? null : Number(e.target.value)})} />,
             [r.error,r.period_conflict].filter(Boolean).join("；"),<input aria-label={`更正说明 ${r.id}`} disabled={preview.status === "confirmed"} value={r.correction_reason} onChange={e => editRow(r.id,{correction_reason:e.target.value})} />,
             <input aria-label={`跳过 ${r.id}`} type="checkbox" disabled={preview.status === "confirmed"} checked={r.skip} onChange={e => editRow(r.id,{skip:e.target.checked})} /> ])} />
-        {preview.status === "preview" && <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => { setPreview(await confirmMealImport(preview)); setImports(await fetchMealImports()); })}>确认导入原账</button>}
+        {preview.status === "preview" && <div className="meal-ticket-actions">
+          <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => { setPreview(await confirmMealImport(preview)); setImports(await fetchMealImports()); })}>确认导入原账</button>
+          <button className="meal-ticket-button" disabled={busy} onClick={() => {
+            setPreview(null); setFile(null); setError("");
+            if (historyFile.current) historyFile.current.value = "";
+          }}>取消</button>
+        </div>}
         <h3>历史部门对账</h3><QueryTable headers={["部门","人员原账合计","部门原登记","差额"]} rows={preview.departments.map(d => [d.dept_name,money(d.person_amount),money(d.historical_amount),money(d.difference)])} />
         <h3>原账与新规则试算</h3><p>按现有考勤字段 × 8 元试算，未包含额外补扣；仅用于核对，不改变原账或生成充值记录。</p>
         <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => operate(async () => setComparison(await compareMealImport(preview.id)))}>读取考勤试算对比</button>
