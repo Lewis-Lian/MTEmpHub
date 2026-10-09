@@ -6,6 +6,10 @@ interface MonthPickerProps {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  format?: "YYYY-MM" | "YYYY年MM月";
+  ariaLabel?: string;
+  id?: string;
+  className?: string;
 }
 
 export default function MonthPicker({
@@ -13,6 +17,10 @@ export default function MonthPicker({
   onChange,
   disabled = false,
   placeholder = "选择月份",
+  format = "YYYY年MM月",
+  ariaLabel,
+  id,
+  className,
 }: MonthPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -43,6 +51,9 @@ export default function MonthPicker({
 
   const displayLabelStr = (val: string) => {
     if (!val) return "";
+    if (format === "YYYY-MM") {
+      return val;
+    }
     const parts = val.split("-");
     if (parts.length === 2) {
       return `${parts[0]}年${parts[1]}月`;
@@ -65,10 +76,15 @@ export default function MonthPicker({
       setInputValue("");
       setTempMonth(null);
     }
-  }, [value]);
+  }, [value, format]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
+    const val = e.target.value;
+    setInputValue(val);
+    const finalRegex = /^(\d{4})-(0[1-9]|1[0-2])$/;
+    if (finalRegex.test(val)) {
+      onChange(val);
+    }
   };
 
   const handleInputBlur = () => {
@@ -103,7 +119,7 @@ export default function MonthPicker({
 
   const handleTriggerClick = () => {
     if (disabled) return;
-    setIsOpen(true);
+    setIsOpen((prev) => !prev);
   };
 
   // 年份导航操作
@@ -163,14 +179,14 @@ export default function MonthPicker({
   ];
 
   return (
-    <div className="month-picker-container" ref={containerRef}>
+    <div className={`month-picker-container${className ? ` ${className}` : ""}`} ref={containerRef}>
       {/* 分栏式触发输入框 */}
       <div className={`month-picker-split-trigger${isOpen ? " is-open" : ""}${disabled ? " is-disabled" : ""}`}>
         {/* 左侧值区域 */}
         <div
           className="month-picker-split-value"
           onClick={handleTriggerClick}
-          style={{ cursor: disabled ? "not-allowed" : "text" }}
+          style={{ cursor: disabled ? "not-allowed" : "pointer" }}
         >
           {/* 日历小图标 */}
           <svg
@@ -183,6 +199,7 @@ export default function MonthPicker({
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
           >
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
             <line x1="16" y1="2" x2="16" y2="6" />
@@ -190,6 +207,8 @@ export default function MonthPicker({
             <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
           <input
+            id={id}
+            aria-label={ariaLabel}
             type="text"
             disabled={disabled}
             value={inputValue}
@@ -204,9 +223,21 @@ export default function MonthPicker({
               fontSize: "inherit",
               width: "100%",
               padding: 0,
-              cursor: disabled ? "not-allowed" : "text"
+              cursor: disabled ? "not-allowed" : "pointer"
             }}
           />
+        </div>
+        <div
+          className={`month-picker-chevron${isOpen ? " is-open" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!disabled) setIsOpen((prev) => !prev);
+          }}
+          aria-hidden="true"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
         </div>
       </div>
 
@@ -260,7 +291,14 @@ export default function MonthPicker({
               <button
                 className={`month-picker-cell${tempMonth === m.num ? " is-selected" : ""}`}
                 key={m.num}
-                onClick={(e) => handleMonthSelect(m.num, e)}
+                onClick={(e) => {
+                  handleMonthSelect(m.num, e);
+                  const formattedMonth = String(m.num).padStart(2, "0");
+                  const newValue = `${panelYear}-${formattedMonth}`;
+                  setInputValue(displayLabelStr(newValue));
+                  onChange(newValue);
+                  setIsOpen(false);
+                }}
                 type="button"
               >
                 {m.label}

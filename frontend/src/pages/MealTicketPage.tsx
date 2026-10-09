@@ -7,6 +7,7 @@ import type { MealBatch, MealItem, MealDepartment, MealImport, MealImportRow, Me
 import QueryTable from "../components/query/QueryTable";
 import EmployeePicker from "../components/query/EmployeePicker";
 import DepartmentMultiPicker from "../components/query/DepartmentMultiPicker";
+import MonthPicker from "../components/common/MonthPicker";
 import { useConfirm } from "../components/feedback/ConfirmDialog";
 import "./meal-ticket.css";
 
@@ -351,11 +352,30 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
       <div className="meal-ticket-header-title-group">
         <h1>{historical ? "菜票历史台账" : paymentView ? "后续补扣与对账" : "月度发放"}</h1>
-        {batch && !historical && (
-          <span className="meal-ticket-period">
-            考勤月份：{batch.month} · <span className={`meal-ticket-badge ${batch.status === "draft" ? "is-warning" : "is-success"}`}>{batch.status === "draft" ? "草稿" : "已确认"}</span>
-          </span>
-        )}
+        <div className="meal-ticket-header-period-capsule" role="group" aria-label="核算月份与周期">
+          <label className="meal-ticket-month-picker-field">
+            <span className="meal-ticket-month-picker-label">{historical ? "文件月份" : "计划充值月份"}</span>
+            <MonthPicker
+              ariaLabel={historical ? "文件月份" : "计划充值月份"}
+              value={month}
+              disabled={busy}
+              onChange={setMonth}
+              format="YYYY-MM"
+              className="meal-ticket-month-picker"
+            />
+          </label>
+          {batch && !historical && (
+            <>
+              <span className="meal-ticket-period-divider" aria-hidden="true" />
+              <span className="meal-ticket-period-text">
+                考勤月份：{batch.month}
+              </span>
+              <span className={`meal-ticket-badge ${batch.status === "draft" ? "is-warning" : "is-success"}`}>
+                {batch.status === "draft" ? "草稿" : "已确认"}
+              </span>
+            </>
+          )}
+        </div>
       </div>
       {!historical && showBatch && batch && (
         <div className="meal-ticket-header-stats" aria-label="金额概览">
@@ -373,17 +393,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           </div>
         </div>
       )}
-      <div className="meal-ticket-header-toolbar">
-        <label>
-          <span className="meal-ticket-header-toolbar-label">{historical ? "文件月份" : "计划充值月份"}</span>
-          <input type="month" value={month} disabled={busy} onChange={e => setMonth(e.target.value)} />
-        </label>
-        {!historical && confirmed && (
+      {!historical && confirmed && (
+        <div className="meal-ticket-header-actions">
           <Link className="meal-ticket-button meal-ticket-export" to={`/meal-tickets/${paymentView ? "calculation" : "payments"}?recharge_month=${month}`}>
             {paymentView ? "查看月度发放" : "前往后续补扣与对账"}
           </Link>
-        )}
-      </div>
+        </div>
+      )}
     </header>
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
