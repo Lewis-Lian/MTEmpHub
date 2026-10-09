@@ -177,6 +177,146 @@ class MealTicketTests(unittest.TestCase):
         again = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
         self.assertEqual(again['rows'][0]['amount'], 0)
 
+    def adjustment_workbook(self, rows, headers=None):
+        book = Workbook()
+        sheet = book.active
+        sheet.append(headers or ['工号', '姓名', '调整金额', '原因'])
+        for row in rows:
+            sheet.append(row)
+        output = io.BytesIO()
+        book.save(output)
+        return output.getvalue()
+
+    def preview_adjustment_file(self, batch, rows, headers=None, payload=None):
+        return self.client.post('/api/meal-tickets/adjustment-import/preview',
+            data={'batch_id':str(batch['id']), 'version':str(batch['version']),
+                  'file':(io.BytesIO(payload if payload is not None else self.adjustment_workbook(rows, headers)), '补扣清单.xlsx')},
+            content_type='multipart/form-data', headers=self.headers)
+
+    def test_adjustment_import_template_and_permissions(self):
+        batch = self.confirm(self.generate())
+        url = '/api/meal-tickets/adjustment-import/template'
+        response = self.client.get(url, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        book = load_workbook(io.BytesIO(response.data))
+        self.assertEqual([c.value for c in book.active[1]], ['工号', '姓名', '调整金额', '原因'])
+        book.close()
+        self.assertEqual(self.client.get(url).status_code, 401)
+        viewer = {'Authorization':'Bearer ' + self.viewer_token}
+        self.assertEqual(self.client.get(url, headers=viewer).status_code, 403)
+        self.assertEqual(self.client.post('/api/meal-tickets/adjustment-import/confirm', json={}, headers=viewer).status_code, 403)
+
+    def test_adjustment_import_preview_confirm_and_retry_preserve_paid_records(self):
+        batch = self.confirm(self.generate())
+        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'176', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'已充值', 'request_key':'import-paid'})
+        self.assertEqual(response.status_code, 200)
+        batch = response.get_json()
+        rows = [['001', '员工甲', -16, '异常天数扣除'], ['002', '员工乙', 8.5, '补发菜票']]
+        payload = self.adjustment_workbook(rows)
+        response = self.preview_adjustment_file(batch, rows, payload=payload)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        preview = response.get_json()
+        self.assertEqual((preview['total_amount'], preview['error_count']), (-7.5, 0))
+        with self.app.app_context():
+            from models.meal_ticket import MealTicketAdjustment
+            self.assertEqual(MealTicketAdjustment.query.count(), 0)
+        result = self.post('/adjustment-import/confirm', {'token':preview['token']})
+        self.assertEqual(result.status_code, 200, result.get_json())
+        updated = result.get_json()
+        self.assertEqual((updated['items'][0]['due_amount'], updated['items'][0]['paid_amount'], updated['items'][0]['difference']), (160,176,-16))
+        self.assertEqual(updated['items'][1]['due_amount'], 8.5)
+        self.assertEqual(len(updated['items'][0]['payments']), 1)
+        self.assertEqual(updated['items'][0]['adjustments'][0]['reason'], '异常天数扣除')
+        receipt = updated['items'][0]['source']['adjustment_imports'][0]
+        self.assertEqual((receipt['filename'],receipt['operator']), ('补扣清单.xlsx','admin'))
+        retry = self.post('/adjustment-import/confirm', {'token':preview['token']})
+        self.assertEqual(retry.status_code, 200)
+        with self.app.app_context():
+            self.assertEqual(MealTicketAdjustment.query.count(), 2)
+        self.assertEqual(self.preview_adjustment_file(updated, rows, payload=payload).status_code, 409)
+
+    def test_adjustment_import_flags_invalid_rows_and_does_not_partially_write(self):
+        batch = self.confirm(self.generate())
+        rows = [['001', '员工甲', 8, '有效行'], ['999', '未知人员', 8, '无法匹配'],
+                ['002', '员工乙', -8, '应发负数'], ['001', '错误姓名', 8, '重复'],
+                ['002', '员工乙', 1.001, '小数错误'], ['002', '员工乙', '=1+1', '公式'],
+                ['002', '员工乙', 0, '零金额'], ['002', '员工乙', 8, '']]
+        response = self.preview_adjustment_file(batch, rows)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        preview = response.get_json()
+        self.assertGreater(preview['error_count'], 0)
+        errors = ' '.join(row['error'] for row in preview['rows'])
+        for message in ('未匹配','负数','重复','姓名','两位小数','公式','零','原因'):
+            self.assertIn(message, errors)
+        self.assertEqual(self.post('/adjustment-import/confirm', {'token':preview['token']}).status_code, 400)
+        with self.app.app_context():
+            from models.meal_ticket import MealTicketAdjustment
+            self.assertEqual(MealTicketAdjustment.query.count(), 0)
+
+    def test_adjustment_import_rejects_drafts_stale_versions_and_tampered_previews(self):
+        batch = self.generate()
+        rows = [['001', '员工甲', 8, '补卡']]
+        self.assertEqual(self.preview_adjustment_file(batch, rows).status_code, 409)
+        batch = self.confirm(batch)
+        response = self.preview_adjustment_file(batch, rows)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        preview = response.get_json()
+        self.adjustment(batch, '1')
+        self.assertEqual(self.post('/adjustment-import/confirm', {'token':preview['token']}).status_code, 409)
+        self.assertEqual(self.post('/adjustment-import/confirm', {'token':preview['token']+'bad'}).status_code, 400)
+        self.assertEqual(self.preview_adjustment_file(batch, rows).status_code, 409)
+
+    def test_adjustment_import_receipts_survive_regeneration_and_backup(self):
+        from services.account_set_backup_service import export_backup, read_backup
+        batch = self.confirm(self.generate())
+        rows = [['001', '员工甲', 8, '补发菜票']]
+        payload = self.adjustment_workbook(rows)
+        preview = self.preview_adjustment_file(batch, rows, payload=payload).get_json()
+        result = self.post('/adjustment-import/confirm', {'token':preview['token']})
+        self.assertEqual(result.status_code, 200)
+        batch = result.get_json()
+        receipt = batch['items'][0]['source']['adjustment_imports']
+        self.assertEqual(self.post('/unconfirm', {'batch_id':batch['id'], 'version':batch['version']}).status_code, 200)
+        batch = self.confirm(self.generate())
+        self.assertEqual(batch['items'][0]['source']['adjustment_imports'], receipt)
+        self.assertEqual(self.preview_adjustment_file(batch, rows, payload=payload).status_code, 409)
+        with self.app.app_context():
+            document = read_backup(export_backup(AccountSet.query.first().id))
+            item = next(row for row in document['datasets']['meal_items'] if row['emp_no_snapshot'] == '001')
+            self.assertEqual(item['source']['adjustment_imports'], receipt)
+
+    def test_adjustment_import_bounds_expanded_size_and_sheet_columns(self):
+        import struct
+        batch = self.confirm(self.generate())
+        rows = [['001', '员工甲', 8, '补发']]
+        payload = bytearray(self.adjustment_workbook(rows))
+        entry = payload.index(b'PK\x01\x02')
+        struct.pack_into('<I', payload, entry + 24, 101 * 1024 * 1024)
+        response = self.preview_adjustment_file(batch, rows, payload=bytes(payload))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('解压内容过大', response.get_json()['error'])
+        book = Workbook()
+        sheet = book.active
+        sheet.append(['工号', '姓名', '调整金额', '原因'])
+        sheet.append(rows[0])
+        sheet.cell(2, 1000, '远端单元格')
+        output = io.BytesIO()
+        book.save(output)
+        response = self.preview_adjustment_file(batch, rows, payload=output.getvalue())
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('列数', response.get_json()['error'])
+
+    def test_adjustment_import_rejects_missing_headers_and_empty_files(self):
+        batch = self.confirm(self.generate())
+        self.assertEqual(self.preview_adjustment_file(batch, [['001']], ['工号']).status_code, 400)
+        self.assertEqual(self.preview_adjustment_file(batch, []).status_code, 400)
+        response = self.client.post('/api/meal-tickets/adjustment-import/preview',
+            data={'batch_id':str(batch['id']), 'version':str(batch['version']),
+                'file':(io.BytesIO(b'bad workbook'), 'bad.xlsx')}, headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+
     def test_navigation_places_meal_tickets_immediately_after_query_center(self):
         response = self.client.get('/api/query/navigation', headers=self.headers)
         self.assertEqual(response.status_code, 200)

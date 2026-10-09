@@ -20,6 +20,7 @@ from services.meal_ticket_service import (
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
 from services.meal_ticket_reconciliation import reconcile
+from services.meal_ticket_adjustment_import_service import HEADERS, preview_adjustments, apply_adjustments
 
 meal_tickets_bp = Blueprint('meal_tickets', __name__, url_prefix='/api/meal-tickets')
 
@@ -132,6 +133,62 @@ def add_adjustment():
     begin_write()
     batch = batch_for_write(body.get('batch_id'), body.get('version'))
     adjustment(batch, body.get('item_id'), body.get('amount'), body.get('reason'), operator)
+    result = serialize_batch(batch)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.get('/adjustment-import/template')
+@admin_required
+@handled
+def adjustment_import_template():
+    book = Workbook()
+    sheet = book.active
+    sheet.title = '菜票补扣'
+    sheet.append(HEADERS)
+    for cell in sheet[1]:
+        cell.font = Font(bold=True)
+    sheet.column_dimensions['A'].width = 20
+    sheet.column_dimensions['B'].width = 18
+    sheet.column_dimensions['C'].width = 18
+    sheet.column_dimensions['D'].width = 45
+    sheet.column_dimensions['A'].number_format = '@'
+    instructions = book.create_sheet('填写说明')
+    for text in ('工号请按文本填写，保留前导零；姓名须与本月核算名单一致。',
+                 '调整金额单位为元：正数补发，负数扣除，最多两位小数，不能填公式或零。',
+                 '每人一行，原因必填；上传预览并核对后，确认导入才能登记补扣。',
+                 '仅登记应发补扣，不会修改实际充值流水或直接操作菜票卡余额。'):
+        instructions.append([text])
+    instructions.column_dimensions['A'].width = 100
+    output = BytesIO()
+    book.save(output)
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='菜票补扣导入模板.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@meal_tickets_bp.post('/adjustment-import/preview')
+@admin_required
+@handled
+def adjustment_import_preview():
+    try:
+        identifier, version = int(request.form.get('batch_id', '')), int(request.form.get('version', ''))
+    except ValueError:
+        raise MealError('核算批次和版本无效')
+    batch = batch_for_write(identifier, version)
+    file = request.files.get('file')
+    if not file:
+        raise MealError('请选择 xlsx 补扣清单')
+    return jsonify(preview_adjustments(file.read(20 * 1024 * 1024 + 1), file.filename or '', batch))
+
+
+@meal_tickets_bp.post('/adjustment-import/confirm')
+@admin_required
+@handled
+def adjustment_import_confirm():
+    body = request.get_json(silent=True) or {}
+    begin_write()
+    batch = apply_adjustments(body.get('token'), g.current_user.username)
     result = serialize_batch(batch)
     db.session.commit()
     return jsonify(result)

@@ -37,6 +37,32 @@ describe("菜票中心", () => {
     expect(detail.getByText(/2026-08-01、2026-08-02/)).toBeInTheDocument();
   });
 
+  it("后续补扣页面在已结清时仍提供导入入口", async () => {
+    const current = { ...batch, status: "confirmed", items: [{ ...batch.items[0], paid_amount: 176, difference: 0 }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    expect(screen.getByRole("button", { name: "导入补扣清单" })).toBeEnabled();
+  });
+
+  it("导入预览期间切换同月链接不会卡住页面", async () => {
+    let finishPreview!: (value: object) => void;
+    const current = { ...batch, status: "confirmed" };
+    request.mockImplementation((path: string) => path === "/api/auth/me" ? Promise.resolve({ role: "admin" })
+      : path === "/api/meal-tickets/adjustment-import/preview" ? new Promise(resolve => { finishPreview = resolve; })
+      : Promise.resolve(current));
+    render(<MemoryRouter initialEntries={["/meal-tickets/payments?recharge_month=2026-09"]}>
+      <Link to="/meal-tickets/payments?recharge_month=2026-09&refresh=1">切换同月页面</Link><MealTicketPage view="payments" />
+    </MemoryRouter>);
+    await screen.findByText("员工甲");
+    fireEvent.click(screen.getByRole("button", { name: "导入补扣清单" }));
+    fireEvent.change(screen.getByLabelText("补扣 Excel 文件"), { target: { files: [new File(["data"], "补扣.xlsx")] } });
+    fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
+    fireEvent.click(screen.getByRole("link", { name: "切换同月页面" }));
+    await act(async () => finishPreview({ filename: "补扣.xlsx", rows: [], total_amount: 0, error_count: 0, token: "preview" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "导入补扣清单" })).toBeEnabled());
+  });
+
   it("月度发放点击月份箭头展开面板并可选择月份", async () => {
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : batch));
     render(<MemoryRouter initialEntries={["/meal-tickets/calculation?recharge_month=2026-09"]}><MealTicketPage /></MemoryRouter>);

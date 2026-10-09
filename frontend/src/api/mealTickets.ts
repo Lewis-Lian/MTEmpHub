@@ -8,6 +8,7 @@ export interface MealItem {
   id: number; emp_id: number; emp_no: string; name: string; dept_name: string; is_manager: boolean;
   days: number; base_amount: number; adjustment_amount: number; due_amount: number; paid_amount: number;
   difference: number; error: string; source: { field: string; configured_source: string; monthly_override?: number; remark?: string;
+    adjustment_imports?: Array<{ file_digest: string; filename: string; operator: string; amount_cents: number; reason: string; created_at: string }>;
     meal_ticket_rule?: MealTicketRule;
     attendance_recalculation?: { days: number; base_cents: number; operator: string; created_at: string; source?: { meal_ticket_rule?: MealTicketRule } };
     supplement_confirmation?: { reason: string; operator: string; created_at: string } };
@@ -55,6 +56,21 @@ export interface MealComparison {
   base_amount: number | null; difference: number | null; error: string;
 }
 export const compareMealImport = (id: number) => apiRequest<MealComparison[]>(`/api/meal-tickets/imports/${id}/comparison`);
+export interface MealAdjustmentPreview {
+  batch_id: number; version: number; recharge_month: string; filename: string; token: string;
+  total_amount: number; error_count: number;
+  rows: Array<{ row: number; emp_no: string; name: string; dept_name: string; amount: number | null; reason: string; error: string }>;
+}
+export const mealAdjustmentTemplateUrl = () => buildApiUrl("/api/meal-tickets/adjustment-import/template");
+export function previewMealAdjustmentImport(batch: MealBatch, file: File) {
+  const body = new FormData();
+  body.append("batch_id", String(batch.id)); body.append("version", String(batch.version)); body.append("file", file);
+  return apiRequest<MealAdjustmentPreview>("/api/meal-tickets/adjustment-import/preview", { method: "POST", body });
+}
+export const confirmMealAdjustmentImport = (token: string) => apiRequest<MealBatch>("/api/meal-tickets/adjustment-import/confirm", {
+  method: "POST", body: { token },
+});
+
 export interface MealReadProgress {
   status: "idle" | "running" | "completed" | "failed";
   stage: string;

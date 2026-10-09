@@ -179,8 +179,9 @@ def generate(recharge_month, operator):
         if item is None:
             db.session.add(MealTicketItem(batch_key=batch.key, month=month, **data))
         else:
-            if 'participation_history' in item.source:
-                data['source']['participation_history'] = item.source['participation_history']
+            for history in ('participation_history', 'adjustment_imports'):
+                if history in item.source:
+                    data['source'][history] = item.source[history]
             for name, value in data.items():
                 setattr(item, name, value)
     for removed in existing.values():

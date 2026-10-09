@@ -4,6 +4,7 @@ import { fetchMe } from "../api/auth";
 import { apiRequest } from "../api/client";
 import { fetchMealBatch, mutateMealBatch, mealRechargeExportUrl, fetchMealImports, previewMealImport, confirmMealImport, cancelMealImport, compareMealImport } from "../api/mealTickets";
 import type { MealBatch, MealItem, MealDepartment, MealImport, MealImportRow, MealComparison, MealAttendanceRecalculation } from "../api/mealTickets";
+import MealAdjustmentImport from "../components/MealAdjustmentImport";
 import QueryTable from "../components/query/QueryTable";
 import EmployeePicker from "../components/query/EmployeePicker";
 import DepartmentMultiPicker from "../components/query/DepartmentMultiPicker";
@@ -492,6 +493,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         {admin && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算或人员补入，请继续通过后续补扣处理。</p>}
       </section>}
     </div>}
+    {paymentView && admin && confirmed && batch && <MealAdjustmentImport key={`${month}:${batch.id}`} batch={batch} busy={busy}
+      onBusyChange={setBusy} onImported={next => { setBatch(next); setFollowupStage("adjustments"); }} />}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
     {busy && !target && !bulk && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
       <div className="meal-ticket-loading-heading"><span><i className="meal-ticket-loading-dot" aria-hidden="true" />{loadProgress?.text ?? "正在提交并等待处理结果"}</span><strong>{progressPercent === null ? "处理中" : `${loadProgress?.phase ? "当前阶段 " : ""}${progressPercent}%`}</strong></div>
@@ -648,6 +651,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       {detail.excluded && <p>原基础金额：{money(detail.original_base_amount)} 元；本月基础金额按 0 元核算，确认后的补发另记补扣。</p>}
       <Link to={`/employee/individual-attendance?emp_id=${detail.emp_id}&month=${batch?.month}`}>查看考勤依据</Link>
       {!!detail.participation_history?.length && <><h3>核算处理历史</h3>{detail.participation_history.map((p, index) => <p key={index}>{p.excluded ? "本月不发" : "恢复核算"} · {p.reason} · {p.operator} · {p.created_at}</p>)}</>}
+      {!!detail.source.adjustment_imports?.length && <><h3>补扣导入记录</h3>{detail.source.adjustment_imports.map(receipt => <p key={receipt.file_digest}>{receipt.filename} · {money(receipt.amount_cents / 100)} 元 · {receipt.reason} · {receipt.operator} · {receipt.created_at}</p>)}</>}
       <h3>补扣历史</h3>{detail.adjustments.map(a => <p key={a.id}>{money(a.amount)} 元 · {a.reason} · {a.operator} · {a.created_at}</p>)}
       <h3>充值 / 扣回历史</h3>{detail.payments.map(p => <p key={p.id}>{p.date} · {money(p.amount)} 元 · {p.reference} · {p.operator} {p.reversed && "（已冲正）"}
         {admin && !p.database_record && p.kind !== "reversal" && !p.reversed && <button className="meal-ticket-button is-link" onClick={() => { setDetail(null); openForm(detail, "reversal", p.id); }}>冲正</button>}</p>)}
