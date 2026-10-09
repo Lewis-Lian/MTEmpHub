@@ -15,6 +15,7 @@ from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
     MealError, begin_write, shift_month, generate, batch_for_write, confirm, adjustment,
     payment, serialize_batch, source_snapshot, participation, unconfirm,
+    attendance_recalculation_preview, recalculate_attendance,
 )
 from services.meal_ticket_import_service import preview, serialize_import, confirm_import, import_rows
 from services.meal_ticket_reconciliation import reconcile
@@ -125,6 +126,28 @@ def set_participation():
     batch = batch_for_write(body.get('batch_id'), body.get('version'))
     participation(batch, body.get('item_id'), body.get('excluded'), body.get('reason'), operator)
     result = serialize_batch(batch)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/attendance-recalculation/preview')
+@admin_required
+@handled
+def preview_attendance_recalculation():
+    body = request.get_json(silent=True) or {}
+    batch = batch_for_write(body.get('batch_id'), body.get('version'))
+    return jsonify(attendance_recalculation_preview(batch))
+
+
+@meal_tickets_bp.post('/attendance-recalculation')
+@admin_required
+@handled
+def apply_attendance_recalculation():
+    body = request.get_json(silent=True) or {}
+    begin_write()
+    batch = batch_for_write(body.get('batch_id'), body.get('version'))
+    recalculate_attendance(batch, body.get('source_digest'), g.current_user.username)
+    result = serialize_batch(batch, check_source=True)
     db.session.commit()
     return jsonify(result)
 

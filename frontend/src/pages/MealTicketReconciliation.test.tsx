@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { render, screen, fireEvent, within, waitFor, act } from '@testing-library/react';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
 import MealTicketPage from './MealTicketPage';
 import { ConfirmProvider } from '../components/feedback/ConfirmDialog';
@@ -12,9 +12,59 @@ const item={id:1,emp_id:1,emp_no:'001',name:'员工甲',dept_name:'生产部',is
 const batch={id:1,month:'2026-08',recharge_month:'2026-09',status:'confirmed',version:2,
   source_changed:false,database:{enabled:true,configured:true},items:[item],departments:[]};
 beforeEach(()=>{request.mockReset();sessionStorage.clear();HTMLElement.prototype.scrollIntoView=vi.fn();});
+it('已确认月度发放不再提示源数据变化', async () => {
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:{...batch,source_changed:true}));
+  page();
+  await screen.findByText('员工甲');
+  expect(screen.queryByText(/源考勤或人员资料已变化/)).not.toBeInTheDocument();
+});
+it('后续补扣预览考勤差额，确认后保留基础金额和已发金额', async () => {
+  let current={...batch,source_changed:true,items:[{...item,paid_amount:176,difference:0}]};
+  request.mockImplementation((path:string)=> {
+    if(path==='/api/auth/me') return Promise.resolve({role:'admin'});
+    if(path==='/api/meal-tickets/attendance-recalculation/preview') return Promise.resolve({batch_id:1,version:2,source_digest:'new-source',issues:[],rows:[{item_id:1,emp_no:'001',name:'员工甲',previous_days:22,days:23,amount:8,excluded:false}],total_amount:8});
+    if(path==='/api/meal-tickets/attendance-recalculation') current={...current,version:3,source_changed:false,items:[{...current.items[0],adjustment_amount:8,due_amount:184,difference:8}]};
+    return Promise.resolve(current);
+  });
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'重算考勤数据'}));
+  const dialog=await screen.findByRole('dialog',{name:'考勤重算差额'});
+  expect(within(dialog).getByText('23')).toBeInTheDocument();
+  expect(within(dialog).getByText('8.00')).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button',{name:'确认登记考勤补扣'}));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'考勤重算差额'})).not.toBeInTheDocument());
+  const row=screen.getByText('员工甲').closest('tr')!;
+  expect(within(row).getByText('184.00')).toBeInTheDocument();
+  expect(within(row).getAllByText('176.00')).toHaveLength(2);
+});
 function page() {
   render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><MealTicketPage/></MemoryRouter></ConfirmProvider>);
 }
+it.each(['preview', 'apply'])('切换月份后忽略旧月份的考勤重算 %s 响应', async stage => {
+  let resolveOld!: (value: unknown) => void;
+  const delayed = new Promise(resolve => { resolveOld = resolve; });
+  const preview = {batch_id:1,version:2,source_digest:'new-source',issues:[],rows:[],total_amount:0};
+  const nextMonth = {...batch,id:2,month:'2026-09',recharge_month:'2026-10',items:[{...item,name:'十月员工'}]};
+  request.mockImplementation((path:string) => {
+    if (path === '/api/auth/me') return Promise.resolve({role:'admin'});
+    if (path === '/api/meal-tickets/attendance-recalculation/preview') return stage === 'preview' ? delayed : Promise.resolve(preview);
+    if (path === '/api/meal-tickets/attendance-recalculation') return delayed;
+    return Promise.resolve(path.includes('recharge_month=2026-10') ? nextMonth : batch);
+  });
+  function Navigation() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate('/meal-tickets/payments?recharge_month=2026-10')}>换到十月</button>;
+  }
+  render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/payments?recharge_month=2026-09']}><Navigation/><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'重算考勤数据'}));
+  if (stage === 'apply') fireEvent.click(await screen.findByRole('button',{name:'确认登记考勤补扣'}));
+  fireEvent.click(screen.getByRole('button',{name:'换到十月'}));
+  await act(async () => { resolveOld(stage === 'preview' ? preview : batch); await delayed; });
+  await screen.findByText('十月员工');
+  expect(screen.queryByRole('dialog',{name:'考勤重算差额'})).not.toBeInTheDocument();
+  expect(screen.getByText('十月员工')).toBeInTheDocument();
+  expect(screen.getByLabelText('计划充值月份')).toHaveValue('2026-10');
+});
 it('取款流水需分类，月末清零不会显示为核算扣回', async () => {
   const report = { checked_at: '2026-10-08T16:00:00', start_date: '2026-09-01', end_date: '2026-09-30', added: 1, existing: 0, unmatched: 0, zero_amount: 0, outside_subsidy_month: 0, sources: { subsidy: 1, recharge: 0, refund: 0 }, pending_refunds: [{ id: 12, emp_no: '001', name: '员工甲', date: '2026-09-30', amount: 20 }] };
   request.mockImplementation((path: string, options?: { body?: { refund_actions?: object } }) => Promise.resolve(path === '/api/auth/me' ? { role: 'admin' } : path === '/api/meal-tickets/reconcile' && options?.body?.refund_actions ?

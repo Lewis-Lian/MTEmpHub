@@ -3,7 +3,8 @@ import { apiRequest, buildApiUrl } from "./client";
 export interface MealItem {
   id: number; emp_id: number; emp_no: string; name: string; dept_name: string; is_manager: boolean;
   days: number; base_amount: number; adjustment_amount: number; due_amount: number; paid_amount: number;
-  difference: number; error: string; source: { field: string; configured_source: string; monthly_override?: number; remark?: string };
+  difference: number; error: string; source: { field: string; configured_source: string; monthly_override?: number; remark?: string;
+    attendance_recalculation?: { days: number; base_cents: number; operator: string; created_at: string } };
   clearances?: Array<{ date: string; amount: number; remark: string; voided: boolean }>;
   employment_status: "active" | "resigned" | "missing"; resigned_at: string | null;
   excluded: boolean; original_base_amount: number;
@@ -14,6 +15,10 @@ export interface MealItem {
 export interface MealDepartment {
   dept_name: string; count: number; base_amount: number; adjustment_amount: number; due_amount: number;
   paid_amount: number; difference: number;
+}
+export interface MealAttendanceRecalculation {
+  batch_id: number; version: number; source_digest: string; total_amount: number; issues: string[];
+  rows: Array<{ item_id: number; emp_no: string; name: string; previous_days: number; days: number; amount: number; excluded: boolean }>;
 }
 export interface MealBatch {
   id: number; month: string; recharge_month: string; status: "draft" | "confirmed"; version: number;

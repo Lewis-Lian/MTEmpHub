@@ -211,6 +211,75 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()['items'][1]['excluded'])
 
+    def test_attendance_recalculation_preserves_payments_and_manual_adjustments(self):
+        batch = self.confirm(self.adjustment(self.generate(), '16'))
+        batch = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'192', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'已充值', 'request_key':'recalc-paid'}).get_json()
+        payments = batch['items'][0]['payments']
+        for days, change, due, difference in [(23, 8, 200, 8), (23, 0, 200, 8), (20, -24, 176, -16)]:
+            with self.app.app_context():
+                EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = days
+                db.session.commit()
+            body = {'batch_id':batch['id'], 'version':batch['version']}
+            response = self.post('/attendance-recalculation/preview', body)
+            self.assertEqual(response.status_code, 200, response.get_json())
+            preview = response.get_json()
+            self.assertEqual(preview['rows'][0]['amount'], change)
+            self.assertEqual(preview['issues'], [])
+            unchanged = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+            self.assertEqual(unchanged['items'][0]['payments'], payments)
+            self.assertEqual(unchanged['version'], batch['version'])
+            response = self.post('/attendance-recalculation', {**body, 'source_digest':preview['source_digest']})
+            self.assertEqual(response.status_code, 200, response.get_json())
+            batch = response.get_json()
+            row = batch['items'][0]
+            self.assertEqual((row['days'], row['base_amount']), (22, 176))
+            self.assertEqual((row['due_amount'], row['difference']), (due, difference))
+            self.assertEqual(row['payments'], payments)
+            self.assertEqual(row['adjustments'][0]['amount'], 16)
+            self.assertFalse(batch['source_changed'])
+        self.assertEqual(len(batch['items'][0]['adjustments']), 3)
+
+    def test_attendance_recalculation_rejects_stale_preview_and_drafts(self):
+        batch = self.generate()
+        body = {'batch_id':batch['id'], 'version':batch['version']}
+        self.assertEqual(self.post('/attendance-recalculation/preview', body).status_code, 409)
+        batch = self.confirm(batch)
+        body['version'] = batch['version']
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 23
+            db.session.commit()
+        self.assertEqual(self.post('/attendance-recalculation', {**body,
+            'source_digest':preview['source_digest']}).status_code, 409)
+        unchanged = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(unchanged['items'][0]['adjustments'], [])
+
+    def test_attendance_recalculation_preserves_exclusion_and_reports_new_people(self):
+        batch = self.generate()
+        batch = self.post('/participation', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'excluded':True, 'reason':'本月不发'}).get_json()
+        batch = self.confirm(batch)
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 23
+            db.session.commit()
+        body = {'batch_id':batch['id'], 'version':batch['version']}
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        self.assertEqual(preview['rows'][0]['amount'], 0)
+        batch = self.post('/attendance-recalculation', {**body, 'source_digest':preview['source_digest']}).get_json()
+        self.assertTrue(batch['items'][0]['excluded'])
+        self.assertEqual(batch['items'][0]['due_amount'], 0)
+        self.assertEqual(self.post('/unconfirm', {'batch_id':batch['id'],
+            'version':batch['version']}).status_code, 409)
+        with self.app.app_context():
+            db.session.add(Employee(emp_no='003', name='新增员工'))
+            db.session.commit()
+        body['version'] = batch['version']
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        self.assertTrue(preview['issues'])
+        self.assertEqual(self.post('/attendance-recalculation', {**body,
+            'source_digest':preview['source_digest']}).status_code, 409)
     def test_unconfirm_allows_recalculation_and_requires_fresh_confirmation(self):
         batch = self.confirm(self.adjustment(self.generate(), '16'))
         with self.app.app_context():

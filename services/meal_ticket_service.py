@@ -188,6 +188,9 @@ def unconfirm(batch):
     ).filter(MealTicketItem.batch_key == batch.key).first()
     if has_payments:
         raise MealError('已登记发放流水，不能退回草稿，请通过补扣或冲正处理', 409)
+    if any('attendance_recalculation' in item.source for item in
+           MealTicketItem.query.filter_by(batch_key=batch.key).all()):
+        raise MealError('已完成后续考勤重算，不能退回草稿，请继续通过后续补扣处理', 409)
     batch.status = 'draft'
     batch.confirmed_by = None
     batch.confirmed_at = None
@@ -214,6 +217,60 @@ def adjustment(batch, item_id, amount, reason, operator):
         raise MealError('调整后应发金额不能为负数')
     db.session.add(MealTicketAdjustment(item_key=item.key, month=batch.month, amount_cents=value,
         reason=required_text(reason, '调整原因'), operator=operator))
+    batch.version += 1
+    db.session.flush()
+
+
+def attendance_recalculation_preview(batch, source_rows=None):
+    if batch.status != 'confirmed':
+        raise MealError('请先完成月度核算，再重算考勤补扣', 409)
+    if source_rows is None:
+        source_rows = source_snapshot(batch.month)
+    current = {row['emp_id']:row for row in source_rows}
+    items = MealTicketItem.query.filter_by(batch_key=batch.key).order_by(MealTicketItem.emp_no_snapshot).all()
+    rows, issues = [], []
+    for item in items:
+        data = current.pop(item.emp_id, None)
+        if data is None:
+            issues.append(f'{item.emp_no_snapshot} {item.name} 已移出考勤范围，请人工核对补扣')
+            continue
+        excluded = bool(participation_state(item).get('excluded'))
+        if data['error'] and not excluded:
+            issues.append(f'{item.emp_no_snapshot} {item.name}：{data["error"]}')
+        previous = item.source.get('attendance_recalculation', {})
+        previous_base = previous.get('base_cents', item.base_cents)
+        amount = 0 if excluded else data['base_cents'] - previous_base
+        if totals(item)[0] + amount < 0:
+            issues.append(f'{item.emp_no_snapshot} {item.name} 重算后应发金额为负数，请先核对已有补扣')
+        rows.append({'item_id':item.id, 'emp_no':item.emp_no_snapshot, 'name':item.name,
+                     'previous_days':previous.get('days', item.days), 'days':data['days'],
+                     'amount':amount / 100, 'excluded':excluded})
+    for data in current.values():
+        issues.append(f'{data["emp_no_snapshot"]} {data["name"]} 不在原核算名单，请人工核对')
+    return {'batch_id':batch.id, 'version':batch.version, 'source_digest':digest(source_rows),
+            'rows':rows, 'issues':issues, 'total_amount':sum(cents(row['amount']) for row in rows) / 100}
+
+
+def recalculate_attendance(batch, source_digest, operator):
+    source_rows = source_snapshot(batch.month)
+    preview = attendance_recalculation_preview(batch, source_rows)
+    if source_digest != preview['source_digest']:
+        raise MealError('考勤或人员资料已变化，请重新预览考勤差额', 409)
+    if preview['issues']:
+        raise MealError('；'.join(preview['issues']), 409)
+    current = {row['emp_id']:row for row in source_rows}
+    # Keep confirmed base amounts and actual payment records intact. The checkpoint
+    # separates attendance corrections from manual adjustments on future recalculations.
+    for row in preview['rows']:
+        item = item_for_batch(batch, row['item_id'])
+        data = current[item.emp_id]
+        if row['amount']:
+            adjustment(batch, item.id, row['amount'],
+                       f'考勤重算：{batch.month} 实际打卡天数 {row["previous_days"]} → {row["days"]} 天', operator)
+        item.source = {**item.source, 'attendance_recalculation':{
+            'days':data['days'], 'base_cents':data['base_cents'], 'source':data['source'],
+            'operator':operator, 'created_at':datetime.utcnow().isoformat()}}
+    batch.source_digest = preview['source_digest']
     batch.version += 1
     db.session.flush()
 
