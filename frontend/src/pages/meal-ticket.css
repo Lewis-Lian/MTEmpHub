@@ -823,17 +823,65 @@
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-settlement-message strong {
-  background: rgba(5, 150, 105, .12);
+  padding: 0;
+  background: transparent;
   color: #059669;
+  font-size: 17px;
 }
 
 .meal-ticket-settlement.is-settled {
+  min-height: 88px;
+  justify-content: center;
+  padding: 20px 24px;
+  border-left-width: 1px;
   border-color: rgba(5, 150, 105, .3);
-  background: rgba(5, 150, 105, .06);
+  background: linear-gradient(100deg, rgba(5, 150, 105, .1), rgba(5, 150, 105, .025));
+  animation: meal-ticket-settled-enter .45s ease-out both;
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-reconciliation-header,
+.meal-ticket-settlement.is-settled .meal-ticket-settlement-message {
+  width: 100%;
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-settlement-message {
+  flex-wrap: nowrap;
+  gap: 16px;
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-settlement-message::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(5, 150, 105, .35), rgba(5, 150, 105, 0));
+  transform-origin: left;
+  animation: meal-ticket-settled-line .7s .1s ease-out both;
 }
 
 .meal-ticket-settlement.is-settled .meal-ticket-notice-icon {
+  width: 40px;
+  height: 40px;
   color: #059669;
+}
+
+.meal-ticket-settlement.is-settled .meal-ticket-checkmark {
+  stroke-dasharray: 1;
+  animation: meal-ticket-settled-check .4s .15s ease-out both;
+}
+
+@keyframes meal-ticket-settled-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes meal-ticket-settled-line {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes meal-ticket-settled-check {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
 }
 
 .meal-ticket-settlement.is-error {
@@ -1635,6 +1683,10 @@
   color: #34d399;
 }
 
+[data-theme="dark"] .meal-ticket-settlement.is-settled .meal-ticket-settlement-message strong {
+  background: transparent;
+}
+
 [data-theme="dark"] .meal-ticket-file-info > span {
   color: #34d399;
 }
@@ -1763,6 +1815,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .meal-ticket-settlement.is-settled,
+  .meal-ticket-settlement.is-settled .meal-ticket-settlement-message::after,
+  .meal-ticket-settlement.is-settled .meal-ticket-checkmark {
+    animation: none;
+  }
   .meal-ticket-button,
   .meal-ticket-page input,
   .meal-ticket-page select,

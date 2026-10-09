@@ -55,6 +55,10 @@ it('月度账目全部结清后只保留完成状态，隐藏核对、人员和�
     {...batch,items:[{...item,paid_amount:176,difference:0}]}));
   page();
   await screen.findByText('本月账目已结清');
+  const completion=screen.getByRole('region',{name:'整月结清检查'});
+  expect(completion).toHaveClass('is-settled');
+  expect(completion.querySelector('.meal-ticket-checkmark')).toHaveAttribute('d','m7 12 3 3 7-7');
+  expect(completion.querySelector('path[d="M12 7v6"]')).toBeNull();
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
   expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
   expect(screen.queryByRole('region',{name:'充值表导出'})).not.toBeInTheDocument();
@@ -105,6 +109,9 @@ it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
     path==='/api/meal-tickets/reconcile'?{...batch,version:3,items:[{...item,paid_amount:176,difference:0}]}:batch));
   page();
   const panel=await screen.findByRole('region',{name:'到账核对'});
+  const pending=screen.getByRole('region',{name:'整月结清检查'});
+  expect(pending).not.toHaveClass('is-settled');
+  expect(pending.querySelector('.meal-ticket-checkmark')).toBeNull();
   expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
   expect(screen.getByRole('region',{name:'充值表导出'})).toBeInTheDocument();
   fireEvent.click(within(panel).getByRole('button',{name:'读取数据库并核对'}));
