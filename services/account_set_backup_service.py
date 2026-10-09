@@ -260,6 +260,8 @@ def validate_document(document):
         if name in FILE_DATASETS:
             expected.update(('file_key', 'file_sha256', 'file_size'))
         for row in rows:
+            if name == 'employees' and isinstance(row, dict):
+                row.setdefault('meal_ticket_as_manager', False)
             if name == 'meal_batches' and isinstance(row, dict):
                 row.setdefault('reconciliation', None)
             if name == 'manager_stats' and isinstance(row, dict):

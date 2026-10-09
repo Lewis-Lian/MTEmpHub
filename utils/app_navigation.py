@@ -272,6 +272,13 @@ MODULES: list[dict[str, Any]] = [
                 "admin_only": True,
                 "description": "选择管理人员考勤数据来源并执行钉钉同步。",
             },
+            {
+                "key": "more_settings",
+                "label": "更多设置",
+                "href": "/admin/more-settings",
+                "admin_only": True,
+                "description": "设置菜票异常考勤天数扣除规则。",
+            },
         ],
     },
 ]

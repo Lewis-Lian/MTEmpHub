@@ -332,6 +332,7 @@ def _serialize_employee(employee: Employee) -> dict:
         "dingtalk_user_id": employee.dingtalk_user_id or None,
         "is_manager": bool(employee.is_manager),
         "is_nursing": bool(employee.is_nursing),
+        "meal_ticket_as_manager": bool(employee.meal_ticket_as_manager),
         "employee_stats_attendance_source": employee.employee_stats_attendance_source or ATTENDANCE_SOURCE_EMPLOYEE,
         "manager_stats_attendance_source": employee.manager_stats_attendance_source or ATTENDANCE_SOURCE_MANAGER,
         "dept_id": employee.dept_id,
@@ -2414,6 +2415,7 @@ def create_employee():
         dept_id=department.id if department else None,
         is_manager=is_manager,
         is_nursing=is_nursing,
+        meal_ticket_as_manager=bool(data.get("meal_ticket_as_manager", False)),
         employee_stats_attendance_source=employee_stats_attendance_source,
         manager_stats_attendance_source=manager_stats_attendance_source,
     )
@@ -2453,6 +2455,8 @@ def update_employee(employee_id: int):
     employee.name = name
     employee.card_no = card_no
     employee.is_manager = is_manager
+    if "meal_ticket_as_manager" in data:
+        employee.meal_ticket_as_manager = bool(data["meal_ticket_as_manager"])
     if is_nursing is not None:
         employee.is_nursing = is_nursing
     employee.employee_stats_attendance_source = _parse_attendance_source(

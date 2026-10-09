@@ -426,6 +426,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const isError = errorCount > 0 || reconciliationFailed;
   const showReconciliation = (!paymentView || followupStage === "settlement") && (confirmed || isError);
 
+  const detailRule = (detail?.source.attendance_recalculation?.source ?? detail?.source)?.meal_ticket_rule;
+
   return <main className={`meal-ticket-page${settlementComplete ? " is-settlement-complete" : ""}`}>
     {(!historical || !preview) && <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
       <div className="meal-ticket-header-title-group">
@@ -636,6 +638,10 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     {detail && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="菜票明细"><h2>{detail.emp_no} {detail.name}</h2>
       <p>实际打卡天数：{detail.days} · 基础金额：{money(detail.base_amount)} 元</p>
       <p>考勤来源：{detail.source.configured_source} {detail.source.remark}</p>
+      {detailRule && (detailRule.as_manager ? <p>按管理人员计算菜票，免扣异常考勤天数。</p> : <>
+        <p>异常考勤 {detailRule.abnormal_dates.length} 天 · 菜票扣除 {money(detailRule.deduction_cents / 100)} 元</p>
+        {!!detailRule.abnormal_dates.length && <p>异常日期：{detailRule.abnormal_dates.join("、")}</p>}
+      </>)}
       {detail.source.supplement_confirmation && <p>补入核算：{detail.source.supplement_confirmation.reason} · {detail.source.supplement_confirmation.operator} · {detail.source.supplement_confirmation.created_at}</p>}
       {employmentLabel(detail) && <p>员工档案核对：{employmentLabel(detail)}</p>}
       {detail.error && <p>原考勤核对提示：{detail.error}</p>}

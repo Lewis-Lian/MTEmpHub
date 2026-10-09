@@ -1,4 +1,4 @@
-"""Monthly meal subsidies use the existing final attendance fields without reinterpreting punches."""
+"""Monthly meal subsidies use final attendance days and optional abnormal-day deductions."""
 from calendar import monthrange
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -10,12 +10,13 @@ from sqlalchemy import or_, text
 
 from models import db
 from models.account_set import AccountSet
+from models.system_setting import SystemSetting
 from models.employee import Employee
 from models.employee_attendance_override import EmployeeAttendanceOverride
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketAdjustment, MealTicketPayment
 from services.attendance_source_service import (
     attendance_views_by_employee, attendance_source_for_context, selected_monthly_report_raw,
-    EMPLOYEE_STATS_CONTEXT, MANAGER_STATS_CONTEXT,
+    EMPLOYEE_STATS_CONTEXT, MANAGER_STATS_CONTEXT, _raw_punch_count,
 )
 from services.daily_override_service import daily_override_maps
 from services.manager_attendance_service import build_manager_rows, ManagerAttendanceOptions
@@ -103,6 +104,7 @@ def source_snapshot(month, progress=None):
     views = {}
     for group, context in ((ordinary, EMPLOYEE_STATS_CONTEXT), (managers, MANAGER_STATS_CONTEXT)):
         views.update(attendance_views_by_employee(month, group, context))
+    deduction_enabled = SystemSetting.get_value("meal_ticket_abnormal_deduction_enabled", "false") == "true"
     result = []
     if progress:
         progress(stage='逐人核对考勤来源', completed=0, total=len(employees))
@@ -135,6 +137,14 @@ def source_snapshot(month, progress=None):
             base = int((days * 800).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         except (InvalidOperation, ValueError, TypeError):
             error, days, base = '实际打卡天数字段异常，请先修正考勤', Decimal(0), 0
+        if deduction_enabled:
+            exempt = bool(emp.is_manager or emp.meal_ticket_as_manager)
+            abnormal_dates = sorted({view.record_date.isoformat() for view in views.get(emp.id, [])
+                if view.record_date and _raw_punch_count(view) in {1, 3}}) if not exempt else []
+            deduction = min(base, len(abnormal_dates) * 800)
+            source['meal_ticket_rule'] = {'abnormal_deduction_enabled':True,
+                'as_manager':exempt, 'abnormal_dates':abnormal_dates, 'deduction_cents':deduction}
+            base -= deduction
         result.append({'emp_id':emp.id, 'emp_no_snapshot':emp.emp_no, 'name':emp.name,
             'dept_name':emp.department.dept_name if emp.department else '未分配部门',
             'is_manager':bool(emp.is_manager), 'days':float(days), 'base_cents':base,

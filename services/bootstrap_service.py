@@ -90,6 +90,9 @@ def ensure_schema_compatibility() -> None:
         if "is_manager" not in employee_columns:
             db.session.execute(text("ALTER TABLE employees ADD COLUMN is_manager BOOLEAN NOT NULL DEFAULT 0"))
             db.session.commit()
+        if "meal_ticket_as_manager" not in employee_columns:
+            db.session.execute(text("ALTER TABLE employees ADD COLUMN meal_ticket_as_manager BOOLEAN NOT NULL DEFAULT 0"))
+            db.session.commit()
         if "is_nursing" not in employee_columns:
             db.session.execute(text("ALTER TABLE employees ADD COLUMN is_nursing BOOLEAN NOT NULL DEFAULT 0"))
             db.session.commit()

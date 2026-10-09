@@ -33,7 +33,7 @@ def test_overtime_upgrade_after_legacy_schema_patch(tmp_path, existing_flags, le
         columns = {column['name'] for column in inspect(db.engine).get_columns('overtime_records')}
         assert {'is_revoked', 'is_manual_edited'} <= columns
         version = db.session.execute(text('SELECT version_num FROM alembic_version')).scalar()
-        assert version == '20261008_ledgers'
+        assert version == '20261009_meal_rules'
         meal_columns = {column['name'] for column in inspect(db.engine).get_columns('meal_ticket_batches')}
         assert 'reconciliation' in meal_columns
         assert {'meal_ledger_records', 'meal_ledger_imports'} <= set(inspect(db.engine).get_table_names())

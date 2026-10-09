@@ -99,6 +99,26 @@ register_admin_account_routes(api_admin_bp)
 from routes.admin_backups import register_admin_backup_routes
 register_admin_backup_routes(api_admin_bp, admin_required)
 
+@api_admin_bp.get("/more-settings")
+@admin_required
+def more_settings():
+    return jsonify({"meal_ticket_abnormal_deduction_enabled":
+        SystemSetting.get_value("meal_ticket_abnormal_deduction_enabled", "false") == "true"})
+
+
+@api_admin_bp.put("/more-settings")
+@admin_required
+def save_more_settings():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or type(data.get("meal_ticket_abnormal_deduction_enabled")) is not bool:
+        return jsonify({"error": "异常考勤天数扣除开关必须为布尔值"}), 400
+    SystemSetting.set_value("meal_ticket_abnormal_deduction_enabled",
+        "true" if data["meal_ticket_abnormal_deduction_enabled"] else "false")
+    from models import db
+    db.session.commit()
+    return more_settings()
+
+
 from functools import wraps
 def setup_required(f):
     @wraps(f)

@@ -41,6 +41,7 @@ type EmployeeFormState = {
   shift_no: string;
   is_manager: boolean;
   is_nursing: boolean;
+  meal_ticket_as_manager: boolean;
   employee_stats_attendance_source: string;
   manager_stats_attendance_source: string;
 };
@@ -53,6 +54,7 @@ const emptyEmployeeForm: EmployeeFormState = {
   shift_no: "",
   is_manager: false,
   is_nursing: false,
+  meal_ticket_as_manager: false,
   employee_stats_attendance_source: "employee",
   manager_stats_attendance_source: "manager",
 };
@@ -89,6 +91,7 @@ function employeeToForm(row: AdminEmployee): EmployeeFormState {
     shift_no: row.shift_no ?? "",
     is_manager: Boolean(row.is_manager),
     is_nursing: Boolean(row.is_nursing),
+    meal_ticket_as_manager: Boolean(row.meal_ticket_as_manager),
     employee_stats_attendance_source: row.employee_stats_attendance_source ?? "employee",
     manager_stats_attendance_source: row.manager_stats_attendance_source ?? "manager",
   };
@@ -825,6 +828,10 @@ export default function EmployeesPage() {
             <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
               <input checked={state.is_manager} onChange={(event) => onChange({ ...state, is_manager: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
               <span className="admin-text">设为管理人员</span>
+            </label>
+            <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }} title="菜票免扣异常考勤天数，出勤天数沿用原口径">
+              <input checked={state.meal_ticket_as_manager} onChange={(event) => onChange({ ...state, meal_ticket_as_manager: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />
+              <span className="admin-text">是否按管理人员计算菜票</span>
             </label>
             <label className="master-check-option" style={{ margin: 0, display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
               <input checked={state.is_nursing} onChange={(event) => onChange({ ...state, is_nursing: event.target.checked })} type="checkbox" style={{ width: "16px", height: "16px", accentColor: "#2563eb", cursor: "pointer", margin: 0 }} />

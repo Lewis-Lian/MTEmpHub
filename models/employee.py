@@ -21,6 +21,7 @@ class Employee(db.Model):
     dingtalk_user_id = db.Column(db.String(100), nullable=True, index=True)
     dept_id = db.Column(db.Integer, db.ForeignKey("departments.id"), nullable=True, index=True)
     is_manager = db.Column(db.Boolean, default=False, nullable=False)
+    meal_ticket_as_manager = db.Column(db.Boolean, default=False, server_default="0", nullable=False)
     is_nursing = db.Column(db.Boolean, default=False, nullable=False)
     include_in_manager_stats = db.Column(db.Boolean, default=False, nullable=False)
     employee_stats_attendance_source = db.Column(db.String(20), default=ATTENDANCE_SOURCE_EMPLOYEE, nullable=False)

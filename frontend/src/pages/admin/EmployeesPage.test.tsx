@@ -421,6 +421,26 @@ describe("EmployeesPage 卡号功能", () => {
     );
   });
 
+  it("编辑员工可保存按管理人员计算菜票，重新打开保留勾选", async () => {
+    const updated = { ...employees[0], meal_ticket_as_manager: true };
+    mockUpdateEmployee.mockResolvedValue({ status: "ok", employee: updated });
+    render(<EmployeesPage />);
+    await screen.findByText("在职员工");
+    fireEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    const dialog = screen.getByRole("heading", { name: "编辑员工" }).closest("form")!;
+    const option = within(dialog).getByRole("checkbox", { name: "是否按管理人员计算菜票" });
+    expect(option).not.toBeChecked();
+    fireEvent.click(option);
+    mockFetchEmployees.mockResolvedValue([updated, ...employees.slice(1)]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "保存" }));
+    await waitFor(() => expect(mockUpdateEmployee).toHaveBeenCalledWith(1,
+      expect.objectContaining({ meal_ticket_as_manager: true, is_manager: false })));
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "编辑员工" })).toBeNull());
+    mockFetchEmployees.mockResolvedValue([updated, ...employees.slice(1)]);
+    fireEvent.click(screen.getAllByRole("button", { name: "编辑" })[0]);
+    expect(within(screen.getByRole("heading", { name: "编辑员工" }).closest("form")!).getByRole("checkbox", { name: "是否按管理人员计算菜票" })).toBeChecked();
+  });
+
   it("编辑员工回填卡号并随更新提交", async () => {
     mockUpdateEmployee.mockResolvedValue({ status: "ok", employee: employees[0] });
     render(<EmployeesPage />);

@@ -190,3 +190,18 @@ def test_legacy_overtime_backup_defaults_manual_flags(backup_app):
     validate_document(document)
     assert row['is_revoked'] is False
     assert row['is_manual_edited'] is False
+
+
+def test_employee_meal_exemption_survives_backup_round_trip(backup_app):
+    Employee.query.one().meal_ticket_as_manager = True
+    db.session.commit()
+    document = read_backup(export_backup(1))
+    assert document['datasets']['employees'][0]['meal_ticket_as_manager'] is True
+
+
+def test_legacy_employee_backups_default_meal_exemption_off(backup_app):
+    from services.account_set_backup_service import validate_document
+    document = collect_backup(1)
+    document['datasets']['employees'][0].pop('meal_ticket_as_manager', None)
+    validate_document(document)
+    assert document['datasets']['employees'][0]['meal_ticket_as_manager'] is False

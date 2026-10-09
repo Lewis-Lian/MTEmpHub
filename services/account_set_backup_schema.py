@@ -50,7 +50,7 @@ def spec(model, fields, key, scope, option=''):
 DATASETS = {
     'departments': spec(Department, 'dept_no dept_name is_locked', 'dept_no', 'shared', 'departments'),
     'shifts': spec(Shift, 'shift_no shift_name time_slots is_cross_day', 'shift_no', 'shared', 'shifts'),
-    'employees': spec(Employee, 'emp_no name card_no dingtalk_user_id is_manager is_nursing include_in_manager_stats employee_stats_attendance_source manager_stats_attendance_source resigned_at', 'emp_no', 'shared', 'employees'),
+    'employees': spec(Employee, 'emp_no name card_no dingtalk_user_id is_manager is_nursing meal_ticket_as_manager include_in_manager_stats employee_stats_attendance_source manager_stats_attendance_source resigned_at', 'emp_no', 'shared', 'employees'),
     'employee_shift_assignments': spec(EmployeeShiftAssignment, '', 'emp_no', 'shared', 'shifts'),
     'factory_rest': spec(AccountSetFactoryRestDay, 'rest_date rest_period', 'rest_date rest_period', 'account'),
     'daily_records': spec(DailyRecord, 'record_date expected_hours actual_hours absent_hours check_in_times check_out_times leave_hours leave_type overtime_hours overtime_type late_minutes early_leave_minutes exception_reason raw_data employee_payload manager_payload', 'emp_no record_date', 'date'),

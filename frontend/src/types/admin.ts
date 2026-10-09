@@ -27,6 +27,7 @@ export interface AdminEmployee {
   shift_name?: string;
   is_manager?: boolean;
   is_nursing?: boolean;
+  meal_ticket_as_manager?: boolean;
   employee_stats_attendance_source?: string;
   manager_stats_attendance_source?: string;
   resigned_at?: string | null;

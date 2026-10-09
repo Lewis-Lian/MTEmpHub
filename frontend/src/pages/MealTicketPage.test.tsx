@@ -21,6 +21,22 @@ vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) 
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it.each([false, true])("菜票明细显示异常日扣减依据（后续重算：%s）", async (recalculated) => {
+    const rule = { abnormal_deduction_enabled: true, as_manager: false,
+      abnormal_dates: ["2026-08-01", "2026-08-02"], deduction_cents: 1600 };
+    const source = recalculated
+      ? { attendance_recalculation: { source: { meal_ticket_rule: rule } } }
+      : { meal_ticket_rule: rule };
+    const current = { ...batch, items: [{ ...batch.items[0], source }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    fireEvent.click(screen.getByRole("button", { name: "明细" }));
+    const detail = within(screen.getByRole("dialog", { name: "菜票明细" }));
+    expect(detail.getByText("异常考勤 2 天 · 菜票扣除 16.00 元")).toBeInTheDocument();
+    expect(detail.getByText(/2026-08-01、2026-08-02/)).toBeInTheDocument();
+  });
+
   it("月度发放点击月份箭头展开面板并可选择月份", async () => {
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : batch));
     render(<MemoryRouter initialEntries={["/meal-tickets/calculation?recharge_month=2026-09"]}><MealTicketPage /></MemoryRouter>);

@@ -73,6 +73,110 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_json())
         return r.get_json()
 
+    def add_punch_records(self):
+        from models.daily_record import DailyRecord
+        with self.app.app_context():
+            for day, punches in enumerate(("08:00", "08:00 12:00 17:00", "08:00 17:00", "08:00 12:00 13:00 17:00"), 1):
+                db.session.add(DailyRecord(emp_id=self.emp_id, record_date=date(2026, 8, day),
+                    raw_data={'刷卡时间数据': punches}, check_in_times=['08:00'], check_out_times=['17:00']))
+            db.session.commit()
+
+    def set_deduction(self, enabled):
+        response = self.client.put('/api/admin/more-settings',
+            json={'meal_ticket_abnormal_deduction_enabled': enabled}, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        return response.get_json()
+
+    def test_more_settings_default_validation_and_permissions(self):
+        url = '/api/admin/more-settings'
+        response = self.client.get(url, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.get_json()['meal_ticket_abnormal_deduction_enabled'])
+        self.assertTrue(self.set_deduction(True)['meal_ticket_abnormal_deduction_enabled'])
+        self.assertTrue(self.client.get(url, headers=self.headers).get_json()['meal_ticket_abnormal_deduction_enabled'])
+        for invalid in ('false', 1, None):
+            self.assertEqual(self.client.put(url, json={'meal_ticket_abnormal_deduction_enabled':invalid},
+                headers=self.headers).status_code, 400)
+        self.assertEqual(self.client.get(url).status_code, 401)
+        viewer_headers = {'Authorization':'Bearer ' + self.viewer_token}
+        self.assertEqual(self.client.get(url, headers=viewer_headers).status_code, 403)
+        self.assertEqual(self.client.put(url, json={'meal_ticket_abnormal_deduction_enabled':True},
+            headers=viewer_headers).status_code, 403)
+        settings = next(m for m in self.client.get('/api/query/navigation', headers=self.headers).get_json()['modules'] if m['slug'] == 'settings')
+        self.assertTrue(any(e['href'] == '/admin/more-settings' for e in settings['entries']))
+
+    def test_abnormal_deduction_defaults_off_and_uses_attendance_abnormal_days(self):
+        self.add_punch_records()
+        batch = self.generate()
+        self.assertEqual(batch['items'][0]['base_amount'], 176)
+        self.set_deduction(True)
+        batch = self.generate()
+        self.assertEqual(batch['items'][0]['days'], 22)
+        self.assertEqual(batch['items'][0]['base_amount'], 160)
+        self.assertEqual(batch['items'][0]['source']['meal_ticket_rule']['abnormal_dates'], ['2026-08-01', '2026-08-02'])
+        self.set_deduction(False)
+        self.assertEqual(self.generate()['items'][0]['base_amount'], 176)
+
+    def test_abnormal_deduction_never_makes_base_negative(self):
+        self.add_punch_records()
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id, month='2026-08').one().actual_attendance_days = 1
+            db.session.commit()
+        self.set_deduction(True)
+        self.assertEqual(self.generate()['items'][0]['base_amount'], 0)
+
+    def test_employee_manager_meal_option_persists_and_exempts_deduction(self):
+        self.add_punch_records()
+        self.set_deduction(True)
+        url = '/api/admin/employees/' + str(self.emp_id)
+        data = {'emp_no':'001', 'name':'员工甲', 'meal_ticket_as_manager':True}
+        response = self.client.put(url, json=data, headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertTrue(response.get_json()['employee']['meal_ticket_as_manager'])
+        self.assertEqual(self.generate()['items'][0]['base_amount'], 176)
+        response = self.client.put(url, json={'emp_no':'001', 'name':'员工甲'}, headers=self.headers)
+        self.assertTrue(response.get_json()['employee']['meal_ticket_as_manager'])
+        response = self.client.post('/api/admin/employees', json={'emp_no':'003', 'name':'特例员工',
+            'meal_ticket_as_manager':True}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()['employee']['meal_ticket_as_manager'])
+        self.client.put(url, json={**data, 'meal_ticket_as_manager':False}, headers=self.headers)
+        self.assertEqual(self.generate()['items'][0]['base_amount'], 160)
+
+    def test_managers_are_exempt_even_with_deduction_enabled(self):
+        from unittest.mock import patch
+        self.add_punch_records()
+        with self.app.app_context():
+            db.session.get(Employee, self.emp_id).is_manager = True
+            db.session.commit()
+        self.set_deduction(True)
+        with patch('services.meal_ticket_service.build_manager_rows', return_value=[{'emp_id':self.emp_id, 'punch_days':22}]):
+            self.assertEqual(self.generate()['items'][0]['base_amount'], 176)
+
+    def test_enabled_deduction_recalculates_paid_batch_once_and_preserves_payments(self):
+        self.add_punch_records()
+        batch = self.confirm(self.generate())
+        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'176', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'已充值', 'request_key':'abnormal-paid'})
+        self.assertEqual(response.status_code, 200)
+        batch = response.get_json()
+        self.assertFalse(batch['source_changed'])
+        self.set_deduction(True)
+        changed = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertTrue(changed['source_changed'])
+        self.assertEqual(changed['items'][0]['due_amount'], 176)
+        preview = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(preview['rows'][0]['amount'], -16)
+        result = self.post('/attendance-recalculation', {'batch_id':batch['id'], 'version':batch['version'], 'source_digest':preview['source_digest']})
+        self.assertEqual(result.status_code, 200, result.get_json())
+        batch = result.get_json()
+        item = batch['items'][0]
+        self.assertEqual((item['base_amount'], item['due_amount'], item['paid_amount'], item['difference']), (176, 160, 176, -16))
+        self.assertEqual(len(item['payments']), 1)
+        again = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(again['rows'][0]['amount'], 0)
+
     def test_navigation_places_meal_tickets_immediately_after_query_center(self):
         response = self.client.get('/api/query/navigation', headers=self.headers)
         self.assertEqual(response.status_code, 200)
