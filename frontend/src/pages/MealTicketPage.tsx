@@ -326,7 +326,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     { id: "generate", title: "生成草稿", text: "按上月考勤生成本月应发名单。", complete: Boolean(batch), control: !confirmed && admin && <button className="meal-ticket-button" disabled={busy} onClick={() => mutate("generate", { recharge_month: month })}>生成 / 重算草稿</button> },
     { id: "adjustments", title: "补发 / 扣除", text: "核对人员，调整金额或登记本月不发。", complete: confirmed, control: !confirmed && batch && <button className="meal-ticket-button" disabled={busy} onClick={jumpToPeople}>核对人员与补扣</button> },
     { id: "confirm", title: "确认核算", text: "处理异常后，锁定考勤账套并确认。", complete: confirmed, control: !confirmed && batch && admin && <button className="meal-ticket-button is-primary" disabled={busy || errorCount > 0} onClick={() => mutate("confirm")}>确认核算</button> },
-    { id: "export", title: "导出充值表", text: "两列 XLS，导出待充值余额。", complete: false, control: <button className="meal-ticket-button" disabled={busy} onClick={() => rechargeExport.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>前往导出</button> },
+    { id: "export", title: "导出充值表", text: "两列 XLS，导出待充值余额。", complete: false, control: confirmed ? <button className="meal-ticket-button" disabled={busy} onClick={() => rechargeExport.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>前往导出</button> : null },
     ...(!databaseEnabled ? [{ id: "payments", title: "登记充值", text: "实际充值成功后，登记金额与凭证。", complete: false, control: confirmed && !settled && <button className="meal-ticket-button" disabled={busy} onClick={jumpToPeople}>登记实际充值</button> }] : []),
     { id: "settlement", title: settlementTitle, text: databaseEnabled ? "发放完成后读取补贴、充值与取款流水，自动核对到账和结清。" : "按每个人的应发与已发金额检查结清。", complete: false, control: confirmed && <button className="meal-ticket-button" disabled={!canCheckSettlement} onClick={() => checkSettlement()}>{databaseEnabled ? settlementTitle : "重新核对"}</button> },
   ];
@@ -344,16 +344,47 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   ];
   const steps = paymentView ? followupSteps : monthlySteps;
   const activeStage = paymentView ? followupStage : monthlyStage;
-  const showReconciliation = !paymentView || followupStage === "settlement";
+  const isError = errorCount > 0 || reconciliationFailed;
+  const showReconciliation = (!paymentView || followupStage === "settlement") && (confirmed || isError);
 
   return <main className="meal-ticket-page">
-    <header className="meal-ticket-heading"><div><p className="meal-ticket-eyebrow">菜票中心</p><h1>{historical ? "菜票历史台账" : paymentView ? "后续补扣与对账" : "月度发放"}</h1>
-      <p>{historical ? "保留历史原账，核对部门登记与考勤试算。" : paymentView ? databaseEnabled ? "处理后续补发与扣除，菜票软件完成操作后直接读取数据库核对到账与结清。" : "处理已核算月份的后续补发与扣除，登记实际处理结果后再次核对结清。" : "从生成草稿到充值结清，按顺序完成本月发放。实际打卡天数 × 8 元 ＋ 额外补扣。"}</p></div></header>
-    <section className="meal-ticket-toolbar meal-ticket-panel">
-      <label>{historical ? "文件月份" : "计划充值月份"}<input type="month" value={month} disabled={busy} onChange={e => setMonth(e.target.value)} /></label>
-      {batch && !historical && <span className="meal-ticket-period">考勤月份：{batch.month} · <span className={`meal-ticket-badge ${batch.status === "draft" ? "is-warning" : "is-success"}`}>{batch.status === "draft" ? "草稿" : "已确认"}</span></span>}
-      {!historical && confirmed && <Link className="meal-ticket-button meal-ticket-export" to={`/meal-tickets/${paymentView ? "calculation" : "payments"}?recharge_month=${month}`}>{paymentView ? "查看月度发放" : "前往后续补扣与对账"}</Link>}
-    </section>
+    <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
+      <div className="meal-ticket-header-title-group">
+        <h1>{historical ? "菜票历史台账" : paymentView ? "后续补扣与对账" : "月度发放"}</h1>
+        {batch && !historical && (
+          <span className="meal-ticket-period">
+            考勤月份：{batch.month} · <span className={`meal-ticket-badge ${batch.status === "draft" ? "is-warning" : "is-success"}`}>{batch.status === "draft" ? "草稿" : "已确认"}</span>
+          </span>
+        )}
+      </div>
+      {!historical && showBatch && batch && (
+        <div className="meal-ticket-header-stats" aria-label="金额概览">
+          <div className="meal-ticket-header-stat is-due" title="基础金额 ＋ 额外补扣">
+            <span className="meal-ticket-header-stat-label">应发金额</span>
+            <strong className="meal-ticket-header-stat-value"><small>¥</small>{money(total("due_amount"))}</strong>
+          </div>
+          <div className="meal-ticket-header-stat is-paid" title="实际充值扣除退回与冲正">
+            <span className="meal-ticket-header-stat-label">净已发金额</span>
+            <strong className="meal-ticket-header-stat-value"><small>¥</small>{money(total("paid_amount"))}</strong>
+          </div>
+          <div className="meal-ticket-header-stat is-diff" title="应发金额 − 净已发金额">
+            <span className="meal-ticket-header-stat-label">差额</span>
+            <strong className="meal-ticket-header-stat-value"><small>¥</small>{money(total("difference"))}</strong>
+          </div>
+        </div>
+      )}
+      <div className="meal-ticket-header-toolbar">
+        <label>
+          <span className="meal-ticket-header-toolbar-label">{historical ? "文件月份" : "计划充值月份"}</span>
+          <input type="month" value={month} disabled={busy} onChange={e => setMonth(e.target.value)} />
+        </label>
+        {!historical && confirmed && (
+          <Link className="meal-ticket-button meal-ticket-export" to={`/meal-tickets/${paymentView ? "calculation" : "payments"}?recharge_month=${month}`}>
+            {paymentView ? "查看月度发放" : "前往后续补扣与对账"}
+          </Link>
+        )}
+      </div>
+    </header>
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
         {steps.map((step, index) => <li key={step.id} className={step.id === activeStage ? "is-current" : step.complete ? "is-complete" : ""} aria-current={step.id === activeStage ? "step" : undefined}>
@@ -362,14 +393,14 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           <div className="meal-ticket-step-action">{step.control}</div>
         </li>)}
       </ol>
-      {!paymentView && <section ref={rechargeExport} className="meal-ticket-export-toolbar" aria-label="充值表导出">
+      {!paymentView && confirmed && <section ref={rechargeExport} className="meal-ticket-export-toolbar" aria-label="充值表导出">
         <div className="meal-ticket-export-summary"><strong>充值表导出</strong><div className="meal-ticket-file-info"><span>XLS</span><small>员工编号 / 充值金额 · 不受列表筛选影响</small></div></div>
         <div className="meal-ticket-actions meal-ticket-export-actions">
-          {confirmed ? <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a> : <button className="meal-ticket-button" disabled>核算后可导出</button>}
-          {admin && confirmed && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory || hasAttendanceRecalculation} onClick={returnToDraft}>退回上一步</button>}
+          <a className="meal-ticket-button is-primary" href={mealRechargeExportUrl(month)}>导出充值表（.xls）</a>
+          {admin && <button className="meal-ticket-button" disabled={busy || hasPaymentHistory || hasAttendanceRecalculation} onClick={returnToDraft}>退回上一步</button>}
         </div>
-        {admin && confirmed && hasPaymentHistory && <p className="meal-ticket-export-hint">已登记发放流水，请通过补扣或冲正处理。</p>}
-        {admin && confirmed && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算，请继续通过后续补扣处理。</p>}
+        {admin && hasPaymentHistory && <p className="meal-ticket-export-hint">已登记发放流水，请通过补扣或冲正处理。</p>}
+        {admin && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算，请继续通过后续补扣处理。</p>}
       </section>}
     </div>}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
@@ -383,16 +414,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     {!historical && batch?.source_changed && (paymentView || !confirmed) && <p className="meal-ticket-alert">{confirmed ? "源考勤或人员资料已变化。请在第一步重算考勤数据，核对差额后登记补扣；原核算和实际充值金额保留。" : "源考勤或人员资料已变化，草稿请重算。"}</p>}
     {!historical && !busy && (paymentView ? !confirmed : !batch) && <div className="meal-ticket-empty meal-ticket-panel"><h2>{paymentView ? "请先完成月度核算" : "本月尚无核算记录"}</h2><p>{paymentView ? "在月度发放页生成草稿、处理补扣并确认核算后，再处理后续补扣与对账。" : "该充值月尚无核算记录，请从第 1 步生成对应上月考勤的草稿。"}</p>{paymentView && <Link className="meal-ticket-button is-primary" to={`/meal-tickets/calculation?recharge_month=${month}`}>前往月度发放</Link>}</div>}
     {!historical && showBatch && batch && <>
-      {showReconciliation && <section ref={settlement} className={`meal-ticket-settlement meal-ticket-alert meal-ticket-reconciliation${settled ? " is-settled" : ""}`} aria-label="整月结清检查" aria-live="polite" title="按整月全部人员检查，不受列表筛选影响。结清结果以实际发放记录为依据。">
+      {showReconciliation && <section ref={settlement} className={`meal-ticket-settlement meal-ticket-reconciliation${isError ? " is-error" : settled ? " is-settled" : ""}`} aria-label="整月结清检查" aria-live="polite" title="按整月全部人员检查，不受列表筛选影响。结清结果以实际发放记录为依据。">
         <div className="meal-ticket-reconciliation-header">
         <div className="meal-ticket-settlement-message"><span>整月结清检查 · {month}</span><strong>{!confirmed ? "草稿待核算" : reconciliationFailed ? "数据库核对未完成" : settled ? "本月账目已结清" : "还有差额需要处理"}</strong><span>{!confirmed ? `异常 ${errorCount} 人；核对后确认核算` : `待充值 ${pendingCount} 人 · 待扣回 ${refundCount} 人 · 异常 ${errorCount} 人`}</span></div>
-        <div className="meal-ticket-actions"><button className="meal-ticket-button is-primary" disabled={busy || errorCount === 0} onClick={showIssues}>查看异常（{errorCount} 人）</button>
+        <div className="meal-ticket-actions"><button className={`meal-ticket-button ${isError ? "is-danger" : "is-primary"}`} disabled={busy || errorCount === 0} onClick={showIssues}>查看异常（{errorCount} 人）</button>
           {confirmed && !settled && <><button className="meal-ticket-button" onClick={() => { setFilterEmployeeIds([]); setDepartmentNames([]); setType(""); setPaymentStatus("pending"); jumpToPeople(); }}>查看待充值</button><button className="meal-ticket-button" onClick={() => { setFilterEmployeeIds([]); setDepartmentNames([]); setType(""); setPaymentStatus("refund"); jumpToPeople(); }}>查看待扣回</button></>}
         </div></div>
-        <div className="meal-ticket-reconciliation-sources" aria-label="到账核对来源">
-          {([ ["subsidy", "首次发放", "补贴发放"], ["recharge", "后续补发", "充值"], ["refund", "扣回金额", "取款"] ] as const).map(([key, title, label]) => <div key={key}><span>{title}</span><strong>{label}</strong><small>{report ? `${report.sources[key]} 条已匹配流水` : databaseEnabled ? "读取实际到账流水" : "依据已登记发放记录"}</small></div>)}
-        </div>
-        {databaseEnabled ? <>
+        {databaseEnabled && <>
           <div className="meal-ticket-reconciliation-controls">
             {admin && <><label>核对开始日期<input type="date" min={`${month}-01`} disabled={busy} value={rangeStart} onChange={e => changeRange("start", e.target.value)} /></label>
               <label>核对结束日期<input type="date" min={rangeStart} disabled={busy} value={rangeEnd} onChange={e => changeRange("end", e.target.value)} /></label>
@@ -400,7 +428,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
             <span className={`meal-ticket-badge ${databaseReady ? "is-success" : "is-warning"}`}>{!databaseActive ? "数据库核对已暂停" : databaseReady ? "共享数据库已启用" : "共享数据库尚未配置"}</span>
           </div>
           <p className="meal-ticket-reconciliation-note">净已发 = 补贴发放 ＋ 充值 − 发放纠错扣回。新取款须确认分类，月末余额清零单独记录。跨月补发可延长结束日期，其他月份的补贴不会计入。</p>
-          {!!report?.pending_refunds?.length && <div className="meal-ticket-panel"><h3>取款流水待分类</h3><p>请选择实际用途，未分类流水尚未计入扣回或清零。</p>
+          {!!report?.pending_refunds?.length && <div className="meal-ticket-reconciliation-pending-refunds"><h3>取款流水待分类</h3><p>请选择实际用途，未分类流水尚未计入扣回或清零。</p>
             {report.pending_refunds.map(row => <label key={row.id}>{row.date} · {row.emp_no} {row.name} · {money(row.amount)} 元 <select aria-label={`流水 ${row.id} 分类`} value={refundActions[String(row.id)] ?? ""} disabled={busy || !admin} onChange={e => setRefundActions(current => ({ ...current, [row.id]: e.target.value }))}>
               <option value="">待确认</option><option value="refund">发放纠错扣回</option><option value="clearance">月末余额清零</option>
             </select></label>)}
@@ -411,9 +439,12 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           {report ? <div className="meal-ticket-reconciliation-result" role="status"><strong>新增 {report.added} 条 · 已登记 {report.existing} 条</strong><span>核对范围 {report.start_date} 至 {report.end_date} · {report.checked_at.replace("T", " ")}</span>
             {!!(report.unmatched || report.zero_amount || report.outside_subsidy_month) && <span>未匹配本月人员 {report.unmatched} 条 · 零金额 {report.zero_amount} 条 · 其他月份补贴 {report.outside_subsidy_month} 条，均未计入。</span>}</div>
             : <p className="meal-ticket-reconciliation-note">点击核对后自动登记实际流水并更新结清状态；重复核对不会重复计入。</p>}
-        </> : <p className="meal-ticket-reconciliation-note">菜票数据库核对未启用，当前按已登记发放检查结清。可在“数据来源与同步”中开启共享连接的菜票核对。</p>}
+        </>}
       </section>}
-      <section className="meal-ticket-totals" aria-label="金额概览"><div className="meal-ticket-stat is-due"><span>应发金额</span><strong><small>¥</small>{money(total("due_amount"))}</strong><p>基础金额 ＋ 额外补扣</p></div><div className="meal-ticket-stat is-paid"><span>净已发金额</span><strong><small>¥</small>{money(total("paid_amount"))}</strong><p>实际充值扣除退回与冲正</p></div><div className="meal-ticket-stat"><span>差额</span><strong><small>¥</small>{money(total("difference"))}</strong><p>应发金额 − 净已发金额</p></div></section>
+      {!databaseEnabled && <div className="meal-ticket-subtle-tip" role="note">
+        <span className="meal-ticket-tip-dot" aria-hidden="true" />
+        <span>菜票数据库核对未启用，当前按已登记发放检查结清。可在“数据来源与同步”中开启共享连接的菜票核对。</span>
+      </div>}
       <section ref={personnel} className="meal-ticket-panel" aria-label={resultView === "person" ? "人员明细" : "部门汇总"}><div className="meal-ticket-section-heading"><div><h2>{resultView === "person" ? "人员明细" : "部门汇总"}</h2><p>{resultView === "department" ? "按当前筛选范围汇总，点击部门查看对应人员明细。" : !confirmed ? "第 2 步：先核对金额，补扣填正数为补发、负数为扣除。" : paymentView ? databaseEnabled ? "追加补扣并在菜票软件处理后，读取数据库核对最新差额。" : "追加补扣后，按最新差额登记实际补发或扣回。" : databaseEnabled ? "菜票软件发放后，读取数据库自动更新到账；后续调整请前往补扣与对账页。" : "第 5 步：充值成功后选择人员登记；后续调整请前往补扣与对账页。"}</p></div><div className="meal-ticket-actions"><div className="meal-ticket-view-switch" role="group" aria-label="结果表视图"><button className="meal-ticket-button" aria-pressed={resultView === "person"} onClick={() => changeResultView("person")}>人员明细</button><button className="meal-ticket-button" aria-pressed={resultView === "department"} onClick={() => changeResultView("department")}>部门汇总</button></div><span className="meal-ticket-count">{resultView === "person" ? `${rows.length} 人` : `${departmentRows.size} 个部门`}</span></div></div>
       <div className="meal-ticket-toolbar meal-ticket-filters">
         <div className="meal-ticket-picker-field"><span>人员筛选</span><EmployeePicker departments={pickerDepartments} employees={pickerEmployees} selectedIds={filterEmployeeIds} onChange={ids => { setFilterEmployeeIds(ids); setDepartmentNames([]); changeResultView("person"); }} label="人员筛选" showFieldChrome={false} emptyHint="未选择时显示本月全部人员。" /></div>

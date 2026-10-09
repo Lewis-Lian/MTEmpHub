@@ -235,7 +235,7 @@ describe("菜票中心", () => {
     fireEvent.click(screen.getByRole("button", { name: "本月不发" }));
     fireEvent.click(screen.getByRole("button", { name: "离职" }));
     fireEvent.click(screen.getByRole("button", { name: "确认本月不发" }));
-    expect(await screen.findByRole("button", { name: "查看异常（0 人）" })).toBeDisabled();
+    await waitFor(() => expect(screen.queryByRole("button", { name: /查看异常/ })).not.toBeInTheDocument());
     expect(screen.queryByText("员工甲")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "确认核算" })).toBeEnabled();
     fireEvent.change(screen.getByLabelText("发放 / 核算状态"), { target: { value: "excluded" } });
@@ -255,10 +255,11 @@ describe("菜票中心", () => {
     expect(within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem").map(item => within(item).getByRole("heading").textContent))
       .toEqual(["生成草稿", "补发 / 扣除", "确认核算", "导出充值表", "登记充值", "核对结清"]);
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
-    const exportStep = screen.getByRole("region", { name: "充值表导出" });
-    expect(within(exportStep).getByRole("button", { name: "核算后可导出" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "充值表导出" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "前往导出" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "登记充值" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "确认核算" }));
+    const exportStep = await screen.findByRole("region", { name: "充值表导出" });
     expect(await screen.findByRole("link", { name: "导出充值表（.xls）" })).toHaveAttribute("href",
       expect.stringContaining("/api/meal-tickets/export-recharge?recharge_month="));
     expect(within(exportStep).getByRole("link", { name: "导出充值表（.xls）" })).toBeInTheDocument();
@@ -303,7 +304,8 @@ describe("菜票中心", () => {
     expect(screen.getByRole("button", { name: "生成 / 重算草稿" })).toBeEnabled();
     screen.getAllByRole("button", { name: "本月不发" }).forEach(button => expect(button).toBeEnabled());
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "核算后可导出" })).toBeDisabled();
+    expect(screen.queryByRole("region", { name: "充值表导出" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "前往导出" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "退回上一步" })).not.toBeInTheDocument();
   });
 

@@ -1,7 +1,351 @@
-.meal-ledger-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; }
-.meal-ledger-form label { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
-.meal-ledger-page input, .meal-ledger-page select { color: inherit; background: var(--bg-surface, transparent); border: 1px solid var(--border-color, #d5dde5); border-radius: 6px; padding: 8px 10px; }
-.meal-ledger-page .meal-ticket-panel { margin-bottom: 16px; }
-.meal-ledger-page .meal-ledger-import { overflow: auto; }
-.meal-ledger-page .meal-ledger-import input { min-width: 100px; max-width: 150px; }
-.meal-ledger-page .meal-ticket-modal section { max-height: 85vh; overflow: auto; }
+/* 菜票中心 - 台账与登记页面现代化样式 */
+
+
+/* 筛选与搜索工具条 */
+.meal-ledger-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.meal-ledger-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.meal-ledger-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  flex: 0 1 auto;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meal-ledger-page input,
+.meal-ledger-page select,
+.meal-ledger-page textarea {
+  color: var(--ent-text);
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  box-sizing: border-box;
+  transition: var(--ent-transition);
+}
+
+.meal-ledger-page input:focus,
+.meal-ledger-page select:focus,
+.meal-ledger-page textarea:focus {
+  outline: none;
+  border-color: var(--ent-border-focus);
+  box-shadow: 0 0 0 3px var(--ent-blue-focus);
+}
+
+.meal-ledger-page .meal-ticket-panel {
+  margin-bottom: 20px;
+}
+
+/* KPI 统计指标卡片 */
+.meal-ledger-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.meal-ledger-stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  background: var(--ent-bg);
+  box-shadow: var(--ent-shadow-card);
+  position: relative;
+  overflow: hidden;
+  transition: var(--ent-transition);
+}
+
+.meal-ledger-stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.05);
+}
+
+.meal-ledger-stat-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--ent-border-strong);
+}
+
+.meal-ledger-stat-card.is-blue::before { background: var(--ent-blue); }
+.meal-ledger-stat-card.is-green::before { background: #059669; }
+.meal-ledger-stat-card.is-amber::before { background: #d97706; }
+.meal-ledger-stat-card.is-rose::before { background: #e11d48; }
+
+.meal-ledger-stat-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.meal-ledger-stat-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: clamp(20px, 1.8vw, 28px);
+  font-weight: 700;
+  color: var(--ent-text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.meal-ledger-stat-value small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ent-text-secondary);
+}
+
+.meal-ledger-stat-card.is-blue .meal-ledger-stat-value { color: var(--ent-blue); }
+.meal-ledger-stat-card.is-green .meal-ledger-stat-value { color: #059669; }
+.meal-ledger-stat-card.is-amber .meal-ledger-stat-value { color: #d97706; }
+.meal-ledger-stat-card.is-rose .meal-ledger-stat-value { color: #e11d48; }
+
+.meal-ledger-stat-sub {
+  margin: 0;
+  color: var(--ent-text-tertiary);
+  font-size: 12px;
+}
+
+/* 状态徽标与提示 */
+.meal-ledger-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.meal-ledger-status-tag.is-active {
+  background: rgba(5, 150, 105, 0.1);
+  color: #047857;
+}
+
+.meal-ledger-status-tag.is-draft {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.meal-ledger-status-tag.is-voided {
+  background: rgba(225, 29, 72, 0.1);
+  color: #be123c;
+}
+
+.meal-ledger-status-tag.is-info {
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+}
+
+/* 登记与操作表单区域 */
+.meal-ledger-form-card {
+  padding: 24px;
+}
+
+.meal-ledger-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--ent-border-strong);
+}
+
+.meal-ledger-card-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ent-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meal-ledger-card-header p {
+  margin: 4px 0 0;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.meal-ledger-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+.meal-ledger-grid-full {
+  grid-column: 1 / -1;
+}
+
+.meal-ledger-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ent-border-strong);
+}
+
+.meal-ledger-form-footer p {
+  margin: 0;
+  color: var(--ent-text-tertiary);
+  font-size: 12px;
+}
+
+/* 历史导入区域 */
+.meal-ledger-import {
+  overflow: auto;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-secondary-bg);
+}
+
+.meal-ledger-import-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.meal-ledger-import-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-ledger-import-header p {
+  margin: 0;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+}
+
+.meal-ledger-history-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.meal-ledger-history-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-bg);
+  font-size: 12px;
+  color: var(--ent-text);
+  cursor: pointer;
+  transition: var(--ent-transition);
+}
+
+.meal-ledger-history-item:hover {
+  border-color: var(--ent-blue);
+  color: var(--ent-blue);
+}
+
+.meal-ledger-page .meal-ledger-import input {
+  min-width: 100px;
+  max-width: 150px;
+}
+
+/* 作废确认弹窗 */
+.meal-ledger-void-dialog {
+  width: min(520px, 100%);
+  padding: 24px;
+}
+
+.meal-ledger-void-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--ent-border-strong);
+}
+
+.meal-ledger-void-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--ent-text);
+}
+
+.meal-ledger-void-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  font-size: 13px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-ledger-void-details strong {
+  color: var(--ent-text);
+}
+
+.meal-ticket-button.is-danger {
+  border-color: #e11d48;
+  background: #e11d48;
+  color: #ffffff;
+}
+
+.meal-ticket-button.is-danger:hover:not(:disabled) {
+  border-color: #be123c;
+  background: #be123c;
+  color: #ffffff;
+}
+
+@media (max-width: 768px) {
+  .meal-ledger-stats {
+    grid-template-columns: 1fr;
+  }
+  .meal-ledger-grid {
+    grid-template-columns: 1fr;
+  }
+  .meal-ledger-form-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
