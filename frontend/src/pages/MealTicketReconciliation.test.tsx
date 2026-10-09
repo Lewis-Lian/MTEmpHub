@@ -50,6 +50,20 @@ it('后续补扣预览考勤差额，确认后保留基础金额和已发金额'
 function page() {
   render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><MealTicketPage/></MemoryRouter></ConfirmProvider>);
 }
+it('月度账目全部结清后只保留完成状态，隐藏核对、人员和导出操作', async () => {
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
+    {...batch,items:[{...item,paid_amount:176,difference:0}]}));
+  page();
+  await screen.findByText('本月账目已结清');
+  expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('region',{name:'充值表导出'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'前往导出'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'核对到账与结清'})).not.toBeInTheDocument();
+  expect(within(screen.getByRole('region',{name:'整月结清检查'})).queryByRole('button')).not.toBeInTheDocument();
+  const flow=screen.getByRole('list',{name:'月度发放流程'});
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('已完成');
+});
 it.each(['preview', 'apply'])('切换月份后忽略旧月份的考勤重算 %s 响应', async stage => {
   let resolveOld!: (value: unknown) => void;
   const delayed = new Promise(resolve => { resolveOld = resolve; });
@@ -86,17 +100,30 @@ it('取款流水需分类，月末清零不会显示为核算扣回', async () =
   fireEvent.click(screen.getByRole('button', { name: '确认分类并重新核对' }));
   expect(await screen.findByText('本月账目已结清')).toBeInTheDocument();
 });
-it('数据库核对按选定日期更新结清，展示三类实际流水及重复记录数',async()=>{
+it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
-    path==='/api/meal-tickets/reconcile'?{...batch,version:3,items:[{...item,paid_amount:176,difference:0}],
+    path==='/api/meal-tickets/reconcile'?{...batch,version:3,items:[{...item,paid_amount:176,difference:0}]}:batch));
+  page();
+  const panel=await screen.findByRole('region',{name:'到账核对'});
+  expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
+  expect(screen.getByRole('region',{name:'充值表导出'})).toBeInTheDocument();
+  fireEvent.click(within(panel).getByRole('button',{name:'读取数据库并核对'}));
+  await screen.findByText('本月账目已结清');
+  expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('region',{name:'充值表导出'})).not.toBeInTheDocument();
+});
+it('数据库核对按选定日期更新账目，未结清时展示实际流水及重复记录数',async()=>{
+  request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
+    path==='/api/meal-tickets/reconcile'?{...batch,version:3,items:[{...item,paid_amount:160,difference:16}],
       reconciliation:{checked_at:'2026-10-08T16:00:00',start_date:'2026-09-01',end_date:'2026-10-06',added:3,existing:2,unmatched:1,zero_amount:1,outside_subsidy_month:0,sources:{subsidy:1,recharge:1,refund:1}}}:batch));
   page();
   const panel=await screen.findByRole('region',{name:'到账核对'});
   expect(screen.queryByRole('button',{name:'登记充值'})).not.toBeInTheDocument();
   fireEvent.change(within(panel).getByLabelText('核对结束日期'),{target:{value:'2026-10-06'}});
   fireEvent.click(within(panel).getByRole('button',{name:'读取数据库并核对'}));
-  expect(await screen.findByText('本月账目已结清')).toBeInTheDocument();
-  expect(within(panel).getByText('新增 3 条 · 已登记 2 条')).toBeInTheDocument();
+  expect(await within(panel).findByText('新增 3 条 · 已登记 2 条')).toBeInTheDocument();
+  expect(screen.getByText('还有差额需要处理')).toBeInTheDocument();
   expect(within(panel).getByText(/未匹配本月人员 1 条/)).toBeInTheDocument();
   expect(request).toHaveBeenCalledWith('/api/meal-tickets/reconcile',expect.objectContaining({method:'POST',body:{batch_id:1,version:2,start_date:'2026-09-01',end_date:'2026-10-06'}}));
 });
@@ -125,10 +152,14 @@ it('已由数据库登记的账目关闭开关后显示暂停，不开放手工�
   expect(screen.getByText('数据库核对已暂停')).toBeInTheDocument();
   expect(screen.getByRole('button',{name:'读取数据库并核对'})).toBeDisabled();
 });
-it('原账结清但本次数据库读取失败时不显示本次核对成功',async()=>{
+it('原账金额平衡但流水待分类，本次数据库读取失败时不显示结清成功',async()=>{
   request.mockImplementation((path:string)=>path==='/api/auth/me'?Promise.resolve({role:'admin'}):
     path==='/api/meal-tickets/reconcile'?Promise.reject(new Error('已登记流水发生变化')):
-    Promise.resolve({...batch,items:[{...item,paid_amount:176,difference:0}]}));
+    Promise.resolve({...batch,items:[{...item,paid_amount:176,difference:0}],reconciliation:{
+      checked_at:'2026-10-08T16:00:00',start_date:'2026-09-01',end_date:'2026-09-30',added:0,existing:0,
+      unmatched:0,zero_amount:0,outside_subsidy_month:0,sources:{subsidy:0,recharge:0,refund:0},
+      pending_refunds:[{id:12,emp_no:'001',name:'员工甲',date:'2026-09-30',amount:20}]
+    }}));
   page();
   const panel=await screen.findByRole('region',{name:'整月结清检查'});
   expect(within(panel).queryByLabelText('核对开始日期')).not.toBeInTheDocument();
@@ -169,12 +200,20 @@ it.each([false,true])('后续补扣进入页面先调整，结清状态为 %s �
   fireEvent.click(within(flow).getByRole('button',{name:'下一步：核对到账与结清'}));
   expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账与结清');
   expect(screen.getByRole('region',{name:'整月结清检查'})).toBeInTheDocument();
-  expect(screen.getByRole('region',{name:'到账核对'})).toBeInTheDocument();
+  if (settled) {
+    expect(screen.getByText('本月账目已结清')).toBeInTheDocument();
+    expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
+    expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
+  } else {
+    expect(screen.getByRole('region',{name:'到账核对'})).toBeInTheDocument();
+    expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
+  }
   expect(request.mock.calls.some(([path])=>path==='/api/meal-tickets/reconcile')).toBe(false);
   fireEvent.click(within(flow).getByRole('button',{name:'返回补发 / 扣除'}));
   expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
   expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
+  expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
 });
 
 it('后续补扣保存成功仍停留调整阶段，切换月份重新从第一步开始',async()=>{
