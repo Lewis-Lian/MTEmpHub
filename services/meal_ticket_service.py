@@ -307,6 +307,11 @@ def payment(body, operator):
 
 
 def serialize_batch(batch, accessible=None, check_source=False):
+    from models.meal_ledger import MealLedgerRecord
+    clearances = {}
+    for record in MealLedgerRecord.query.filter_by(kind='clearance', month=batch.recharge_month).all():
+        clearances.setdefault(record.data.get('emp_no'), []).append({'date':record.record_date.isoformat(),
+            'amount':record.amount_cents/100, 'remark':record.data.get('remark', ''), 'voided':record.voided})
     query = MealTicketItem.query.filter_by(batch_key=batch.key).order_by(MealTicketItem.emp_no_snapshot)
     if accessible is not None:
         query = query.filter(MealTicketItem.emp_id.in_(accessible))
@@ -324,6 +329,7 @@ def serialize_batch(batch, accessible=None, check_source=False):
                'participation_history':item.source.get('participation_history', []),
                'due_amount':due/100, 'paid_amount':paid/100, 'difference':(due-paid)/100,
                'error':item.error, 'source':item.source,
+               'clearances':clearances.get(item.emp_no_snapshot, []),
                'employment_status':'missing' if employee_id is None else 'resigned' if resigned_at else 'active',
                'resigned_at':resigned_at.isoformat() if resigned_at else None,
                'adjustments':[{'id':a.id, 'amount':a.amount_cents/100, 'reason':a.reason, 'operator':a.operator,
@@ -344,6 +350,7 @@ def serialize_batch(batch, accessible=None, check_source=False):
         changed = (batch.status == 'confirmed' and not account.is_locked) or digest(source_snapshot(batch.month)) != batch.source_digest
     from services.meal_ticket_reconciliation import database_status
     return {'id':batch.id, 'month':batch.month, 'recharge_month':batch.recharge_month, 'status':batch.status,
+            'reconciliation':batch.reconciliation if accessible is None else None,
             'database':database_status(),
             'rule_version':batch.rule_version, 'rate_cents':batch.rate_cents,
             'version':batch.version, 'source_changed':changed, 'created_at':batch.created_at.isoformat(),

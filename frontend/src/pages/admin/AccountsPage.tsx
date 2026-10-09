@@ -33,6 +33,7 @@ interface AccountUser {
 }
 
 const permissionCatalog = [
+  { key: "meal_ledger_query", label: "菜票台账与存档下载", group: "通用" },
   { key: "meal_ticket_query", label: "菜票查询", group: "通用" },
   { key: "query_home", label: "首页", group: "通用" },
   { key: "individual_attendance", label: "个人考勤查询", group: "通用" },

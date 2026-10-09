@@ -190,7 +190,7 @@ describe("AccountsPage edit modal navigation permissions", () => {
 
     // 点击全部勾选
     fireEvent.click(screen.getByRole("button", { name: "全部勾选" }));
-    expect(screen.getByText("已选 12 / 12 项")).toBeInTheDocument();
+    expect(screen.getByText("已选 13 / 13 项")).toBeInTheDocument();
 
     // 点击保存修改
     fireEvent.click(screen.getByRole("button", { name: "保存修改" }));

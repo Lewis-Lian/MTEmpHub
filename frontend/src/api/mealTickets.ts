@@ -4,6 +4,7 @@ export interface MealItem {
   id: number; emp_id: number; emp_no: string; name: string; dept_name: string; is_manager: boolean;
   days: number; base_amount: number; adjustment_amount: number; due_amount: number; paid_amount: number;
   difference: number; error: string; source: { field: string; configured_source: string; monthly_override?: number; remark?: string };
+  clearances?: Array<{ date: string; amount: number; remark: string; voided: boolean }>;
   employment_status: "active" | "resigned" | "missing"; resigned_at: string | null;
   excluded: boolean; original_base_amount: number;
   participation_history: Array<{ excluded: boolean; reason: string; operator: string; created_at: string }>;
@@ -22,6 +23,8 @@ export interface MealBatch {
     checked_at: string; start_date: string; end_date: string; added: number; existing: number;
     unmatched: number; zero_amount: number; outside_subsidy_month: number;
     sources: { subsidy: number; recharge: number; refund: number };
+    pending_refunds?: Array<{ id: number; emp_no: string; name: string; date: string; amount: number }>;
+    clearance_added?: number;
   };
 }
 export interface MealImportRow {

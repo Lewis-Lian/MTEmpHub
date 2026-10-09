@@ -23,6 +23,7 @@ from models.annual_leave import AnnualLeave
 from models.manager_month_stat import ManagerMonthStat
 from models.dingtalk_sync_run import DingTalkSyncRun
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketAdjustment, MealTicketPayment, MealTicketImport, MealTicketImportRow
+from models.meal_ledger import MealLedgerRecord, MealLedgerImport
 
 
 class BackupError(ValueError):
@@ -64,15 +65,17 @@ DATASETS = {
     'override_history': spec(AttendanceOverrideHistory, 'override_type month action_type changed_fields_json before_values_json after_values_json remark source_file_name created_at', 'origin_key', 'month'),
     'sync_history': spec(DingTalkSyncRun, 'month source status read_count imported_count unmatched_count unmatched error_message started_at finished_at', 'origin_key', 'account'),
     'imports': spec(AccountSetImport, 'source_filename file_type status imported_count error_message created_at', 'origin_key', 'account'),
-    'meal_batches': spec(MealTicketBatch, 'key month recharge_month rule_version rate_cents status version source_digest created_by confirmed_by created_at confirmed_at', 'month', 'account'),
+    'meal_batches': spec(MealTicketBatch, 'key month recharge_month rule_version rate_cents status version source_digest created_by confirmed_by created_at confirmed_at reconciliation', 'month', 'account'),
     'meal_items': spec(MealTicketItem, 'key batch_key month emp_no_snapshot name dept_name is_manager days base_cents source error', 'key', 'month'),
     'meal_adjustments': spec(MealTicketAdjustment, 'key item_key month amount_cents reason operator created_at', 'key', 'month'),
     'meal_payments': spec(MealTicketPayment, 'key item_key month kind amount_cents payment_date reference operator request_key request_digest reversal_of created_at', 'key', 'month'),
     'meal_imports': spec(MealTicketImport, 'key month recharge_month source_filename file_digest status operator created_at', 'key', 'month'),
     'meal_import_rows': spec(MealTicketImportRow, 'key import_key month data', 'key', 'month'),
+    'meal_ledger_records': spec(MealLedgerRecord, 'key kind month record_date amount_cents data active_slot request_key request_digest source_key operator created_at voided void_reason void_operator voided_at', 'key', 'month'),
+    'meal_ledger_imports': spec(MealLedgerImport, 'key kind month source_filename file_digest data status operator created_at', 'key', 'month'),
 }
 MEAL_DATASETS = {name for name in DATASETS if name.startswith('meal_')}
-FILE_DATASETS = {'imports', 'meal_imports'}
+FILE_DATASETS = {'imports', 'meal_imports', 'meal_ledger_imports'}
 ACCOUNT_FIELDS = ('name', 'factory_rest_days', 'monthly_benefit_days')
 OPTION_KEYS = ('employees', 'departments', 'shifts', 'annual_stats', 'delete_month_only')
 REFS = {

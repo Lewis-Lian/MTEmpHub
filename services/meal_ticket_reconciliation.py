@@ -3,6 +3,7 @@ from datetime import date, datetime, timedelta
 
 from models import db
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketPayment
+from models.meal_ledger import MealLedgerRecord
 from models.system_setting import SystemSetting
 from services.card_db_client import CardDBClient, CardDBClientError, card_db_config_from_settings, card_db_configured
 from services.meal_ticket_service import MealError, begin_write, batch_for_write, cents, digest
@@ -17,6 +18,9 @@ def database_status():
 
 
 def reconcile(body, operator):
+    refund_actions = body.get('refund_actions', {})
+    if not isinstance(refund_actions, dict) or any(not str(k).isdigit() or v not in ('refund', 'clearance') for k, v in refund_actions.items()):
+        raise MealError('取款分类无效')
     status = database_status()
     if not status['enabled']:
         raise MealError('请先在数据来源与同步中启用菜票数据库核对',409)
@@ -76,7 +80,7 @@ def reconcile(body, operator):
     report = {'checked_at':datetime.now().isoformat(timespec='seconds'),
               'start_date':start.isoformat(), 'end_date':end.isoformat(),
               'added':0, 'existing':0, 'unmatched':0, 'zero_amount':0, 'outside_subsidy_month':0,
-              'sources':{source:0 for source in SOURCE_LABELS}}
+              'sources':{source:0 for source in SOURCE_LABELS}, 'pending_refunds':[], 'clearance_added':0}
     seen = {}
     for row in records:
         source = row.get('source')
@@ -101,6 +105,37 @@ def reconcile(body, operator):
             report['zero_amount'] += 1
             continue
         item = by_number.get(row['emp_no'])
+        if source == 'refund':
+            posted = MealTicketPayment.query.filter_by(request_key=request_key).first()
+            cleared = MealLedgerRecord.query.filter_by(source_key=request_key).first()
+            action = refund_actions.get(str(row['id']))
+            if posted and cleared:
+                raise MealError('取款流水重复归属，请核对历史', 409)
+            if cleared:
+                if action == 'refund' or cleared.data.get('database_digest') != content:
+                    raise MealError('已登记清零流水分类或内容不一致，请核对原始记录', 409)
+                report['existing'] += 1
+                report['sources']['refund'] += 1
+                continue
+            if posted and action == 'clearance':
+                raise MealError('该取款已计入核算扣回，不能重复登记清零', 409)
+            if not posted and action is None:
+                report['pending_refunds'].append({'id':row['id'], 'emp_no':row['emp_no'],
+                    'name':item.name if item else row['emp_no'], 'date':time.date().isoformat(), 'amount':amount/100})
+                continue
+            if not posted and action == 'clearance':
+                from services.meal_ledger_service import create
+                if any(not r.voided and r.month == time.strftime('%Y-%m') and r.data.get('emp_no') == row['emp_no'] and r.amount_cents == amount
+                       for r in MealLedgerRecord.query.filter_by(kind='clearance').all()):
+                    raise MealError('本月已有同人员同金额取款记录，请先核对手工/导入与数据库是否重复', 409)
+                record = create('clearance', {'month':time.strftime('%Y-%m'), 'date':time.date().isoformat(),
+                    'emp_no':row['emp_no'], 'name':item.name if item else row['emp_no'],
+                    'dept_name':item.dept_name if item else '', 'amount':amount/100,
+                    'remark':f'数据库清零流水 {row["id"]}', 'request_key':'db-clearance:' + digest(request_key)}, operator, request_key)
+                record.data = {**record.data, 'database_digest':content}
+                report['clearance_added'] += 1
+                report['sources']['refund'] += 1
+                continue
         if not item:
             report['unmatched'] += 1
             continue
@@ -126,7 +161,12 @@ def reconcile(body, operator):
                 raise MealError('已登记流水在数据库中缺失，请核对原始流水；本次未更新账目',409)
             if seen[existing.request_key] != existing.request_digest:
                 raise MealError('已登记的数据库流水发生变化，请核对原始流水；本次未更新账目',409)
-    if report['added']:
+    for cleared in MealLedgerRecord.query.filter(MealLedgerRecord.source_key.startswith(f'{DATABASE_REQUEST_PREFIX}{database_id}:'),
+            MealLedgerRecord.record_date >= start, MealLedgerRecord.record_date <= end).all():
+        if seen.get(cleared.source_key) != cleared.data.get('database_digest'):
+            raise MealError('已登记清零流水缺失或变化，请核对数据库；本次未更新账目', 409)
+    if report['added'] or report['clearance_added']:
         batch.version += 1
+    batch.reconciliation = report
     db.session.flush()
     return batch, report

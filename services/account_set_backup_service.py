@@ -12,6 +12,7 @@ import stat
 import zipfile
 
 from sqlalchemy import Date, DateTime, Boolean, Float, Integer, String, JSON
+from sqlalchemy import or_
 from models import db
 from models.account_set import AccountSet
 from models.employee import Employee
@@ -58,7 +59,12 @@ def scoped_rows(name, account, employee_ids=None):
     elif ds.scope == 'date':
         query = query.filter(model.record_date >= start, model.record_date < end)
     elif ds.scope in ('month', 'report_month'):
-        query = query.filter(getattr(model, ds.scope) == account.month)
+        if name == 'meal_ledger_imports':
+            from models.meal_ledger import MealLedgerRecord
+            keys = [r.data['import_key'] for r in MealLedgerRecord.query.filter_by(month=account.month).all() if r.data.get('import_key')]
+            query = query.filter(or_(model.month == account.month, model.key.in_(keys)))
+        else:
+            query = query.filter(getattr(model, ds.scope) == account.month)
     elif ds.scope == 'interval':
         query = query.filter(model.start_time < datetime.combine(end, datetime.min.time()),
                              model.end_time > datetime.combine(start, datetime.min.time()))
@@ -95,7 +101,7 @@ def serialize_row(name, row):
             'operator_id': getattr(row, 'operator_user_id', None),
         }
     if name in FILE_DATASETS:
-        identity = result['key'] if name == 'meal_imports' else result['origin_key']
+        identity = result['key'] if name.startswith('meal_') else result['origin_key']
         result['file_key'] = 'files/%s/%s' % (identity, Path(row.source_filename).name)
         path = Path(row.stored_path)
         result['file_sha256'] = file_digest(path) if path.is_file() else None
@@ -254,6 +260,8 @@ def validate_document(document):
         if name in FILE_DATASETS:
             expected.update(('file_key', 'file_sha256', 'file_size'))
         for row in rows:
+            if name == 'meal_batches' and isinstance(row, dict):
+                row.setdefault('reconciliation', None)
             if name == 'manager_stats' and isinstance(row, dict):
                 # Backups made before source tracking keep their numeric fields as legacy corrections.
                 row.setdefault('automatic_values', None)
@@ -310,7 +318,7 @@ def validate_document(document):
                     raise BackupError('厂休时段无效')
             if ds.scope == 'date' and not start <= date.fromisoformat(row['record_date']) < end:
                 raise BackupError('日期超出账套月份')
-            if ds.scope in ('month', 'report_month') and row[ds.scope] != document['month']:
+            if ds.scope in ('month', 'report_month') and row[ds.scope] != document['month'] and name != 'meal_ledger_imports':
                 raise BackupError('记录月份不匹配')
             if name == 'meal_batches' and row['month'] != document['month']:
                 raise BackupError('菜票考勤月份不匹配')

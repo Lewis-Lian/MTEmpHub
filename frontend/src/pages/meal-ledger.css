@@ -1,0 +1,7 @@
+.meal-ledger-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: end; }
+.meal-ledger-form label { display: flex; flex-direction: column; gap: 6px; min-width: 150px; }
+.meal-ledger-page input, .meal-ledger-page select { color: inherit; background: var(--bg-surface, transparent); border: 1px solid var(--border-color, #d5dde5); border-radius: 6px; padding: 8px 10px; }
+.meal-ledger-page .meal-ticket-panel { margin-bottom: 16px; }
+.meal-ledger-page .meal-ledger-import { overflow: auto; }
+.meal-ledger-page .meal-ledger-import input { min-width: 100px; max-width: 150px; }
+.meal-ledger-page .meal-ticket-modal section { max-height: 85vh; overflow: auto; }

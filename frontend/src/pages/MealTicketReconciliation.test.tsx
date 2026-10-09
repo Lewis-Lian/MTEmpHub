@@ -15,6 +15,17 @@ beforeEach(()=>{request.mockReset();sessionStorage.clear();HTMLElement.prototype
 function page() {
   render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><MealTicketPage/></MemoryRouter></ConfirmProvider>);
 }
+it('取款流水需分类，月末清零不会显示为核算扣回', async () => {
+  const report = { checked_at: '2026-10-08T16:00:00', start_date: '2026-09-01', end_date: '2026-09-30', added: 1, existing: 0, unmatched: 0, zero_amount: 0, outside_subsidy_month: 0, sources: { subsidy: 1, recharge: 0, refund: 0 }, pending_refunds: [{ id: 12, emp_no: '001', name: '员工甲', date: '2026-09-30', amount: 20 }] };
+  request.mockImplementation((path: string, options?: { body?: { refund_actions?: object } }) => Promise.resolve(path === '/api/auth/me' ? { role: 'admin' } : path === '/api/meal-tickets/reconcile' && options?.body?.refund_actions ?
+    { ...batch, items: [{ ...item, paid_amount: 176, difference: 0 }], reconciliation: { ...report, pending_refunds: [] } } : { ...batch, reconciliation: report }));
+  page();
+  await screen.findByLabelText('流水 12 分类');
+  expect(screen.queryByText('本月账目已结清')).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('流水 12 分类'), { target: { value: 'clearance' } });
+  fireEvent.click(screen.getByRole('button', { name: '确认分类并重新核对' }));
+  expect(await screen.findByText('本月账目已结清')).toBeInTheDocument();
+});
 it('数据库核对按选定日期更新结清，展示三类实际流水及重复记录数',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
     path==='/api/meal-tickets/reconcile'?{...batch,version:3,items:[{...item,paid_amount:176,difference:0}],

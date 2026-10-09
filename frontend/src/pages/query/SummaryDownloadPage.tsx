@@ -854,7 +854,7 @@ export default function SummaryDownloadPage() {
         }}
       >
         <div className="legacy-page-heading">
-          <p className="legacy-page-kicker">查询中心</p>
+          <p className="legacy-page-kicker">下载中心</p>
           <h2 className="legacy-page-title">汇总下载</h2>
           <p className="legacy-page-description">选择账套、员工范围和下载内容，一键打包生成并下载合并后的多工作簿月度 Excel 报表。</p>
         </div>

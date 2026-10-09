@@ -1051,7 +1051,7 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("heading", { name: "下载说明" })).toBeInTheDocument();
     expect(await screen.findAllByText("考勤数据查询工作表")).not.toHaveLength(0);
     expect(screen.queryByRole("listbox")).toBeNull();
-    await waitFor(() => expect(window.location.pathname).toBe("/employee/summary-download"));
+    await waitFor(() => expect(window.location.pathname).toBe("/downloads/attendance"));
   });
 
   it("员工考勤数据查询页会挂载旧版筛选栏和结果面板", async () => {

@@ -31,7 +31,32 @@ class MealReconciliationTests(unittest.TestCase):
 
     def reconcile(self, batch, **kwargs):
         return self.post('/reconcile', {'batch_id':batch['id'], 'version':batch['version'],
-            'start_date':'2026-09-01', 'end_date':'2026-09-30', **kwargs})
+            'start_date':'2026-09-01', 'end_date':'2026-09-30', 'refund_actions': {'12': 'refund'}, **kwargs})
+
+    def test_unclassified_takefund_is_not_automatically_a_subsidy_refund(self):
+        self.enable()
+        batch = self.confirm(self.generate())
+        rows = [self.records()[0], {**self.records()[2], 'amount': Decimal('20')}]
+        with patch('services.card_db_client.CardDBClient.meal_records', return_value=rows):
+            result = self.reconcile(batch, refund_actions={}).get_json()
+        self.assertEqual(result['items'][0]['paid_amount'], 160)
+        self.assertEqual(len(result['reconciliation']['pending_refunds']), 1)
+        refreshed = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(len(refreshed['reconciliation']['pending_refunds']), 1)
+
+    def test_explicit_clearance_is_recorded_once_without_reducing_paid_amount(self):
+        self.enable()
+        batch = self.confirm(self.generate())
+        rows = [{**self.records()[0], 'amount': Decimal('176')}, {**self.records()[2], 'amount': Decimal('20')}]
+        with patch('services.card_db_client.CardDBClient.meal_records', return_value=rows):
+            result = self.reconcile(batch, refund_actions={'12': 'clearance'}).get_json()
+            self.assertEqual(result['items'][0]['paid_amount'], 176)
+            self.assertEqual(result['items'][0]['difference'], 0)
+            repeated = self.reconcile(result, refund_actions={'12': 'clearance'})
+            self.assertEqual(repeated.status_code, 200)
+        rows = self.client.get('/api/meal-ledgers/clearance?month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['amount'], 20)
 
     def test_three_ledgers_settle_actual_amount_and_repeat_is_idempotent(self):
         self.enable()

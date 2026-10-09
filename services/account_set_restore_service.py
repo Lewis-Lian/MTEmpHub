@@ -206,7 +206,19 @@ def validate_selection(document, options, rows, choices):
         for field, parent in (('batch_key','meal_batches'), ('item_key','meal_items'), ('import_key','meal_imports'), ('reversal_of','meal_payments')):
             if value.get(field) and value[field] not in meal_maps[parent]:
                 block('missing_meal_reference', '缺少菜票关联记录，请一并选择对应核算/明细')
+        if row['dataset'] == 'meal_ledger_records':
+            for field in ('active_slot', 'request_key', 'source_key'):
+                if value.get(field) and any(other['key'] != value['key'] and other.get(field) == value[field]
+                                           for other in meal_maps['meal_ledger_records'].values()):
+                    block('meal_ledger_unique_conflict', '台账月份或来源标识已被其他记录使用，请核对后恢复')
+            import_key = value.get('data', {}).get('import_key')
+            if import_key and import_key not in meal_maps['meal_ledger_imports']:
+                block('missing_meal_reference', '缺少独立台账的导入原文件，请一并恢复')
+            if value.get('source_key') and any(p['request_key'] == value['source_key'] for p in meal_maps['meal_payments'].values()):
+                block('meal_ledger_unique_conflict', '同一取款来源已计入发放扣回，不能再恢复为清零')
         if row['dataset'] in ('meal_adjustments','meal_payments'):
+            if row['dataset'] == 'meal_payments' and any(record.get('source_key') == value['request_key'] for record in meal_maps['meal_ledger_records'].values()):
+                block('meal_ledger_unique_conflict', '该取款来源已保存为清零，不能再恢复为发放扣回')
             source_item = next((item for item in document['datasets']['meal_items'] if item['key'] == value['item_key']), None)
             retained_item = meal_maps['meal_items'].get(value['item_key'])
             if retained_item != source_item:

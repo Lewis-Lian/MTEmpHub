@@ -170,7 +170,9 @@ class ApiQueryTests(unittest.TestCase):
         query_module = next(module for module in modules if module["slug"] == "query")
         entry_keys = {entry["key"] for entry in query_module["entries"]}
         self.assertIn("employee_dashboard", entry_keys)
-        self.assertIn("summary_download", entry_keys)
+        self.assertNotIn("summary_download", entry_keys)
+        download_module = next(module for module in modules if module['slug'] == 'downloads')
+        self.assertIn('summary_download', {entry['key'] for entry in download_module['entries']})
         self.assertIn("individual_attendance", entry_keys)
         self.assertTrue(all("href" in entry for entry in query_module["entries"]))
 

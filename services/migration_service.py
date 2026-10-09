@@ -38,6 +38,8 @@ MIGRATION_ORDER = [
     "meal_ticket_payments",
     "meal_ticket_imports",
     "meal_ticket_import_rows",
+    "meal_ledger_records",
+    "meal_ledger_imports",
 ]
 
 BATCH_SIZE = 500

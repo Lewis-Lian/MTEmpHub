@@ -12,6 +12,7 @@ from models.user import (
 
 
 QUERY_CENTER_PERMISSION_KEYS = (
+    "meal_ticket_query",
     *HOME_PAGE_PERMISSION_KEYS,
     *COMMON_PAGE_PERMISSION_KEYS,
     *EMPLOYEE_PAGE_PERMISSION_KEYS,
@@ -40,7 +41,7 @@ MODULES: list[dict[str, Any]] = [
         "slug": "query",
         "label": "查询中心",
         "short_label": "查询",
-        "description": "集中查看员工、管理人员、打卡、异常与汇总下载。",
+        "description": "集中查看员工、管理人员、打卡、异常和菜票数据。",
         "icon_key": "attendance",
         "entries": [
             {
@@ -84,12 +85,12 @@ MODULES: list[dict[str, Any]] = [
                 "description": "按部门查看员工工时汇总。",
             },
             {
-                "key": "summary_download",
-                "label": "汇总下载",
-                "href": "/employee/summary-download",
-                "permission_key": "summary_download",
-                "group": "员工考勤",
-                "description": "下载月度考勤汇总文件。",
+                "key": "meal_ticket_query",
+                "label": "菜票查询",
+                "href": "/employee/meal-ticket-query",
+                "permission_key": "meal_ticket_query",
+                "group": "菜票查询",
+                "description": "独立查询菜票核算、补扣、实际发放与差额。",
             },
             {
                 "key": "manager_query",
@@ -129,9 +130,21 @@ MODULES: list[dict[str, Any]] = [
         "slug": "meal-tickets", "label": "菜票中心", "short_label": "菜票",
         "description": "核算次月菜票、登记充值并核对历史账。", "icon_key": "account-dashboard",
         "entries": [
-            {"key": "meal_ticket_calculation", "label": "月度发放", "href": "/meal-tickets/calculation", "permission_key": "meal_ticket_query"},
-            {"key": "meal_ticket_payments", "label": "后续补扣与对账", "href": "/meal-tickets/payments", "permission_key": "meal_ticket_query"},
+            {"key": "meal_ticket_calculation", "label": "月度发放", "href": "/meal-tickets/calculation", "admin_only": True},
+            {"key": "meal_ticket_payments", "label": "后续补扣与对账", "href": "/meal-tickets/payments", "admin_only": True},
             {"key": "meal_ticket_history", "label": "历史台账", "href": "/meal-tickets/history", "admin_only": True},
+            {"key": "meal_departments", "label": "部门菜票登记", "href": "/meal-tickets/departments", "permission_key": "meal_ledger_query"},
+            {"key": "meal_external", "label": "外来人员领用", "href": "/meal-tickets/external", "permission_key": "meal_ledger_query"},
+            {"key": "meal_annual", "label": "全年菜票汇总", "href": "/meal-tickets/annual", "permission_key": "meal_ledger_query"},
+            {"key": "meal_clearance", "label": "月末取款记录", "href": "/meal-tickets/clearance", "permission_key": "meal_ledger_query"},
+        ],
+    },
+    {
+        "slug": "downloads", "label": "下载中心", "short_label": "下载",
+        "description": "下载考勤汇总及菜票存档报表。", "icon_key": "attendance",
+        "entries": [
+            {"key": "summary_download", "label": "考勤汇总下载", "href": "/downloads/attendance", "permission_key": "summary_download"},
+            {"key": "meal_download", "label": "菜票存档下载", "href": "/downloads/meal-tickets", "requires_any_page_access_keys": ("meal_ticket_query", "meal_ledger_query")},
         ],
     },
     {

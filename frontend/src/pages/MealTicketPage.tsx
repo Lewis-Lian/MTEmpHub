@@ -42,6 +42,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const [loadProgress, setLoadProgress] = useState<{ completed: number; total: number; text: string; label: string } | null>(null);
   const [error, setError] = useState("");
   const [reconciliationFailed, setReconciliationFailed] = useState(false);
+  const [refundActions, setRefundActions] = useState<Record<string, string>>({});
   const [followupStage, setFollowupStage] = useState<"adjustments" | "payments" | "settlement">("adjustments");
   const [reconcileRange, setReconcileRange] = useState({ month: "", start: "", end: "" });
   const [filterEmployeeIds, setFilterEmployeeIds] = useState<number[]>([]);
@@ -269,20 +270,21 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
   const pendingCount = batch?.items.filter(i => i.difference > 0).length ?? 0;
   const refundCount = batch?.items.filter(i => i.difference < 0).length ?? 0;
   const errorCount = batch?.items.filter(hasIssue).length ?? 0;
-  const settled = confirmed && !reconciliationFailed && pendingCount === 0 && refundCount === 0 && errorCount === 0;
+  const settled = confirmed && !reconciliationFailed && !report?.pending_refunds?.length && pendingCount === 0 && refundCount === 0 && errorCount === 0;
   const showBatch = batch && (!paymentView || confirmed);
   const jumpToPeople = () => { changeResultView("person"); personnel.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const showIssues = () => {
     setFilterEmployeeIds([]); setDepartmentNames([]); setType(""); setPaymentStatus("issue"); setSelected([]); jumpToPeople();
     void operate(async () => { setBatch(await fetchMealBatch(month)); });
   };
-  const checkSettlement = () => operate(async () => {
+  const checkSettlement = (actions?: Record<string, string>) => operate(async () => {
     setReconciliationFailed(false);
     try {
       const next = databaseEnabled && admin
-        ? await mutateMealBatch("reconcile", { batch_id: batch?.id, version: batch?.version, start_date: rangeStart, end_date: rangeEnd })
+        ? await mutateMealBatch("reconcile", { batch_id: batch?.id, version: batch?.version, start_date: rangeStart, end_date: rangeEnd, ...(actions && Object.keys(actions).length ? { refund_actions: actions } : {}) })
         : await fetchMealBatch(month);
       setBatch(next);
+      setRefundActions({});
       settlement.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (e) {
       if (databaseEnabled && admin) setReconciliationFailed(true);
@@ -298,7 +300,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     { id: "confirm", title: "确认核算", text: "处理异常后，锁定考勤账套并确认。", complete: confirmed, control: !confirmed && batch && admin && <button className="meal-ticket-button is-primary" disabled={busy || errorCount > 0} onClick={() => mutate("confirm")}>确认核算</button> },
     { id: "export", title: "导出充值表", text: "两列 XLS，导出待充值余额。", complete: false, control: <button className="meal-ticket-button" disabled={busy} onClick={() => rechargeExport.current?.scrollIntoView({ behavior: "smooth", block: "start" })}>前往导出</button> },
     ...(!databaseEnabled ? [{ id: "payments", title: "登记充值", text: "实际充值成功后，登记金额与凭证。", complete: false, control: confirmed && !settled && <button className="meal-ticket-button" disabled={busy} onClick={jumpToPeople}>登记实际充值</button> }] : []),
-    { id: "settlement", title: settlementTitle, text: databaseEnabled ? "发放完成后读取补贴、充值与取款流水，自动核对到账和结清。" : "按每个人的应发与已发金额检查结清。", complete: false, control: confirmed && <button className="meal-ticket-button" disabled={!canCheckSettlement} onClick={checkSettlement}>{databaseEnabled ? settlementTitle : "重新核对"}</button> },
+    { id: "settlement", title: settlementTitle, text: databaseEnabled ? "发放完成后读取补贴、充值与取款流水，自动核对到账和结清。" : "按每个人的应发与已发金额检查结清。", complete: false, control: confirmed && <button className="meal-ticket-button" disabled={!canCheckSettlement} onClick={() => checkSettlement()}>{databaseEnabled ? settlementTitle : "重新核对"}</button> },
   ];
   const followupSteps = [
     { id: "adjustments", title: "补发 / 扣除", text: "保存补扣后，在菜票软件完成实际补发或取款，再进入下一步。", complete: followupStage !== "adjustments", control: <>
@@ -309,7 +311,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <button className="meal-ticket-button" disabled={busy || !confirmed} onClick={jumpToPeople}>处理人员差额</button>
       <button className="meal-ticket-button is-primary" disabled={busy || !confirmed} onClick={() => setFollowupStage("settlement")}>下一步：核对结清</button>
     </> }] : []),
-    { id: "settlement", title: databaseEnabled ? settlementTitle : "再次核对结清", text: databaseEnabled ? "读取充值与取款流水，核对本次补扣的到账结果和剩余差额。" : "逐人检查剩余差额，补扣后再次核对。", complete: false, control: followupStage === "settlement" && <button className="meal-ticket-button" disabled={!canCheckSettlement} onClick={checkSettlement}>{databaseEnabled ? settlementTitle : "重新核对"}</button> },
+    { id: "settlement", title: databaseEnabled ? settlementTitle : "再次核对结清", text: databaseEnabled ? "读取充值与取款流水，核对本次补扣的到账结果和剩余差额。" : "逐人检查剩余差额，补扣后再次核对。", complete: false, control: followupStage === "settlement" && <button className="meal-ticket-button" disabled={!canCheckSettlement} onClick={() => checkSettlement()}>{databaseEnabled ? settlementTitle : "重新核对"}</button> },
   ];
   const steps = paymentView ? followupSteps : monthlySteps;
   const activeStage = paymentView ? followupStage : monthlyStage;
@@ -364,10 +366,16 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           <div className="meal-ticket-reconciliation-controls">
             {admin && <><label>核对开始日期<input type="date" min={`${month}-01`} disabled={busy} value={rangeStart} onChange={e => changeRange("start", e.target.value)} /></label>
               <label>核对结束日期<input type="date" min={rangeStart} disabled={busy} value={rangeEnd} onChange={e => changeRange("end", e.target.value)} /></label>
-              <button className="meal-ticket-button is-primary" disabled={busy || !confirmed || !databaseReady || !rangeStart || !rangeEnd || rangeEnd < rangeStart} onClick={checkSettlement}>读取数据库并核对</button></>}
+              <button className="meal-ticket-button is-primary" disabled={busy || !confirmed || !databaseReady || !rangeStart || !rangeEnd || rangeEnd < rangeStart} onClick={() => checkSettlement()}>读取数据库并核对</button></>}
             <span className={`meal-ticket-badge ${databaseReady ? "is-success" : "is-warning"}`}>{!databaseActive ? "数据库核对已暂停" : databaseReady ? "共享数据库已启用" : "共享数据库尚未配置"}</span>
           </div>
-          <p className="meal-ticket-reconciliation-note">净已发 = 补贴发放 ＋ 充值 − 取款。跨月补发可延长结束日期，请选择本批次补发或取款的实际日期；其他月份的补贴不会计入。</p>
+          <p className="meal-ticket-reconciliation-note">净已发 = 补贴发放 ＋ 充值 − 发放纠错扣回。新取款须确认分类，月末余额清零单独记录。跨月补发可延长结束日期，其他月份的补贴不会计入。</p>
+          {!!report?.pending_refunds?.length && <div className="meal-ticket-panel"><h3>取款流水待分类</h3><p>请选择实际用途，未分类流水尚未计入扣回或清零。</p>
+            {report.pending_refunds.map(row => <label key={row.id}>{row.date} · {row.emp_no} {row.name} · {money(row.amount)} 元 <select aria-label={`流水 ${row.id} 分类`} value={refundActions[String(row.id)] ?? ""} disabled={busy || !admin} onChange={e => setRefundActions(current => ({ ...current, [row.id]: e.target.value }))}>
+              <option value="">待确认</option><option value="refund">发放纠错扣回</option><option value="clearance">月末余额清零</option>
+            </select></label>)}
+            {admin && <button className="meal-ticket-button is-primary" disabled={busy || !databaseReady || !report.pending_refunds.every(row => refundActions[String(row.id)])} onClick={() => checkSettlement(refundActions)}>确认分类并重新核对</button>}
+          </div>}
           {!databaseReady && admin && <p className="meal-ticket-reconciliation-note">{!databaseActive ? "请在“数据来源与同步”中重新开启菜票数据库核对。已有数据库流水的账目通过数据库继续核对。" : "请在“数据来源与同步”中配置共享数据库连接后核对。"}</p>}
           {reconciliationFailed && <p className="meal-ticket-reconciliation-note">本次核对未完成，金额保留上次登记结果，请排查后重试。</p>}
           {report ? <div className="meal-ticket-reconciliation-result" role="status"><strong>新增 {report.added} 条 · 已登记 {report.existing} 条</strong><span>核对范围 {report.start_date} 至 {report.end_date} · {report.checked_at.replace("T", " ")}</span>

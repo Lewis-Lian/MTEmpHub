@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import type { ComponentType, LazyExoticComponent, ReactElement } from "react";
-import { matchPath } from "react-router-dom";
+import { matchPath, Navigate, useLocation } from "react-router-dom";
 
 const AccountsPage = lazy(() => import("../pages/admin/AccountsPage"));
 const AdminDashboardPage = lazy(() => import("../pages/admin/AdminDashboardPage"));
@@ -28,6 +28,9 @@ const PunchRecordsPage = lazy(() => import("../pages/query/PunchRecordsPage"));
 const QueryHomePage = lazy(() => import("../pages/query/QueryHomePage"));
 const SummaryDownloadPage = lazy(() => import("../pages/query/SummaryDownloadPage"));
 const MealTicketPage = lazy(() => import("../pages/MealTicketPage"));
+const MealTicketQueryPage = lazy(() => import("../pages/query/MealTicketQueryPage"));
+const MealLedgerPage = lazy(() => import("../pages/MealLedgerPage"));
+const MealDownloadPage = lazy(() => import("../pages/MealDownloadPage"));
 
 export interface ProtectedRouteConfig {
   element: ReactElement;
@@ -42,7 +45,21 @@ function lazyPage(Page: LazyExoticComponent<ComponentType>): ReactElement {
   );
 }
 
+function LegacyDownloadRedirect() {
+  const location = useLocation();
+  // Tabs keep inactive pages mounted; only the active legacy URL may redirect.
+  return location.pathname === "/employee/summary-download"
+    ? <Navigate to={`/downloads/attendance${location.search}${location.hash}`} replace /> : null;
+}
+
 export const protectedRoutes: ProtectedRouteConfig[] = [
+  { element: lazyPage(MealTicketQueryPage), path: "/employee/meal-ticket-query" },
+  { element: lazyPage(SummaryDownloadPage), path: "/downloads/attendance" },
+  { element: lazyPage(MealDownloadPage), path: "/downloads/meal-tickets" },
+  ...(["department", "external", "annual", "clearance"] as const).map(kind => ({
+    element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealLedgerPage kind={kind} /></Suspense>,
+    path: `/meal-tickets/${kind === "department" ? "departments" : kind}`,
+  })),
   { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="calculation" /></Suspense>, path: "/meal-tickets/calculation" },
   { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="payments" /></Suspense>, path: "/meal-tickets/payments" },
   { element: <Suspense fallback={<div className="page-loading">加载中…</div>}><MealTicketPage view="history" /></Suspense>, path: "/meal-tickets/history" },
@@ -57,7 +74,7 @@ export const protectedRoutes: ProtectedRouteConfig[] = [
   { element: lazyPage(ManagerOvertimePage), path: "/employee/manager-overtime-query" },
   { element: lazyPage(ManagerAnnualLeavePage), path: "/employee/manager-annual-leave-query" },
   { element: lazyPage(ManagerDepartmentHoursPage), path: "/employee/manager-department-hours-query" },
-  { element: lazyPage(SummaryDownloadPage), path: "/employee/summary-download" },
+  { element: <LegacyDownloadRedirect />, path: "/employee/summary-download" },
   { element: lazyPage(AdminDashboardPage), path: "/admin/dashboard" },
   { element: lazyPage(AccountsPage), path: "/admin/accounts" },
   { element: lazyPage(AdminMessagesPage), path: "/admin/messages" },

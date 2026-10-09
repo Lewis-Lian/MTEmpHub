@@ -28,6 +28,7 @@ from models.system_setting import SystemSetting
 from models.dingtalk_sync_run import DingTalkSyncRun
 from models.message import Message
 from models.meal_ticket import MEAL_MODELS
+from models.meal_ledger import LEDGER_MODELS
 from routes import configure_api_cors, register_routes
 
 _compat_app: Flask | None = None

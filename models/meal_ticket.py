@@ -24,6 +24,7 @@ class MealTicketBatch(db.Model):
     confirmed_by = db.Column(db.String(80))
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     confirmed_at = db.Column(db.DateTime)
+    reconciliation = db.Column(db.JSON)
 
 
 class MealTicketItem(db.Model):

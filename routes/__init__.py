@@ -6,6 +6,7 @@ from .api_auth import api_auth_bp
 from .api_query import api_query_bp
 from .messages import messages_bp
 from .meal_tickets import meal_tickets_bp
+from .meal_ledgers import meal_ledgers_bp
 
 _WRITE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -73,4 +74,5 @@ def register_routes(app):
     app.register_blueprint(api_query_bp)
     app.register_blueprint(messages_bp)
     app.register_blueprint(meal_tickets_bp)
+    app.register_blueprint(meal_ledgers_bp)
     app.register_blueprint(api_admin_bp)
