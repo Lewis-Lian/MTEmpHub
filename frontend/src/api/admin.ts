@@ -14,15 +14,16 @@ import type { AttendanceCalendarData } from "../types/query";
 
 export interface MoreSettings {
   meal_ticket_abnormal_deduction_enabled: boolean;
+  meal_ticket_offset_enabled: boolean;
 }
 
 export function fetchMoreSettings(): Promise<MoreSettings> {
   return apiRequest<MoreSettings>("/api/admin/more-settings");
 }
 
-export function saveMoreSettings(enabled: boolean): Promise<MoreSettings> {
+export function saveMoreSettings(settings: Partial<MoreSettings>): Promise<MoreSettings> {
   return apiRequest<MoreSettings>("/api/admin/more-settings", {
-    method: "PUT", body: { meal_ticket_abnormal_deduction_enabled: enabled },
+    method: "PUT", body: settings,
   });
 }
 

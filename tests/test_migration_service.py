@@ -65,3 +65,47 @@ class MigrationServiceTests(unittest.TestCase):
                     'SELECT business_key, payload, quality FROM monthly_reference_snapshots')).one(),
                     ('E1', '{"name":"History"}', 'verified'))
             target.dispose()
+
+
+def test_followup_business_rows_and_cursor_survive_whole_database_transfer(tmp_path):
+    """Use the real transfer path on isolated SQLite, without a live MySQL."""
+    from datetime import date
+    from models import db
+    from models.account_set import AccountSet
+    from models.employee import Employee
+    from models.meal_ticket import (MealTicketBatch, MealTicketItem, MealTicketPayment,
+                                   MealTicketFollowupTask, MealTicketFollowupAllocation)
+    from services.migration_service import migrate_mysql_to_sqlite
+    source_url = 'sqlite:///' + str(tmp_path/'followup-source.db')
+    target_url = 'sqlite:///' + str(tmp_path/'followup-target.db')
+    source = create_engine(source_url)
+    db.metadata.create_all(source)
+    with source.begin() as conn:
+        conn.execute(AccountSet.__table__.insert(), dict(id=11, month='2026-06', name='六月'))
+        conn.execute(Employee.__table__.insert(), dict(id=12, emp_no='00123', name='甲'))
+        conn.execute(MealTicketBatch.__table__.insert(), dict(id=13, key='b'*32, account_set_id=11,
+            month='2026-06', recharge_month='2026-07', source_digest='x', created_by='admin', status='confirmed',
+            followup_state={'current_task_key':'t'*32, 'skip_sequence':3}))
+        conn.execute(MealTicketItem.__table__.insert(), dict(id=14, key='i'*32, batch_key='b'*32,
+            month='2026-06', emp_id=12, emp_no_snapshot='00123', name='甲', dept_name='',
+            is_manager=False, days=1, base_cents=800, source={}))
+        conn.execute(MealTicketPayment.__table__.insert(), dict(id=15, key='p'*32, item_key='i'*32,
+            month='2026-06', kind='recharge', amount_cents=1000, payment_date=date(2026,7,2),
+            reference='到账', operator='admin', request_key='payment', request_digest='x'))
+        conn.execute(MealTicketFollowupTask.__table__.insert(), dict(id=16, key='t'*32, item_key='i'*32,
+            batch_key='b'*32, month='2026-06', kind='recharge', amount_cents=2400, status='partial',
+            offset_enabled=False, skip_order=3, source_snapshot={}, operator='admin'))
+        conn.execute(MealTicketFollowupAllocation.__table__.insert(), dict(id=17, key='a'*32,
+            task_key='t'*32, payment_key='p'*32, month='2026-06', amount_cents=1000, operator='admin'))
+    source.dispose()
+    results = migrate_mysql_to_sqlite(source_url, target_url)
+    assert {'table':'meal_ticket_followup_tasks', 'rows':1, 'status':'ok'} in results
+    assert {'table':'meal_ticket_followup_allocations', 'rows':1, 'status':'ok'} in results
+    target = create_engine(target_url)
+    with target.connect() as conn:
+        assert conn.execute(text('SELECT amount_cents, status, skip_order FROM meal_ticket_followup_tasks')).one() == (2400,'partial',3)
+        assert conn.execute(text('SELECT amount_cents FROM meal_ticket_payments')).scalar() == 1000
+        assert conn.execute(text('SELECT task_key, payment_key FROM meal_ticket_followup_allocations')).one() == ('t'*32,'p'*32)
+        import json
+        assert json.loads(conn.execute(text('SELECT followup_state FROM meal_ticket_batches')).scalar())['current_task_key'] == 't'*32
+    target.dispose()

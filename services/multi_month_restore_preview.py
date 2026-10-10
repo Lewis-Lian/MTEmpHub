@@ -420,7 +420,8 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
     for name, records in current.items():
         for key, value in records.values():
             for field, parent in (('batch_key', 'meal_batches'), ('item_key', 'meal_items'),
-                                  ('import_key', 'meal_imports'), ('reversal_of', 'meal_payments')):
+                                  ('import_key', 'meal_imports'), ('reversal_of', 'meal_payments'),
+                                  ('task_key', 'meal_followup_tasks'), ('payment_key', 'meal_payments')):
                 reference(key, value, field, parent)
             if name == 'meal_ledger_records':
                 reference(key, {**value, 'import_key': value['data'].get('import_key')}, 'import_key', 'meal_ledger_imports')
@@ -430,7 +431,7 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
                         original[1]['kind'] == 'reversal' or original[1]['item_key'] != value['item_key']
                         or original[1]['amount_cents'] != -value['amount_cents'])):
                     block('meal_reversal_mismatch', key, '冲正必须对应同一明细的原交易，金额互为相反数', [original[0]] if original else [])
-            if name not in ('meal_payments', 'meal_adjustments'):
+            if name not in ('meal_payments', 'meal_adjustments', 'meal_followup_tasks'):
                 continue
             item = current['meal_items'].get(value['item_key'])
             batch = current['meal_batches'].get(item[1]['batch_key']) if item else None
@@ -466,6 +467,7 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
             block('meal_history_mismatch', r['row_key'], '采用备份资金记录时仍保留了备份之外的历史，请统一选择该明细的资金记录', extra)
     # Validate actual unique constraints and cross-ledger source deduplication.
     for name, fields in {
+        'meal_followup_allocations': [('task_key', 'payment_key')],
         'meal_items': [('batch_key', 'emp_no')],
         'meal_payments': [('request_key',), ('reversal_of',)],
         'meal_batches': [('key',), ('month',)],
@@ -481,6 +483,9 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
                 if identity in seen:
                     block('meal_unique_conflict', key, '菜票标识重复：%s' % ', '.join(fields_group), [seen[identity]])
                 seen[identity] = key
+    from services.meal_ticket_followup_validation import validate_followup_records
+    for code, key, message, required in validate_followup_records(current):
+        block(code, key, message, required)
     payments = {v['request_key']: key for key, v in current['meal_payments'].values()}
     for key, value in current['meal_ledger_records'].values():
         if value.get('source_key') in payments:

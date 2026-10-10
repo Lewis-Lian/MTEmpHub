@@ -169,4 +169,7 @@ def reconcile(body, operator):
         batch.version += 1
     batch.reconciliation = report
     db.session.flush()
+    from services.meal_ticket_followup_service import sync_batch_allocations
+    sync_batch_allocations(batch, operator, automatic=True)
+    db.session.flush()
     return batch, report

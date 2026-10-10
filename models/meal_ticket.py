@@ -25,6 +25,7 @@ class MealTicketBatch(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     confirmed_at = db.Column(db.DateTime)
     reconciliation = db.Column(db.JSON)
+    followup_state = db.Column(db.JSON)
 
 
 class MealTicketItem(db.Model):
@@ -99,5 +100,38 @@ class MealTicketImportRow(db.Model):
     data = db.Column(db.JSON, nullable=False)
 
 
+class MealTicketFollowupTask(db.Model):
+    __tablename__ = 'meal_ticket_followup_tasks'
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(32), unique=True, nullable=False, default=new_key)
+    month = db.Column(db.String(7), nullable=False, index=True)
+    batch_key = db.Column(db.String(32), db.ForeignKey('meal_ticket_batches.key'), nullable=False)
+    item_key = db.Column(db.String(32), db.ForeignKey('meal_ticket_items.key'), nullable=False)
+    kind = db.Column(db.String(20), nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    status = db.Column(db.String(20), nullable=False, default='pending')
+    version = db.Column(db.Integer, nullable=False, default=1)
+    source_snapshot = db.Column(db.JSON, nullable=False)
+    offset_enabled = db.Column(db.Boolean, nullable=False)
+    skip_order = db.Column(db.Integer, nullable=False, default=0)
+    operator = db.Column(db.String(80), nullable=False)
+    operation_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (db.CheckConstraint('amount_cents > 0'),)
+
+
+class MealTicketFollowupAllocation(db.Model):
+    __tablename__ = 'meal_ticket_followup_allocations'
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(32), unique=True, nullable=False, default=new_key)
+    month = db.Column(db.String(7), nullable=False, index=True)
+    task_key = db.Column(db.String(32), db.ForeignKey('meal_ticket_followup_tasks.key'), nullable=False)
+    payment_key = db.Column(db.String(32), db.ForeignKey('meal_ticket_payments.key'), nullable=False)
+    amount_cents = db.Column(db.Integer, nullable=False)
+    operator = db.Column(db.String(80), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    __table_args__ = (db.UniqueConstraint('task_key', 'payment_key'), db.CheckConstraint('amount_cents > 0'))
+
+
 MEAL_MODELS = (MealTicketBatch, MealTicketItem, MealTicketAdjustment, MealTicketPayment,
-               MealTicketImport, MealTicketImportRow)
+               MealTicketImport, MealTicketImportRow, MealTicketFollowupTask, MealTicketFollowupAllocation)

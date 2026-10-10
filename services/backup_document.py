@@ -224,7 +224,7 @@ def _validate_v2_rows(present, versions):
     from sqlalchemy import Boolean, Integer, Float, DateTime, Date, String, JSON
     from services.account_set_backup_schema import DATASET_VERSIONS, HISTORY, FILE_DATASETS, canonical
     from services.account_set_backup_service import month_bounds
-    if not isinstance(versions, dict) or any(name not in DATASET_VERSIONS or type(value) is not int or value != DATASET_VERSIONS[name] for name, value in versions.items()):
+    if not isinstance(versions, dict) or any(name not in DATASET_VERSIONS or type(value) is not int or value not in ((1, 2) if name == 'meal_batches' else (DATASET_VERSIONS[name],)) for name, value in versions.items()):
         raise BackupError('不支持的数据集版本')
     for scope, rows in present.items():
         name = scope.split('/')[-1]
@@ -238,10 +238,13 @@ def _validate_v2_rows(present, versions):
             expected.update(('avatar_file_key', 'avatar_sha256', 'avatar_size'))
         seen = set()
         for row in rows:
-            row_fields = expected | (set(row) & set(V2_OPTIONAL_FIELDS.get(name, ()))) if isinstance(row, dict) else expected
+            legacy_batch = name == 'meal_batches' and versions.get(name, 1) == 1 and isinstance(row, dict) and 'followup_state' not in row
+            row_fields = (expected - {'followup_state'} if legacy_batch else expected) | (set(row) & set(V2_OPTIONAL_FIELDS.get(name, ()))) if isinstance(row, dict) else expected
             if not isinstance(row, dict) or set(row) != row_fields:
                 raise BackupError('备份字段无效：%s' % name)
             for field in ds.fields:
+                if field == 'followup_state' and legacy_batch:
+                    continue
                 column = ds.model.__table__.columns[field]
                 value, kind = row[field], column.type
                 valid = True

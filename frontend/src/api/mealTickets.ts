@@ -106,3 +106,22 @@ export const cancelMealImport = (id: number) => apiRequest<{ deleted: number }>(
 export const confirmMealImport = (record: MealImport) => apiRequest<MealImport>(`/api/meal-tickets/imports/${record.id}/confirm`, {
   method: "POST", body: { rows: record.rows },
 });
+
+export interface MealFollowupTask {
+  key: string; item_key: string; emp_no: string; name: string; dept_name: string;
+  kind: "recharge" | "refund"; amount_cents: number; allocated_cents: number; remaining_cents: number;
+  status: "pending" | "skipped" | "awaiting" | "partial" | "verified" | "superseded";
+  version: number; operation_at: string | null; offset_enabled: boolean; settings_digest: string;
+  candidates?: { requires_confirmation: boolean; payments: Array<{ payment_key: string; available_cents: number; date: string; reference: string }> };
+}
+export interface MealFollowupState {
+  batch_id: number | null; batch_version: number | null; offset_enabled: boolean; settings_digest: string;
+  queue_offset_enabled: boolean | null; settings_changed: boolean; baseline_required: boolean; baseline_reason: string;
+  current_task_key: string | null; tasks: MealFollowupTask[];
+  baseline_items?: Array<{ item_key: string; emp_no: string; name: string; due_cents: number; paid_cents: number; difference_cents: number }>;
+}
+export const fetchMealFollowup = (month: string) => apiRequest<MealFollowupState>(`/api/meal-tickets/followup-tasks?recharge_month=${month}`);
+export const refreshMealFollowup = (body: object) => apiRequest<MealFollowupState>("/api/meal-tickets/followup-tasks/refresh", { method: "POST", body });
+export const progressMealFollowup = (key: string, body: object) => apiRequest<MealFollowupState>(`/api/meal-tickets/followup-tasks/${key}/progress`, { method: "POST", body });
+
+export const allocateMealFollowup = (key: string, body: object) => apiRequest<MealFollowupState>(`/api/meal-tickets/followup-tasks/${key}/allocations`, { method: "POST", body });

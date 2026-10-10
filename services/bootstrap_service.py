@@ -44,6 +44,10 @@ def ensure_schema_compatibility() -> None:
     for model in MEAL_MODELS:
         model.__table__.create(bind=db.engine, checkfirst=True)
 
+    if 'followup_state' not in _get_column_names(inspect(db.engine), 'meal_ticket_batches'):
+        db.session.execute(text('ALTER TABLE meal_ticket_batches ADD COLUMN followup_state JSON'))
+        db.session.commit()
+
     # The legacy upgrade command intentionally does not depend on Alembic. Keep
     # the DingTalk additions available to installations upgrading an older
     # SQLite database in place.

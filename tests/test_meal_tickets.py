@@ -403,6 +403,11 @@ class MealTicketTests(unittest.TestCase):
             self.assertEqual(font.italic, 0)
         current = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
         self.assertEqual(len(current['items'][0]['payments']), 1)
+        repeated = self.client.get('/api/meal-tickets/export-recharge?recharge_month=2026-09', headers=self.headers)
+        self.assertEqual(repeated.status_code, 200)
+        self.assertEqual(xlrd.open_workbook(file_contents=repeated.data).sheet_by_index(0).row_values(0), ['001', 16.5])
+        after = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
+        self.assertEqual(after, current)
 
     def test_recharge_export_omits_settled_and_refund_items(self):
         batch = self.confirm(self.generate())

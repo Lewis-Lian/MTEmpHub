@@ -91,6 +91,50 @@ class ApiAdminTests(unittest.TestCase):
             json={"username": "admin", "password": "admin123", "captcha_token": captcha_token},
         )
 
+    def test_more_settings_defaults_and_independent_updates(self):
+        self._login()
+        url = "/api/admin/more-settings"
+        expected = {"meal_ticket_abnormal_deduction_enabled": False,
+                    "meal_ticket_offset_enabled": True}
+        self.assertEqual(self.client.get(url).get_json(), expected)
+        for patch in ({"meal_ticket_offset_enabled": False},
+                      {"meal_ticket_abnormal_deduction_enabled": True},
+                      {"meal_ticket_offset_enabled": True}):
+            response = self.client.put(url, json=patch)
+            self.assertEqual(response.status_code, 200)
+            expected.update(patch)
+            self.assertEqual(response.get_json(), expected)
+            self.assertEqual(self.client.get(url).get_json(), expected)
+        response = self.client.put(url, json={key: False for key in expected})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {key: False for key in expected})
+
+    def test_more_settings_rejects_invalid_patch_without_partial_save(self):
+        self._login()
+        url = "/api/admin/more-settings"
+        before = self.client.get(url).get_json()
+        for field in ("meal_ticket_offset_enabled", "meal_ticket_abnormal_deduction_enabled"):
+            for invalid in (None, 0, 1, "true", [], {}):
+                patch = {"meal_ticket_offset_enabled": False,
+                         "meal_ticket_abnormal_deduction_enabled": True, field: invalid}
+                self.assertEqual(self.client.put(url, json=patch).status_code, 400)
+                self.assertEqual(self.client.get(url).get_json(), before)
+        for invalid in ({}, {"unknown": True}, {"meal_ticket_offset_enabled": False, "unknown": True}, []):
+            self.assertEqual(self.client.put(url, json=invalid).status_code, 400)
+            self.assertEqual(self.client.get(url).get_json(), before)
+
+    def test_more_settings_requires_admin(self):
+        self._login()
+        with self.app.app_context():
+            User.query.filter_by(username="admin").one().role = "user"
+            db.session.commit()
+        url = "/api/admin/more-settings"
+        self.assertEqual(self.client.get(url).status_code, 403)
+        self.assertEqual(self.client.put(url, json={"meal_ticket_offset_enabled": False}).status_code, 403)
+        from models.system_setting import SystemSetting
+        with self.app.app_context():
+            self.assertIsNone(SystemSetting.get_value("meal_ticket_offset_enabled"))
+
     def _xlsx_file(self, rows: list[list[object]], filename: str) -> BytesIO:
         wb = openpyxl.Workbook()
         ws = wb.active

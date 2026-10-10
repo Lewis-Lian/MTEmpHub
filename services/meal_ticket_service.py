@@ -217,6 +217,8 @@ def unconfirm(batch):
     if any('attendance_recalculation' in item.source for item in
            MealTicketItem.query.filter_by(batch_key=batch.key).all()):
         raise MealError('已完成后续考勤重算或人员补入，不能退回草稿，请继续通过后续补扣处理', 409)
+    from services.meal_ticket_followup_service import invalidate_for_draft
+    invalidate_for_draft(batch)
     batch.status = 'draft'
     batch.confirmed_by = None
     batch.confirmed_at = None
@@ -365,11 +367,16 @@ def totals(item):
 
 
 def payment_payload(body):
-    return {key:body.get(key) for key in ('batch_id','item_id','kind','amount','date','reference','reversal_id')}
+    values = {key:body.get(key) for key in ('batch_id','item_id','kind','amount','date','reference','reversal_id')}
+    if body.get('task_key'):
+        values['task_key'] = body['task_key']
+    return values
 
 
 def payment(body, operator):
     request_key = required_text(body.get('request_key'), '请求标识', 100)
+    if body.get('task_key') is not None:
+        required_text(body['task_key'], '任务标识', 100)
     if request_key.startswith('card-meal:'):
         raise MealError('请求标识不能使用数据库流水保留前缀')
     request_digest = digest(payment_payload(body))
@@ -389,11 +396,15 @@ def payment(body, operator):
     amount, kind = cents(body.get('amount')), body.get('kind')
     due, paid, _, _ = totals(item)
     reversal = None
+    task = None
+    if body.get('task_key'):
+        from services.meal_ticket_followup_service import task_for_payment
+        task = task_for_payment(batch, item, body, amount)
     if kind == 'recharge':
-        if amount <= 0 or amount > due - paid:
+        if not task and (amount <= 0 or amount > due - paid):
             raise MealError('充值金额必须大于零且不能超过待发金额')
     elif kind == 'refund':
-        if amount <= 0 or amount > paid - due:
+        if not task and (amount <= 0 or amount > paid - due):
             raise MealError('扣回金额必须大于零且不能超过待扣回金额')
         amount = -amount
     elif kind == 'reversal':
@@ -411,11 +422,16 @@ def payment(body, operator):
         payment_date = date.fromisoformat(body.get('date', ''))
     except (ValueError, TypeError):
         raise MealError('实际日期无效')
-    db.session.add(MealTicketPayment(item_key=item.key, month=batch.month, kind=kind,
+    posted = MealTicketPayment(item_key=item.key, month=batch.month, kind=kind,
         amount_cents=amount, payment_date=payment_date, reference=required_text(body.get('reference'), '凭证或冲正原因'),
-        operator=operator, request_key=request_key, request_digest=request_digest, reversal_of=reversal))
+        operator=operator, request_key=request_key, request_digest=request_digest, reversal_of=reversal)
+    db.session.add(posted)
     batch.version += 1
     db.session.flush()
+    from services.meal_ticket_followup_service import allocate_payment, sync_batch_allocations
+    if task:
+        allocate_payment(task.key, posted.key, abs(amount), operator)
+    sync_batch_allocations(batch, operator)
     return batch
 
 

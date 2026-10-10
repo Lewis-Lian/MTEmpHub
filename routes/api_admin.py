@@ -99,21 +99,30 @@ register_admin_account_routes(api_admin_bp)
 from routes.admin_backups import register_admin_backup_routes
 register_admin_backup_routes(api_admin_bp, admin_required)
 
+MORE_SETTINGS = {
+    "meal_ticket_abnormal_deduction_enabled": ("false", "异常考勤天数扣除"),
+    "meal_ticket_offset_enabled": ("true", "补发与扣款抵消"),
+}
+
+
 @api_admin_bp.get("/more-settings")
 @admin_required
 def more_settings():
-    return jsonify({"meal_ticket_abnormal_deduction_enabled":
-        SystemSetting.get_value("meal_ticket_abnormal_deduction_enabled", "false") == "true"})
+    return jsonify({key: SystemSetting.get_value(key, default) == "true"
+                    for key, (default, _) in MORE_SETTINGS.items()})
 
 
 @api_admin_bp.put("/more-settings")
 @admin_required
 def save_more_settings():
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or type(data.get("meal_ticket_abnormal_deduction_enabled")) is not bool:
-        return jsonify({"error": "异常考勤天数扣除开关必须为布尔值"}), 400
-    SystemSetting.set_value("meal_ticket_abnormal_deduction_enabled",
-        "true" if data["meal_ticket_abnormal_deduction_enabled"] else "false")
+    if not isinstance(data, dict) or not data or set(data) - set(MORE_SETTINGS):
+        return jsonify({"error": "请提交有效的更多设置字段"}), 400
+    for key, value in data.items():
+        if type(value) is not bool:
+            return jsonify({"error": f"{MORE_SETTINGS[key][1]}开关必须为布尔值"}), 400
+    for key, value in data.items():
+        SystemSetting.set_value(key, "true" if value else "false")
     from models import db
     db.session.commit()
     return more_settings()

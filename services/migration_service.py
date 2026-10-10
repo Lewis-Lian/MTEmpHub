@@ -37,6 +37,8 @@ MIGRATION_ORDER = [
     "meal_ticket_items",
     "meal_ticket_adjustments",
     "meal_ticket_payments",
+    "meal_ticket_followup_tasks",
+    "meal_ticket_followup_allocations",
     "meal_ticket_imports",
     "meal_ticket_import_rows",
     "meal_ledger_records",

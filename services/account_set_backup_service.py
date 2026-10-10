@@ -52,7 +52,7 @@ def month_bounds(month):
 
 
 def scoped_rows(name, account, employee_ids=None):
-    ds = DATASETS[name]
+    ds = V2_DATASETS[name]
     model = ds.model
     query = model.query
     start, end = month_bounds(account.month)
@@ -617,6 +617,7 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
         except OSError as exc:
             raise BackupError('原始文件缺失或无法读取，请重新导出') from exc
         for source, item in zip(rows, items):
+            item.update({field: serial(getattr(source, field)) for field in V2_DATASETS[name].fields})
             for field, (output, model, natural) in V2_REFS.get(name, {}).items():
                 identifier = getattr(source, field)
                 ref = db.session.get(model, identifier) if identifier is not None else None
@@ -683,7 +684,18 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
     for scope in _contents(doc):
         # Intervals cover a union of selected months, not the entire global dataset.
         doc['coverage'][scope] = {'included': True, 'complete': not scope.startswith('cross_month/')}
-    return normalize_backup(doc)
+    normalized = normalize_backup(doc)
+    if 'meal_tickets' in selected:
+        from services.meal_ticket_followup_validation import validate_followup_records
+        records = {name: {} for name in V2_DATASETS if name.startswith('meal_')}
+        for scope, values in _contents(normalized).items():
+            name = scope.split('/')[-1]
+            if name in records:
+                records[name].update({v['key']:(scope + '/' + v['key'], v) for v in values})
+        errors = validate_followup_records(records)
+        if errors:
+            raise BackupError('；'.join(error[2] for error in errors))
+    return normalized
 
 
 def _multi_fingerprint(document):

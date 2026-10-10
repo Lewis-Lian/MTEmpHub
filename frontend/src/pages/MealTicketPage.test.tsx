@@ -17,10 +17,84 @@ const batch = { id: 1, month: "2026-08", recharge_month: "2026-09", version: 1, 
   items: [{ id: 1, emp_id: 1, emp_no: "001", name: "员工甲", dept_name: "生产部", days: 22, base_amount: 176,
     adjustment_amount: 0, due_amount: 176, paid_amount: 0, difference: 176, error: "", source: {}, adjustments: [], payments: [] }] };
 const request = vi.hoisted(() => vi.fn());
-vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) => p }));
+vi.mock("../api/client", () => ({ apiRequest: async (path: string, options?: object) => {
+  const result = await request(path, options);
+  if (path.includes("followup-tasks") && !Array.isArray(result?.tasks)) return {
+    batch_id: result?.id ?? 1, batch_version: result?.version ?? 1, offset_enabled: true, settings_digest: "s",
+    queue_offset_enabled: true, settings_changed: false, baseline_required: false, baseline_reason: "", current_task_key: null, tasks: [],
+  };
+  return result;
+}, buildApiUrl: (p: string) => p }));
 
 describe("菜票中心", () => {
   beforeEach(() => { sessionStorage.clear(); request.mockClear(); });
+  it("无批次只计算一次，草稿仅一个重算入口，步骤条无操作", async () => {
+    let current: typeof batch | null = null;
+    request.mockImplementation((path: string, options?: { body?: object }) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/generate") {
+        expect(options?.body).toEqual(expect.objectContaining({ recharge_month: "2026-09" }));
+        current = batch;
+      }
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter initialEntries={["/meal-tickets/calculation?recharge_month=2026-09"]}><MealTicketPage /></MemoryRouter>);
+    const calculate = await screen.findByRole("button", { name: "计算菜票" });
+    expect(screen.getByText("考勤月份：2026-08")).toBeInTheDocument();
+    fireEvent.click(calculate);
+    await screen.findByText("员工甲");
+    const flow = within(screen.getByRole("list", { name: "月度发放流程" }));
+    expect(flow.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByLabelText("计划充值月份")).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "重算草稿" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "补扣" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "本月不发" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "重算草稿" }));
+    await waitFor(() => expect(request.mock.calls.filter(([path]) => path === "/api/meal-tickets/generate")).toHaveLength(2));
+  });
+
+  it("下载可重复且不证明充值，确认后仍处于导出并充值", async () => {
+    const current = { ...batch, status: "confirmed", database: { enabled: true, configured: true } };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    await screen.findByText("员工甲");
+    const flow = screen.getByRole("list", { name: "月度发放流程" });
+    expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent("导出并充值");
+    expect(within(flow).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "导出充值表（.xls）" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "已完成充值，核对到账" })).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "前往导出" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "人员明细" })).not.toBeVisible();
+    const download = screen.getByRole("link", { name: "导出充值表（.xls）" });
+    download.addEventListener("click", event => event.preventDefault());
+    fireEvent.click(download); fireEvent.click(download);
+    expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent("导出并充值");
+    expect(request.mock.calls.some(([path]) => path === "/api/meal-tickets/payments" || path === "/api/meal-tickets/reconcile")).toBe(false);
+  });
+
+  it("草稿重算保留补扣、本月不发，并显示应发金额变化", async () => {
+    let current = { ...batch, source_changed: true, items: [
+      { ...batch.items[0], adjustment_amount: 16, due_amount: 192, difference: 192 },
+      { ...batch.items[0], id: 2, emp_id: 2, emp_no: "002", name: "员工乙", excluded: true, base_amount: 0, due_amount: 0, difference: 0 },
+    ] };
+    request.mockImplementation((path: string) => {
+      if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/generate") current = { ...current, source_changed: false, version: 2,
+        items: [{ ...current.items[0], days: 23, base_amount: 184, due_amount: 200, difference: 200 }, current.items[1]] };
+      return Promise.resolve(current);
+    });
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
+    fireEvent.click(await screen.findByRole("button", { name: "重算草稿" }));
+    expect(await screen.findByText("001 员工甲：192.00 → 200.00 元")).toBeInTheDocument();
+    const row = within(screen.getByText("员工甲").closest("tr")!);
+    expect(row.getByText("16.00")).toBeInTheDocument();
+    const excluded = within(screen.getByText("员工乙").closest("tr")!);
+    expect(excluded.getByRole("button", { name: "恢复核算" })).toBeEnabled();
+    expect(excluded.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/源考勤或人员资料已变化/)).not.toBeInTheDocument();
+  });
+
   it.each([false, true])("菜票明细显示异常日扣减依据（后续重算：%s）", async (recalculated) => {
     const rule = { abnormal_deduction_enabled: true, as_manager: false,
       abnormal_dates: ["2026-08-01", "2026-08-02"], deduction_cents: 1600 };
@@ -41,7 +115,9 @@ describe("菜票中心", () => {
     const current = { ...batch, status: "confirmed", items: [{ ...batch.items[0], paid_amount: 176, difference: 0 }] };
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : current));
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
-    await screen.findByText("员工甲");
+    await screen.findByRole("button", { name: "导入补扣清单" });
+    fireEvent.click(screen.getByLabelText("显示全部人员"));
+    expect(screen.getByText("员工甲")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "导入补扣清单" })).toBeEnabled();
   });
 
@@ -258,10 +334,6 @@ describe("菜票中心", () => {
     fireEvent.click(departmentPicker.getByRole("button", { name: "生产部" }));
     fireEvent.click(departmentPicker.getByRole("button", { name: "确定" }));
     fireEvent.change(screen.getByLabelText("人员类型"), { target: { value: "employee" } });
-    if (view === "payments") {
-      fireEvent.click(screen.getByRole("button", { name: "下一步：登记补发 / 扣回" }));
-      fireEvent.click(screen.getByRole("button", { name: "下一步：核对结清" }));
-    }
     await act(async () => fireEvent.click(screen.getByRole("button", { name: "查看异常（2 人）" })));
     expect(screen.getByPlaceholderText("搜索员工编号/姓名")).toHaveValue("");
     expect(screen.getByPlaceholderText("搜索部门编号/名称")).toHaveValue("");
@@ -309,9 +381,10 @@ describe("菜票中心", () => {
     render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
     await screen.findByText("员工甲");
     expect(within(screen.getByRole("list", { name: "月度发放流程" })).getAllByRole("listitem").map(item => within(item).getByRole("heading").textContent))
-      .toEqual(["生成草稿", "补扣与确认核算", "导出充值表", "登记充值", "核对结清"]);
+      .toEqual(["选月份", "计算与核对", "导出并充值", "核对到账"]);
     const activeStep = screen.getByRole("list", { name: "月度发放流程" }).querySelector('[aria-current="step"]') as HTMLElement;
-    expect(within(activeStep).getByRole("button", { name: "确认核算" })).toBeEnabled();
+    expect(within(activeStep).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "确认核算" })).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "核对人员与补扣" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "充值表导出" })).not.toBeInTheDocument();
@@ -334,7 +407,7 @@ describe("菜票中心", () => {
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
     expect(await screen.findByText("请先完成月度核算")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "前往月度发放" })).toHaveAttribute("href", expect.stringContaining("/meal-tickets/calculation?recharge_month="));
-    expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "重算草稿" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "确认核算" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
   });
@@ -360,7 +433,7 @@ describe("菜票中心", () => {
     fireEvent.click(within(exportStep).getByRole("button", { name: "退回上一步" }));
     fireEvent.click(screen.getByRole("button", { name: "确认退回" }));
     expect(await screen.findByRole("button", { name: "确认核算" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "生成 / 重算草稿" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "重算草稿" })).toBeEnabled();
     screen.getAllByRole("button", { name: "本月不发" }).forEach(button => expect(button).toBeEnabled());
     expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "充值表导出" })).not.toBeInTheDocument();
@@ -417,18 +490,18 @@ describe("菜票中心", () => {
       return Promise.resolve(current);
     });
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
-    await screen.findByText("员工甲");
-    expect(screen.queryByRole("region", { name: "整月结清检查" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
+    await screen.findByRole("button", { name: "导入补扣清单" });
+    fireEvent.click(screen.getByLabelText("显示全部人员"));
+    expect(screen.getByRole("region", { name: "整月结清检查" })).toHaveTextContent("本月账目已结清");
+    expect(screen.queryByRole("button", { name: "重算草稿" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "补扣" }));
     fireEvent.change(screen.getByLabelText("调整金额（元）"), { target: { value: "8" } });
     fireEvent.click(screen.getByRole("button", { name: "线长补卡" }));
     fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "额外补扣" })).not.toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "下一步：登记补发 / 扣回" }));
-    fireEvent.click(screen.getByRole("button", { name: "下一步：核对结清" }));
     await screen.findByText("还有差额需要处理");
-    fireEvent.click(screen.getByRole("button", { name: "登记充值" }));
+    fireEvent.click(screen.getByRole("button", { name: "明细" }));
+    fireEvent.click(screen.getByRole("button", { name: "登记实际充值流水" }));
     fireEvent.change(screen.getByLabelText("凭证 / 说明"), { target: { value: "补充充值成功" } });
     fireEvent.click(screen.getByRole("button", { name: "确认登记" }));
     expect(await screen.findByText("本月账目已结清")).toBeInTheDocument();
@@ -585,17 +658,14 @@ describe("菜票中心", () => {
     expect(screen.getAllByRole("alert").some(alert => alert.textContent === "保存失败，请重试")).toBe(true);
   });
 
-  it("批量充值不沿用补月份模板，按成功登记人数显示进度", async () => {
+  it("月度批量实际登记按成功登记人数显示进度", async () => {
     const confirmed = { ...batch, status: "confirmed", items: [batch.items[0], { ...batch.items[0], id: 2, emp_id: 2, emp_no: "002", name: "员工乙" }] };
     const payments: Array<(value: object) => void> = [];
     request.mockImplementation((path: string) => path === "/api/auth/me" ? Promise.resolve({ role: "admin" })
       : path === "/api/meal-tickets/payments" ? new Promise(resolve => { payments.push(resolve); })
       : Promise.resolve(confirmed));
-    render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
+    render(<MemoryRouter><MealTicketPage /></MemoryRouter>);
     await screen.findByText("员工乙");
-    fireEvent.click(screen.getAllByRole("button", { name: "补扣" })[0]);
-    fireEvent.click(screen.getByRole("button", { name: "补x月菜票" }));
-    fireEvent.click(screen.getByRole("button", { name: "取消" }));
     fireEvent.click(screen.getByLabelText("选择 001"));
     fireEvent.click(screen.getByLabelText("选择 002"));
     fireEvent.click(screen.getByRole("button", { name: "登记选中人员充值" }));
@@ -634,7 +704,7 @@ describe("菜票中心", () => {
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "readonly" } : batch));
     render(<MemoryRouter initialEntries={["/meal-tickets/calculation"]}><MealTicketPage /></MemoryRouter>);
     await screen.findByText("员工甲");
-    expect(screen.queryByRole("button", { name: "生成 / 重算草稿" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "重算草稿" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "补扣" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "本月不发" })).not.toBeInTheDocument();
   });
@@ -936,4 +1006,67 @@ describe("菜票中心", () => {
     fireEvent.click(screen.getByRole("button",{name:"查看"}));
     expect(screen.getByLabelText("更正说明 1")).toHaveValue("已人工核对");
   });
+});
+
+describe("阶段 4 后续流程", () => {
+  it("查询账号在后续页仍可查看已结清实际账目，不能写操作进度", async () => {
+    const current = { ...batch, status: "confirmed", items: [{ ...batch.items[0], paid_amount: 176, difference: 0 }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "query" } : current));
+    render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
+    await screen.findByText("本月账目已结清");
+    expect(screen.queryByRole("button", { name: "已完成充值，下一人" })).not.toBeInTheDocument();
+    expect(request.mock.calls.some(([path]) => path.includes("followup-tasks"))).toBe(false);
+  });
+
+  it("三阶段只读导航、取消手动下一步与设备批量入口，扣除提交负金额", async () => {
+    const current = { ...batch, status: "confirmed" };
+    const queue = { batch_id: 1, batch_version: 1, offset_enabled: true, settings_digest: "s", queue_offset_enabled: true,
+      settings_changed: false, baseline_required: false, current_task_key: "a", tasks: [{ key: "a", item_key: "i", emp_no: "00123", name: "任务员工", dept_name: "财务部", kind: "refund", status: "pending", version: 1, amount_cents: 2400, remaining_cents: 2400, allocated_cents: 0 }] };
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? { role: "admin" } : path.includes("followup-tasks") ? queue : current));
+    render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
+    await screen.findByRole("button", { name: "已完成取款，下一人" });
+    const flow = within(screen.getByRole("list", { name: "后续补扣流程" }));
+    expect(flow.getAllByRole("heading").map(h => h.textContent)).toEqual(["登记补扣", "逐人办理", "核对结果"]);
+    expect(flow.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /下一步：/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "登记选中人员充值" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "导出充值表（.xls）" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入补扣清单" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "补扣" }));
+    fireEvent.change(screen.getByLabelText("补扣方向"), { target: { value: "refund" } });
+    fireEvent.change(screen.getByLabelText("调整金额（元）"), { target: { value: "16" } });
+    fireEvent.change(screen.getByLabelText("调整原因"), { target: { value: "核对扣除" } });
+    fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
+    await waitFor(() => expect(request).toHaveBeenCalledWith("/api/meal-tickets/adjustments", expect.objectContaining({ body: expect.objectContaining({ amount: "-16", reason: "核对扣除" }) })));
+  });
+});
+it("操作声明后的旧账目刷新响应不能覆盖新补扣", async () => {
+  let current = { ...batch, status: "confirmed", version: 3 };
+  const task = { key: "a", item_key: "i", emp_no: "00123", name: "任务员工", dept_name: "财务部", kind: "recharge", status: "pending", version: 1, amount_cents: 2400, remaining_cents: 2400, allocated_cents: 0 };
+  let queue = { batch_id: 1, batch_version: 3, offset_enabled: true, settings_digest: "s", queue_offset_enabled: true, settings_changed: false, baseline_required: false, current_task_key: "a", tasks: [task] };
+  let finishOld!: (value: unknown) => void;
+  let batchReads = 0;
+  let holdQueue = false;
+  request.mockImplementation((path: string) => {
+    if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+    if (path.includes("/progress")) { queue = { ...queue, batch_version: 4, tasks: [{ ...task, status: "awaiting" }] }; return Promise.resolve(queue); }
+    if (path.includes("followup-tasks")) return holdQueue ? new Promise(() => {}) : Promise.resolve(queue);
+    if (path === "/api/meal-tickets/adjustments") { current = { ...current, version: 5, items: [{ ...batch.items[0], due_amount: 200, adjustment_amount: 24, difference: 200 }] }; queue = { ...queue, batch_version: 5 }; return Promise.resolve(current); }
+    if (path.startsWith("/api/meal-tickets?")) {
+      if (++batchReads === 2) return new Promise(resolve => { finishOld = resolve; });
+      return Promise.resolve(current);
+    }
+    return Promise.resolve(current);
+  });
+  render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button", { name: "已完成充值，下一人" }));
+  await waitFor(() => expect(batchReads).toBe(2));
+  fireEvent.click(screen.getByRole("button", { name: "补扣" }));
+  fireEvent.change(screen.getByLabelText("调整金额（元）"), { target: { value: "24" } });
+  fireEvent.click(screen.getByRole("button", { name: "线长补卡" }));
+  fireEvent.click(screen.getByRole("button", { name: "保存补扣" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "额外补扣" })).not.toBeInTheDocument());
+  holdQueue = true;
+  await act(async () => finishOld({ ...batch, status: "confirmed", version: 4 }));
+  expect(within(screen.getByRole("region", { name: "人员明细" })).getByText("24.00")).toBeInTheDocument();
 });

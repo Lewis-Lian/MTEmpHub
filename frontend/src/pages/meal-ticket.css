@@ -2048,3 +2048,29 @@
 .meal-ticket-refund-table select { min-height: 34px; padding: 5px 30px 5px 10px; border: 1px solid var(--ent-border-strong); border-radius: var(--ent-radius); background: var(--ent-bg); color: var(--ent-text); font: inherit; }
 .meal-ticket-refund-table select.is-classified { border-color: var(--ent-blue); }
 .meal-ticket-refund-footer { padding: 8px 0 2px; }
+
+/* 月度流程操作集中在当前区域；结果可按需展开。 */
+.meal-ticket-monthly-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.meal-ticket-monthly-actions h2 { margin: 0; font-size: 16px; }
+.meal-ticket-monthly-actions p { margin: 6px 0 0; color: var(--ent-text-secondary); }
+.meal-ticket-result-details > summary,
+.meal-ticket-range-options > summary {
+  cursor: pointer;
+  padding: 10px 0;
+  color: var(--ent-text-secondary);
+}
+.meal-ticket-low-frequency { margin-left: 16px; font-size: 12px; }
+
+.meal-followup-queue { display: grid; gap: 12px; }
+.meal-followup-card { border: 1px solid var(--ent-border); border-radius: 12px; padding: 20px; background: var(--ent-bg); }
+.meal-followup-card strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.meal-followup-queue ul { padding-left: 20px; }
+.meal-followup-queue li { margin: 8px 0; }
+.meal-followup-queue label { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.meal-followup-queue input { max-width: 100%; padding: 8px 12px; }

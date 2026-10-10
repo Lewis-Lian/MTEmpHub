@@ -173,7 +173,7 @@ it('shows snapshot provenance and meaningful field values without raw structured
   expect(screen.queryByText('dept_no')).not.toBeInTheDocument(); expect(screen.queryByText('HASH_BEFORE')).not.toBeInTheDocument();
 });
 it('labels all meal-ticket datasets and confirms recharge impact outside the selected months', async () => {
-  const labels = {meal_batches:'菜票核算批次',meal_items:'菜票明细',meal_adjustments:'菜票补扣',meal_payments:'菜票充值与冲正',meal_imports:'菜票历史导入',meal_import_rows:'菜票导入明细',meal_ledger_records:'菜票独立台账记录',meal_ledger_imports:'菜票台账导入'};
+  const labels = {meal_batches:'菜票核算批次',meal_items:'菜票明细',meal_adjustments:'菜票补扣',meal_payments:'菜票充值与冲正',meal_followup_tasks:'菜票后续办理任务',meal_followup_allocations:'菜票任务资金分配',meal_imports:'菜票历史导入',meal_import_rows:'菜票导入明细',meal_ledger_records:'菜票独立台账记录',meal_ledger_imports:'菜票台账导入'};
   mocks.upload.mockResolvedValue({...preview,selection:{...selection,categories:['meal_tickets','meal_ledgers','archives']},rows:Object.keys(labels).map(dataset => ({...row(dataset,dataset.startsWith('meal_ledger') ? 'meal_ledgers' : 'meal_tickets','M1','changed'),affected_months:['2026-06','2026-08']}))});
   renderModal(); await upload(); Object.values(labels).forEach(label => expect(screen.getByLabelText(`勾选 ${label} M1`)).toBeInTheDocument());
   fireEvent.click(screen.getByRole('button',{name:'查看导入确认'})); expect(screen.getByText(/菜票核算批次 M1.*2026-08/)).toBeInTheDocument();

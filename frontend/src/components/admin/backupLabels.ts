@@ -13,7 +13,7 @@ export const DATASET_LABELS: Record<string, string> = {
   manager_overrides: '管理人员月度修正', annual_leave: '年度年假余额', manager_stats: '管理人员年度统计',
   override_history: '修正历史', sync_history: '同步历史', imports: '考勤原始文件', snapshots: '月度历史资料快照',
   users: '账号', user_employee_assignments: '账号人员授权', user_department_assignments: '账号部门授权',
-  meal_batches: '菜票核算批次', meal_items: '菜票明细', meal_adjustments: '菜票补扣', meal_payments: '菜票充值与冲正',
+  meal_batches: '菜票核算批次', meal_items: '菜票明细', meal_adjustments: '菜票补扣', meal_followup_tasks: '菜票后续办理任务', meal_followup_allocations: '菜票任务资金分配', meal_payments: '菜票充值与冲正',
   meal_imports: '菜票历史导入', meal_import_rows: '菜票导入明细', meal_ledger_records: '菜票独立台账记录', meal_ledger_imports: '菜票台账导入',
 };
 export const STATUS_LABELS = {new: '备份新增', changed: '值不一致', system_only: '系统独有', same: '一致'};
@@ -43,6 +43,7 @@ const FIELD_LABELS: Record<string, string> = {
   read_count: '读取条数', imported_count: '导入条数', unmatched_count: '未匹配条数', unmatched: '未匹配资料', error_message: '错误信息', updated_at: '更新时间', finished_at: '完成时间',
   source_filename: '来源文件', file_type: '文件类型', key: '业务编号', batch_key: '核算批次编号', item_key: '菜票明细编号', emp_no_snapshot: '历史工号',
   created_by: '创建人', confirmed_by: '确认人', confirmed_at: '确认时间', reconciliation: '核对资料', error: '错误信息',
+  task_key: '办理任务编号', payment_key: '实际流水编号', source_snapshot: '办理来源与资金基线', offset_enabled: '任务抵消方式', skip_order: '暂时跳过顺序', operation_at: '外部操作声明时间', followup_state: '办理清单与进度',
   request_key: '请求编号', request_digest: '请求内容是否变化', reversal_of: '冲正原记录', import_key: '导入编号', active_slot: '有效记录槽位', source_key: '来源编号',
   voided: '作废状态', void_reason: '作废原因', void_operator: '作废操作人', voided_at: '作废时间', business_key: '历史业务编号', source_digest: '来源内容是否变化', file_digest: '文件内容是否变化',
   query_home: '首页权限', meal_ledger_query: '菜票台账查询权限', meal_ticket_query: '菜票查询权限', individual_attendance: '个人考勤查询权限',

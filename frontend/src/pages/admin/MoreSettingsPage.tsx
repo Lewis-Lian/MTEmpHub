@@ -6,7 +6,7 @@ export default function MoreSettingsPage() {
   const notification = useNotification();
   const [settings, setSettings] = useState<MoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<keyof MoreSettings | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -18,17 +18,17 @@ export default function MoreSettingsPage() {
     return () => { active = false; };
   }, []);
 
-  async function toggleDeduction() {
+  async function toggleSetting(key: keyof MoreSettings, label: string) {
     if (!settings || saving) return;
-    setSaving(true);
+    setSaving(key);
     try {
-      const value = await saveMoreSettings(!settings.meal_ticket_abnormal_deduction_enabled);
+      const value = await saveMoreSettings({ [key]: !settings[key] });
       setSettings(value);
-      notification.success(value.meal_ticket_abnormal_deduction_enabled ? "异常考勤天数扣除已开启" : "异常考勤天数扣除已关闭");
+      notification.success(`${label}${value[key] ? "已开启" : "已关闭"}`);
     } catch (err) {
       notification.error(err instanceof Error ? err.message : "设置保存失败");
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   }
 
@@ -50,10 +50,25 @@ export default function MoreSettingsPage() {
         </div>
         <div className="settings-source-switch-row">
           <button type="button" role="switch" aria-label="异常考勤天数扣除"
-            aria-checked={settings.meal_ticket_abnormal_deduction_enabled} disabled={saving}
+            aria-checked={settings.meal_ticket_abnormal_deduction_enabled} disabled={saving !== null}
             className={`settings-database-switch${settings.meal_ticket_abnormal_deduction_enabled ? " is-enabled" : ""}`}
-            onClick={toggleDeduction}>
-            <span aria-hidden="true" />{saving ? "保存中..." : settings.meal_ticket_abnormal_deduction_enabled ? "已开启" : "已关闭"}
+            onClick={() => toggleSetting("meal_ticket_abnormal_deduction_enabled", "异常考勤天数扣除")}>
+            <span aria-hidden="true" />{saving === "meal_ticket_abnormal_deduction_enabled" ? "保存中..." : settings.meal_ticket_abnormal_deduction_enabled ? "已开启" : "已关闭"}
+          </button>
+        </div>
+      </section>}
+      {settings && <section className="settings-card settings-source-card" aria-labelledby="meal-offset-title">
+        <div>
+          <h3 id="meal-offset-title" className="settings-card-title">补发与扣款抵消</h3>
+          <p className="settings-card-desc">开启后，同一人的待补发与待扣款按净额处理，净额为零无需操作；关闭后，补发与扣款分别逐人办理。已完成的实际流水和原始补扣明细保留。</p>
+          <p className="settings-card-desc">默认开启。修改后请刷新后续操作清单，已操作和已到账任务保留原金额与抵消方式。</p>
+        </div>
+        <div className="settings-source-switch-row">
+          <button type="button" role="switch" aria-label="补发与扣款抵消"
+            aria-checked={settings.meal_ticket_offset_enabled} disabled={saving !== null}
+            className={`settings-database-switch${settings.meal_ticket_offset_enabled ? " is-enabled" : ""}`}
+            onClick={() => toggleSetting("meal_ticket_offset_enabled", "补发与扣款抵消")}>
+            <span aria-hidden="true" />{saving === "meal_ticket_offset_enabled" ? "保存中..." : settings.meal_ticket_offset_enabled ? "已开启" : "已关闭"}
           </button>
         </div>
       </section>}

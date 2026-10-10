@@ -4,7 +4,14 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import MealTicketPage from './MealTicketPage';
 import { ConfirmProvider } from '../components/feedback/ConfirmDialog';
 const request=vi.hoisted(()=>vi.fn());
-vi.mock('../api/client',()=>({apiRequest:request,buildApiUrl:(p:string)=>p}));
+vi.mock('../api/client',()=>({apiRequest: async (path: string, options?: object) => {
+  const result = await request(path, options);
+  if (path.includes("followup-tasks") && !Array.isArray(result?.tasks)) return {
+    batch_id: result?.id ?? 1, batch_version: result?.version ?? 1, offset_enabled: true, settings_digest: "s",
+    queue_offset_enabled: true, settings_changed: false, baseline_required: false, baseline_reason: "", current_task_key: null, tasks: [],
+  };
+  return result;
+},buildApiUrl:(p:string)=>p}));
 const item={id:1,emp_id:1,emp_no:'001',name:'员工甲',dept_name:'生产部',is_manager:false,days:22,
   base_amount:176,adjustment_amount:0,due_amount:176,paid_amount:0,difference:176,error:'',source:{},
   employment_status:'active',resigned_at:null,excluded:false,original_base_amount:176,
@@ -17,16 +24,16 @@ it('草稿核算异常仍提示，但到账核对卡片在结清步骤前隐藏'
     {...batch,status:'draft',items:[{...item,error:'缺少考勤来源'}]}));
   page();
   await screen.findByText('员工甲');
-  expect(screen.getByRole('list',{name:'月度发放流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('补扣与确认核算');
+  expect(screen.getByRole('list',{name:'月度发放流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('计算与核对');
   expect(screen.getByRole('region',{name:'整月结清检查'})).toHaveTextContent('草稿待核算');
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
   expect(screen.queryByLabelText('核对开始日期')).not.toBeInTheDocument();
 });
-it('已确认月度发放不再提示源数据变化', async () => {
+it('已确认来源变化引导到后续页处理', async () => {
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:{...batch,source_changed:true}));
   page();
   await screen.findByText('员工甲');
-  expect(screen.queryByText(/源考勤或人员资料已变化/)).not.toBeInTheDocument();
+  expect(screen.getByText(/请前往后续补扣与对账页核对差额/)).toBeInTheDocument();
 });
 it('后续补扣预览考勤差额，确认后保留基础金额和已发金额', async () => {
   let current={...batch,source_changed:true,items:[{...item,paid_amount:176,difference:0}]};
@@ -79,7 +86,7 @@ it('新增人员需核对原因才能补入，补入后刷新预览并可继续�
 function page() {
   render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><MealTicketPage/></MemoryRouter></ConfirmProvider>);
 }
-it('月度账目全部结清后只保留完成状态，隐藏核对、人员和导出操作', async () => {
+it('月度结清后保留摘要和唯一下载入口，明细按需展开', async () => {
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
     {...batch,items:[{...item,paid_amount:176,difference:0}]}));
   page();
@@ -91,13 +98,15 @@ it('月度账目全部结清后只保留完成状态，隐藏核对、人员和�
   expect(completion.querySelector('.meal-ticket-checkmark')).toHaveAttribute('d','m7 12 3 3 7-7');
   expect(completion.querySelector('path[d="M12 7v6"]')).toBeNull();
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
-  expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
-  expect(screen.queryByRole('region',{name:'充值表导出'})).not.toBeInTheDocument();
+  expect(screen.getByRole('region',{name:'人员明细'})).not.toBeVisible();
+  expect(screen.getAllByRole('link',{name:'导出充值表（.xls）'})).toHaveLength(1);
   expect(screen.queryByRole('button',{name:'前往导出'})).not.toBeInTheDocument();
   expect(screen.queryByRole('button',{name:'核对到账与结清'})).not.toBeInTheDocument();
   expect(within(screen.getByRole('region',{name:'整月结清检查'})).queryByRole('button')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText('查看核算明细'));
+  expect(screen.getByRole('region',{name:'人员明细'})).toBeVisible();
   const flow=screen.getByRole('list',{name:'月度发放流程'});
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('已完成');
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账');
 });
 it.each(['preview', 'apply'])('切换月份后忽略旧月份的考勤重算 %s 响应', async stage => {
   let resolveOld!: (value: unknown) => void;
@@ -132,7 +141,7 @@ it('取款流水需分类，月末清零不会显示为核算扣回', async () =
   await screen.findByLabelText('流水 12 分类');
   expect(screen.queryByText('本月账目已结清')).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('流水 12 分类'), { target: { value: 'clearance' } });
-  fireEvent.click(screen.getByRole('button', { name: '确认分类并重新核对' }));
+  fireEvent.click(screen.getByRole('button', { name: '核对到账' }));
   expect(await screen.findByText('本月账目已结清')).toBeInTheDocument();
 });
 it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
@@ -147,11 +156,11 @@ it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
   expect(pending.querySelector('.meal-ticket-checkmark')).toBeNull();
   expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
   expect(screen.getByRole('region',{name:'充值表导出'})).toBeInTheDocument();
-  fireEvent.click(within(panel).getByRole('button',{name:'读取数据库并核对'}));
+  fireEvent.click(within(panel).getByRole('button',{name:/已完成充值，核对到账|^核对到账$/}));
   await screen.findByText('本月账目已结清');
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
-  expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
-  expect(screen.queryByRole('region',{name:'充值表导出'})).not.toBeInTheDocument();
+  expect(screen.getByRole('region',{name:'人员明细'})).not.toBeVisible();
+  expect(screen.getAllByRole('link',{name:'导出充值表（.xls）'})).toHaveLength(1);
 });
 it('数据库核对按选定日期更新账目，未结清时展示实际流水及重复记录数',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
@@ -161,7 +170,7 @@ it('数据库核对按选定日期更新账目，未结清时展示实际流水�
   const panel=await screen.findByRole('region',{name:'到账核对'});
   expect(screen.queryByRole('button',{name:'登记充值'})).not.toBeInTheDocument();
   fireEvent.change(within(panel).getByLabelText('核对结束日期'),{target:{value:'2026-10-06'}});
-  fireEvent.click(within(panel).getByRole('button',{name:'读取数据库并核对'}));
+  fireEvent.click(within(panel).getByRole('button',{name:/已完成充值，核对到账|^核对到账$/}));
   expect(await within(panel).findByText('新增 3 条 · 已登记 2 条')).toBeInTheDocument();
   expect(screen.getByText('还有差额需要处理')).toBeInTheDocument();
   expect(within(panel).getByText(/未匹配本月人员 1 条/)).toBeInTheDocument();
@@ -172,15 +181,16 @@ it('数据库读取失败保留待发账目并显示错误',async()=>{
     path==='/api/meal-tickets/reconcile'?Promise.reject(new Error('共享数据库读取失败')):Promise.resolve(batch));
   page();
   const panel=await screen.findByRole('region',{name:'整月结清检查'});
-  fireEvent.click(within(screen.getByRole('region',{name:'到账核对'})).getByRole('button',{name:'读取数据库并核对'}));
+  fireEvent.click(within(screen.getByRole('region',{name:'到账核对'})).getByRole('button',{name:/已完成充值，核对到账|^核对到账$/}));
   expect(await screen.findByRole('alert')).toHaveTextContent('共享数据库读取失败');
   expect(within(panel).getByText('数据库核对未完成')).toBeInTheDocument();
+  expect(screen.getAllByRole('button',{name:'核对到账'})).toHaveLength(1);
 });
 it('只读账号查看到账结果，不发起数据库入账',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'readonly'}:batch));
   page();
   await screen.findByText('员工甲');
-  expect(screen.queryByRole('button',{name:'读取数据库并核对'})).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:/已完成充值，核对到账|^核对到账$/})).not.toBeInTheDocument();
 });
 it('已由数据库登记的账目关闭开关后显示暂停，不开放手工重复登记',async()=>{
   const current={...batch,database:{enabled:false,configured:true},items:[{...item,paid_amount:160,difference:16,
@@ -190,7 +200,7 @@ it('已由数据库登记的账目关闭开关后显示暂停，不开放手工�
   await screen.findByText('员工甲');
   expect(screen.queryByRole('button',{name:'登记充值'})).not.toBeInTheDocument();
   expect(screen.getByText('数据库核对已暂停')).toBeInTheDocument();
-  expect(screen.getByRole('button',{name:'读取数据库并核对'})).toBeDisabled();
+  expect(screen.getByRole('button',{name:/已完成充值，核对到账|^核对到账$/})).toBeDisabled();
 });
 it('原账金额平衡但流水待分类，本次数据库读取失败时不显示结清成功',async()=>{
   request.mockImplementation((path:string)=>path==='/api/auth/me'?Promise.resolve({role:'admin'}):
@@ -203,80 +213,67 @@ it('原账金额平衡但流水待分类，本次数据库读取失败时不显�
   page();
   const panel=await screen.findByRole('region',{name:'整月结清检查'});
   expect(within(panel).queryByLabelText('核对开始日期')).not.toBeInTheDocument();
-  fireEvent.click(within(screen.getByRole('region',{name:'到账核对'})).getByRole('button',{name:'读取数据库并核对'}));
+  fireEvent.click(within(screen.getByRole('region',{name:'到账核对'})).getByRole('button',{name:/已完成充值，核对到账|^核对到账$/}));
   await screen.findByRole('alert');
   expect(within(panel).queryByText('本月账目已结清')).not.toBeInTheDocument();
   expect(within(panel).getByText('数据库核对未完成')).toBeInTheDocument();
 });
 
-it('数据库模式合并到账与结清步骤，后续补扣也直接核对',async()=>{
+it('数据库模式月度固定四阶段，步骤条不提供操作',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:batch));
   page();
   await screen.findByText('员工甲');
   const flow=screen.getByRole('list',{name:'月度发放流程'});
   expect(within(flow).getAllByRole('listitem').map(step=>within(step).getByRole('heading').textContent))
-    .toEqual(['生成草稿','补扣与确认核算','导出充值表','核对到账与结清']);
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账与结清');
-  expect(within(flow).getByRole('button',{name:'核对到账与结清'})).toBeEnabled();
+    .toEqual(['选月份','计算与核对','导出并充值','核对到账']);
+  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('导出并充值');
+  expect(within(flow).queryByRole('button')).not.toBeInTheDocument();
 });
 
-it('数据库模式后续补扣仅保留调整和到账结清两个步骤',async()=>{
+it('数据库模式后续补扣三阶段导航无按钮，核对只有一个入口', async () => {
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:batch));
   render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
   await screen.findByText('员工甲');
   const flow=screen.getByRole('list',{name:'后续补扣流程'});
-  expect(within(flow).getAllByRole('listitem').map(step=>within(step).getByRole('heading').textContent))
-    .toEqual(['补发 / 扣除','核对到账与结清']);
+  expect(within(flow).getAllByRole('heading').map(step=>step.textContent)).toEqual(['登记补扣','逐人办理','核对结果']);
+  expect(within(flow).queryByRole('button')).not.toBeInTheDocument();
+  expect(screen.getAllByRole('button',{name:'核对结果'})).toHaveLength(1);
 });
-
-it.each([false,true])('后续补扣进入页面先调整，结清状态为 %s 也不跳过',async settled=>{
+it.each([false,true])('后续页按真实金额显示结果，结清状态为 %s，仍能登记补扣',async settled=>{
   const current={...batch,items:[{...item,paid_amount:settled?176:0,difference:settled?0:176}]};
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:current));
   render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
-  await screen.findByText('员工甲');
-  const flow=screen.getByRole('list',{name:'后续补扣流程'});
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
-  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
-  fireEvent.click(within(flow).getByRole('button',{name:'下一步：核对到账与结清'}));
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('核对到账与结清');
-  expect(screen.getByRole('region',{name:'整月结清检查'})).toBeInTheDocument();
+  await screen.findByRole('button',{name:'导入补扣清单'});
   if (settled) {
-    expect(screen.getByText('本月账目已结清')).toBeInTheDocument();
+    await screen.findByText('本月账目已结清');
     expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
-    expect(screen.queryByRole('region',{name:'人员明细'})).not.toBeInTheDocument();
-  } else {
-    expect(screen.getByRole('region',{name:'到账核对'})).toBeInTheDocument();
-    expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
-  }
+    expect(screen.queryByText('员工甲')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('显示全部人员'));
+  } else expect(screen.getByRole('region',{name:'到账核对'})).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'补扣'})).toBeEnabled();
   expect(request.mock.calls.some(([path])=>path==='/api/meal-tickets/reconcile')).toBe(false);
-  fireEvent.click(within(flow).getByRole('button',{name:'返回补发 / 扣除'}));
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
-  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
-  expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
-  expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
 });
-
-it('后续补扣保存成功仍停留调整阶段，切换月份重新从第一步开始',async()=>{
+it('后续保存补扣自动刷新清单，不需要手动下一步', async () => {
   let current={...batch,items:[{...item,paid_amount:176,difference:0}]};
+  const empty = {batch_id:1,batch_version:2,offset_enabled:true,settings_digest:'s',queue_offset_enabled:true,settings_changed:false,baseline_required:false,baseline_reason:'',current_task_key:null,tasks:[]};
+  const task = {key:'task',item_key:'i',emp_no:'001',name:'员工甲',dept_name:'生产部',kind:'recharge',status:'pending',amount_cents:1600,allocated_cents:0,remaining_cents:1600,version:1};
   request.mockImplementation((path:string)=>{
     if(path==='/api/auth/me')return Promise.resolve({role:'admin'});
     if(path==='/api/meal-tickets/adjustments')current={...current,version:3,items:[{...current.items[0],adjustment_amount:16,due_amount:192,difference:16}]};
+    if(path.includes('followup-tasks'))return Promise.resolve(current.version===2?empty:{...empty,batch_version:3,current_task_key:'task',tasks:[task]});
     return Promise.resolve(current);
   });
-  render(<ConfirmProvider><MemoryRouter initialEntries={["/meal-tickets/payments?recharge_month=2026-09"]}><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
-  await screen.findByText('员工甲');
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
+  await screen.findByRole('button',{name:'导入补扣清单'});
+  fireEvent.click(screen.getByLabelText('显示全部人员'));
   fireEvent.click(screen.getByRole('button',{name:'补扣'}));
   fireEvent.change(screen.getByLabelText('调整金额（元）'),{target:{value:'16'}});
   fireEvent.click(screen.getByRole('button',{name:'线长补卡'}));
   fireEvent.click(screen.getByRole('button',{name:'保存补扣'}));
-  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'额外补扣'})).not.toBeInTheDocument());
-  const flow=screen.getByRole('list',{name:'后续补扣流程'});
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
-  expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
-  fireEvent.click(within(flow).getByRole('button',{name:'下一步：核对到账与结清'}));
-  fireEvent.change(screen.getByLabelText('计划充值月份'),{target:{value:'2026-10'}});
-  await screen.findByText('员工甲');
-  expect(flow.querySelector('[aria-current="step"]')).toHaveTextContent('补发 / 扣除');
+  await screen.findByRole('button',{name:'已完成充值，下一人'});
+  expect(screen.getByRole('list',{name:'后续补扣流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('逐人办理');
+  expect(request).toHaveBeenCalledWith('/api/meal-tickets/followup-tasks/refresh',expect.objectContaining({body:expect.objectContaining({version:3,settings_digest:'s'})}));
+  expect(screen.queryByRole('button',{name:/下一步：/})).not.toBeInTheDocument();
 });
 it('多选流水批量分类，未选流水保持原分类，全选支持取消', async () => {
   const pending_refunds = [12, 13, 14].map((id, index) => ({id, emp_no: `00${index + 1}`, name: `员工${index + 1}`, date: '2026-09-30', amount: 20}));
@@ -289,14 +286,14 @@ it('多选流水批量分类，未选流水保持原分类，全选支持取消'
   expect(screen.getByLabelText('流水 12 分类')).toHaveValue('clearance');
   expect(screen.getByLabelText('流水 13 分类')).toHaveValue('clearance');
   expect(screen.getByLabelText('流水 14 分类')).toHaveValue('');
-  expect(screen.getByRole('button',{name:'确认分类并重新核对'})).toBeDisabled();
+  expect(screen.getByRole('button',{name:'核对到账'})).toBeDisabled();
   const all = screen.getByLabelText('全选待分类流水');
   expect(all).toBePartiallyChecked();
   fireEvent.click(all);
   expect(screen.getByText('已选 3 条 · 60.00 元')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button',{name:'批量设为菜票扣回'}));
   expect(screen.getByLabelText('流水 14 分类')).toHaveValue('refund');
-  expect(screen.getByRole('button',{name:'确认分类并重新核对'})).toBeEnabled();
+  expect(screen.getByRole('button',{name:'核对到账'})).toBeEnabled();
   fireEvent.click(all);
   expect(screen.getByRole('button',{name:'批量设为菜票扣回'})).toBeDisabled();
 });
@@ -316,6 +313,59 @@ it('同月刷新移除已处理流水的选择和分类', async () => {
   expect(screen.getByLabelText('全选待分类流水')).not.toBeChecked();
   expect(screen.getByText('已选 0 条 · 0.00 元')).toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('流水 13 分类'),{target:{value:'refund'}});
-  fireEvent.click(screen.getByRole('button',{name:'确认分类并重新核对'}));
+  fireEvent.click(screen.getByRole('button',{name:'核对到账'}));
   await waitFor(() => expect(request).toHaveBeenCalledWith('/api/meal-tickets/reconcile',expect.objectContaining({body:expect.objectContaining({refund_actions:{13:'refund'}})})));
+});
+
+it('月度核对期间切换月份，旧响应不会覆盖新月份真实状态', async () => {
+  let finish!: (value: unknown) => void;
+  const delayed = new Promise(resolve => { finish = resolve; });
+  const next = {...batch,id:2,month:'2026-09',recharge_month:'2026-10',status:'draft',items:[{...item,name:'十月员工'}]};
+  request.mockImplementation((path:string) => path === '/api/auth/me' ? Promise.resolve({role:'admin'})
+    : path === '/api/meal-tickets/reconcile' ? delayed
+    : Promise.resolve(path.includes('recharge_month=2026-10') ? next : batch));
+  function Navigation() {
+    const navigate = useNavigate();
+    return <button onClick={() => navigate('/meal-tickets/calculation?recharge_month=2026-10')}>换到十月</button>;
+  }
+  render(<ConfirmProvider><MemoryRouter initialEntries={['/meal-tickets/calculation?recharge_month=2026-09']}><Navigation/><MealTicketPage/></MemoryRouter></ConfirmProvider>);
+  fireEvent.click(await screen.findByRole('button',{name:'已完成充值，核对到账'}));
+  fireEvent.click(screen.getByRole('button',{name:'换到十月'}));
+  expect(screen.getByLabelText('计划充值月份')).toHaveValue('2026-09');
+  await act(async () => { finish({...batch,items:[{...item,paid_amount:176,difference:0}]}); await delayed; });
+  await screen.findByText('十月员工');
+  expect(screen.getByText('十月员工')).toBeInTheDocument();
+  expect(screen.getByLabelText('计划充值月份')).toHaveValue('2026-10');
+  expect(screen.getByRole('list',{name:'月度发放流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('计算与核对');
+  expect(screen.queryByRole('link',{name:'导出充值表（.xls）'})).not.toBeInTheDocument();
+});
+
+it('已有部分实际到账恢复核对阶段，不因没有下载记录退回充值阶段', async () => {
+  request.mockImplementation((path:string) => Promise.resolve(path === '/api/auth/me' ? {role:'admin'}
+    : {...batch,items:[{...item,paid_amount:160,difference:16}]}));
+  page();
+  await screen.findByText('员工甲');
+  expect(screen.getByRole('list',{name:'月度发放流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('核对到账');
+  expect(screen.getAllByRole('button',{name:'核对到账'})).toHaveLength(1);
+});
+
+it('后续核对失败保留原金额和待核对任务，延迟流水不自动提示再次充值', async () => {
+  const current = { ...batch, version: 3, items: [{ ...item, due_amount: 200, paid_amount: 176, difference: 24 }] };
+  const state = { batch_id: 1, batch_version: 3, offset_enabled: true, settings_digest: "s", queue_offset_enabled: true,
+    settings_changed: false, baseline_required: false, baseline_reason: "", current_task_key: null,
+    tasks: [{ key: "waiting", item_key: "i", emp_no: "001", name: "员工甲", dept_name: "生产部", kind: "recharge",
+      amount_cents: 2400, allocated_cents: 0, remaining_cents: 2400, status: "awaiting", version: 2,
+      operation_at: "2026-09-02T00:00:00", offset_enabled: true, settings_digest: "s" }] };
+  request.mockImplementation((path: string) => path.endsWith('/reconcile') ? Promise.reject(new Error('共享数据库读取失败'))
+    : Promise.resolve(path === '/api/auth/me' ? { role: 'admin' } : path.includes('followup-tasks') ? state : current));
+  render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments" /></MemoryRouter></ConfirmProvider>);
+  await waitFor(() => expect(screen.getByRole('region', { name: '待核对任务' })).toHaveTextContent('剩余 24.00 元'));
+  fireEvent.click(screen.getByRole('button', { name: '核对结果' }));
+  await screen.findByText('共享数据库读取失败');
+  expect(screen.getByRole('region', { name: '待核对任务' })).toHaveTextContent('已匹配 0.00 元 · 剩余 24.00 元');
+  expect(screen.queryByRole('button', { name: '已完成充值，下一人' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '登记实际充值 · 001' })).not.toBeInTheDocument();
+  const row = screen.getByRole('region', { name: '人员明细' }).querySelector('tbody tr')!;
+  expect(row).toHaveTextContent('176.00');
+  expect(request.mock.calls.some(([path]) => path.endsWith('/progress') || path.endsWith('/payments'))).toBe(false);
 });

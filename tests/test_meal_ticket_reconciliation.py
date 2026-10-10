@@ -213,3 +213,182 @@ class MealReconciliationTests(unittest.TestCase):
             again=self.reconcile(data)
             self.assertEqual(again.status_code,200,again.get_json())
             self.assertEqual(again.get_json()['reconciliation']['added'],0)
+
+
+class FollowupReconciliationIntegrationTests(unittest.TestCase):
+    setUp = MealReconciliationTests.setUp
+    tearDown = MealReconciliationTests.tearDown
+    post = MealReconciliationTests.post
+    generate = MealReconciliationTests.generate
+    confirm = MealReconciliationTests.confirm
+    enable = MealReconciliationTests.enable
+    reconcile = MealReconciliationTests.reconcile
+    from tests.test_meal_ticket_followup import FollowupPersistenceTests as _helpers
+    queue = _helpers.queue
+    refresh = _helpers.refresh
+    progress = _helpers.progress
+    adjustment = _helpers.adjustment
+
+    def batch(self):
+        return self.client.get('/api/meal-tickets?recharge_month=2026-09',headers=self.headers).get_json()
+
+    def prepare(self, enabled=True):
+        from models.meal_ticket import MealTicketFollowupTask
+        self.enable()
+        self.base = {'source':'subsidy','id':1,'emp_no':'001','time':datetime(2026,9,1),'amount':Decimal('176')}
+        with patch('services.card_db_client.CardDBClient.meal_records',return_value=[self.base]):
+            response = self.reconcile(self.confirm(self.generate()))
+            self.assertEqual(response.status_code,200,response.get_json())
+        self.refresh()
+        self.client.put('/api/admin/more-settings',json={'meal_ticket_offset_enabled':enabled},headers=self.headers)
+        batch = self.adjustment(self.batch(),40)
+        self.adjustment(batch,-16)
+        queue = self.refresh()
+        # Simulate a queue established on September 1, before remote September 2 funds.
+        with self.app.app_context():
+            for task in MealTicketFollowupTask.query.all():
+                task.source_snapshot = {**task.source_snapshot,'baseline_at':'2026-09-01T00:00:00'}
+                task.created_at = datetime(2026,9,1)
+            db.session.commit()
+        return queue
+
+    def read(self, rows, **kwargs):
+        with patch('services.card_db_client.CardDBClient.meal_records',return_value=[self.base]+rows):
+            return self.reconcile(self.batch(),**kwargs)
+
+    def row(self, amount=10, identifier=2, source='recharge', time=None):
+        return {'source':source,'id':identifier,'emp_no':'001','time':time or datetime(2026,9,2,12),'amount':Decimal(str(amount))}
+
+    def test_partial_delayed_repeat_and_failure_preserve_task(self):
+        queue = self.prepare()
+        self.progress(queue,queue['tasks'][0],'complete')
+        response = self.read([])
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.queue()['tasks'][0]['status'],'awaiting')
+        self.assertEqual(self.read([self.row()]).status_code,200)
+        task = self.queue()['tasks'][0]
+        self.assertEqual((task['status'],task['remaining_cents']),('partial',1400))
+        response = self.read([self.row(),self.row(14,3,time=datetime(2026,10,2))],end_date='2026-10-02')
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.queue()['tasks'][0]['status'],'verified')
+        before = self.batch()
+        response = self.read([self.row(),self.row(14,3,time=datetime(2026,10,2))],end_date='2026-10-02')
+        self.assertEqual(response.get_json()['version'],before['version'])
+        self.assertEqual(len(response.get_json()['items'][0]['payments']),3)
+        with patch('services.card_db_client.CardDBClient.meal_records',side_effect=CardDBClientError('offline')):
+            self.assertEqual(self.reconcile(self.batch()).status_code,502)
+        self.assertEqual(self.queue()['tasks'][0]['status'],'verified')
+
+    def test_same_amount_ambiguity_explicit_link_checks_available_and_versions(self):
+        queue = self.prepare()
+        self.progress(queue,queue['tasks'][0],'complete')
+        response = self.read([self.row(12,2),self.row(12,3)])
+        self.assertEqual(response.status_code,200,response.get_json())
+        queue = self.queue(); task = queue['tasks'][0]
+        self.assertEqual(task['allocated_cents'],0)
+        self.assertTrue(task['candidates']['requires_confirmation'])
+        candidate = task['candidates']['payments'][0]
+        body = {'batch_id':queue['batch_id'],'version':queue['batch_version'],'task_version':task['version'],
+                'payment_key':candidate['payment_key'],'amount_cents':1300,'request_key':'link'}
+        endpoint = '/followup-tasks/'+task['key']+'/allocations'
+        self.assertEqual(self.post(endpoint,body).status_code,409)
+        body['amount_cents']=1200
+        response = self.post(endpoint,body)
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.post(endpoint,body).get_json(),response.get_json())
+        self.assertEqual(response.get_json()['tasks'][0]['remaining_cents'],1200)
+        self.assertEqual(self.post(endpoint,{**body,'request_key':'stale'}).status_code,409)
+        queue=self.queue();task=queue['tasks'][0]
+        remaining=task['candidates']['payments'][0]
+        response=self.post(endpoint,{**body,'version':queue['batch_version'],'task_version':task['version'],
+            'payment_key':remaining['payment_key'],'request_key':'other'})
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(response.get_json()['tasks'][0]['status'],'verified')
+
+    def test_clearance_does_not_close_refund_and_classified_refund_does(self):
+        self.prepare(enabled=False)
+        rows=[self.row(40),self.row(16,3,'refund')]
+        response=self.read(rows,refund_actions={})
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual([t['status'] for t in self.queue()['tasks']],['verified','pending'])
+        response=self.read(rows,refund_actions={'3':'clearance'})
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.queue()['tasks'][1]['allocated_cents'],0)
+        response=self.read(rows+[self.row(16,4,'refund')],refund_actions={'4':'refund'})
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual([t['status'] for t in self.queue()['tasks']],['verified','verified'])
+        self.assertEqual(response.get_json()['items'][0]['paid_amount'],200)
+
+    def test_late_imported_old_funds_never_verify_new_task(self):
+        queue=self.prepare()
+        self.progress(queue,queue['tasks'][0],'complete')
+        # A remote event before the task baseline is newly imported locally.
+        response=self.read([self.row(24,time=datetime(2026,9,1,7))])
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.queue()['tasks'][0]['allocated_cents'],0)
+
+    def test_failure_after_fund_import_rolls_back_funds_and_allocations(self):
+        from services.meal_ticket_service import MealError
+        self.prepare()
+        before=self.batch()
+        with patch('services.meal_ticket_followup_service.allocate_payment',side_effect=MealError('分配失败',409)):
+            response=self.read([self.row(24)])
+        self.assertEqual(response.status_code,409,response.get_json())
+        after=self.batch()
+        self.assertEqual(after['version'],before['version'])
+        self.assertEqual(after['items'][0]['payments'],before['items'][0]['payments'])
+        self.assertEqual(self.queue()['tasks'][0]['allocated_cents'],0)
+
+
+    def test_overlarge_single_fund_requires_confirmation(self):
+        self.prepare()
+        response=self.read([self.row(40)])
+        self.assertEqual(response.status_code,200,response.get_json())
+        task=self.queue()['tasks'][0]
+        self.assertEqual(task['allocated_cents'],0)
+        self.assertTrue(task['candidates']['requires_confirmation'])
+
+    def test_old_fund_between_financial_baseline_and_new_task_not_reused(self):
+        from models.meal_ticket import MealTicketFollowupTask
+        self.prepare()
+        with self.app.app_context():
+            task=MealTicketFollowupTask.query.one()
+            task.created_at=datetime(2026,9,3)
+            db.session.commit()
+        response=self.read([self.row(24)])
+        self.assertEqual(response.status_code,200,response.get_json())
+        task=self.queue()['tasks'][0]
+        self.assertEqual(task['allocated_cents'],0)
+        self.assertEqual(task['candidates']['payments'],[])
+
+    def test_stale_unoperated_task_does_not_auto_match_changed_sources(self):
+        self.prepare()
+        self.adjustment(self.batch(),-8)
+        response=self.read([self.row(24)])
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual(self.queue()['tasks'][0]['allocated_cents'],0)
+
+    def test_two_same_direction_tasks_wait_for_explicit_link(self):
+        from models.meal_ticket import MealTicketFollowupTask
+        queue=self.prepare()
+        self.progress(queue,queue['tasks'][0],'complete')
+        self.adjustment(self.batch(),24)
+        queue=self.refresh()
+        with self.app.app_context():
+            for task in MealTicketFollowupTask.query.all():
+                task.created_at=datetime(2026,9,1)
+                task.source_snapshot={**task.source_snapshot,'baseline_at':'2026-09-01T00:00:00'}
+            db.session.commit()
+        response=self.read([self.row(24)])
+        self.assertEqual(response.status_code,200,response.get_json())
+        self.assertEqual([t['allocated_cents'] for t in self.queue()['tasks']],[0,0])
+        self.assertTrue(all(t['candidates']['requires_confirmation'] for t in self.queue()['tasks']))
+
+
+    def test_link_rejects_invalid_payment_key_before_query(self):
+        queue=self.prepare()
+        task=queue['tasks'][0]
+        response=self.post('/followup-tasks/'+task['key']+'/allocations', {
+            'batch_id':queue['batch_id'],'version':queue['batch_version'],'task_version':task['version'],
+            'payment_key':['bad'],'amount_cents':100,'request_key':'invalid-key'})
+        self.assertEqual(response.status_code,400,response.get_json())

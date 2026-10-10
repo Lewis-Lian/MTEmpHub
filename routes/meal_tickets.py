@@ -417,3 +417,48 @@ def import_confirm(identifier):
     result = serialize_import(record)
     db.session.commit()
     return jsonify(result)
+
+
+@meal_tickets_bp.get('/followup-tasks')
+@admin_required
+@handled
+def get_followup_tasks():
+    from services.meal_ticket_followup_service import get_queue
+    return jsonify(get_queue(selected_batch()))
+
+
+@meal_tickets_bp.post('/followup-tasks/refresh')
+@admin_required
+@handled
+def refresh_followup_tasks():
+    from services.meal_ticket_followup_service import refresh_queue
+    body = request.get_json(silent=True) or {}
+    operator = g.current_user.username
+    begin_write()
+    result = refresh_queue(body, operator)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/followup-tasks/<task_key>/progress')
+@admin_required
+@handled
+def followup_task_progress(task_key):
+    from services.meal_ticket_followup_service import progress_task
+    body = request.get_json(silent=True) or {}
+    operator = g.current_user.username
+    begin_write()
+    result = progress_task(task_key, body, operator)
+    db.session.commit()
+    return jsonify(result)
+
+
+@meal_tickets_bp.post('/followup-tasks/<task_key>/allocations')
+@admin_required
+@handled
+def followup_task_allocation(task_key):
+    from services.meal_ticket_followup_service import link_payment
+    begin_write()
+    result = link_payment(task_key, request.get_json(silent=True) or {}, g.current_user.username)
+    db.session.commit()
+    return jsonify(result)

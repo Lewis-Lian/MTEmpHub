@@ -26,6 +26,7 @@ ORDER = ['departments', 'shifts', 'employees', 'account_set', 'users',
          'overtime_records', 'daily_overrides', 'employee_overrides', 'manager_overrides',
          'annual_leave', 'manager_stats', 'override_history', 'sync_history', 'imports',
          'meal_batches', 'meal_items', 'meal_adjustments', 'meal_payments',
+         'meal_followup_tasks', 'meal_followup_allocations',
          'meal_imports', 'meal_import_rows', 'meal_ledger_imports', 'meal_ledger_records']
 
 

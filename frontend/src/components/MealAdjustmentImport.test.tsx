@@ -36,6 +36,11 @@ it("previews an uploaded file and only applies it after confirmation", async () 
   expect(request).toHaveBeenLastCalledWith("/api/meal-tickets/adjustment-import/confirm",
     { method: "POST", body: { token: "signed-preview" } });
   expect(screen.queryByRole("dialog")).toBeNull();
+  expect(onImported).toHaveBeenCalledTimes(1);
+  // 父页用确认返回的新批次版本刷新任务；导入本身只登记调整，不办理资金或进度。
+  expect(request.mock.calls.map(([path]) => path)).toEqual([
+    "/api/meal-tickets/adjustment-import/preview", "/api/meal-tickets/adjustment-import/confirm",
+  ]);
 });
 
 it("shows row errors and prevents confirmation", async () => {
