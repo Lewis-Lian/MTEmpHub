@@ -306,15 +306,19 @@ npm run build
 
 ## 阶段 10：完整验证、使用说明与交接
 
+**状态：** 自动化验证、说明与交接完成；隔离真实浏览器恢复、MySQL 8.0.46 迁移/并发及限定规模验证已补验；目标环境和更广压力验证仍保留限制，见阶段 10 执行记录。勾选仅表示本节列出的工作已有证据或明确限制记录，不表示生产验收签收。
+
 **Files:** 修改 `README.md`、本计划执行记录；新增 `docs/monthly-backup-user-guide.md`（界面完成后按实际文案编写）。
 
-- [ ] 设计文档 11 的十个验收场景都有真实测试或明确的人工验证记录，验证至少两个月、跨年和源/目标 ID 不同。
-- [ ] 隔离测试数据库验证升级、v1→统一格式、v2 导出→空库恢复、部分恢复；不得拿生产库做恢复实验。
-- [ ] 验证新业务字段未登记时覆盖测试会失败，以及旧包 absent 类别不会误删。
-- [ ] 运行后端全套、前端全套和构建，记录实际命令与结果。已有失败、缺环境、未连真实 MySQL 均明确注明，不能称全部通过。
+- [x] 设计文档 11 的十个验收场景都有真实测试或明确的人工验证记录，验证至少两个月、跨年和源/目标 ID 不同。
+- [x] 隔离测试数据库验证升级、v1→统一格式、v2 导出→空库恢复、部分恢复；不得拿生产库做恢复实验。
+- [x] 验证新业务字段未登记时覆盖测试会失败，以及旧包 absent 类别不会误删。
+- [x] 运行后端全套、前端全套和构建，记录实际命令与结果。已有失败、缺环境、未连真实 MySQL 均明确注明，不能称全部通过。
 
 ```bash
-python -m pytest -q
+# 禁用 .env，只运行隔离 tests/；不要执行根目录 test_api.py
+PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests -q
+PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests/test_backup_coverage.py -q
 ```
 
 前端工作目录 `frontend/`：
@@ -324,16 +328,16 @@ npm test
 npm run build
 ```
 
-- [ ] 检查差异只涉及本功能和必要历史隔离，检查迁移 head 与整库迁移清单。
+- [x] 检查差异只涉及本功能和必要历史隔离，检查迁移 head 与整库迁移清单。
 
 ```bash
 git diff --check
 git status --short
 ```
 
-- [ ] README 更新真实入口、完整资料范围、版本兼容、默认删除含义、账号重新登录、快照质量及文件限制。
-- [ ] 新增用户指南包含导出/导入步骤、选择依赖提示、旧包不可删除的说明、恢复结果和失败处理。
-- [ ] 最后记录完成阶段、未完成项、测试和部署所需迁移命令；生产数据库升级/部署另按用户授权执行。
+- [x] README 更新真实入口、完整资料范围、版本兼容、默认删除含义、账号重新登录、快照质量及文件限制。
+- [x] 新增用户指南包含导出/导入步骤、选择依赖提示、旧包不可删除的说明、恢复结果和失败处理。
+- [x] 最后记录完成阶段、未完成项、测试和部署所需迁移命令；生产数据库升级/部署另按用户授权执行。
 
 **验收：** 核心场景通过、兼容性有固定旧包证据、文档与界面一致，迁移/部署限制写清楚。
 
@@ -780,3 +784,146 @@ collect_shared_backup 保留原密码哈希及账号业务状态，不含 auth_v
 
 本次不部署、不操作生产数据库、不提交、不推送；不要把前端 HTTP 模拟测试当成真实浏览器/生产验证。
 ```
+
+
+## 实际执行记录：阶段 10
+
+- 执行日期：2026-10-10。目录 `/Users/lewis/Lewis/code/git/MTEmpHub`，分支 `master`；本人顺序验证和作者自审，无子代理。实际开始时 `git status --short` 为空，HEAD 为 `216c5a6 feat: add multi-month backups and selective restore`，阶段 0–9 已进入该提交；提示词“全部未提交”与实际状态不同，以实际 Git 为准，未改写历史。本次不提交、不推送、不部署、不操作生产数据库。
+- 本阶段初次验证范围：README、用户指南、本计划，新增 `tests/test_monthly_backup_acceptance.py` 两个集成验收测试。没有业务代码、ORM 或迁移改动，不做无关重构。
+- 新验收用真实 ZIP 编解码和 ORM 写入，月份 `2026-12`/`2027-01`：新建 schema 只有操作管理员（ID 901），其余业务为空；恢复备份账号产生不同目标 ID（源 ID 1；测试断言目标不等于 1），密码验证、人员/部门授权映射、两月考勤、唯一跨年请假单和两年年假全部核对。跨月/年度先确认不自动选择，再用服务端 row_key 显式选择 1/2 条。部分恢复另验只恢复十二月考勤，一月及未明确选中的跨月/年度记录保持目标值。
+- 新测试首次 1 failed / 6 passed：测试误把 scope 当固定 `cross_month`/`annual`，导致显式条目集合为空；查看契约确认应按 `cross_month/<dataset>` / `year/<year>/<dataset>` 前缀读取，修正测试并增加明确条目数量断言后 7 passed。没有把测试错误当业务缺陷、没有放宽产品边界，也没有业务修正的 RED→GREEN 声称。
+
+### 设计第 11 节验收证据
+
+下列都是本次后端全套内实际运行的合成 SQLite 测试；前端组件测试仍使用 HTTP 模拟，不能算真实浏览器恢复。表中的文件与函数可直接定位证据。
+
+| 场景 | 测试证据 | 验证范围 |
+| --- | --- | --- |
+| 1. 两月只恢复一月考勤 | `test_multi_month_restore.py::test_only_selected_month_is_restored`；新 `test_cross_year_partial_restore_does_not_select_cross_or_annual_rows` | 六/七月及十二月/次年一月，未选月不变，年度及跨月未明确选择不写入 |
+| 2. 完整当前资料 | `test_backup_shared_data.py::test_full_shared_collection_includes_unrelated_and_archived_data` | 无业务人员、空部门、未分配班次和归档状态进入完整集合 |
+| 3. 历史不漂移 | `test_monthly_reference_integration.py::test_query_calendar_summary_and_meal_recalculation_use_month_identity`、`test_history_download_contains_frozen_name_department_and_hours`、`test_manager_membership_and_recalculation_survive_current_type_change`；恢复测试 `test_cards_parent_reorder_and_current_exit_keep_historical_ids` | 查询、成员、权限、部门汇总、下载、重算和未选月快照保持历史身份 |
+| 4. 跨月去重、年度边界 | `test_multi_month_backup.py::test_split_zip_roundtrip_deduplicates_without_losing_relations`；新 `test_cross_year_zip_restores_fresh_schema_and_explicit_rows`；预览 `test_annual_explicit_keys_actual_year_and_locks` | 同一单据只导出/写入一次，跨年两年统计逐条选择，实际影响和锁定月检测 |
+| 5. 默认移除、明确保留、旧包子集 | 预览 `test_defaults_and_unselected_month_category`、`test_empty_complete_vs_subset_and_absent`；恢复 `test_legacy_and_absent_categories_do_not_delete_existing_current_data`、`test_cards_parent_reorder_and_current_exit_keep_historical_ids` | 完整所选默认 backup；system/skip 决策和 absent/incomplete 拒删；当前资料退出保留 ID |
+| 6. 菜票一致替换、资金关系阻止 | 恢复 `test_meal_replacement_with_changed_batch_key_and_payment_retry`、`test_batch_replacement_deletes_old_children_before_parent_key_change`；预览 `test_meal_complete_replacement_and_mixed_snapshot_block`、`test_mixed_target_only_funds_not_added_to_replaced_history` | FK 开启的真实替换，幂等重试不重复计款，悬空或混合资金关系拒绝 |
+| 7. 账号旧密码、不同 ID、旧 JWT | 新跨年新库验收；`test_multi_month_restore.py::test_new_month_and_portable_grants_use_target_business_ids`；`test_backup_account_state.py::test_version_change_revokes_cookie_and_bearer_then_new_login_succeeds`、`test_local_revocation_and_restored_hash_allow_backup_password` | 新库恢复哈希可验证；真实登录接口另测备份密码；不同本地 ID 的授权映射；旧 cookie/Bearer 失效 |
+| 8. 多月与文件失败原子回滚 | `test_second_month_database_failure_rolls_back_first_month`、`test_file_write_failure_preserves_database_and_originals`、`test_avatar_bytes_restore_and_database_failure_cleans_new_files` | 第二月失败前一月回滚，文件错误保留原文件，账号密码/新文件回滚 |
+| 9. 未登记字段及旧包保护 | `test_backup_coverage.py`；`test_backup_document.py::test_legacy_missing_non_meal_category_stays_absent`；恢复 `test_legacy_and_absent_categories_do_not_delete_existing_current_data` | 新表/字段包括排除表字段均检测，旧包缺类别不当空完整；另有本次注入失败实证 |
+| 10. 只读预览及任务保护 | 预览 `test_password_redaction_versions_and_zero_writes`；HTTP `test_multi_owner_expiry_target_change_and_failed_audit`、`test_multi_upload_repreview_restore_repeated_and_cancel`、`test_completed_audit_prevents_replay_when_metadata_write_fails` | 零业务写入；他人、过期、成功重放、目标变化拒绝，持久审计防重复 |
+
+### 隔离、兼容和迁移核查
+
+- 所有后端命令设置 `PYTHON_DOTENV_DISABLED=1`，fixture 使用内存/临时 SQLite 与临时文件。未执行根目录 `test_api.py`，未读取 `.env` 去连接业务数据库。
+- 升级证据：`test_monthly_reference_snapshot.py::test_snapshot_upgrade_preserves_rows_and_is_compatible_with_create_all` 与 `test_backup_account_state.py::test_account_state_upgrade_preserves_legacy_users_and_audit` 在临时库实际执行 Alembic/legacy 路径，保留存量行、默认状态、幂等；不是实际 MySQL 升级。MySQL 只做方言编译和模拟 SQL 边界测试。
+- 固定旧包：`tests/fixtures/monthly_backup/legacy-v1.zip` 由 `test_fixed_legacy_zip_can_be_read_by_old_and_normalized_callers` 验证 v1→统一格式；旧路径和新路径兼容实际恢复测试均保留。
+- 覆盖注入：独立 Python 进程给 `Employee.__table__` 临时追加 `stage10_unregistered_field`，运行 `test_every_model_and_field_has_a_backup_decision` 得到预期 **1 failed**（报告 `employees.stage10_unregistered_field`）；断言 pytest 退出码 TESTS_FAILED 后结束进程。没有写 ORM 文件或数据库 DDL。随后正常覆盖检查 **5 passed in 0.17s**。
+- 只读 Alembic ScriptDirectory 核查唯一 head **`20261009_account_state`**，down_revision 为 `20261009_month_refs`；本阶段不新增迁移。第一次直接读取 `migrations/alembic.ini` 因没有 script_location 报错，改为显式 `Config.set_main_option('script_location', 'migrations')`，不创建应用也不连接数据库。
+- 整库迁移 `MIGRATION_ORDER` 包含快照、账号完整列及授权、考勤修正历史和菜票业务；与 metadata 对比仍缺 **`account_set_backup_origins`、`account_set_backup_restores`、`daily_attendance_overrides`、`messages`** 四张既有表。README 修正为实际表名；这是已有整库切换限制，本次不扩展功能修复。切库不能宣称完整搬迁，文件也不会自动复制。
+
+### 实际命令与结果
+
+- 基线全套：`PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests -q` → **866 passed in 242.07s**（不含本阶段两项新测试），退出码 0。
+- 新验收与覆盖：`PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests/test_monthly_backup_acceptance.py tests/test_backup_coverage.py -q` → **7 passed in 1.02s**。
+- 隔离升级/格式/覆盖定向：`PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests/test_backup_document.py tests/test_backup_coverage.py tests/test_monthly_reference_snapshot.py tests/test_backup_account_state.py tests/test_monthly_backup_acceptance.py -q` → **70 passed in 9.29s**。
+- `frontend/` 内 `npm test` → **54 files / 466 passed，10.35s**，退出码 0。`npm run build` → **成功，退出码 0**；仍有既有 >500 kB bundle 提醒，AdminMessagesPage 815.60 kB，未做无关拆包。
+- 最终包含新增验收的后端全套：`PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests -q` → **868 passed in 257.77s（4:17）**，退出码 0，无失败或警告。
+- 完整日志临时保存在 `/private/tmp/mtemphub-stage10-{backend,backend-final,frontend,build,acceptance,isolation,coverage-mutation}.log`；长期交接以本执行记录的命令和结果为准。
+
+### 浏览器实际记录与未完成项
+
+- Chrome 使用独立 `http://127.0.0.1:5098` 和 `/private/tmp/mtemphub-stage10-browser/acceptance.db`，全部合成数据：十二月/次年一月考勤、测试部门/人员及跨年请假。独立 Cookie 名 `stage10_test_token`。临时脚本显式禁用 dotenv、指定数据库及运行目录，为合成账号提供预置测试会话；未测试真人登录/验证码，也没有进入原业务标签页进行操作。临时测试脚本和会话入口不写入仓库、不用于部署。
+- 浏览器实际打开账套设置、多月导出弹窗：确认 2026-12/2027-01 可选、11 类默认选中（含账号）、完整当前资料说明和 100 MiB 提示；点击开始导出后页面显示 **“备份下载完成 100%”**，Chrome 下载列表显示 **“多月份备份.zip 3.8 KB · 完成”**。自动等待 download 事件超时，但界面和下载列表证实完成，未将工具等待失败误记为业务失败。
+- 进入“导入月度账套”并点击“选择账套备份”，尝试上传合成 `cross-year.zip` 时扩展要求 “Allow access to file URLs”；未改变扩展权限。**当时浏览器上传→比较→确认→恢复结果/重新登录尚未完成；用户开启权限后已补验，见下方续验记录**，不能把组件模拟 HTTP 或后端集成通过写成浏览器全流程通过。验收服务已经停止；关闭测试标签页时浏览器工具报告不可用，不操作其他业务标签页。
+- 当时待办的浏览器上传、部分恢复、跨月/年度明确选择、409 重比、失败保留选择、成功 warnings 和结果后重新登录已在下方续验完成。仍待授权隔离环境完成：真实 MySQL 升级/恢复/并发锁；文件权限/磁盘异常的目标环境验证；大月份/大差异性能及接近文件上限的真实规模验证。当前没有指定隔离 MySQL 实例，不借用生产连接。
+
+### 运维交接（命令仅交接，本次未执行生产升级）
+
+先完整备份现有数据库、上传目录与配置，检查目标连接和权限；在授权隔离副本验收后再安排升级。使用目标环境 Python，mac 本地可替换为 `.venv-mac/bin/python`：
+
+```bash
+# 现有已纳管数据库：核对现状，再升级、检查 head
+python -m flask --app manage.py db current
+python -m flask --app manage.py db upgrade
+python -m flask --app manage.py db current
+# 预期最终版本：20261009_account_state
+
+# 全新空库（基线迁移依赖已存在表，不能直接 db upgrade）
+python -m flask --app manage.py init-db
+python -m flask --app manage.py init-admin
+
+# 旧月先只读核对，不自动采集/重算
+python -m flask --app manage.py scan-month-references --inspect-archives
+# 人工核对并明确同意基线语义后，才选择指定月份采集，例如：
+python -m flask --app manage.py capture-month-references --month 2026-12 --month 2027-01
+```
+
+历史兼容结构/版本不一致时参考 README 的 `upgrade-legacy-schema` 流程，先核对实际结构，不能盲目 stamp 或把兼容补丁当所有迁移。baseline 不证明真实过去；证据冲突需明确选取，不能自动把当前值当 verified。
+
+本次交接不授权生产升级、部署、提交或推送。README 和用户指南已反映真实按钮、范围、默认移除、旧包保护、依赖、快照质量、账号结果先展示再重新登录及限制；阶段 10 的自动化验证与文档交接不等于生产就绪签收，上述真实环境事项继续保留待办。
+
+- 文档校验：核对验收表完整文件/函数引用及 README/指南相对链接，均存在；`git diff --check` 通过。
+- 作者自审：遵照本次不派发要求，自行核对新增测试、真实按钮文案、文档默认策略、兼容/回滚/历史隔离、迁移清单及验证边界；没有发现需修改业务实现的缺陷。不是独立审查代理或生产验收。
+
+
+### 最终状态
+
+- 阶段 10 上述 8 项验证/文档/交接复选框已勾选，依据本记录逐项证据；新增 2 项验收测试；续验先写真实浏览器失败断言，再作一处必要 CSS 修正。所有设计验收场景已有测试证据，但仍保留以下环境验收事项：
+  - [x] 隔离浏览器真实上传→比较→选择→确认→结果、warnings 及重新登录跳转；见续验。真人登录/验证码未测。
+  - [x] 真实隔离 MySQL 8.0.46 增量升级、恢复与独立连接并发锁验证（见后续记录）。
+  - [ ] 实际部署环境文件权限、磁盘异常、多主机与高并发压力验证。
+  - [x] 合成 24 月 / 67,200 条考勤与 90 MiB 文件，在 SQLite 和真实 MySQL 验证（见后续记录）。
+  - [ ] 大列表浏览器/网络端到端性能与实际业务数据代表性负载验收。
+- 初次收尾 `git diff --check` 通过；当时仅文档与新增验收测试改动。续验增加一处 CSS 和浏览器回归断言，最终状态见下方。HEAD 仍为 `216c5a6`，未 stage/commit/push；没有生产库、设备或外部资金操作。
+
+### 用户开启文件访问权限后的真实浏览器续验（2026-10-10）
+
+- 用户开启扩展文件访问权限后，Chrome 实际上传成功。继续使用 `127.0.0.1:5098` 的构建前端、真实 Flask 路由与专用临时 SQLite 合成库，未访问生产数据库。没有子代理、生产升级、部署、提交或推送。会话预置入口只在临时脚本中，真人登录/验证码不属于本次浏览器证据。
+- 部分恢复：上传十二月/次年一月 ZIP，仅选择十二月考勤。预览后直接变更隔离库目标值，真实恢复接口返回 **409**；页面显示“系统数据已变化，请重新比较并检查差异后确认。”、保留选择并阻止确认。重新预览后恢复成功；实际数据库十二月为 8、一月仍为 1。
+- 账号恢复：只选账号类别，密码预览显示“一致”，未显示哈希；恢复结果先留在账套页，并提示核对结果后重新登录。点击“重新登录”才跳转 `/login`。账号资料与本地 auth_version 更新已在隔离库核对。
+- 多月失败：只在临时 SQLite 创建第二月更新失败的测试 trigger。浏览器选两月差异、批量采用备份并确认，接口失败；数据库十二月/一月仍为失败前的 3/2，全部回滚。行勾选和 choices 保留；筛选十二月时隐藏勾选计数为 1。移除本次测试 trigger、重新预览并重试后两月为 8/7。
+- 跨月/年度：合成 ZIP 包含唯一跨年请假单与 2026/2027 两条年假。只选择十二月、跨月和年度类别时条目仍未自动选择；逐条勾选服务端条目后，确认展示跨年影响及两年实际影响月份。成功 3 项更新：年假为 5/6、请假类型恢复为病假；考勤仍为 8/7，未隐式扩展类别。
+- 成功 warnings 与重新登录同屏：仅在临时服务注入清理异常，业务事务真实提交。浏览器结果显示 2 项更新、警告“旧归档清理暂未完成，恢复数据已保存，下次恢复时会重试”，随后才提供重新登录引导。数据库考勤/账号已恢复；服务日志在 restore 200 后、点击重新登录前没有业务 GET。不是模拟前端 HTTP 响应，也没有触碰真实归档。测试注入和标记不写入仓库。
+
+**发现缺陷及 RED→GREEN：** 多条年度/跨月差异存在时，弹窗 flex 布局把 `.backup-differences` 压到 **0 px**，14 条记录在 DOM 内但不可见、无法操作。先新增 `docs/testing/monthly-backup-browser-layout.js` 的实际浏览器断言，在旧样式上得到 `Backup rows are inaccessible: 14 rows, 0px scroll area`。随后仅在 `frontend/src/pages/admin/account-center.css` 增加 `flex-shrink: 0`。重建、重新上传，在同一浏览器断言得到 **14 rows / 260 px**，然后完成上述逐条恢复。这段断言需在 cua_repl 的隔离 tab 上运行 `await assertMonthlyBackupListVisible(tab)`；不将 jsdom 测试算作实际布局验证，不重构其他样式。
+
+- CSS 修正后 `frontend/`：`npm test` → **54 files / 466 passed，11.40s**，退出码 0；`npm run build` → 成功、退出码 0，仍有既有 AdminMessagesPage **815.60 kB** / >500 kB 提醒。日志 `/private/tmp/mtemphub-stage10-browser-{frontend,build}.log`。后端代码未变，沿用本阶段已跑的 **868 passed** 全套结果，不声称续验重跑了后端。
+- 续验收尾：移除本次临时故障标记并停止隔离服务；`git diff --check` 通过。`git status --short` 为 README、本计划、单行 CSS modified，用户指南、浏览器布局断言、后端验收测试 untracked；HEAD 仍为 `216c5a6`。未 stage/commit/push。
+- 此次浏览器续验结束时，MySQL 与规模验证仍待办，之后已按下节限定范围补验。目标环境文件权限/磁盘异常、浏览器大列表/网络性能、真人登录/验证码仍未完成；不能替代生产签收。
+
+### 真实 MySQL、并发与规模续验（2026-10-10）
+
+- 沿用原目录、全部未提交更改和顺序执行要求，无子代理。本次只新增独立验收脚本 `docs/testing/monthly_backup_mysql.py`、`docs/testing/monthly_backup_scale.py` 和 [隔离复跑说明](../testing/monthly-backup-verification.md)，更新本记录；没有业务代码、ORM、备份登记或迁移改动。
+- 本机没有 mysqld/MariaDB、Docker/Podman。使用官方 `mysql-8.0.46-macos15-arm64.tar.gz`，MD5 与官方值 `aefb850c25a2c703a63554283fb94cae` 一致，解压到 `/private/tmp/mtemphub-stage10-mysql`。`--no-defaults` 初始化独立 data，启动参数 `--skip-networking --mysqlx=OFF`，只允许该目录 Unix socket。实际只读核对 **8.0.46 / REPEATABLE-READ / port 0 / skip_networking 1**，datadir 为该临时目录。没有全局安装、Homebrew 服务、生产连接或项目 `.env`。
+- 默认沙箱下 mysqld 初始化/启动崩溃，允许系统调用后初始化成功；默认沙箱也禁止 Unix socket 连接，精确授权临时实例的测试命令后可运行。没有因权限错误改用生产实例。`.venv-mac` 缺 `pymysql`；网络安装先因解析限制失败，随后下载项目指定的 PyMySQL 1.1.1 wheel 并核对 PyPI SHA256，只安装在 `/private/tmp/mtemphub-stage10-python`，未修改现有虚拟环境或 requirements。
+- MySQL 测试先核对 `@@datadir`，每项创建随机 `mtemphub_stage10_<uuid>` schema，结束只清理自己创建的 schema。stamp 只在这些测试 schema 重建的明确旧状态使用，不是生产 stamp。两项增量迁移从 `20261009_meal_rules` 实际升级至 `20261009_account_state` 并重复 upgrade，原员工、账号和审计行保留，默认有效、auth_version 0、操作人名称回填正确。
+- 真实 MySQL 覆盖：跨年两月 ZIP 到业务空库、源账号 ID 1→目标不同 ID、密码/授权、逐条跨月/两年年假；只恢复选月；v1 ZIP→统一格式和旧资料 absent/incomplete 保护；v1 厂休/归档实际恢复；多月第二月失败全部回滚；菜票外键开启状态下父 key 替换及本地幂等重试。
+- 并发不是 SQL 模拟：独立连接更新在恢复持锁时进入 `performance_schema.data_lock_waits`，恢复完成后才提交；普通写入先持锁并提交后，等待的恢复读到新值、拒绝旧指纹；同主机两项恢复串行，后一项因指纹变化被拒绝，成功/失败审计分别一条。没有隐式扩大恢复选择。
+- 初次真实 MySQL **2 failed / 8 passed in 4.39s**：复用菜票测试含 SQLite `PRAGMA`；另一断言把失败审计也算作成功。改为检查 MySQL `@@foreign_key_checks=1`、明确成功/失败两条审计，业务代码未变。修正后 10 passed，追加先行写入/旧包恢复后 **13 passed in 5.49s**。
+
+实际命令（全部禁用 dotenv）：
+
+```bash
+PYTHON_DOTENV_DISABLED=1 PYTHONPATH=.:/private/tmp/mtemphub-stage10-python .venv-mac/bin/python -m pytest docs/testing/monthly_backup_mysql.py -q -s
+PYTHON_DOTENV_DISABLED=1 PYTHONPATH=. .venv-mac/bin/python -m pytest docs/testing/monthly_backup_scale.py -q -s
+PYTHON_DOTENV_DISABLED=1 PYTHONPATH=. .venv-mac/bin/python -m pytest docs/testing/monthly_backup_scale.py::test_real_ninety_mib_archive_and_over_limit_rejection tests/test_backup_coverage.py -q -s
+```
+
+- SQLite 规模最终 **2 passed in 67.62s**：24 月、100 人、67,200 条日报；导出校验 20.522s，读取 2.131s，69,751 条预览（含快照/账套等）19.796s，恢复明确所选十二月 2,800 条 22.050s，其他 23 月保持原值。ZIP 323,016 bytes，整个进程峰值 RSS **1,230,503,936 bytes（约 1.23 GB）**。测量使用实际 ORM/ZIP/数据库，没有假进度、mock HTTP 或生产数据。
+- 90 MiB 随机文件 ZIP（不可用压缩零填充冒充大小）实际导出、读入；追加恢复后核对目标文件大小和 SHA256。补验文件恢复与覆盖登记最终 **6 passed in 2.40s**：导出校验 1.572s、读取 0.113s、写入恢复 0.097s；ZIP 94,403,018 bytes。100 MiB + 1 字节的文件导出和上传读入都实际拒绝。
+- 规模脚本初次文件测试只选 archives，没有选择该归档所属 attendance 类别，实际包正确不包含原文件；改正测试范围后通过。追加恢复测试后，超限检查误修改恢复前原路径而非已经恢复的目标路径；改为目标路径后通过。都是测试构造问题，没有修改业务实现或声称业务 RED→GREEN。
+
+- MySQL 规模同样使用真实 ORM/ZIP 与随机 schema：24 月导出校验 **39.198s**、读取 **2.066s**、预览 **38.693s**、明确所选月恢复 **42.911s**；67,200 条考勤保持总数，2,800 条恢复，其他月保持原值。预览 69,751 条，ZIP 314,934 bytes，进程峰值 RSS **1,244,528,640 bytes（约 1.24 GB）**。
+- 包含规模的 MySQL 批次 **14 passed / 1 failed in 134.00s**：运行中的 Python 已加载超限检查旧路径版本，文件读写/恢复本身成功，只有该测试构造断言失败。修正路径后仅定向重跑该项（不无故重复已通过的 24 月验证）：**1 passed in 2.52s**，导出校验 1.490s、读取 0.106s、恢复 0.107s、ZIP 94,403,008 bytes，峰值 RSS 465,371,136 bytes。最终 15 项都有通过证据，但不是一次“15 passed”的命令结果，不能把中间失败省略成全程绿灯。
+- 完整临时日志：`/private/tmp/mtemphub-stage10-mysql-{tests,final,scale-final,file-final}.log` 和 `/private/tmp/mtemphub-stage10-scale{,-final,-file-final}.log`；最终命令可按隔离复跑说明执行。普通后端 tests/ 的上次 **868 passed**、前端 **466 passed** 与构建成功保留为前次证据；本次没有业务/前端修改，不声称重新跑了这些全套。本次覆盖检查实跑 **5 passed**（上述 6 项内）。
+- 收尾确认临时实例所有 `mtemphub_stage10_*` schema 已清理，校验 datadir 后只关闭该测试实例。保留临时压缩包和独立数据目录供复跑，未安装全局服务。`git diff --check` 通过，HEAD 仍为 `216c5a6`；保护原未提交修改，无 stage/commit/push、部署、生产库或设备操作。作者自审确认新增脚本显式隔离、实际测试证据与失败记录，不派发审查代理。
+- 结论与边界：真实 MySQL 增量迁移、恢复、独立连接并发和本次 24 月/90 MiB 限定规模验证已有证据；**没有新发现需要修改业务实现的缺陷**。约 39 秒 MySQL 预览、约 1.24 GB 峰值不是性能优化成果或生产容量保证。本阶段不顺手优化；实际 MySQL 版本/配置、全历史升级链、多主机、故障/权限/磁盘、浏览器大列表及网络上传、代表性负载/更高并发仍需在目标隔离环境签收。迁移 head 和此前整库迁移四表缺口保持原交接，不执行生产迁移。
+
+### 用户授权提交与推送前的验证（2026-10-10）
+
+用户随后明确要求“提交并推送”，本次据此提交阶段 10 文件；此前不提交/不推送的记录描述当时行为。生产数据库操作和部署仍未授权、未执行。
+
+- 提交前新跑 `PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests -q` → **868 passed in 252.79s**，退出码 0；没有执行根目录 test_api.py。
+- 独立覆盖检查 `PYTHON_DOTENV_DISABLED=1 .venv-mac/bin/python -m pytest tests/test_backup_coverage.py -q` → **5 passed in 0.15s**。
+- `frontend/` 新跑 `npm test` → **54 files / 466 passed，14.15s**；`npm run build` 成功，退出码均为 0，保留既有 AdminMessagesPage 815.60 kB / >500 kB 警告。
+- 只读复核 Alembic 唯一 head `20261009_account_state`；`git diff --check` 与暂存区检查通过。实际 MySQL/规模证据沿用上一节，不虚称此次再次启动临时实例。
+- README 和用户指南同步续验后的真实状态，区分已完成的隔离 MySQL/并发/限定规模与未完成的目标环境、多主机和浏览器大列表压力验收。
+- 提交范围仅 9 个阶段 10 文件；不包含临时数据库、下载包、依赖或日志。提交前只读查询 origin/master 为 `216c5a6`，与原本地基线一致。后续普通推送，不使用 force。

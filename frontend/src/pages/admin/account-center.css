@@ -1534,7 +1534,7 @@
 .backup-summary-item--changed { border-color: #f5dfb6; background: #fffbf2; }
 .backup-summary-item--system_only { border-color: #cfe5fa; background: #f3f9ff; }
 .backup-summary-item--same { background: #f8fafc; }
-.backup-differences { max-height: 32vh; padding-right: 4px; scrollbar-width: thin; }
+.backup-differences { max-height: 32vh; flex-shrink: 0; padding-right: 4px; scrollbar-width: thin; }
 .backup-differences details { padding: 12px 14px; margin: 8px 0; box-shadow: 0 2px 8px rgba(15, 23, 42, .025); }
 .backup-differences summary { line-height: 1.9; }
 .backup-row-category { color: var(--acm-primary); margin-right: 10px; }
