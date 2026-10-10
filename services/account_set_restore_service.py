@@ -455,10 +455,10 @@ def restore_backup(document, options, choices, fingerprint, operator_id):
                     shutil.rmtree(destination)
 
 
-def build_multi_preview(document, selection, choices=None):
+def build_multi_preview(document, selection, choices=None, *, progress=None):
     """V2 read-only preview; legacy single-month restore remains separate."""
     from services.multi_month_restore_preview import build_multi_preview as build
-    return build(document, selection, choices)
+    return build(document, selection, choices, progress=progress)
 
 
 def restore_multi_backup(document, selection, choices, fingerprint, operator_id, *, task_id=None):

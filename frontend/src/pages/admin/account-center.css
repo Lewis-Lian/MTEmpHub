@@ -1365,6 +1365,7 @@
 .backup-processing-spinner { flex-shrink: 0; width: 30px; height: 30px; border: 3px solid #dbe1ff; border-top-color: var(--acm-primary); border-radius: 50%; animation: backup-processing-spin 1s linear infinite; }
 .backup-processing-copy { flex: 1; min-width: 0; }
 .backup-processing-copy strong { color: var(--acm-primary); font-size: 14px; }
+.backup-import-progress { display: block; width: 100%; height: 8px; accent-color: var(--acm-primary); }
 .backup-processing-copy p { margin: 6px 0 12px; color: var(--acm-text-secondary); font-size: 12px; line-height: 1.6; }
 .backup-processing-track { display: block; height: 4px; overflow: hidden; border-radius: 8px; background: #dfe5ff; }
 .backup-processing-track > span { display: block; width: 35%; height: 100%; border-radius: inherit; background: #818cf8; animation: backup-processing-slide 1.6s ease-in-out infinite alternate; }

@@ -1,12 +1,14 @@
 import { afterEach, expect, it, vi } from 'vitest';
 const request = vi.hoisted(() => vi.fn());
 vi.mock('./client', async importOriginal => ({...(await importOriginal<object>()), apiRequest: request}));
-import { downloadAccountSetBackup } from './accountSetBackup';
+import { downloadAccountSetBackup, uploadMonthlyBackup } from './accountSetBackup';
 
 class DownloadXHR {
   static instance: DownloadXHR;
   status = 200; response = new Blob(['zip'], {type:'application/zip'});
   responseType = ''; withCredentials = false;
+  responseText = '{"token":"preview"}';
+  upload: {onprogress?: (event: {lengthComputable: boolean; loaded: number; total: number}) => void; onload?: () => void} = {};
   onprogress?: (event: {lengthComputable: boolean; loaded: number; total: number}) => void;
   onload?: () => void; onerror?: () => void; onabort?: () => void;
   open = vi.fn(); send = vi.fn(); setRequestHeader = vi.fn(); getResponseHeader = vi.fn(() => 'application/zip');
@@ -29,6 +31,31 @@ it('reports backend work and actual transferred bytes then saves the selected mo
   expect(click).toHaveBeenCalled();
   expect(xhr.open).toHaveBeenCalledWith('GET', expect.stringContaining('/account-sets/7/backup?export_token='));
   expect(vi.getTimerCount()).toBe(1); // Object URL cleanup only, polling stopped.
+});
+it('reports real upload bytes then backend counts and stops polling when the response arrives', async () => {
+  vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
+  request.mockResolvedValue({status:'running', phase:'target', percent:25, completed:25, total:100, stage:'读取本地数据'});
+  const progress = vi.fn();
+  const task = uploadMonthlyBackup(new File(['zip'],'backup.zip'), progress);
+  const xhr = DownloadXHR.instance;
+  xhr.upload.onprogress?.({lengthComputable:true,loaded:5,total:10});
+  expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({phase:'upload',completed:5,total:10,percent:50}));
+  xhr.upload.onload?.();
+  await vi.advanceTimersByTimeAsync(600);
+  expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({phase:'target',completed:25,total:100,percent:25}));
+  xhr.getResponseHeader.mockReturnValue('application/json'); xhr.onload?.();
+  await expect(task).resolves.toEqual({token:'preview'});
+  expect(vi.getTimerCount()).toBe(0);
+});
+it('stops import polling and propagates validation errors', async () => {
+  vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
+  const task = uploadMonthlyBackup(new File(['bad'],'backup.zip'), vi.fn());
+  const failure = expect(task).rejects.toThrow('单据时间区间无效');
+  const xhr = DownloadXHR.instance;
+  xhr.status = 400; xhr.responseText = '{"error":"单据时间区间无效"}';
+  xhr.getResponseHeader.mockReturnValue('application/json'); xhr.onload?.();
+  await failure;
+  expect(vi.getTimerCount()).toBe(0);
 });
 it('surfaces server errors without reporting successful completion', async () => {
   vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);

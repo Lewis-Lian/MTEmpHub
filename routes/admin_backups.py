@@ -140,37 +140,59 @@ def register_admin_backup_routes(bp, admin_required):
         from services.account_set_export_progress_service import get_export_progress
         return jsonify(get_export_progress(request.args.get('export_token'), None, g.current_user.id))
 
+    @bp.get('/backups/preview/progress')
+    @admin_required
+    @handled
+    def multi_backup_import_progress():
+        from services.account_set_import_progress_service import get_import_progress
+        return jsonify(get_import_progress(request.args.get('progress_token'), g.current_user.id))
+
     @bp.post('/backups/preview')
     @admin_required
     @handled
     def multi_backup_upload():
-        if request.content_length and request.content_length > MAX_UPLOAD + 1024 * 1024:
-            return jsonify({'error': '上传文件超过 100 MiB'}), 413
-        uploaded = request.files.get('file')
-        if not uploaded:
-            raise BackupError('请选择 ZIP 备份文件')
-        data = uploaded.stream.read(MAX_UPLOAD + 1)
-        if len(data) > MAX_UPLOAD:
-            return jsonify({'error': '上传文件超过 100 MiB'}), 413
-        document = read_backup(data, normalized=True)
-        from services.account_set_backup_schema import DATASET_CATEGORIES, FILE_DATASETS
-        included = {scope.split('/')[-1] for scope, coverage in document['coverage'].items() if coverage['included']}
-        categories = {DATASET_CATEGORIES[name] for name in included} - {'monthly_references'}
-        if included & (FILE_DATASETS | {'meal_import_rows'}):
-            categories.add('archives')
-        selection = dict(months=document['months'], categories=sorted(categories), cross_month_keys=[], annual_keys=[])
-        preview = build_multi_preview(document, selection)
-        clean_expired()
-        token = uuid.uuid4().hex
-        path = preview_root() / token
-        path.mkdir(mode=0o700)
+        from services.account_set_import_progress_service import start_import_progress
+        progress_token = request.args.get('progress_token')
+        update = start_import_progress(progress_token, g.current_user.id) if progress_token is not None else None
         try:
-            (path / 'backup.zip').write_bytes(data)
-            atomic_json(path / 'metadata.json', dict(owner_id=g.current_user.id, created_at=time.time(), format='multi'))
-        except Exception:
-            shutil.rmtree(path)
+            if request.content_length and request.content_length > MAX_UPLOAD + 1024 * 1024:
+                if update:
+                    update(status='failed', phase='failed', stage='上传文件超过 100 MiB')
+                return jsonify({'error': '上传文件超过 100 MiB'}), 413
+            uploaded = request.files.get('file')
+            if not uploaded:
+                raise BackupError('请选择 ZIP 备份文件')
+            data = uploaded.stream.read(MAX_UPLOAD + 1)
+            if len(data) > MAX_UPLOAD:
+                if update:
+                    update(status='failed', phase='failed', stage='上传文件超过 100 MiB')
+                return jsonify({'error': '上传文件超过 100 MiB'}), 413
+            document = read_backup(data, normalized=True, progress=update)
+            from services.account_set_backup_schema import DATASET_CATEGORIES, FILE_DATASETS
+            included = {scope.split('/')[-1] for scope, coverage in document['coverage'].items() if coverage['included']}
+            categories = {DATASET_CATEGORIES[name] for name in included} - {'monthly_references'}
+            if included & (FILE_DATASETS | {'meal_import_rows'}):
+                categories.add('archives')
+            selection = dict(months=document['months'], categories=sorted(categories), cross_month_keys=[], annual_keys=[])
+            preview = build_multi_preview(document, selection, progress=update)
+            clean_expired()
+            token = uuid.uuid4().hex
+            path = preview_root() / token
+            path.mkdir(mode=0o700)
+            try:
+                (path / 'backup.zip').write_bytes(data)
+                atomic_json(path / 'metadata.json', dict(owner_id=g.current_user.id, created_at=time.time(), format='multi'))
+            except Exception:
+                shutil.rmtree(path)
+                raise
+            response = jsonify(dict(token=token, selection=selection, **preview))
+            if update:
+                update(status='completed', phase='completed', completed=1, total=1, stage='差异预览已就绪')
+            return response
+        except Exception as exc:
+            if update:
+                update(status='failed', phase='failed', stage=str(exc) if isinstance(exc, BackupError) else '备份解析失败')
             raise
-        return jsonify(dict(token=token, selection=selection, **preview))
 
     @bp.post('/backups/<token>/preview')
     @admin_required

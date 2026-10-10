@@ -50,8 +50,12 @@ def _serialize(name, obj):
     return value
 
 
-def _target_state():
+def _target_state(progress=None):
     state, local = {}, {}
+    completed = 0
+    total = sum(ds.model.query.count() for ds in V2_DATASETS.values()) if progress else 0
+    if progress:
+        progress(phase='target', completed=0, total=total, stage='读取本地数据')
     for name, ds in V2_DATASETS.items():
         for obj in ds.model.query.order_by(ds.model.id).all():
             value = _serialize(name, obj)
@@ -66,6 +70,9 @@ def _target_state():
                 'id': obj.id, 'auth_version': getattr(obj, 'auth_version', None),
                 'login_locked_until': serial(getattr(obj, 'login_locked_until', None)),
                 'stored_path': getattr(obj, 'stored_path', None), 'avatar': getattr(obj, 'avatar', None)}
+            completed += 1
+            if progress:
+                progress(phase='target', completed=completed, total=total, stage='读取本地数据')
     return state, local
 
 
@@ -108,14 +115,14 @@ def _selection(document, selection):
     return result
 
 
-def build_multi_preview(document, selection, choices=None):
+def build_multi_preview(document, selection, choices=None, *, progress=None):
     # Prevent relationship loads, history identity lookups and queries from
     # flushing unrelated pending changes. No snapshot capture or file staging.
     with db.session.no_autoflush:
-        return _build(document, selection, choices)
+        return _build(document, selection, choices, progress=progress)
 
 
-def _build(document, selection, choices, *, private=False):
+def _build(document, selection, choices, *, private=False, progress=None):
     if document.get('format_version') == 2 and document.get('source_format_version') == 1:
         # Normalized V1 is not a native V2 document: reconstruct the frozen
         # codec input and derive coverage again, never trust elevated coverage.
@@ -136,9 +143,15 @@ def _build(document, selection, choices, *, private=False):
             block['account_set'].setdefault('month', month)
     source = {scope: {_key(scope.split('/')[-1], v): v for v in values}
               for scope, values in _contents(document).items()}
-    target, local = _target_state()
+    if progress:
+        progress(phase='target', completed=0, total=0, stage='统计本地数据量')
+    target, local = _target_state(progress)
     accounts = {a.month: a for a in AccountSet.query.all()}
     rows, internal = [], {}
+    comparison_total = sum(len(target.get(scope, {}).keys() | source.get(scope, {}).keys())
+                           for scope in document['coverage']) if progress else 0
+    if progress:
+        progress(phase='comparison', completed=0, total=comparison_total, stage='比较备份与本地数据')
     def quality(state, month):
         values = list(state.get(_scope('snapshots', month), {}).values())
         return 'missing' if not values else ('partial' if any(v['quality'] == 'partial' for v in values)
@@ -202,6 +215,8 @@ def _build(document, selection, choices, *, private=False):
             rows.append(public)
             destination = _scope(name, (right or left)['month']) if name == 'meal_ledger_imports' else scope
             internal[key] = (destination, identity, left, right)
+            if progress:
+                progress(phase='comparison', completed=len(rows), total=comparison_total, stage='比较备份与本地数据')
     valid = {r['row_key']: r for r in rows}
     for field, prefix in (('cross_month_keys', 'cross_month/'), ('annual_keys', 'year/')):
         if any(key not in valid or not valid[key]['scope'].startswith(prefix) for key in selection[field]):
@@ -229,6 +244,8 @@ def _build(document, selection, choices, *, private=False):
         else:
             final.setdefault(scope, {})[identity] = {**(left or {}), **deepcopy(right)}
         changes.append(r)
+    if progress:
+        progress(phase='dependencies', completed=0, total=0, stage='校验关联关系与生成预览')
     blockers = _validate(final, target, source, rows, changes, selection, document, accounts)
     # All inspected dependency state is included. Keep password hashes private;
     # the only exported fingerprint is a SHA-256 digest of this private state.

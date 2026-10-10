@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { MonthlyBackupPreview, MonthlyBackupRow, RestoreSelection } from '../../api/accountSetBackup';
 const mocks = vi.hoisted(() => ({ upload: vi.fn(), refresh: vi.fn(), restore: vi.fn(), cancel: vi.fn() }));
@@ -31,6 +31,21 @@ async function upload() {
 }
 function renderModal(done = vi.fn(), login = vi.fn()) { render(<AccountSetBackupModal onClose={() => {}} onRestored={done} onReauthenticate={login} />); return {done,login}; }
 async function confirm() { fireEvent.click(screen.getByRole('button',{name:'查看导入确认'})); fireEvent.click(screen.getByRole('button',{name:'确认导入'})); }
+it('shows real stage counts while uploading and removes progress when the preview arrives', async () => {
+  let report: (work: {phase: string; stage: string; completed: number; total: number; percent: number | null; status: string}) => void;
+  let finish: (value: MonthlyBackupPreview) => void;
+  mocks.upload.mockImplementation((_file, callback) => { report = callback; return new Promise(resolve => { finish = resolve; }); });
+  renderModal();
+  fireEvent.change(screen.getByLabelText('选择账套备份'), {target:{files:[new File(['zip'],'backup.zip')]}});
+  act(() => report({phase:'target',stage:'读取本地数据',completed:25,total:100,percent:25,status:'running'}));
+  expect(screen.getByRole('progressbar')).toHaveAttribute('value', '25');
+  expect(screen.getByText(/25 \/ 100 条记录/)).toBeInTheDocument();
+  expect(screen.getByText(/已耗时/)).toBeInTheDocument();
+  act(() => report({phase:'dependencies',stage:'校验关联关系',completed:0,total:0,percent:null,status:'running'}));
+  expect(screen.getByRole('progressbar')).not.toHaveAttribute('value');
+  await act(async () => finish(preview));
+  expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+});
 it('recognizes actual included scope and explains incomplete or absent deletion and snapshot quality', async () => {
   renderModal(); await upload();
   expect(screen.getByLabelText('恢复月份 2026-06')).toBeChecked(); expect(screen.getByLabelText('恢复月份 2026-07')).toBeChecked();

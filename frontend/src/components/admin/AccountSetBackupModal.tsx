@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import { uploadMonthlyBackup, refreshMonthlyBackupPreview, confirmMonthlyBackupRestore, cancelMonthlyBackupPreview,
-  type BackupChoice, type RestoreSelection, type MonthlyBackupPreview, type MonthlyBackupRestoreResult, type MonthlyBackupRow } from '../../api/accountSetBackup';
+  type BackupChoice, type RestoreSelection, type MonthlyBackupPreview, type MonthlyBackupRestoreResult, type MonthlyBackupRow, type BackupImportProgress } from '../../api/accountSetBackup';
 import { BACKUP_CATEGORIES, DATASET_LABELS, STATUS_LABELS, QUALITY_LABELS, EXITS_CURRENT, rowLabel, fieldLabel, displayBackupValue, snapshotSource, humanBackupMessage } from './backupLabels';
 
 const EMPTY_SELECTION: RestoreSelection = {months: [], categories: [], cross_month_keys: [], annual_keys: []};
@@ -24,6 +24,8 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const [choices, setChoices] = useState<Record<string, BackupChoice>>({});
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<BackupImportProgress | null>(null);
+  const [elapsed, setElapsed] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragDepth = useRef(0);
   const [error, setError] = useState('');
@@ -36,6 +38,14 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0);
   const [valid, setValid] = useState(false);
+
+  useEffect(() => {
+    if (!busy) return;
+    const started = Date.now();
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [busy]);
 
   // The result is committed to the screen before any authenticated reload.
   useEffect(() => {
@@ -62,11 +72,12 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
     if (!file.name.toLowerCase().endsWith('.zip')) { setError('请选择 ZIP 格式的账套备份'); return; }
     if (file.size > 100 * 1024 * 1024) { setError('ZIP 备份不能超过 100 MiB'); return; }
     setBusy(true); setError('');
+    setProgress({status:'running', phase:'upload', stage:'上传备份文件', percent:0, completed:0, total:file.size});
     try {
-      const next = await uploadMonthlyBackup(file);
+      const next = await uploadMonthlyBackup(file, setProgress);
       setPreview(next); setSelection(next.selection); setAvailableMonths(next.selection.months); setAvailableCategories(next.selection.categories); setValid(true);
     } catch (caught) { setError(caught instanceof Error ? caught.message : '上传失败'); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setProgress(null); }
   }
   function changeSelection(next: RestoreSelection) {
     // Disabled rows cannot be submitted as explicit choices to the server.
@@ -123,7 +134,13 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
     <div className="acm-modal-body">
       <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '核对差异', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
       {error && <p role="alert" className="backup-error">{error}</p>}
-      {busy && <div className="backup-processing" role="status"><span className="backup-processing-spinner" aria-hidden="true" /><p>{confirming ? '正在恢复账套数据' : preview ? '正在重新核对差异' : '正在上传并解析备份'}</p></div>}
+      {busy && <div className="backup-processing" role="status"><span className="backup-processing-spinner" aria-hidden="true" />
+        {progress ? <div className="backup-processing-copy"><strong>{progress.stage}</strong>
+          <p>{(progress.total ?? 0) > 0 && `${(progress.completed ?? 0).toLocaleString()} / ${progress.total!.toLocaleString()} ${['upload', 'unpacking'].includes(progress.phase ?? '') ? '字节' : progress.phase === 'completed' ? '项' : '条记录'} · `}
+            已耗时 {elapsed} 秒{progress.percent !== null && ` · 当前阶段 ${Math.floor(progress.percent)}%`}</p>
+          <progress className="backup-import-progress" aria-label="当前阶段进度" max={100} value={progress.percent ?? undefined} />
+        </div> : <p>{confirming ? '正在恢复账套数据' : preview ? '正在重新核对差异' : '正在上传并解析备份'}</p>}
+      </div>}
       {!preview && <div className={`backup-upload-zone${dragging ? ' is-dragging' : ''}`} role="region" aria-label="上传账套备份" aria-busy={busy}
         onDragEnter={event => {event.preventDefault(); if (!busy && event.dataTransfer.types.includes('Files')) {dragDepth.current++; setDragging(true);}}}
         onDragOver={event => {event.preventDefault(); event.dataTransfer.dropEffect = busy ? 'none' : 'copy';}}

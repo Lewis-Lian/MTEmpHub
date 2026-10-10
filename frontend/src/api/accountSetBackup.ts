@@ -123,9 +123,56 @@ export interface MonthlyBackupRestoreResult {
   category_counts: Record<string, {new: number; updated: number; deleted: number}>;
   warnings: string[]; reauthentication_required: boolean;
 }
-export function uploadMonthlyBackup(file: File): Promise<MonthlyBackupPreview> {
+export interface BackupImportProgress {
+  status: 'idle' | 'running' | 'completed' | 'failed';
+  phase?: string; stage: string; percent: number | null; completed?: number; total?: number;
+}
+export function uploadMonthlyBackup(file: File, onProgress?: (progress: BackupImportProgress) => void): Promise<MonthlyBackupPreview> {
   const body = new FormData(); body.append('file', file);
-  return apiRequest('/api/admin/backups/preview', {method: 'POST', body});
+  if (!onProgress) return apiRequest('/api/admin/backups/preview', {method: 'POST', body});
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
+  const xhr = new XMLHttpRequest();
+  let settled = false, polling = false, uploaded = false;
+  const poll = async () => {
+    if (settled || polling || !uploaded) return;
+    polling = true;
+    try {
+      const progress = await apiRequest<BackupImportProgress>(`/api/admin/backups/preview/progress?progress_token=${token}`);
+      if (!settled && progress.status !== 'idle') onProgress(progress);
+    } catch { /* The upload response remains authoritative. */ }
+    finally { polling = false; }
+  };
+  const timer = setInterval(() => void poll(), 500);
+  return new Promise((resolve, reject) => {
+    const finish = (error?: Error, preview?: MonthlyBackupPreview) => {
+      settled = true; clearInterval(timer);
+      if (error) reject(error); else resolve(preview!);
+    };
+    xhr.open('POST', buildApiUrl(`/api/admin/backups/preview?progress_token=${token}`));
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = event => {
+      if (settled || uploaded) return;
+      onProgress({status:'running', phase:'upload', stage:'上传备份文件', completed:event.loaded,
+        total:event.lengthComputable ? event.total : 0,
+        percent:event.lengthComputable && event.total > 0 ? event.loaded * 100 / event.total : null});
+    };
+    xhr.upload.onload = () => {
+      uploaded = true;
+      onProgress({status:'running', phase:'validation', stage:'等待服务器解析备份', percent:null});
+      void poll();
+    };
+    xhr.onload = () => {
+      try {
+        const payload = JSON.parse(xhr.responseText);
+        if (xhr.status < 200 || xhr.status >= 300) {
+          finish(new ApiError(typeof payload.error === 'string' ? payload.error : '备份解析失败', xhr.status, payload));
+        } else finish(undefined, payload);
+      } catch { finish(new Error('服务器响应解析失败')); }
+    };
+    xhr.onerror = () => finish(new Error('网络错误，备份上传失败'));
+    xhr.onabort = () => finish(new Error('备份上传已中止'));
+    xhr.send(body);
+  });
 }
 export function refreshMonthlyBackupPreview(token: string, selection: RestoreSelection, choices: Record<string, BackupChoice>): Promise<MonthlyBackupPreview> {
   return apiRequest(`/api/admin/backups/${token}/preview`, {method: 'POST', body: {selection, choices}});

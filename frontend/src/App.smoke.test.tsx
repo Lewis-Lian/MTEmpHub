@@ -655,6 +655,18 @@ describe("App smoke regression", () => {
     window.history.replaceState({}, "", "/admin/dashboard");
     let restored = false;
     const scope = {months:["2026-05"],categories:["attendance"],cross_month_keys:[],annual_keys:[]};
+    // The upload now uses XHR for byte progress; keep the network boundary
+    // connected to this test's response fixtures and exercise the real API.
+    vi.stubGlobal("XMLHttpRequest", class {
+      upload = {}; withCredentials = false; status = 0; responseText = "";
+      onload?: () => void;
+      url = "";
+      open(_method: string, url: string) { this.url = url; }
+      async send(body: FormData) {
+        const response = await fetchMock(this.url, {method:"POST",body});
+        this.status = response.status; this.responseText = await response.text(); this.onload?.();
+      }
+    });
     fetchMock.mockImplementation((input, init) => {
       const path = normalizePath(input);
       if (path === "/api/admin/backups/preview") return Promise.resolve(jsonResponse({token:"task",selection:scope,months:scope.months,coverage:{},rows:[],summary:{new:0,changed:0,system_only:0,same:0},blockers:[],fingerprint:"fp"}));

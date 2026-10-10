@@ -440,7 +440,7 @@ def validate_document(document):
     return document
 
 
-def read_backup(payload, *, normalized=False):
+def read_backup(payload, *, normalized=False, progress=None):
     if len(payload) > MAX_UPLOAD:
         raise BackupError('上传文件超过 100 MiB')
     try:
@@ -450,6 +450,9 @@ def read_backup(payload, *, normalized=False):
             if len(infos) > MAX_MEMBERS or len(set(names)) != len(names):
                 raise BackupError('成员重复或过多')
             total, contents = 0, {}
+            unpacked_total = sum(entry.file_size for entry in infos)
+            if progress:
+                progress(phase='unpacking', completed=0, total=unpacked_total, stage='解压备份文件')
             for entry in infos:
                 path = PurePosixPath(entry.filename)
                 if path.is_absolute() or '..' in path.parts or '\\' in entry.filename or ':' in entry.filename or entry.is_dir() or stat.S_ISLNK(entry.external_attr >> 16):
@@ -466,7 +469,11 @@ def read_backup(payload, *, normalized=False):
                         buffer.extend(chunk)
                         if total > MAX_TOTAL or len(buffer) > MAX_UPLOAD:
                             raise BackupError('解压内容超过限制')
+                        if progress:
+                            progress(phase='unpacking', completed=total, total=unpacked_total, stage='解压备份文件')
                 contents[entry.filename] = bytes(buffer)
+            if progress:
+                progress(phase='validation', completed=0, total=0, stage='校验备份格式与内容')
             manifest = json.loads(contents['manifest.json'])
             if type(manifest['format_version']) is not int:
                 raise BackupError('不支持的备份版本')
