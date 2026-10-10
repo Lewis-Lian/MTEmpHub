@@ -190,9 +190,16 @@ def register_admin_backup_routes(bp, admin_required):
                 update(status='completed', phase='completed', completed=1, total=1, stage='差异预览已就绪')
             return response
         except Exception as exc:
+            from sqlalchemy.exc import OperationalError
+            message = str(exc) if isinstance(exc, BackupError) else '备份解析失败，请查看服务器日志'
+            if isinstance(exc, OperationalError) and getattr(exc.orig, 'args', (None,))[0] in (1054, 1146):
+                message = '数据库结构尚未升级，请先执行数据库升级后重试'
             if update:
-                update(status='failed', phase='failed', stage=str(exc) if isinstance(exc, BackupError) else '备份解析失败')
-            raise
+                update(status='failed', phase='failed', stage=message)
+            if isinstance(exc, BackupError):
+                raise
+            current_app.logger.exception('备份上传解析失败')
+            return jsonify({'error': message}), 500
 
     @bp.post('/backups/<token>/preview')
     @admin_required

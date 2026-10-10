@@ -167,7 +167,11 @@ export function uploadMonthlyBackup(file: File, onProgress?: (progress: BackupIm
         if (xhr.status < 200 || xhr.status >= 300) {
           finish(new ApiError(typeof payload.error === 'string' ? payload.error : '备份解析失败', xhr.status, payload));
         } else finish(undefined, payload);
-      } catch { finish(new Error('服务器响应解析失败')); }
+      } catch {
+        if (xhr.status < 200 || xhr.status >= 300) {
+          finish(new ApiError(`备份请求失败（HTTP ${xhr.status}），服务器返回了无效响应`, xhr.status, null));
+        } else finish(new Error('服务器返回了无效的备份预览，请重试'));
+      }
     };
     xhr.onerror = () => finish(new Error('网络错误，备份上传失败'));
     xhr.onabort = () => finish(new Error('备份上传已中止'));

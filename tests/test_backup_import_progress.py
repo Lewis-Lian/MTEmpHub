@@ -40,6 +40,24 @@ def test_import_progress_is_private_and_token_is_validated(backup_app):
         get_import_progress('../escape', 1)
 
 
+def test_missing_schema_returns_json_error_and_logs_the_exception(backup_app, monkeypatch, caplog):
+    from sqlalchemy.exc import OperationalError
+    import routes.admin_backups as routes
+    payload = export_multi_backup([1])
+    def missing_schema(*args, **kwargs):
+        raise OperationalError('SELECT ...', {}, Exception(1054, 'Unknown column followup_state'))
+    monkeypatch.setattr(routes, 'build_multi_preview', missing_schema)
+    client = logged_in(backup_app)
+    response = client.post('/api/admin/backups/preview?progress_token=' + 'e' * 32,
+                           data={'file': (BytesIO(payload), 'backup.zip')})
+    assert response.status_code == 500
+    assert '数据库' in response.get_json()['error'] and '升级' in response.get_json()['error']
+    assert 'SELECT' not in response.get_json()['error']
+    state = client.get('/api/admin/backups/preview/progress?progress_token=' + 'e' * 32).get_json()
+    assert state['stage'] == response.get_json()['error']
+    assert 'followup_state' in caplog.text
+
+
 @pytest.mark.parametrize('legacy', [False, True])
 def test_codec_and_preview_report_actual_completed_work(backup_app, legacy):
     payload = export_backup(1) if legacy else export_multi_backup([1])

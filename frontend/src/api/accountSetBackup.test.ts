@@ -57,6 +57,16 @@ it('stops import polling and propagates validation errors', async () => {
   await failure;
   expect(vi.getTimerCount()).toBe(0);
 });
+it('preserves the HTTP error when the server returns an HTML error page', async () => {
+  vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
+  const task = uploadMonthlyBackup(new File(['zip'],'backup.zip'), vi.fn());
+  const failure = expect(task).rejects.toMatchObject({status:500, message:expect.stringContaining('500')});
+  const xhr = DownloadXHR.instance;
+  xhr.status = 500; xhr.responseText = '<html>Internal Server Error</html>';
+  xhr.getResponseHeader.mockReturnValue('text/html'); xhr.onload?.();
+  await failure;
+  expect(vi.getTimerCount()).toBe(0);
+});
 it('surfaces server errors without reporting successful completion', async () => {
   vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
   request.mockResolvedValue({status:'idle',percent:0,stage:'等待'});
