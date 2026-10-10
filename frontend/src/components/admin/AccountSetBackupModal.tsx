@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import { uploadMonthlyBackup, refreshMonthlyBackupPreview, confirmMonthlyBackupRestore, cancelMonthlyBackupPreview,
   type BackupChoice, type RestoreSelection, type MonthlyBackupPreview, type MonthlyBackupRestoreResult, type MonthlyBackupRow, type BackupImportProgress } from '../../api/accountSetBackup';
@@ -35,9 +35,11 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const notifiedTask = useRef('');
   const [filters, setFilters] = useState({month: '', category: '', status: '', keyword: ''});
   const [limit, setLimit] = useState(100);
+  const [blockerLimit, setBlockerLimit] = useState(50);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0);
   const [valid, setValid] = useState(false);
+  const rowsByKey = useMemo(() => new Map(preview?.rows.map(row => [row.row_key, row]) ?? []), [preview]);
 
   useEffect(() => {
     if (!busy) return;
@@ -61,7 +63,7 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
     try {
       const next = await refreshMonthlyBackupPreview(preview.token, nextSelection, nextChoices);
       if (generation.current === requestGeneration) {
-        setPreview(next); setValid(true);
+        setPreview(next); setBlockerLimit(50); setValid(true);
         setChecked(current => new Set([...current].filter(key => next.rows.some(row => row.row_key === key && row.enabled))));
       }
     } catch (caught) { if (generation.current === requestGeneration) setError(caught instanceof Error ? caught.message : '预览失败'); }
@@ -75,7 +77,7 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
     setProgress({status:'running', phase:'upload', stage:'上传备份文件', percent:0, completed:0, total:file.size});
     try {
       const next = await uploadMonthlyBackup(file, setProgress);
-      setPreview(next); setSelection(next.selection); setAvailableMonths(next.selection.months); setAvailableCategories(next.selection.categories); setValid(true);
+      setPreview(next); setBlockerLimit(50); setSelection(next.selection); setAvailableMonths(next.selection.months); setAvailableCategories(next.selection.categories); setValid(true);
     } catch (caught) { setError(caught instanceof Error ? caught.message : '上传失败'); }
     finally { setBusy(false); setProgress(null); }
   }
@@ -122,10 +124,10 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const deleting = changes.filter(row => row.status === 'system_only' && !EXITS_CURRENT.has(row.dataset));
   const outside = changes.filter(row => explicitScope(row) || row.affected_months.some(month => !selection.months.includes(month)));
   function blockers() {
-    return !!preview?.blockers.length && <div role="alert" className="backup-error">{preview.blockers.map((item, index) => <div key={index}><p>{humanBackupMessage(item.message)}</p>
-      {item.row_key && <p>相关记录：{preview.rows.find(row => row.row_key === item.row_key) ? rowLabel(preview.rows.find(row => row.row_key === item.row_key)!) : '所选业务记录'}</p>}
-      {!!item.required_rows?.length && <p>需要一并选择：{item.required_rows.map(key => {const row = preview.rows.find(row => row.row_key === key); return row ? rowLabel(row) : '依赖记录（请核对所选范围）';}).join('、')}</p>}
-    </div>)}</div>;
+    return !!preview?.blockers.length && <div role="alert" className="backup-error"><p>共 {preview.blockers.length} 项校验问题，已显示 {Math.min(blockerLimit, preview.blockers.length)} 项</p>{preview.blockers.slice(0, blockerLimit).map((item, index) => <div key={index}><p>{humanBackupMessage(item.message)}</p>
+      {item.row_key && <p>相关记录：{rowsByKey.has(item.row_key) ? rowLabel(rowsByKey.get(item.row_key)!) : '所选业务记录'}</p>}
+      {!!item.required_rows?.length && <p>需要一并选择：{item.required_rows.map(key => {const row = rowsByKey.get(key); return row ? rowLabel(row) : '依赖记录（请核对所选范围）';}).join('、')}</p>}
+    </div>)}{preview.blockers.length > blockerLimit && <button onClick={() => setBlockerLimit(blockerLimit + 50)}>显示更多校验问题</button>}</div>;
   }
   function removalList(title: string, list: MonthlyBackupRow[]) { return !!list.length && <><h4>{title}清单</h4><ul>{list.map(row => <li key={row.row_key}>{rowLabel(row)}{row.month && `（${row.month}）`}</li>)}</ul></>; }
 

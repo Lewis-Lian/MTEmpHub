@@ -56,6 +56,11 @@ def _target_state(progress=None):
     total = sum(ds.model.query.count() for ds in V2_DATASETS.values()) if progress else 0
     if progress:
         progress(phase='target', completed=0, total=total, stage='读取本地数据')
+    # The identity map holds weak references. Keep parent rows alive so each
+    # attendance row can resolve its employee/account without another SELECT.
+    reference_models = {model for refs in V2_REFS.values() for _, model, _ in refs.values()}
+    references = [obj for model in sorted(reference_models, key=lambda model: model.__name__)
+                  for obj in model.query.all()]
     for name, ds in V2_DATASETS.items():
         for obj in ds.model.query.order_by(ds.model.id).all():
             value = _serialize(name, obj)
@@ -260,15 +265,23 @@ def _build(document, selection, choices, *, private=False, progress=None):
 
 def _validate(final, target, source, rows, changes, selection, document, accounts):
     blockers = []
+    blocker_keys, entry_cache = set(), {}
     def block(code, key, message, required=(), **extra):
         item = dict(code=code, row_key=key, message=message, required_rows=sorted(set(required)), **extra)
-        if item not in blockers:
+        identity = canonical(item)
+        if identity not in blocker_keys:
+            blocker_keys.add(identity)
             blockers.append(item)
     def entries(state, name):
-        return [(scope + '/' + identity, value) for scope, values in state.items()
-                if scope.split('/')[-1] == name for identity, value in values.items()]
+        cache_key = (id(state), name)
+        if cache_key not in entry_cache:
+            entry_cache[cache_key] = [(scope + '/' + identity, value) for scope, values in state.items()
+                                     if scope.split('/')[-1] == name for identity, value in values.items()]
+        return entry_cache[cache_key]
     maps = {name: {v[ds.key[0]]: (key, v) for key, v in entries(final, name)}
             for name, ds in V2_DATASETS.items() if name in EXIT_CURRENT | {'account_set'}}
+    old_maps = {name: {v[V2_DATASETS[name].key[0]]: v for _, v in entries(target, name)}
+                for name in maps}
     local_users = {u.username: u for u in User.query.all()}
     if changes and not any(value.get('role') == 'admin' and value.get('is_active', True)
                and not value.get('login_disabled_until_admin_unlock') and value.get('password_hash')
@@ -284,8 +297,7 @@ def _validate(final, target, source, rows, changes, selection, document, account
         if found and (historical or allow_inactive or found[1].get('is_active', True)):
             return
         # Archived current rows remain local FK anchors for frozen history.
-        old = next((v for _, v in entries(target, parent) if v[V2_DATASETS[parent].key[0]] == identifier), None)
-        if historical and old:
+        if historical and identifier in old_maps[parent]:
             return
         required = 'shared/' + parent + '/' + canonical([identifier])
         if parent == 'account_set':

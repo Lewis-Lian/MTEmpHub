@@ -214,3 +214,17 @@ it('renders field tables only when a user expands a difference', async () => {
   expect(await screen.findByRole('table')).toBeInTheDocument();
   expect(screen.getByText('实际工时')).toBeInTheDocument();
 });
+
+it('progressively displays all dependency problems and keeps confirmation blocked', async () => {
+  const blockers = Array.from({length:125}, (_, index) => ({code:'locked', message:`校验问题 ${index}`}));
+  mocks.upload.mockResolvedValue({...preview, blockers}); renderModal(); await upload();
+  expect(screen.getAllByText(/^校验问题 /)).toHaveLength(50);
+  expect(screen.getByText('共 125 项校验问题，已显示 50 项')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name:'显示更多校验问题'}));
+  expect(screen.getAllByText(/^校验问题 /)).toHaveLength(100);
+  fireEvent.click(screen.getByRole('button', {name:'显示更多校验问题'}));
+  expect(screen.getAllByText(/^校验问题 /)).toHaveLength(125);
+  expect(screen.queryByRole('button', {name:'显示更多校验问题'})).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name:'查看导入确认'}));
+  expect(screen.getByRole('button', {name:'确认导入'})).toBeDisabled();
+});
