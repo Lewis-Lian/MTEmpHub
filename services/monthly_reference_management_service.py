@@ -14,6 +14,7 @@ from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
 from services.monthly_reference_service import (
     REFERENCE_FIELDS, _current_references, _validate_month, correct_month_reference,
     reconcile_month_evidence, reference_change_blockers, scan_legacy_month_references,
+    validate_month_reference_relations,
 )
 
 KINDS = tuple(REFERENCE_FIELDS)
@@ -146,6 +147,7 @@ def execute_operation(month, operation, missing):
                 provenance={'source': 'current_baseline', 'fields': {field: 'baseline' for field in row['payload']}},
                 quality='baseline', schema_version=1))
         db.session.flush()
+        validate_month_reference_relations(month)
     elif operation['action'] == 'correct':
         correct_month_reference(month, operation['kind'], operation['business_key'],
                                 operation['changes'], operation['categories'])

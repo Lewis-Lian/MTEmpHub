@@ -85,6 +85,45 @@ def ensure_month_reference(month: str) -> None:
                 quality='baseline', schema_version=1,
             ))
     db.session.flush()
+    validate_month_reference_relations(month)
+
+
+def validate_month_reference_relations(month: str) -> None:
+    """Check the final graph, including preserved history and newly captured rows."""
+    _validate_month(month)
+    rows = MonthlyReferenceSnapshot.query.filter_by(month=month).order_by(
+        MonthlyReferenceSnapshot.kind, MonthlyReferenceSnapshot.business_key).all()
+    references = {(row.kind, row.business_key): row for row in rows}
+    labels = {'employee': '员工', 'department': '部门', 'shift': '班次'}
+    for row in rows:
+        if row.kind not in REFERENCE_FIELDS or not isinstance(row.payload, dict):
+            raise ValueError(f'{month} 快照资料格式无效：{row.business_key}')
+        natural = REFERENCE_FIELDS[row.kind][0]
+        # Partial legacy payloads may omit identity; reads use the stable business key.
+        if natural in row.payload and row.payload[natural] != row.business_key:
+            raise ValueError(f'{month} {labels[row.kind]}快照编号与资料不一致：{row.business_key}')
+        if row.kind == 'employee':
+            targets = [('department', row.payload.get('dept_no'), '部门'),
+                       ('shift', row.payload.get('default_shift_no'), '班次')]
+        elif row.kind == 'department':
+            targets = [('department', row.payload.get('parent_no'), '父部门')]
+        else:
+            targets = []
+        for kind, identifier, label in targets:
+            if identifier and (kind, identifier) not in references:
+                raise ValueError(f'{month} {labels[row.kind]} {row.business_key} 缺少{label}快照 {identifier}，请先核对并修正关联资料')
+    parents = {row.business_key: row.payload.get('parent_no') for row in rows if row.kind == 'department'}
+    checked = set()
+    for key in parents:
+        path, seen, cursor = [], set(), key
+        while cursor and cursor not in checked:
+            if cursor in seen:
+                chain = ' → '.join(path + [cursor])
+                raise ValueError(f'{month} 部门父链形成循环：{chain}，请先修正该月部门快照后再补齐')
+            path.append(cursor)
+            seen.add(cursor)
+            cursor = parents[cursor]
+        checked.update(path)
 
 
 def get_month_reference(month: str, kind: str, business_key: str) -> dict | None:

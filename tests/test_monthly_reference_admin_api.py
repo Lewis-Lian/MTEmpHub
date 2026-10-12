@@ -6,6 +6,7 @@ import pytest
 from models import db
 from models.account_set import AccountSet
 from models.daily_record import DailyRecord
+from models.department import Department
 from models.employee import Employee
 from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
 from models.meal_ticket import MealTicketBatch
@@ -213,3 +214,50 @@ def test_new_business_consumer_invalidates_the_reviewed_scope(backup_app):
     assert preview(client, operation)['required_categories'] == ['attendance', 'meal_tickets']
     assert apply(client, operation, compared).status_code == 409
     assert MonthlyReferenceSnapshot.query.count() == 0
+
+
+def test_capture_rejects_cycle_created_by_mixing_history_and_current_departments(backup_app):
+    client = logged_in(backup_app)
+    ensure_month_reference('2026-06')
+    historical = MonthlyReferenceSnapshot.query.filter_by(kind='department', business_key='D1').one()
+    historical.payload = {**historical.payload, 'parent_no': 'D2'}
+    db.session.add(Department(dept_no='D2', dept_name='当前子部门', parent_id=Department.query.one().id))
+    db.session.commit()
+    original = [deepcopy(row.payload) for row in MonthlyReferenceSnapshot.query.order_by(MonthlyReferenceSnapshot.id)]
+    operation = {'action': 'capture'}
+    response = client.post(BASE + '/2026-06/preview', json=operation)
+    assert response.status_code == 400
+    assert '循环' in response.get_json()['error']
+    # Apply must independently reject the invalid final graph as well.
+    response = client.post(BASE + '/2026-06/apply', json={**operation, 'fingerprint': '0' * 64})
+    assert response.status_code == 400
+    assert '循环' in response.get_json()['error']
+    assert MonthlyReferenceSnapshot.query.count() == 2
+    assert [row.payload for row in MonthlyReferenceSnapshot.query.order_by(MonthlyReferenceSnapshot.id)] == original
+    # Explicitly repairing the historical parent lets missing-only capture proceed.
+    correction = {'action': 'correct', 'kind': 'department', 'business_key': 'D1',
+                  'changes': {'parent_no': None}, 'categories': ['attendance']}
+    assert apply(client, correction, preview(client, correction)).status_code == 200
+    assert apply(client, operation, preview(client, operation)).status_code == 200
+    assert MonthlyReferenceSnapshot.query.filter_by(kind='department', business_key='D2').one().payload['parent_no'] == 'D1'
+
+
+@pytest.mark.parametrize('kind,key,changes,expected', [
+    ('employee', 'E1', {'dept_no': 'D404'}, '部门'),
+    ('employee', 'E1', {'default_shift_no': 'S404'}, '班次'),
+    ('department', 'D1', {'parent_no': 'D404'}, '父部门'),
+    ('employee', 'E1', {'emp_no': 'E404'}, '编号'),
+])
+def test_capture_rejects_unresolved_or_mismatched_historical_references(backup_app, kind, key, changes, expected):
+    client = logged_in(backup_app)
+    ensure_month_reference('2026-06')
+    historical = MonthlyReferenceSnapshot.query.filter_by(kind=kind, business_key=key).one()
+    historical.payload = {**historical.payload, **changes}
+    db.session.add(Employee(emp_no='E2', name='待补齐员工'))
+    db.session.commit()
+    original = deepcopy(historical.payload)
+    response = client.post(BASE + '/2026-06/preview', json={'action': 'capture'})
+    assert response.status_code == 400
+    assert expected in response.get_json()['error']
+    assert MonthlyReferenceSnapshot.query.count() == 2
+    assert MonthlyReferenceSnapshot.query.filter_by(kind=kind, business_key=key).one().payload == original

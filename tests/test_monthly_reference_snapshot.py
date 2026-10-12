@@ -14,7 +14,20 @@ from models.department import Department
 from models.employee import Employee
 from models.employee_shift import EmployeeShiftAssignment
 from models.shift import Shift
+from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
 from tests.test_account_set_backup import backup_app
+
+
+def test_baseline_capture_rejects_a_mixed_historical_department_cycle(backup_app):
+    from services.monthly_reference_service import ensure_month_reference
+    ensure_month_reference('2026-06')
+    historical = MonthlyReferenceSnapshot.query.filter_by(kind='department', business_key='D1').one()
+    historical.payload = {**historical.payload, 'parent_no': 'D2'}
+    db.session.add(Department(dept_no='D2', dept_name='子部门', parent_id=Department.query.one().id))
+    db.session.commit()
+    with pytest.raises(ValueError, match='循环'), db.session.begin_nested():
+        ensure_month_reference('2026-06')
+    assert MonthlyReferenceSnapshot.query.count() == 2
 
 
 def test_snapshot_is_not_refreshed_by_current_change(backup_app):
