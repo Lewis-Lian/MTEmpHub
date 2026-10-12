@@ -279,6 +279,13 @@ MODULES: list[dict[str, Any]] = [
                 "admin_only": True,
                 "description": "设置菜票异常考勤天数扣除规则。",
             },
+            {
+                "key": "monthly_references",
+                "label": "快照管理",
+                "href": "/admin/monthly-references",
+                "admin_only": True,
+                "description": "核对月度历史资料，补齐缺失快照并按月修正。",
+            },
         ],
     },
 ]

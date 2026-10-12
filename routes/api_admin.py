@@ -98,6 +98,8 @@ api_admin_bp = Blueprint("api_admin", __name__, url_prefix="/api/admin")
 register_admin_account_routes(api_admin_bp)
 from routes.admin_backups import register_admin_backup_routes
 register_admin_backup_routes(api_admin_bp, admin_required)
+from routes.admin_monthly_references import register_monthly_reference_routes
+register_monthly_reference_routes(api_admin_bp, admin_required)
 
 MORE_SETTINGS = {
     "meal_ticket_abnormal_deduction_enabled": ("false", "异常考勤天数扣除"),

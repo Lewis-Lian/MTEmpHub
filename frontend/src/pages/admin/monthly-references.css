@@ -1,0 +1,50 @@
+.snapshot-page { color: #1e293b; padding: 24px; max-width: 1600px; margin: 0 auto; }
+.snapshot-page h2, .snapshot-page h3, .snapshot-page h4 { margin: 0 0 10px; }
+.snapshot-page p { line-height: 1.65; margin: 8px 0 14px; }
+.snapshot-header, .snapshot-section-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.snapshot-header { margin-bottom: 20px; }
+.snapshot-header p { color: #64748b; }
+.snapshot-layout { display: grid; grid-template-columns: 235px minmax(0, 1fr); align-items: start; gap: 20px; }
+.snapshot-card { background: rgba(255, 255, 255, .9); border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; box-shadow: 0 4px 18px rgba(15, 23, 42, .04); }
+.snapshot-months { position: sticky; top: 12px; max-height: 80vh; overflow: auto; }
+.snapshot-content { display: grid; gap: 18px; min-width: 0; }
+.snapshot-page button { border: 1px solid #cbd5e1; background: #fff; border-radius: 8px; padding: 8px 12px; cursor: pointer; color: #334155; }
+.snapshot-page button:hover:not(:disabled) { border-color: #6366f1; background: #eef2ff; }
+.snapshot-page button:disabled { cursor: default; opacity: .5; }
+.snapshot-page button.snapshot-primary { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+.snapshot-page button.snapshot-primary:hover:not(:disabled) { background: #4338ca; }
+.snapshot-months button { display: grid; gap: 5px; width: 100%; text-align: left; margin-top: 10px; }
+.snapshot-months button.is-selected { border-color: #818cf8; background: #eef2ff; }
+.snapshot-months span, .snapshot-months small { font-size: 12px; color: #64748b; }
+.snapshot-note { padding: 12px 14px; background: #f8fafc; border-radius: 8px; color: #475569; font-size: 13px; }
+.snapshot-error { padding: 12px 16px; background: #fef2f2; color: #b91c1c; border-radius: 8px; }
+.snapshot-toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; margin: 16px 0 8px; }
+.snapshot-toolbar label { display: grid; gap: 6px; font-size: 13px; }
+.snapshot-toolbar input, .snapshot-toolbar select, .snapshot-toolbar textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #1e293b; min-width: 160px; }
+.snapshot-toolbar textarea { min-height: 100px; min-width: 300px; font-family: monospace; }
+.snapshot-edit-value { flex: 1; }
+.snapshot-categories { display: flex; gap: 18px; border: 0; padding: 0; }
+.snapshot-categories legend { font-size: 13px; margin-bottom: 10px; }
+.snapshot-page input[type=checkbox], .snapshot-page input[type=radio] { accent-color: #4f46e5; margin-right: 8px; }
+.snapshot-evidence { max-height: 420px; overflow: auto; }
+.snapshot-evidence fieldset { margin: 12px 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+.snapshot-evidence label { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px; }
+.snapshot-evidence label span { color: #64748b; font-size: 12px; }
+.snapshot-page .snapshot-backdrop { position: fixed; inset: 0; z-index: var(--z-modal, 1300); background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.snapshot-dialog { background: #fff; border-radius: 16px; padding: 24px; width: min(850px, 100%); max-height: 88vh; overflow: auto; }
+.snapshot-preview-list { max-height: 50vh; overflow: auto; margin-bottom: 16px; }
+.snapshot-preview-list article { border: 1px solid #e2e8f0; border-radius: 8px; margin: 12px 0; padding: 14px; }
+.snapshot-preview-list dl { margin: 0; }
+.snapshot-preview-list dl div { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 12px; padding: 6px 0; }
+.snapshot-preview-list dt { color: #64748b; }
+.snapshot-preview-list dd { margin: 0; overflow-wrap: anywhere; }
+.snapshot-acknowledgement { display: block; font-size: 13px; }
+@media (max-width: 800px) {
+  .snapshot-page { padding: 14px; }
+  .snapshot-layout { grid-template-columns: minmax(0, 1fr); }
+  .snapshot-months { position: static; max-height: 240px; }
+  .snapshot-card { padding: 14px; }
+  .snapshot-toolbar label { width: 100%; }
+  .snapshot-toolbar textarea { min-width: 0; }
+  .snapshot-preview-list dl div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+}
