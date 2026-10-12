@@ -4,6 +4,25 @@ const download = vi.hoisted(() => vi.fn());
 vi.mock('../../api/accountSetBackup', async original => ({...await original<object>(), downloadMonthlyBackup: download}));
 import MonthlyBackupExportModal from './MonthlyBackupExportModal';
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+it('does not export a default account that is absent from the month list', async () => {
+  download.mockResolvedValue(undefined);
+  render(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-12'}]} initialId={2} onClose={() => {}} />);
+  expect(screen.getByRole('button', {name: '开始导出'})).toBeDisabled();
+  fireEvent.click(screen.getByLabelText('2026-12'));
+  fireEvent.click(screen.getByRole('button', {name: '开始导出'}));
+  expect(download).toHaveBeenCalledWith([1], expect.any(Array), expect.any(Function));
+  await screen.findByRole('button', {name: '开始导出'});
+});
+it('does not export a checked account removed from the visible month list', async () => {
+  download.mockResolvedValue(undefined);
+  const {rerender} = render(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-12'}, {id: 2, month: '2027-01'}]} initialId={2} onClose={() => {}} />);
+  fireEvent.click(screen.getByLabelText('2026-12'));
+  rerender(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-12'}]} initialId={2} onClose={() => {}} />);
+  expect(screen.queryByLabelText('2027-01')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', {name: '开始导出'}));
+  expect(download).toHaveBeenCalledWith([1], expect.any(Array), expect.any(Function));
+  await screen.findByRole('button', {name: '开始导出'});
+});
 it('exports multiple checked months and every category including accounts by default', async () => {
   download.mockResolvedValue(undefined);
   render(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-06'}, {id: 2, month: '2026-07'}]} initialId={1} onClose={() => {}} />);
