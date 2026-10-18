@@ -37,10 +37,12 @@ def serialize_snapshot(row):
 
 
 def list_reference_months():
-    report = scan_legacy_month_references()
+    report = scan_legacy_month_references(include_evidence=False)
     accounts = {row.month: row for row in AccountSet.query.all()}
     snapshots = {}
-    for row in MonthlyReferenceSnapshot.query.all():
+    for row in MonthlyReferenceSnapshot.query.with_entities(
+            MonthlyReferenceSnapshot.month, MonthlyReferenceSnapshot.kind,
+            MonthlyReferenceSnapshot.business_key, MonthlyReferenceSnapshot.quality).all():
         snapshots.setdefault(row.month, []).append(row)
     scans = {row['month']: row for row in report['months']}
     current_keys = {(kind, key) for kind, key, _ in _current_references()}
@@ -56,9 +58,9 @@ def list_reference_months():
     return {'months': rows}
 
 
-def reference_detail(month, inspect_archives=False):
+def reference_detail(month, inspect_archives=False, *, include_evidence=True):
     _validate_month(month)
-    report = next((row for row in scan_legacy_month_references(inspect_archives)['months']
+    report = next((row for row in scan_legacy_month_references(inspect_archives, include_evidence=include_evidence)['months']
                    if row['month'] == month), None)
     account = AccountSet.query.filter_by(month=month).first()
     snapshots = MonthlyReferenceSnapshot.query.filter_by(month=month).order_by(
@@ -80,12 +82,12 @@ def validate_operation(operation):
     if not isinstance(operation, dict):
         raise ValueError('请选择有效的快照操作')
     action = operation.get('action')
-    allowed = {'capture': {'action'},
+    allowed = {'capture': {'action'}, 'rebuild': {'action'},
                'correct': {'action', 'kind', 'business_key', 'changes', 'categories'},
                'reconcile': {'action', 'decisions', 'categories', 'inspect_archives'}}
     if not isinstance(action, str) or action not in allowed or set(operation) - allowed[action]:
         raise ValueError('快照操作无效')
-    if action == 'capture':
+    if action in ('capture', 'rebuild'):
         return
     categories = operation.get('categories')
     if (not isinstance(categories, list) or any(not isinstance(v, str) or v not in CATEGORIES for v in categories)
@@ -139,7 +141,11 @@ def validate_operation(operation):
 
 
 def execute_operation(month, operation, missing):
-    if operation['action'] == 'capture':
+    if operation['action'] in ('capture', 'rebuild'):
+        if operation['action'] == 'rebuild':
+            for existing in MonthlyReferenceSnapshot.query.filter_by(month=month).all():
+                db.session.delete(existing)
+            db.session.flush()
         # Write precisely the reviewed payloads, never collect additional live rows here.
         for row in missing:
             db.session.add(MonthlyReferenceSnapshot(
@@ -158,26 +164,27 @@ def execute_operation(month, operation, missing):
 
 def preview_reference_operation(month, operation):
     validate_operation(operation)
-    before = reference_detail(month, operation.get('inspect_archives', False))
+    before = reference_detail(month, operation.get('inspect_archives', False),
+                              include_evidence=operation['action'] == 'reconcile')
     if before['is_locked']:
         raise ValueError('月份已锁定，请先在账套中心解锁')
     savepoint = db.session.begin_nested()
     try:
-        execute_operation(month, operation, before['missing'])
+        execute_operation(month, operation, before['current'] if operation['action'] == 'rebuild' else before['missing'])
         after = [serialize_snapshot(row) for row in MonthlyReferenceSnapshot.query.filter_by(month=month).order_by(
             MonthlyReferenceSnapshot.kind, MonthlyReferenceSnapshot.business_key).all()]
     finally:
         savepoint.rollback()
     old = {(row['kind'], row['business_key']): row for row in before['snapshots']}
-    changes = [{'kind': row['kind'], 'business_key': row['business_key'],
-                'before': old.get((row['kind'], row['business_key'])), 'after': row}
-               for row in after if row != old.get((row['kind'], row['business_key']))]
-    blockers = reference_change_blockers(month, [row['after'] for row in changes], [])
+    new = {(row['kind'], row['business_key']): row for row in after}
+    changes = [{'kind': kind, 'business_key': key, 'before': old.get((kind, key)), 'after': new.get((kind, key))}
+               for kind, key in sorted(set(old) | set(new)) if old.get((kind, key)) != new.get((kind, key))]
+    blockers = reference_change_blockers(month, [row['after'] for row in changes if row['after']], [])
     required = sorted({category for row in blockers for category in row['required_categories']})
     encoded = json.dumps([month, operation, before, changes, required], sort_keys=True, ensure_ascii=False, separators=(',', ':'))
     fingerprint = hmac.new(current_app.config['SECRET_KEY'].encode(), encoded.encode(), hashlib.sha256).hexdigest()
     return dict(month=month, action=operation['action'], changes=changes, required_categories=required,
-                fingerprint=fingerprint), before['missing']
+                fingerprint=fingerprint), before['current'] if operation['action'] == 'rebuild' else before['missing']
 
 
 def apply_reference_operation(month, operation, fingerprint):

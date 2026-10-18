@@ -5,28 +5,26 @@ import { applyReferenceOperation, fetchReferenceDetail, listReferenceMonths, pre
 import { clearQueryBootstrapCache } from '../../api/query';
 import { useNotification } from '../../components/feedback/Notification';
 import QueryTable from '../../components/query/QueryTable';
-import { displayBackupValue, fieldLabel, QUALITY_LABELS, snapshotSource } from '../../components/admin/backupLabels';
+import { displayBackupValue, fieldLabel } from '../../components/admin/backupLabels';
 import './monthly-references.css';
 
 const KIND_LABELS: Record<ReferenceKind, string> = {employee: '员工', department: '部门', shift: '班次'};
-const CATEGORY_LABELS: Record<string, string> = {attendance: '考勤数据', meal_tickets: '菜票核算'};
-const BOOLEAN_FIELDS = new Set(['is_active', 'is_manager', 'meal_ticket_as_manager', 'is_nursing', 'include_in_manager_stats', 'is_locked', 'is_cross_day']);
-const ENUMS: Record<string, Array<[string, string]>> = {
-  employee_stats_attendance_source: [['employee', '员工考勤'], ['manager', '管理人员考勤'], ['auto_fallback', '自动回退']],
-  manager_stats_attendance_source: [['employee', '员工考勤'], ['manager', '管理人员考勤'], ['auto_fallback', '自动回退']],
-};
-const SOURCE_LABELS: Record<string, string> = {daily_records: '日报记录', monthly_reports: '月报记录', meal_ticket_items: '菜票明细', account_set_imports: '归档文件'};
+const MAIN_PREVIEW_FIELDS = new Set(['emp_no', 'name', 'dept_no', 'dept_name', 'parent_no', 'default_shift_no', 'shift_no', 'shift_name', 'time_slots', 'is_cross_day']);
 function label(field: string) {
   const names: Record<string, string> = {default_shift_no: '默认班次编号',
     employee_attendance_source: '员工打卡数据来源（整月）', manager_attendance_source: '管理人员打卡数据来源（整月）'};
   return names[field] ?? fieldLabel({name: field});
 }
 function displayValue(value: unknown, field = '') {
-  const enums = ENUMS[field] ?? (field.endsWith('_attendance_source') ? [['local', '本地导入'], ['dingtalk', '钉钉'], ['card_db', '刷卡数据库']] : []);
-  return enums.find(([key]) => key === value)?.[1] ?? displayBackupValue(value, field);
+  if (field === 'time_slots' && value != null) {
+    const periods = readSlots(value);
+    return periods ? periods.map(([start, end]) => `${start || '未填写'}—${end || '未填写'}`).join('；') || '未设置时段' : '原有时段格式需核对';
+  }
+  if (field.endsWith('_stats_attendance_source')) {
+    return ({employee: '员工考勤', manager: '管理人员考勤', auto_fallback: '自动回退'} as Record<string, string>)[String(value)] ?? displayBackupValue(value, field);
+  }
+  return displayBackupValue(value, field);
 }
-function editText(value: unknown) { return value == null ? '' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value); }
-function evidenceKey(key: string, field: string) { return JSON.stringify([key, field]); }
 function message(error: unknown) { return error instanceof Error ? error.message : '快照操作失败'; }
 
 export default function MonthlyReferencesPage() {
@@ -37,26 +35,22 @@ export default function MonthlyReferencesPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [inspectArchives, setInspectArchives] = useState(false);
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useState<ReferenceKind>('employee');
   const [keyword, setKeyword] = useState('');
-  const [quality, setQuality] = useState('');
   const [selected, setSelected] = useState<ReferenceSnapshot | null>(null);
-  const [field, setField] = useState('');
-  const [value, setValue] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [evidenceChoices, setEvidenceChoices] = useState<Record<string, number>>({});
   const [comparison, setComparison] = useState<{preview: ReferencePreview; operation: ReferenceOperation} | null>(null);
   const [acknowledged, setAcknowledged] = useState(false);
   const revision = useRef(0);
   const dialogRef = useRef<HTMLElement>(null);
 
+  const activeDialog = comparison ? 'confirm' : selected ? 'view' : '';
   useEffect(() => {
-    if (!comparison) return;
+    if (!activeDialog) return;
     const previous = document.activeElement as HTMLElement | null;
-    dialogRef.current?.querySelector<HTMLInputElement>('input')?.focus();
+    const target = activeDialog === 'confirm' ? 'input[type=checkbox]' : 'button';
+    dialogRef.current?.querySelector<HTMLElement>(target)?.focus();
     return () => {previous?.focus();};
-  }, [comparison]);
+  }, [activeDialog]);
 
   useEffect(() => {
     let active = true;
@@ -71,21 +65,21 @@ export default function MonthlyReferencesPage() {
     if (!month) return;
     const version = ++revision.current;
     setLoading(true); setDetail(null); setSelected(null); setComparison(null); setError('');
-    setCategories([]); setEvidenceChoices({});
-    fetchReferenceDetail(month, inspectArchives).then(result => {
+
+    fetchReferenceDetail(month, false).then(result => {
       if (version === revision.current) setDetail(result);
     }).catch(caught => {if (version === revision.current) setError(message(caught));})
       .finally(() => {if (version === revision.current) setLoading(false);});
     return () => {revision.current++;};
-  }, [month, inspectArchives]);
+  }, [month]);
 
   async function reload() {
     setBusy(true); setError(''); setComparison(null);
     const version = ++revision.current;
     try {
-      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, inspectArchives)]);
+      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, false)]);
       if (version === revision.current) {
-        setMonths(list.months); setDetail(next); setSelected(null); setEvidenceChoices({});
+        setMonths(list.months); setDetail(next); setSelected(null);
       }
     } catch (caught) {if (version === revision.current) {setError(message(caught)); setDetail(null);}}
     finally {if (version === revision.current) setBusy(false);}
@@ -104,130 +98,142 @@ export default function MonthlyReferencesPage() {
     setBusy(true); setError('');
     try {
       const result = await applyReferenceOperation(month, comparison.operation, comparison.preview.fingerprint);
-      clearQueryBootstrapCache(); setComparison(null); setSelected(null); setEvidenceChoices({});
+      clearQueryBootstrapCache(); setComparison(null); setSelected(null);
       notification.success(`${result.month} 快照操作完成，变更 ${result.changed_count} 条`);
       // A successful write is final even if the following read fails.
       setDetail(null);
-      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, inspectArchives)]);
+      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, false)]);
       setMonths(list.months); setDetail(next);
     } catch (caught) {setError(message(caught)); setComparison(null);}
     finally {setBusy(false);}
   }
 
   function chooseSnapshot(row: ReferenceSnapshot) {
-    setSelected(row);
-    const first = detail?.editable_fields[row.kind][0] ?? '';
-    setField(first); setValue(editText(row.payload[first])); setComparison(null);
-  }
-  function correct() {
-    if (!selected) return;
-    try {
-      const parsed = BOOLEAN_FIELDS.has(field) ? value === 'true' : field === 'time_slots' ? JSON.parse(value)
-        : value === '' && ['resigned_at', 'card_no', 'dingtalk_user_id', 'dept_no', 'default_shift_no', 'parent_no'].includes(field) ? null : value;
-      void compare({action: 'correct', kind: selected.kind, business_key: selected.business_key, changes: {[field]: parsed}, categories});
-    } catch {setError('班次时段格式无效，请填写开始、结束时间组成的时段数组');}
+    setSelected(row); setComparison(null); setError('');
   }
 
   const disabled = busy || loading || !!comparison;
   const writeDisabled = disabled || !detail || detail.is_locked;
-  const records = detail?.snapshots.filter(row => (!kind || row.kind === kind) && (!quality || row.quality === quality)
+  const records = detail?.snapshots.filter(row => (!kind || row.kind === kind)
     && (!keyword || `${row.business_key} ${row.payload.name ?? row.payload.dept_name ?? row.payload.shift_name ?? ''}`.includes(keyword))) ?? [];
-  const decisions = (detail?.evidence ?? []).flatMap(row => {
-    const index = evidenceChoices[evidenceKey(row.business_key, row.field)];
-    return index === undefined ? [] : [{business_key: row.business_key, field: row.field, value: row.candidates[index].value}];
-  });
-  const current = selected && detail?.current.find(row => row.kind === selected.kind && row.business_key === selected.business_key);
+  const navigationDisabled = disabled || !!selected;
+  const savedCount = detail?.snapshots.length ?? 0;
+  const missingCount = detail?.missing.length ?? 0;
+  const captureLabel = !savedCount ? '生成本月快照' : missingCount ? '补齐缺失资料' : '资料已完整';
+  const statusText = !savedCount ? '尚未保存本月资料' : missingCount ? `还缺 ${missingCount} 条资料` : '本月资料已保存';
+  function relatedName(type: ReferenceKind, key: unknown) {
+    if (!key) return '—';
+    const row = detail?.snapshots.find(item => item.kind === type && item.business_key === key);
+    return String(row?.payload.dept_name ?? row?.payload.shift_name ?? `${key}（待补齐）`);
+  }
+  const rebuilding = comparison?.operation.action === 'rebuild';
+  const confirmTitle = rebuilding ? '确认重建本月快照' : '确认保存本月资料';
+  function closeDialog() {if (comparison) setComparison(null); else setSelected(null);}
 
   return <main className="snapshot-page" aria-label="月度快照管理">
-    <header className="snapshot-header"><div><h2>快照管理</h2><p>核对历史资料、补齐缺失快照，并按月修正员工、部门及班次信息。</p></div>
-      <button disabled={busy || loading || !month || !!comparison} onClick={() => void reload()}>刷新资料</button></header>
-    {error && <p className="snapshot-error" role="alert">{error}</p>}
-    {loading && <p role="status">正在读取月度快照…</p>}
-    <div className="snapshot-layout">
-      <aside className="snapshot-card snapshot-months" aria-label="月份列表"><h3>业务月份</h3>
-        {!loading && !months.length && <p>暂无可管理的业务月份。</p>}
-        {months.map(row => <button key={row.month} className={month === row.month ? 'is-selected' : ''} aria-pressed={month === row.month}
-          disabled={busy || !!comparison} onClick={() => {setMonth(row.month); setInspectArchives(false);}}>
-          <strong>{row.month} {row.is_locked && '已锁定'}</strong><span>{row.name}</span>
-          <span>快照 {row.snapshot_count} · 缺失 {row.missing_count}</span>
-          <small>基线 {row.quality_counts.baseline ?? 0} · 部分 {row.quality_counts.partial ?? 0} · 可证 {row.quality_counts.verified ?? 0}</small>
-        </button>)}
-      </aside>
-      <div className="snapshot-content">{detail && <>
-        <section className="snapshot-card"><div className="snapshot-section-head"><div><h3>{month} 月度资料</h3>
-          <p>已有 {detail.snapshots.length} 条快照，缺失 {detail.missing.length} 条。</p></div>
-          <button className="snapshot-primary" disabled={writeDisabled || !detail.missing.length} onClick={() => void compare({action: 'capture'})}>预览补齐缺失快照</button></div>
-          <p className="snapshot-note">补齐以当前资料建立“旧数据基线”，只新增缺失记录，保留已有快照。基线能固定资料，但不能证明当月真实状态；请结合历史报表核对。</p>
-          {detail.is_locked && <p className="snapshot-note">该月份已锁定，可查看资料；补齐或修正前请先在账套中心解锁。</p>}
-          <div className="snapshot-toolbar"><label>资料类型<select value={kind} disabled={disabled} onChange={event => setKind(event.target.value)}><option value="">全部类型</option>{Object.entries(KIND_LABELS).map(([key, title]) => <option key={key} value={key}>{title}</option>)}</select></label>
-            <label>资料质量<select value={quality} disabled={disabled} onChange={event => setQuality(event.target.value)}><option value="">全部质量</option>{Object.entries(QUALITY_LABELS).filter(([key]) => key !== 'missing').map(([key, title]) => <option key={key} value={key}>{title}</option>)}</select></label>
-            <label>编号或名称<input value={keyword} disabled={disabled} onChange={event => setKeyword(event.target.value)} /></label></div>
-          <QueryTable headers={['类型', '编号', '名称', '资料质量', '操作']} rows={records.map(row => [KIND_LABELS[row.kind], row.business_key,
-            String(row.payload.name ?? row.payload.dept_name ?? row.payload.shift_name ?? ''), QUALITY_LABELS[row.quality] ?? row.quality,
-            <button disabled={disabled} aria-label={`查看快照 ${row.business_key}`} onClick={() => chooseSnapshot(row)}>查看 / 修正</button>])} emptyText="该月暂无符合条件的快照" paginationKey={`${month}-${kind}-${quality}-${keyword}`} />
+    <div aria-hidden={!!activeDialog}>
+      <header className="snapshot-header"><div><span className="snapshot-eyebrow">每个月的资料，单独留存</span><h2>快照管理</h2>
+        <p>保存本月的员工、部门和班次资料，之后修改人员信息，旧月份仍使用当月保存的资料。</p></div>
+        <button className="snapshot-button" disabled={busy || loading || !month || !!activeDialog} onClick={() => void reload()}>刷新资料</button></header>
+      {error && !activeDialog && <p className="snapshot-error" role="alert">{error}</p>}
+      <section className="snapshot-month-bar" aria-label="选择月份">
+        <label>账套月份<select value={month} disabled={navigationDisabled || !months.length} onChange={event => {
+          setMonth(event.target.value); setKind('employee'); setKeyword('');
+        }}>{!months.length && <option value="">暂无月份</option>}{months.map(row => <option key={row.month} value={row.month}>{row.month} · {row.name || '月度账套'}{row.is_locked ? '（已锁定）' : ''}</option>)}</select></label>
+        <span>先选月份，再查看或保存这个月的资料</span>
+      </section>
+      {loading && <p className="snapshot-loading" role="status">正在读取这个月的资料…</p>}
+      {!loading && !month && !error && <section className="snapshot-card snapshot-empty"><h3>还没有可管理的月份</h3><p>先在账套中心创建一个月份，再来保存资料。</p><a href="/admin/dashboard">前往账套中心</a></section>}
+      {detail && <>
+        <section className={`snapshot-overview ${!missingCount && savedCount ? 'is-complete' : ''}`}>
+          <div className="snapshot-overview-icon" aria-hidden="true">{!missingCount && savedCount ? '✓' : '+'}</div>
+          <div className="snapshot-overview-copy"><div className="snapshot-status-line"><h3>{statusText}</h3>{detail.is_locked && <span className="snapshot-badge">月份已锁定</span>}</div>
+            <p>{!savedCount ? '还没有保存员工、部门和班次资料，先生成一份本月快照。' : missingCount ? '部分资料尚未保存，补齐后可以一起用于本月查询和备份。' : '已保存当月资料，可查看姓名、部门和班次。'}</p>
+            <div className="snapshot-counts"><span>已保存 <strong>{savedCount}</strong> 条</span><span>待补齐 <strong>{missingCount}</strong> 条</span></div>
+          </div>
+          <div className="snapshot-overview-action"><button className="snapshot-button snapshot-primary" disabled={writeDisabled || !missingCount || !!selected}
+            onClick={() => void compare({action: 'capture'})}>{captureLabel}</button>
+            {!!savedCount && <button className="snapshot-button" disabled={writeDisabled || !!selected} onClick={() => void compare({action: 'rebuild'})}>重建本月快照</button>}<small>{detail.is_locked ? '先在账套中心解锁，才能保存' : !missingCount ? '已保存，无需重复生成' : '先查看将保存的资料，再确认'}</small></div>
         </section>
-
-        <section className="snapshot-card"><h3>受影响业务</h3><p>修正或采用证据时，请明确勾选允许受影响的业务。服务端会检查是否漏选。</p>
-          <fieldset className="snapshot-categories" disabled={writeDisabled}><legend>允许影响的业务类别</legend>{Object.entries(CATEGORY_LABELS).map(([key, title]) => <label key={key}>
-            <input type="checkbox" checked={categories.includes(key)} onChange={event => {setCategories(event.target.checked ? [...categories, key] : categories.filter(item => item !== key)); setComparison(null);}} />{title}</label>)}</fieldset></section>
-
-        {selected && <section className="snapshot-card"><h3>{KIND_LABELS[selected.kind]}快照：{selected.business_key}</h3>
-          <p>质量：{QUALITY_LABELS[selected.quality]} · 来源：{snapshotSource(selected.provenance)}</p>
-          <QueryTable headers={['字段', '该月快照', '当前资料', '字段来源']} rows={Object.entries(selected.payload).map(([key, item]) => [label(key), displayValue(item, key),
-            displayValue(current?.payload[key], key), sourceDescription((selected.provenance.fields as Record<string, unknown> | undefined)?.[key])])} paginationKey={`${month}-${selected.kind}-${selected.business_key}`} />
-          <div className="snapshot-toolbar"><label>修正字段<select value={field} disabled={writeDisabled} onChange={event => {setField(event.target.value); setValue(editText(selected.payload[event.target.value]));}}>
-            {detail.editable_fields[selected.kind].map(key => <option key={key} value={key}>{label(key)}</option>)}</select></label>
-            <label className="snapshot-edit-value">修正值{BOOLEAN_FIELDS.has(field) ? <select value={value} disabled={writeDisabled} onChange={event => setValue(event.target.value)}><option value="" disabled>未记录，请选择</option><option value="true">是</option><option value="false">否</option></select>
-              : ENUMS[field] ? <select value={value} disabled={writeDisabled} onChange={event => setValue(event.target.value)}><option value="" disabled>未记录，请选择</option>{ENUMS[field].map(([key, title]) => <option key={key} value={key}>{title}</option>)}</select>
-              : field === 'time_slots' ? <textarea value={value} disabled={writeDisabled} onChange={event => setValue(event.target.value)} />
-              : <input type={field === 'resigned_at' ? 'date' : 'text'} value={value} disabled={writeDisabled} onChange={event => setValue(event.target.value)} />}</label>
-            <button disabled={writeDisabled || !field || ((BOOLEAN_FIELDS.has(field) || !!ENUMS[field]) && !value)} onClick={correct}>预览修正</button></div>
-          {field === 'time_slots' && <p className="snapshot-note">时段格式示例：{JSON.stringify([['08:00', '12:00'], ['13:00', '17:00']])}</p>}
-          <p className="snapshot-note">修正仅影响该月份，记录字段来源，资料质量标记为“资料不完整”；当前主数据保持原值。</p>
-        </section>}
-
-        <section className="snapshot-card"><div className="snapshot-section-head"><h3>历史证据核对</h3><label><input type="checkbox" checked={inspectArchives} disabled={disabled}
-          onChange={event => setInspectArchives(event.target.checked)} />读取归档文件证据</label></div>
-          <p>日报、月报及菜票资料作为候选来源。冲突需逐项选择，系统不会自动采用。</p>
-          <div className="snapshot-evidence">{detail.evidence.map(row => <fieldset key={evidenceKey(row.business_key, row.field)} disabled={writeDisabled}>
-            <legend>{row.business_key} · {label(row.field)} {row.conflict && '（证据冲突）'}</legend>
-            {row.candidates.map((candidate, index) => <label key={index}><input type="radio" name={evidenceKey(row.business_key, row.field)}
-              aria-label={`${row.business_key} ${label(row.field)}：${displayBackupValue(candidate.value)}`} checked={evidenceChoices[evidenceKey(row.business_key, row.field)] === index}
-              onChange={() => setEvidenceChoices({...evidenceChoices, [evidenceKey(row.business_key, row.field)]: index})} />
-              <strong>{displayBackupValue(candidate.value)}</strong><span>{candidate.sources.map(source => `${SOURCE_LABELS[source.table] ?? '业务记录'}${source.source_filename ? `：${source.source_filename}` : source.id ? ` #${source.id}` : ''}`).join('；')}</span></label>)}
-          </fieldset>)}</div>
-          {!detail.evidence.length && <p>未找到可核对的历史证据。</p>}
-          {!!detail.archives.length && <details><summary>归档读取情况</summary><ul>{detail.archives.map(row => <li key={row.id}>{row.source_filename}：{row.status === 'inspected' ? '已读取' : row.status === 'unreadable' ? '无法读取' : '尚未读取或不适用'}</li>)}</ul></details>}
-          <div className="snapshot-toolbar"><button disabled={writeDisabled || !decisions.length} onClick={() => void compare({action: 'reconcile', decisions, categories, inspect_archives: inspectArchives})}>预览采用所选证据</button>
-            <button disabled={disabled || !decisions.length} onClick={() => setEvidenceChoices({})}>清空证据选择</button></div>
+        <p className="snapshot-hint">补齐使用的是现在的资料，已保存的记录会保留。处理旧月份时，请对照当时的报表核对。</p>
+        <section className="snapshot-card snapshot-workspace">
+            <div className="snapshot-table-tools"><div className="snapshot-type-buttons" role="group" aria-label="资料类型">{Object.entries(KIND_LABELS).map(([key, title]) => <button key={key}
+              className={kind === key ? 'is-active' : ''} aria-label={title} aria-pressed={kind === key} disabled={navigationDisabled} onClick={() => setKind(key as ReferenceKind)}>{title}<span>{detail.snapshots.filter(row => row.kind === key).length}</span></button>)}</div>
+              <div className="snapshot-filters"><label>搜索资料<input placeholder="输入编号或姓名" value={keyword} disabled={navigationDisabled} onChange={event => setKeyword(event.target.value)} /></label></div>
+            </div>
+            <QueryTable headers={kind === 'employee' ? ['工号', '姓名', '部门', '班次', '操作'] : ['编号', '名称', kind === 'department' ? '上级部门' : '时段', '操作']}
+              rows={records.map(row => [row.business_key, String(row.payload.name ?? row.payload.dept_name ?? row.payload.shift_name ?? ''),
+                ...(kind === 'employee' ? [relatedName('department', row.payload.dept_no), relatedName('shift', row.payload.default_shift_no)]
+                  : [kind === 'department' ? relatedName('department', row.payload.parent_no) : displayValue(row.payload.time_slots, 'time_slots')]),
+                <button className="snapshot-row-button" disabled={navigationDisabled} aria-label={`查看资料 ${row.business_key}`} onClick={() => chooseSnapshot(row)}>查看资料</button>])}
+              emptyText={!savedCount ? '本月还没有保存资料，点击上方“生成本月快照”开始。' : '没有找到符合条件的资料。'} paginationKey={`${month}-${kind}-${keyword}`} />
         </section>
-      </>}</div>
+      </>}
     </div>
-    {comparison && <div className="snapshot-backdrop"><section ref={dialogRef} className="snapshot-dialog" role="dialog" aria-modal="true" aria-labelledby="snapshot-confirm-title"
+    {activeDialog && <div className="snapshot-backdrop"><section ref={dialogRef} className={`snapshot-dialog ${comparison ? 'snapshot-confirm-dialog' : 'snapshot-edit-dialog'}`} role="dialog" aria-modal="true"
+      aria-label={comparison ? confirmTitle : '查看资料'}
       onKeyDown={event => {
-        if (event.key === 'Escape' && !busy) {event.preventDefault(); setComparison(null);}
+        if (event.key === 'Escape' && !busy) {event.preventDefault(); closeDialog();}
         if (event.key !== 'Tab') return;
-        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input:not(:disabled),button:not(:disabled)'));
+        const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('input:not(:disabled),button:not(:disabled),select:not(:disabled),summary'));
         const first = controls[0], last = controls[controls.length - 1];
-        if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
-        else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
+        if (!controls.length) event.preventDefault();
+        else if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last.focus();}
+        else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
       }}>
-      <h3 id="snapshot-confirm-title">确认快照变更</h3><p>月份：{comparison.preview.month} · 变更 {comparison.preview.changes.length} 条快照</p>
-      {!!comparison.preview.required_categories.length && <p>影响业务：{comparison.preview.required_categories.map(key => CATEGORY_LABELS[key] ?? key).join('、')}</p>}
-      <div className="snapshot-preview-list">{comparison.preview.changes.map(change => <article key={`${change.kind}-${change.business_key}`}><h4>{KIND_LABELS[change.kind]} {change.business_key} · {change.before ? '修正' : '补齐'}</h4>
-        <dl>{Object.entries(change.after.payload).filter(([key, item]) => !change.before || JSON.stringify(item) !== JSON.stringify(change.before.payload[key])).map(([key, item]) => <div key={key}><dt>{label(key)}</dt><dd>{change.before && <>{displayValue(change.before.payload[key], key)} → </>}{displayValue(item, key)}</dd></div>)}</dl>
-        <p>变更后质量：{QUALITY_LABELS[change.after.quality]}</p></article>)}</div>
-      {!comparison.preview.changes.length && <p>没有需要写入的变更。</p>}
-      <label className="snapshot-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={busy} onChange={event => setAcknowledged(event.target.checked)} />我已核对变更，并了解基线资料不代表已验证历史</label>
-      <div className="snapshot-toolbar"><button className="snapshot-primary" disabled={busy || !acknowledged || !comparison.preview.changes.length} onClick={() => void apply()}>确认执行</button>
-        <button disabled={busy} onClick={() => setComparison(null)}>取消</button></div>
+      {comparison ? <>
+        <div className="snapshot-dialog-head"><div><span className="snapshot-eyebrow">最后一步 · 核对后保存</span><h3>{confirmTitle}</h3></div>
+          <button className="snapshot-icon-button" aria-label="关闭确认窗口" disabled={busy} onClick={closeDialog}>×</button></div>
+        <div className="snapshot-dialog-body"><div className="snapshot-confirm-summary"><span>保存到 <strong>{comparison.preview.month}</strong></span><span>共 <strong>{comparison.preview.changes.length}</strong> 条资料</span></div>
+          <p>{rebuilding ? '将用当前员工、部门和班次资料替换本月旧快照，旧快照不再保留。本月考勤、刷卡和菜票业务记录仍保留，请核对后确认。' : '以下资料将保存到所选月份。已有记录会保留，请检查名称、部门和班次是否正确。'}</p>
+
+          <div className="snapshot-preview-list">{comparison.preview.changes.map(change => {
+            const record = change.after ?? change.before!;
+            if (!change.after) return <article key={`${change.kind}-${change.business_key}`}><h4>删除旧快照 · {String(record.payload.name ?? record.payload.dept_name ?? record.payload.shift_name ?? change.business_key)}<small>{KIND_LABELS[change.kind]} · {change.business_key}</small></h4></article>;
+            const fields = Object.entries(record.payload).filter(([key, item]) => !change.before || JSON.stringify(item) !== JSON.stringify(change.before.payload[key]));
+            const main = fields.filter(([key]) => change.before || MAIN_PREVIEW_FIELDS.has(key));
+            const extra = change.before ? [] : fields.filter(([key]) => !MAIN_PREVIEW_FIELDS.has(key));
+            const renderFields = (items: Array<[string, unknown]>) => <dl>{items.map(([key, item]) => <div key={key}><dt>{label(key)}</dt><dd>{change.before && <span className="snapshot-before">{displayValue(change.before.payload[key], key)} → </span>}{displayValue(item, key)}</dd></div>)}</dl>;
+            return <article key={`${change.kind}-${change.business_key}`}><h4>{String(change.after.payload.name ?? change.after.payload.dept_name ?? change.after.payload.shift_name ?? change.business_key)}<small>{KIND_LABELS[change.kind]} · {change.business_key}</small></h4>
+              {renderFields(main)}{!!extra.length && <details className="snapshot-archive-details"><summary>查看其他保存信息</summary>{renderFields(extra)}</details>}
+            </article>;
+          })}</div>
+          {!comparison.preview.changes.length && <p>没有需要保存的变更。</p>}
+          <label className="snapshot-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={busy} onChange={event => setAcknowledged(event.target.checked)} />我已核对以上变更</label>
+        </div>
+        <div className="snapshot-dialog-footer"><button className="snapshot-button" disabled={busy} onClick={closeDialog}>返回检查</button>
+          <button className="snapshot-button snapshot-primary" disabled={busy || !acknowledged || !comparison.preview.changes.length} onClick={() => void apply()}>{rebuilding ? '确认重建' : '确认保存'}</button></div>
+      </> : selected && detail && <>
+        <div className="snapshot-dialog-head"><div><span className="snapshot-eyebrow">{month} · {KIND_LABELS[selected.kind]}资料</span><h3>{String(selected.payload.name ?? selected.payload.dept_name ?? selected.payload.shift_name ?? selected.business_key)}<small>{selected.business_key}</small></h3></div>
+          <button className="snapshot-icon-button" aria-label="关闭资料窗口" disabled={busy} onClick={closeDialog}>×</button></div>
+        <div className="snapshot-dialog-body">{error && <p className="snapshot-error" role="alert">{error}</p>}
+          <QueryTable headers={['资料', '当月保存的内容']} rows={Object.entries(selected.payload).filter(([key]) => MAIN_PREVIEW_FIELDS.has(key)).map(([key, item]) => [label(key), displayValue(item, key)])}
+            paginationKey={`${month}-${selected.kind}-${selected.business_key}`} />
+          <details className="snapshot-archive-details"><summary>查看其他保存信息</summary>
+            <QueryTable headers={['资料', '当月保存的内容']} rows={Object.entries(selected.payload).filter(([key]) => !MAIN_PREVIEW_FIELDS.has(key)).map(([key, item]) => [label(key), displayValue(item, key)])}
+              paginationKey={`${month}-${selected.kind}-${selected.business_key}-extra`} />
+          </details>
+        </div>
+        <div className="snapshot-dialog-footer"><button className="snapshot-button" disabled={busy} onClick={closeDialog}>关闭</button></div>
+      </>}
     </section></div>}
   </main>;
 }
 
-function sourceDescription(source: unknown): string {
-  if (source === 'baseline') return '当前资料基线';
-  if (source === 'explicit_month_correction') return '管理员月内修正';
-  if (source && typeof source === 'object' && 'source' in source && source.source === 'explicit_evidence_selection') return '明确选择历史证据';
-  return source == null ? '未标明' : '已记录来源';
+function readSlots(value: unknown): string[][] | null {
+  if (value == null) return [];
+  if (!Array.isArray(value)) return null;
+  const result: string[][] = [];
+  for (const slot of value) {
+    const pair = Array.isArray(slot) && slot.length === 2 ? slot
+      : slot && typeof slot === 'object' && !Array.isArray(slot) ? [slot.start ?? slot.start_time, slot.end ?? slot.end_time] : null;
+    if (!pair) return null;
+    const normalized: string[] = [];
+    for (const time of pair) {
+      if (typeof time !== 'string' || (time && !/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time.trim()))) return null;
+      normalized.push(time ? time.trim().padStart(5, '0') : '');
+    }
+    result.push(normalized);
+  }
+  return result;
 }

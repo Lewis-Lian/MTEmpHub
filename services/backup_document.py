@@ -224,7 +224,7 @@ def _validate_v2_rows(present, versions):
     from sqlalchemy import Boolean, Integer, Float, DateTime, Date, String, JSON
     from services.account_set_backup_schema import DATASET_VERSIONS, HISTORY, FILE_DATASETS, canonical
     from services.account_set_backup_service import month_bounds
-    if not isinstance(versions, dict) or any(name not in DATASET_VERSIONS or type(value) is not int or value not in ((1, 2) if name == 'meal_batches' else (DATASET_VERSIONS[name],)) for name, value in versions.items()):
+    if not isinstance(versions, dict) or any(name not in DATASET_VERSIONS or type(value) is not int or value not in ((1, 2) if name == 'meal_batches' or name in FILE_DATASETS else (DATASET_VERSIONS[name],)) for name, value in versions.items()):
         raise BackupError('不支持的数据集版本')
     for scope, rows in present.items():
         name = scope.split('/')[-1]
@@ -298,6 +298,16 @@ def _validate_v2_rows(present, versions):
                 raise BackupError('年度记录年份不匹配')
             if ds.scope == 'interval' and datetime.fromisoformat(row['start_time']) >= datetime.fromisoformat(row['end_time']):
                 raise BackupError('单据时间区间无效')
+            if name in FILE_DATASETS:
+                attachment = [row[field] for field in ('file_key', 'file_sha256', 'file_size')]
+                if any(value is None for value in attachment):
+                    if versions.get(name, 1) < 2 or any(value is not None for value in attachment):
+                        raise BackupError('原始文件引用无效')
+                elif (not isinstance(row['file_key'], str) or not row['file_key'].startswith('files/')
+                      or not isinstance(row['file_sha256'], str)
+                      or not re.fullmatch('[0-9a-f]{64}', row['file_sha256'])
+                      or type(row['file_size']) is not int or row['file_size'] < 0):
+                    raise BackupError('原始文件引用无效')
             if name in HISTORY and (not re.fullmatch('[0-9a-f]{64}', row['origin_key']) or not isinstance(row['provenance'], dict)):
                 raise BackupError('历史来源无效')
             if name == 'snapshots' and (row['kind'] not in ('employee', 'department', 'shift') or row['quality'] not in ('verified', 'baseline', 'partial') or row['schema_version'] != 1 or not isinstance(row['payload'], dict) or not isinstance(row['provenance'], dict)):

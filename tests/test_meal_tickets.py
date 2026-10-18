@@ -919,6 +919,23 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(self.client.delete(url, headers=self.headers).status_code, 404)
         self.assertEqual(upload().status_code, 200)
 
+    def test_cancel_metadata_only_import_preview_without_attachment(self):
+        from models.meal_ticket import MealTicketImport, MealTicketImportRow
+        with self.app.app_context():
+            record = MealTicketImport(month='2026-08', recharge_month='2026-09',
+                source_filename='restored.xlsx', file_digest='restored', stored_path='',
+                status='preview', operator='admin')
+            db.session.add(record)
+            db.session.flush()
+            identifier = record.id
+            db.session.add(MealTicketImportRow(import_key=record.key, month='2026-08', data={}))
+            db.session.commit()
+        response = self.client.delete(f'/api/meal-tickets/imports/{identifier}', headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.get_json())
+        with self.app.app_context():
+            self.assertIsNone(db.session.get(MealTicketImport, identifier))
+            self.assertEqual(MealTicketImportRow.query.count(), 0)
+
     def test_cancel_cannot_delete_confirmed_historical_import(self):
         from pathlib import Path
         from models.meal_ticket import MealTicketImport

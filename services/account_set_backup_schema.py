@@ -169,6 +169,8 @@ DATASET_CATEGORIES = {
 }
 DATASET_VERSIONS = {name: 1 for name in V2_DATASETS}
 DATASET_VERSIONS['meal_batches'] = 2
+# Version 2 retains import metadata without requiring original file attachments.
+DATASET_VERSIONS.update({name: 2 for name in FILE_DATASETS})
 DELETION_POLICIES = {name: ('exit_current' if name in ('employees', 'departments', 'shifts', 'users') else 'selected_complete')
                      for name, ds in V2_DATASETS.items()}
 

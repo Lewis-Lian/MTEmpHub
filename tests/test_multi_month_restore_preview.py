@@ -322,7 +322,7 @@ def test_file_dependency_missing_source_bytes_blocks(backup_app, tmp_path):
     path.write_bytes(b'backup-file')
     db.session.add(AccountSetImport(account_set_id=1, source_filename=path.name, stored_path=str(path), status='ok'))
     db.session.commit()
-    doc = collect_multi_backup([1])
+    doc = collect_multi_backup([1], ['attendance', 'archives'])
     doc['monthly']['2026-06']['datasets']['imports'][0]['status'] = 'restored'
     doc['_files'] = {}
     assert any(b['code'] == 'missing_file' for b in preview(doc)['blockers'])

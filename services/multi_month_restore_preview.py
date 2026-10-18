@@ -170,8 +170,6 @@ def _build(document, selection, choices, *, private=False, progress=None):
         selected = category in selection['categories'] and (month is None or month in selection['months'])
         if name == 'snapshots':
             selected = month in selection['months'] and bool(selection['categories'] & MONTH_CATEGORIES)
-        if name in FILE_DATASETS or name == 'meal_import_rows':
-            selected = selected and 'archives' in selection['categories']
         lefts, rights = dict(target.get(scope, {})), source.get(scope, {})
         if name == 'meal_ledger_imports':
             all_imports = {k: v for s, records in target.items() if s.endswith('/meal_ledger_imports')
@@ -187,6 +185,8 @@ def _build(document, selection, choices, *, private=False, progress=None):
             # Old portable subsets lack new fields. Missing fields never mean
             # reset a target's newly introduced state.
             comparison = {f: left.get(f) for f in right} if left and right else left
+            if name in FILE_DATASETS and comparison and right and right.get('file_key') is None:
+                comparison.update(file_key=None, file_sha256=None, file_size=None)
             if ds.scope == 'shared':
                 public = shared_preview_row(name, comparison, right, coverage=coverage, selected=enabled)
             else:

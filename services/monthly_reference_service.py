@@ -272,8 +272,8 @@ def reference_change_blockers(month: str, proposed: list, selected_categories: l
     required = set()
     start = date.fromisoformat(month + '-01')
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
-    if (DailyRecord.query.filter(DailyRecord.record_date >= start, DailyRecord.record_date < end).first()
-            or MonthlyReport.query.filter_by(report_month=month).first()
+    if (DailyRecord.query.with_entities(DailyRecord.id).filter(DailyRecord.record_date >= start, DailyRecord.record_date < end).first()
+            or MonthlyReport.query.with_entities(MonthlyReport.id).filter_by(report_month=month).first()
             or DailyAttendanceOverride.query.filter(DailyAttendanceOverride.record_date >= start,
                                                     DailyAttendanceOverride.record_date < end).first()
             or EmployeeAttendanceOverride.query.filter_by(month=month).first()
@@ -374,7 +374,7 @@ def reconcile_month_evidence(month: str, decisions: list, selected_categories: l
     db.session.flush()
 
 
-def scan_legacy_month_references(inspect_archives: bool = False) -> dict:
+def scan_legacy_month_references(inspect_archives: bool = False, *, include_evidence: bool = True) -> dict:
     """Report missing snapshots and sourced candidates without flushing or writing.
 
     A source proves what was stored, not every field of an employee's past state.
@@ -385,6 +385,19 @@ def scan_legacy_month_references(inspect_archives: bool = False) -> dict:
     from models.manager_attendance_override import ManagerAttendanceOverride
     from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketImport
     from models.meal_ledger import MealLedgerRecord, MealLedgerImport
+
+    if not include_evidence and not inspect_archives:
+        from sqlalchemy import select, union, func
+        # Discover months in SQL without transferring complete historical payloads.
+        columns = [AccountSet.month, MonthlyReferenceSnapshot.month, DailyRecord.record_date,
+                   MonthlyReport.report_month, MealTicketItem.month, DailyAttendanceOverride.record_date,
+                   EmployeeAttendanceOverride.month, ManagerAttendanceOverride.month, MealTicketBatch.month,
+                   MealTicketImport.month, MealLedgerRecord.month, MealLedgerImport.month]
+        statement = union(*(select(func.substr(column, 1, 7)) for column in columns))
+        months = sorted(value for (value,) in db.session.execute(statement) if value)
+        for month in months:
+            _validate_month(month)
+        return {'months': [{'month': month, 'evidence': [], 'archives': []} for month in months], 'warnings': []}
 
     with db.session.no_autoflush:
         months = {row.month for row in AccountSet.query.all()}

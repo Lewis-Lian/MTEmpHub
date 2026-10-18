@@ -21,19 +21,19 @@ export interface ReferenceDetail {
   archives: Array<{id: number; source_filename: string; status: string}>;
   editable_fields: Record<ReferenceKind, string[]>;
 }
-export type ReferenceOperation = {action: 'capture'} |
+export type ReferenceOperation = {action: 'capture' | 'rebuild'} |
   {action: 'correct'; kind: ReferenceKind; business_key: string; changes: Record<string, unknown>; categories: string[]} |
   {action: 'reconcile'; decisions: Array<{business_key: string; field: string; value: unknown}>; categories: string[]; inspect_archives: boolean};
 export interface ReferencePreview {
   month: string; action: string; fingerprint: string; required_categories: string[];
-  changes: Array<{kind: ReferenceKind; business_key: string; before: ReferenceSnapshot | null; after: ReferenceSnapshot}>;
+  changes: Array<{kind: ReferenceKind; business_key: string; before: ReferenceSnapshot | null; after: ReferenceSnapshot | null}>;
 }
 const base = '/api/admin/monthly-references';
 export function listReferenceMonths(): Promise<{months: ReferenceMonth[]}> {
   return apiRequest(base);
 }
 export function fetchReferenceDetail(month: string, inspectArchives = false): Promise<ReferenceDetail> {
-  return apiRequest(`${base}/${month}${inspectArchives ? '?inspect_archives=1' : ''}`);
+  return apiRequest(`${base}/${month}${inspectArchives ? '?inspect_archives=1' : '?summary=1'}`);
 }
 export function previewReferenceOperation(month: string, operation: ReferenceOperation): Promise<ReferencePreview> {
   return apiRequest(`${base}/${month}/preview`, {method: 'POST', body: operation});

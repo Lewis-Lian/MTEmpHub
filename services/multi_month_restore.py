@@ -152,7 +152,7 @@ def restore_multi_backup(document, selection, choices, fingerprint, operator_id,
                         affected_users.add(obj.id)
                 else:
                     db.session.delete(obj)
-                if name in FILE_DATASETS:
+                if name in FILE_DATASETS and obj.stored_path:
                     old_paths.append(str(Path(obj.stored_path).resolve()))
                 if name.startswith('user_'):
                     affected_users.add(obj.user_id)
@@ -182,9 +182,12 @@ def restore_multi_backup(document, selection, choices, fingerprint, operator_id,
                 if name == 'account_set' and obj is None:
                     fields.update(is_active=False, is_locked=False)
                 if name in FILE_DATASETS:
-                    if obj:
-                        old_paths.append(str(Path(obj.stored_path).resolve()))
-                    fields['stored_path'] = str(file_paths[row['row_key']])
+                    if value.get('file_key'):
+                        if obj and obj.stored_path:
+                            old_paths.append(str(Path(obj.stored_path).resolve()))
+                        fields['stored_path'] = str(file_paths[row['row_key']])
+                    else:
+                        fields['stored_path'] = obj.stored_path if obj else ''
                 if name == 'users':
                     # Avatar URLs point at the existing protected avatar endpoint.
                     if value.get('avatar_file_key'):

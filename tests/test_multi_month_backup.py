@@ -13,7 +13,9 @@ from models.department import Department
 from models.leave import LeaveRecord
 from models.user import User
 from services import account_set_backup_service as service
-from services.account_set_backup_schema import BackupError
+from services.account_set_backup_schema import BackupError, DATASET_CATEGORIES
+
+ALL_CATEGORIES = sorted(set(DATASET_CATEGORIES.values()) - {'monthly_references'} | {'archives'})
 from tests.test_account_set_backup import backup_app
 from tests.test_account_set_backup_api import logged_in
 
@@ -40,7 +42,7 @@ def multi_app(backup_app, tmp_path):
 
 
 def test_split_zip_roundtrip_deduplicates_without_losing_relations(multi_app):
-    payload = service.export_multi_backup([2, 1])
+    payload = service.export_multi_backup([2, 1], ALL_CATEGORIES)
     doc = service.read_backup(payload, normalized=True)
     assert doc['months'] == ['2026-06', '2026-07']
     assert len(doc['shared']['users']) == len(doc['shared']['employees']) == 1
@@ -65,13 +67,13 @@ def test_split_zip_roundtrip_deduplicates_without_losing_relations(multi_app):
         assert set(archive.namelist()) == {'manifest.json', *(item['path'] for item in manifest['files'])}
 
 
-def test_cancelled_categories_are_absent_and_archives_cancel_dependants(multi_app):
+def test_cancelled_categories_are_absent_and_import_metadata_is_preserved(multi_app):
     doc = service.read_backup(service.export_multi_backup([1, 2], categories=['attendance']), normalized=True)
     assert doc['shared'] == {} and doc['_files'] == {}
     for month in doc['months']:
-        assert 'imports' not in doc['monthly'][month]['datasets']
+        assert doc['monthly'][month]['datasets']['imports'][0]['file_key'] is None
         assert 'snapshots' in doc['monthly'][month]
-        assert doc['coverage']['month/%s/imports' % month] == {'included': False, 'complete': False}
+        assert doc['coverage']['month/%s/imports' % month] == {'included': True, 'complete': True}
     assert doc['coverage']['shared/users'] == {'included': False, 'complete': False}
     empty = service.collect_multi_backup([1], categories=[])
     assert empty['monthly']['2026-06'] == {'datasets': {}}
@@ -111,14 +113,14 @@ def test_full_scope_change_during_export_is_rejected(multi_app, tmp_path, scope)
                 (tmp_path / 'source2.xlsx').write_bytes(b'changed')
             db.session.commit()
     with pytest.raises(BackupError, match='变化'):
-        service.export_multi_backup([1, 2], progress=progress)
+        service.export_multi_backup([1, 2], ALL_CATEGORIES, progress=progress)
     assert changed
 
 
 def test_missing_file_rejected_but_unselected_archives_not_read(multi_app, tmp_path):
     (tmp_path / 'source2.xlsx').unlink()
     with pytest.raises(BackupError, match='缺失'):
-        service.export_multi_backup([1, 2])
+        service.export_multi_backup([1, 2], ALL_CATEGORIES)
     service.export_multi_backup([1, 2], categories=['attendance'])
 
 
@@ -161,7 +163,7 @@ def test_export_failure_has_owned_progress(multi_app, tmp_path):
     client = logged_in(multi_app)
     token = 'd' * 32
     (tmp_path / 'source2.xlsx').unlink()
-    response = client.post('/api/admin/backups/export', json={'account_set_ids': [1, 2], 'export_token': token})
+    response = client.post('/api/admin/backups/export', json={'account_set_ids': [1, 2], 'export_token': token, 'categories': ALL_CATEGORIES})
     assert response.status_code == 400
     state = client.get('/api/admin/backups/export/progress?export_token=' + token).get_json()
     assert state['status'] == 'failed' and '缺失' in state['stage']
@@ -199,7 +201,7 @@ def test_unselected_accounts_do_not_read_missing_avatar(multi_app, tmp_path):
 
 def test_different_contents_keep_separate_archive_references(multi_app, tmp_path):
     (tmp_path / 'source2.xlsx').write_bytes(b'other synthetic file')
-    doc = service.read_backup(service.export_multi_backup([1, 2]), normalized=True)
+    doc = service.read_backup(service.export_multi_backup([1, 2], ALL_CATEGORIES), normalized=True)
     assert len(doc['_files']) == 2
     key = doc['monthly']['2026-07']['datasets']['imports'][0]['file_key']
     assert doc['_files'][key] == b'other synthetic file'
@@ -249,7 +251,7 @@ def test_aborted_download_is_not_reported_ready(multi_app):
     assert state['status'] == 'failed' and state['phase'] == 'download'
 
 
-def test_ledger_archive_dependency_requires_explicit_archives_selection(multi_app, tmp_path):
+def test_ledger_metadata_dependency_is_included_without_archives(multi_app, tmp_path):
     from models.meal_ledger import MealLedgerRecord, MealLedgerImport
     path = tmp_path / 'ledger.xlsx'
     path.write_bytes(b'synthetic ledger')
@@ -260,8 +262,9 @@ def test_ledger_archive_dependency_requires_explicit_archives_selection(multi_ap
                                    record_date=date(2026, 6, 2), data={'import_key': 'source-key'},
                                    request_key='request', request_digest='f' * 64, operator='test'))
     db.session.commit()
-    with pytest.raises(BackupError, match='归档'):
-        service.export_multi_backup([1], ['meal_ledgers'])
+    metadata = service.read_backup(service.export_multi_backup([1], ['meal_ledgers']), normalized=True)
+    assert metadata['_files'] == {}
+    assert metadata['monthly']['2026-06']['datasets']['meal_ledger_imports'][0]['key'] == 'source-key'
     doc = service.read_backup(service.export_multi_backup([1], ['meal_ledgers', 'archives']), normalized=True)
     datasets = doc['monthly']['2026-06']['datasets']
     assert datasets['meal_ledger_records'][0]['data']['import_key'] == datasets['meal_ledger_imports'][0]['key']
@@ -276,4 +279,39 @@ def test_disappearing_file_is_a_backup_error(multi_app, tmp_path, monkeypatch):
         return original(path)
     monkeypatch.setattr(service, 'file_digest', digest)
     with pytest.raises(BackupError, match='原始文件'):
-        service.export_multi_backup([1, 2])
+        service.export_multi_backup([1, 2], ALL_CATEGORIES)
+
+
+def test_default_export_keeps_import_metadata_without_source_files(multi_app, tmp_path):
+    (tmp_path / 'source2.xlsx').unlink()
+    document = service.read_backup(service.export_multi_backup([1, 2]), normalized=True)
+    for month in document['months']:
+        row = document['monthly'][month]['datasets']['imports'][0]
+        assert row['source_filename'].endswith('.xlsx')
+        assert row['origin_key'] and row['provenance']
+        assert row['file_key'] is row['file_sha256'] is row['file_size'] is None
+        assert document['coverage']['month/%s/imports' % month]['complete']
+    assert set(document['_files']) == {document['shared']['users'][0]['avatar_file_key']}
+
+
+@pytest.mark.parametrize('mutation', ['partial_attachment', 'legacy_metadata_only'])
+def test_metadata_only_attachment_contract_rejects_invalid_or_legacy_claims(multi_app, mutation):
+    from services.backup_document import normalize_backup
+    document = service.collect_multi_backup([1], ['attendance'])
+    row = document['monthly']['2026-06']['datasets']['imports'][0]
+    if mutation == 'partial_attachment':
+        row['file_sha256'] = 'a' * 64
+    else:
+        document['dataset_versions']['imports'] = 1
+    with pytest.raises(BackupError, match='文件引用'):
+        normalize_backup(document)
+
+
+def test_legacy_v2_archive_dataset_versions_remain_readable(multi_app):
+    from services.backup_document import normalize_backup
+    from services.account_set_backup_schema import FILE_DATASETS
+    document = service.collect_multi_backup([1], ALL_CATEGORIES)
+    for name in FILE_DATASETS:
+        document['dataset_versions'][name] = 1
+    normalized = normalize_backup(document)
+    assert normalized['monthly']['2026-06']['datasets']['imports'][0]['file_key'] in document['_files']

@@ -395,11 +395,12 @@ def import_cancel(identifier):
         raise MealError('导入预览不存在', 404)
     if record.status != 'preview':
         raise MealError('已确认入账的历史记录不能取消', 409)
-    path = Path(record.stored_path)
+    path = Path(record.stored_path) if record.stored_path else None
     MealTicketImportRow.query.filter_by(import_key=record.key).delete(synchronize_session=False)
     db.session.delete(record)
     db.session.commit()
-    path.unlink(missing_ok=True)
+    if path is not None:
+        path.unlink(missing_ok=True)
     return jsonify({'deleted': identifier})
 
 

@@ -7,7 +7,7 @@ export default function MonthlyBackupExportModal({accountSets, initialId, onClos
 }) {
   const [ids, setIds] = useState<number[]>(initialId ? [initialId] : []);
   const selectedIds = ids.filter(id => accountSets.some(account => account.id === id));
-  const [categories, setCategories] = useState(Object.keys(BACKUP_CATEGORIES));
+  const [categories, setCategories] = useState(Object.keys(BACKUP_CATEGORIES).filter(key => key !== 'archives'));
   const [progress, setProgress] = useState<BackupExportProgress | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -25,8 +25,9 @@ export default function MonthlyBackupExportModal({accountSets, initialId, onClos
         {accountSets.map(account => <label key={account.id}><input type="checkbox" checked={ids.includes(account.id)} onChange={event => setIds(event.target.checked ? [...ids, account.id] : ids.filter(id => id !== account.id))} />{account.month}</label>)}
       </fieldset>
       <p>已选月份：{accountSets.filter(account => ids.includes(account.id)).map(account => account.month).join('、') || '尚未选择'}</p>
-      <fieldset className="backup-options" disabled={busy}><legend>导出内容（默认全部）</legend>{Object.entries(BACKUP_CATEGORIES).map(([key, label]) => <label key={key}><input type="checkbox" checked={categories.includes(key)} onChange={event => setCategories(event.target.checked ? [...categories, key] : categories.filter(item => item !== key))} />{label}</label>)}</fieldset>
+      <fieldset className="backup-options" disabled={busy}><legend>导出数据（默认全部）</legend>{Object.entries(BACKUP_CATEGORIES).filter(([key]) => key !== 'archives').map(([key, label]) => <label key={key}><input type="checkbox" checked={categories.includes(key)} onChange={event => setCategories(event.target.checked ? [...categories, key] : categories.filter(item => item !== key))} />{label}</label>)}</fieldset>
       <p className="backup-scope-note">当前部门、员工、班次及账号按完整当前资料导出，不局限于所选月有业务记录的人员。月份业务携带历史资料快照；账号包含密码和权限，请妥善保存备份。</p>
+      <p>保留业务数据、导入记录和当月人员资料，不附带导入时的原始文件。</p>
       <p>ZIP 备份上传限制为 100 MiB。超限请减少导出月份或内容后重试。</p>
       {error && <p role="alert" className="backup-error">{error}</p>}
       {progress && <div className="acm-export-progress" role="status"><div className="acm-export-progress-heading"><span>{progress.stage}</span><strong>{receiving ? '接收中' : `${progress.percent}%`}</strong></div>

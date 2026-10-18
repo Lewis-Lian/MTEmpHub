@@ -77,7 +77,7 @@ def scoped_rows(name, account, employee_ids=None):
     return query.order_by(model.id).all()
 
 
-def serialize_row(name, row):
+def serialize_row(name, row, *, include_files=True):
     ds = DATASETS[name]
     result = {field: serial(getattr(row, field)) for field in ds.fields}
     if hasattr(row, 'emp_id'):
@@ -102,7 +102,9 @@ def serialize_row(name, row):
             'source_id': row.id,
             'operator_id': getattr(row, 'operator_user_id', None),
         }
-    if name in FILE_DATASETS:
+    if name in FILE_DATASETS and not include_files:
+        result.update(file_key=None, file_sha256=None, file_size=None)
+    elif name in FILE_DATASETS:
         identity = result['key'] if name.startswith('meal_') else result['origin_key']
         result['file_key'] = 'files/%s/%s' % (identity, Path(row.source_filename).name)
         path = Path(row.stored_path)
@@ -111,7 +113,7 @@ def serialize_row(name, row):
     return result
 
 
-def serialize_rows(name, rows):
+def serialize_rows(name, rows, *, include_files=True):
     # Keep bulk-loaded references alive while serializing: the session identity
     # map uses weak references and otherwise repeats lookups for every day.
     references = []
@@ -123,7 +125,7 @@ def serialize_rows(name, rows):
         ids = {getattr(row, field) for row in rows if getattr(row, field)}
         if ids:
             references.extend(model.query.filter(model.id.in_(ids)).all())
-    return [serialize_row(name, row) for row in rows]
+    return [serialize_row(name, row, include_files=include_files) for row in rows]
 
 
 def _shared_avatar(avatar):
@@ -554,7 +556,7 @@ def _read_v2_contents(manifest, contents):
         key, checksum, size = ('avatar_file_key', 'avatar_sha256', 'avatar_size') if name == 'users' else ('file_key', 'file_sha256', 'file_size')
         for row in rows:
             path = row[key]
-            if name == 'users' and path is None and row[checksum] is None and row[size] is None:
+            if path is None and row[checksum] is None and row[size] is None:
                 continue
             if not isinstance(path, str) or not path.startswith('files/') or path not in contents:
                 raise BackupError('原始文件引用无效')
@@ -575,7 +577,7 @@ def _multi_selection(account_set_ids, categories):
             or len(set(account_set_ids)) != len(account_set_ids)):
         raise BackupError('请选择不重复的有效账套月份')
     if categories is None:
-        categories = sorted(allowed)
+        categories = sorted(allowed - {'archives'})
     if (not isinstance(categories, list) or any(not isinstance(item, str) for item in categories)
             or len(set(categories)) != len(categories) or set(categories) - allowed):
         raise BackupError('备份类别无效')
@@ -596,8 +598,7 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
     selected = set(categories)
     monthly_business = bool(selected & {'account_settings', 'attendance', 'meal_tickets', 'meal_ledgers'})
     names = [name for name in V2_DATASETS
-             if (DATASET_CATEGORIES[name] in selected or (name == 'snapshots' and monthly_business))
-             and ('archives' in selected or name not in FILE_DATASETS | {'meal_import_rows'})]
+             if DATASET_CATEGORIES[name] in selected or (name == 'snapshots' and monthly_business)]
     years = sorted({account.month[:4] for account in accounts})
     total = sum(1 if V2_DATASETS[name].scope == 'shared' else
                 len(years) if V2_DATASETS[name].scope == 'year' else len(accounts) for name in names)
@@ -619,7 +620,7 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
     def encode(name, rows):
         nonlocal file_bytes
         try:
-            items = serialize_rows(name, rows) if name in DATASETS else [
+            items = serialize_rows(name, rows, include_files='archives' in selected) if name in DATASETS else [
                 {field: serial(getattr(row, field)) for field in V2_DATASETS[name].fields} for row in rows]
         except OSError as exc:
             raise BackupError('原始文件缺失或无法读取，请重新导出') from exc
@@ -631,7 +632,7 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
                 if identifier is not None and ref is None:
                     raise BackupError('关联资料缺失：%s' % output)
                 item[output] = getattr(ref, natural) if ref else None
-            if name in FILE_DATASETS:
+            if name in FILE_DATASETS and 'archives' in selected:
                 path = Path(source.stored_path)
                 if not path.is_file():
                     raise BackupError('原始文件缺失：%s' % source.source_filename)
@@ -667,9 +668,6 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
                 block['snapshots'] = encode(name, ds.model.query.filter_by(month=account.month).order_by(ds.model.id).all())
             else:
                 items = encode(name, scoped_rows(name, account))
-                if name == 'meal_ledger_records' and 'archives' not in selected and any(
-                        item['data'].get('import_key') for item in items):
-                    raise BackupError('台账来源依赖归档文件，请同时选择归档类别')
                 if ds.scope == 'interval':
                     existing = {canonical([row[field] for field in ds.key]): row
                                 for row in doc['cross_month'].setdefault(name, [])}

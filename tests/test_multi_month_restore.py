@@ -21,13 +21,13 @@ def restore(document, selection, choices=None, fingerprint=None):
     return restore_multi_backup(document, selection, choices or {}, fingerprint or preview['fingerprint'], 1)
 
 
-def two_months():
+def two_months(categories=None):
     db.session.add(AccountSet(month='2026-07', name='七月'))
     db.session.add(DailyRecord(emp_id=1, record_date=date(2026, 7, 3), actual_hours=7))
     ensure_month_reference('2026-06')
     ensure_month_reference('2026-07')
     db.session.commit()
-    document = collect_multi_backup([1, 2])
+    document = collect_multi_backup([1, 2], categories)
     for record in DailyRecord.query.all():
         record.actual_hours = 1
     db.session.commit()
@@ -66,7 +66,7 @@ def test_file_write_failure_preserves_database_and_originals(backup_app, tmp_pat
     source.write_bytes(b'backup')
     db.session.add(AccountSetImport(account_set_id=1, source_filename=source.name, stored_path=str(source), status='ok'))
     db.session.commit()
-    document = two_months()
+    document = two_months(['attendance', 'archives'])
     source.write_bytes(b'target')
     write = Path.write_bytes
     def fail_staging(path, data):
@@ -160,7 +160,7 @@ def test_file_cleanup_keeps_unselected_month_reference(backup_app, tmp_path):
     document = two_months()
     db.session.add_all([AccountSetImport(account_set_id=i, source_filename=source.name, stored_path=str(source), status='ok') for i in (1, 2)])
     db.session.commit()
-    document = collect_multi_backup([1, 2])
+    document = collect_multi_backup([1, 2], ['attendance', 'archives'])
     source.write_bytes(b'target')
     restore(document, {'months': ['2026-06'], 'categories': ['attendance', 'archives']})
     june = AccountSetImport.query.filter_by(account_set_id=1).one()
@@ -445,3 +445,76 @@ def test_legacy_account_scoped_writes_bind_selected_month(backup_app, tmp_path, 
     categories = ['account_settings'] if dataset == 'factory_rest' else ['attendance', 'archives']
     restore(document, {'months': ['2026-06'], 'categories': categories})
     assert model.query.one().account_set_id == 1
+
+
+def test_data_only_roundtrip_restores_import_rows_ledger_sources_and_snapshots(backup_app, tmp_path):
+    from models.meal_ticket import MealTicketImport, MealTicketImportRow
+    from models.meal_ledger import MealLedgerImport, MealLedgerRecord
+    from models.user import User
+    from services.account_set_backup_service import export_multi_backup, read_backup
+    from services.account_set_backup_schema import DATASET_CATEGORIES
+    from services.backup_document import _contents
+    db.session.add(AccountSetImport(account_set_id=1, source_filename='missing.xlsx',
+                                   stored_path=str(tmp_path / 'missing.xlsx'), status='ok', imported_count=7))
+    db.session.add(MealTicketImport(key='meal-source', month='2026-06', recharge_month='2026-06',
+        source_filename='meal.xlsx', file_digest='a' * 64, stored_path='', operator='test', status='confirmed'))
+    db.session.flush()
+    db.session.add(MealTicketImportRow(key='meal-row', import_key='meal-source', month='2026-06',
+                                      emp_id=1, data={'amount': 23, 'source_row': 8}))
+    db.session.add(MealLedgerImport(key='ledger-source', kind='import', month='2026-06',
+        source_filename='ledger.xlsx', file_digest='b' * 64, stored_path='', data={'rows': 1}, operator='test'))
+    db.session.add(MealLedgerRecord(key='ledger-row', kind='import', month='2026-06',
+        record_date=date(2026, 6, 2), data={'import_key': 'ledger-source'},
+        request_key='request', request_digest='c' * 64, operator='test'))
+    ensure_month_reference('2026-06')
+    db.session.commit()
+    document = read_backup(export_multi_backup([1]), normalized=True)
+    assert document['_files'] == {}
+    db.session.remove()
+    db.drop_all()
+    db.create_all()
+    db.session.add(User(username='admin', role='admin', password_hash='unused'))
+    db.session.commit()
+    selection = {'months': document['months'], 'categories': sorted(set(DATASET_CATEGORIES.values()) - {'monthly_references'})}
+    selection['cross_month_keys'] = []
+    selection['annual_keys'] = []
+    preview = build_multi_preview(document, selection)
+    selection['cross_month_keys'] = [r['row_key'] for r in preview['rows'] if r['scope'].startswith('cross_month/')]
+    selection['annual_keys'] = [r['row_key'] for r in preview['rows'] if r['scope'].startswith('year/')]
+    restore(document, selection)
+    assert AccountSetImport.query.one().stored_path == ''
+    assert AccountSetImport.query.one().imported_count == 7
+    assert MealTicketImport.query.one().file_digest == 'a' * 64
+    assert MealTicketImportRow.query.one().data == {'amount': 23, 'source_row': 8}
+    assert MealTicketImportRow.query.one().import_key == MealTicketImport.query.one().key
+    assert MealLedgerRecord.query.one().data['import_key'] == MealLedgerImport.query.one().key
+    restored = collect_multi_backup([AccountSet.query.one().id])
+    assert restored['monthly']['2026-06']['snapshots'] == document['monthly']['2026-06']['snapshots']
+    expected, actual = _contents(document), _contents(restored)
+    # The bootstrap admin retains its local creation timestamp.
+    expected.pop('shared/users')
+    actual.pop('shared/users')
+    assert actual == expected
+
+
+def test_metadata_only_restore_preserves_existing_local_attachment(backup_app, tmp_path):
+    path = tmp_path / 'local.xlsx'
+    path.write_bytes(b'local attachment')
+    row = AccountSetImport(account_set_id=1, source_filename='local.xlsx', stored_path=str(path), status='ok')
+    db.session.add(row)
+    db.session.commit()
+    document = collect_multi_backup([1])
+    document['monthly']['2026-06']['datasets']['imports'][0]['imported_count'] = 42
+    restore(document, {'months': document['months'], 'categories': ['attendance']})
+    assert AccountSetImport.query.one().imported_count == 42
+    assert AccountSetImport.query.one().stored_path == str(path)
+    assert path.read_bytes() == b'local attachment'
+
+
+def test_delete_metadata_only_import_does_not_queue_working_directory_cleanup(backup_app):
+    document = collect_multi_backup([1])
+    db.session.add(AccountSetImport(account_set_id=1, source_filename='restored.xlsx', stored_path='', status='ok'))
+    db.session.commit()
+    result = restore(document, {'months': document['months'], 'categories': ['attendance']})
+    assert AccountSetImport.query.count() == 0
+    assert result['warnings'] == []

@@ -38,7 +38,8 @@ def register_monthly_reference_routes(bp, admin_required):
     @admin_required
     @handled
     def detail(month):
-        return jsonify(reference_detail(month, request.args.get('inspect_archives') == '1'))
+        return jsonify(reference_detail(month, request.args.get('inspect_archives') == '1',
+                                        include_evidence=request.args.get('summary') != '1'))
 
     @bp.post('/monthly-references/<month>/preview')
     @admin_required

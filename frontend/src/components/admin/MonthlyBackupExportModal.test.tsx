@@ -23,16 +23,17 @@ it('does not export a checked account removed from the visible month list', asyn
   expect(download).toHaveBeenCalledWith([1], expect.any(Array), expect.any(Function));
   await screen.findByRole('button', {name: '开始导出'});
 });
-it('exports multiple checked months and every category including accounts by default', async () => {
+it('exports multiple checked months and all business categories without original files by default', async () => {
   download.mockResolvedValue(undefined);
   render(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-06'}, {id: 2, month: '2026-07'}]} initialId={1} onClose={() => {}} />);
   expect(screen.getByLabelText('2026-06')).toBeChecked();
   fireEvent.click(screen.getByLabelText('2026-07'));
-  ['账套参数与厂休', '考勤数据', '菜票核算与充值', '菜票独立台账', '原始文件', '当前部门资料', '当前员工资料', '班次与默认分配', '账号、密码与权限', '跨月请假与加班', '年度统计与年假'].forEach(label => expect(screen.getByLabelText(label)).toBeChecked());
+  ['账套参数与厂休', '考勤数据', '菜票核算与充值', '菜票独立台账', '当前部门资料', '当前员工资料', '班次与默认分配', '账号、密码与权限', '跨月请假与加班', '年度统计与年假'].forEach(label => expect(screen.getByLabelText(label)).toBeChecked());
+  expect(screen.queryByLabelText('原始文件')).not.toBeInTheDocument();
   expect(screen.getByText(/不局限于所选月有业务记录/)).toBeInTheDocument();
   expect(screen.getByText(/100 MiB/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', {name: '开始导出'}));
-  expect(download).toHaveBeenCalledWith([1, 2], ['account_settings', 'attendance', 'meal_tickets', 'meal_ledgers', 'archives', 'departments', 'employees', 'shifts', 'accounts', 'cross_month', 'annual_stats'], expect.any(Function));
+  expect(download).toHaveBeenCalledWith([1, 2], ['account_settings', 'attendance', 'meal_tickets', 'meal_ledgers', 'departments', 'employees', 'shifts', 'accounts', 'cross_month', 'annual_stats'], expect.any(Function));
   await screen.findByRole('button', {name: '开始导出'});
 });
 it('reports actual stages, prevents duplicate downloads and retains completion', async () => {

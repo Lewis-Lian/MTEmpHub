@@ -261,3 +261,93 @@ def test_capture_rejects_unresolved_or_mismatched_historical_references(backup_a
     assert expected in response.get_json()['error']
     assert MonthlyReferenceSnapshot.query.count() == 2
     assert MonthlyReferenceSnapshot.query.filter_by(kind=kind, business_key=key).one().payload == original
+
+
+def test_rebuild_replaces_old_month_snapshots_with_current_data(backup_app):
+    client = logged_in(backup_app)
+    ensure_month_reference('2026-06')
+    ensure_month_reference('2026-05')
+    employee = Employee.query.one()
+    employee.name = '最新姓名'
+    old = MonthlyReferenceSnapshot(month='2026-06', kind='employee', business_key='OLD',
+        payload={'emp_no': 'OLD', 'name': '旧资料'}, quality='verified', schema_version=1,
+        provenance={'source': 'history'})
+    db.session.add(old)
+    db.session.commit()
+    operation = {'action': 'rebuild'}
+    compared = preview(client, operation)
+    assert MonthlyReferenceSnapshot.query.filter_by(month='2026-06', business_key='OLD').count() == 1
+    removed = next(row for row in compared['changes'] if row['business_key'] == 'OLD')
+    assert removed['after'] is None
+    assert apply(client, operation, compared).status_code == 200
+    rows = MonthlyReferenceSnapshot.query.filter_by(month='2026-06').all()
+    assert {row.business_key for row in rows} == {'E1', 'D1'}
+    assert next(row for row in rows if row.kind == 'employee').payload['name'] == '最新姓名'
+    assert all(row.quality == 'baseline' for row in rows)
+    assert MonthlyReferenceSnapshot.query.filter_by(month='2026-05', kind='employee').one().payload['name'] == '甲'
+    assert DailyRecord.query.count() == 1
+
+
+@pytest.mark.parametrize('change', ['current', 'snapshot', 'lock'])
+def test_rebuild_rejects_stale_preview_without_replacing_snapshots(backup_app, change):
+    client = logged_in(backup_app)
+    ensure_month_reference('2026-06')
+    db.session.commit()
+    operation = {'action': 'rebuild'}
+    compared = preview(client, operation)
+    if change == 'current':
+        Employee.query.one().name = '变化姓名'
+    elif change == 'snapshot':
+        MonthlyReferenceSnapshot.query.filter_by(kind='employee').one().payload = {'name': '被修改'}
+    else:
+        AccountSet.query.one().is_locked = True
+    db.session.commit()
+    before = [(row.id, deepcopy(row.payload)) for row in MonthlyReferenceSnapshot.query.all()]
+    assert apply(client, operation, compared).status_code in (400, 409)
+    assert [(row.id, row.payload) for row in MonthlyReferenceSnapshot.query.all()] == before
+
+
+def test_rebuild_invalid_current_relations_preserves_old_snapshots(backup_app):
+    client = logged_in(backup_app)
+    ensure_month_reference('2026-06')
+    db.session.commit()
+    before = [(row.id, deepcopy(row.payload)) for row in MonthlyReferenceSnapshot.query.all()]
+    department = Department.query.one()
+    department.parent_id = department.id
+    db.session.commit()
+    response = client.post(BASE + '/2026-06/preview', json={'action': 'rebuild'})
+    assert response.status_code == 400
+    assert [(row.id, row.payload) for row in MonthlyReferenceSnapshot.query.all()] == before
+
+
+def test_snapshot_summary_and_capture_do_not_load_attendance_payloads(backup_app):
+    from sqlalchemy import event
+    client = logged_in(backup_app)
+    statements = []
+    def capture_sql(conn, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lower())
+    event.listen(db.engine, 'before_cursor_execute', capture_sql)
+    try:
+        assert client.get(BASE).status_code == 200
+        response = client.get(BASE + '/2026-06?summary=1')
+        assert response.status_code == 200
+        assert response.get_json()['missing']
+        preview(client, {'action': 'capture'})
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', capture_sql)
+    attendance_reads = [sql for sql in statements if 'from daily_records' in sql or 'from monthly_reports' in sql]
+    assert attendance_reads
+    assert not any('raw_data' in sql or 'employee_payload' in sql or 'agg_01' in sql for sql in attendance_reads)
+
+
+def test_lightweight_snapshot_months_include_business_months_without_accounts(backup_app):
+    client = logged_in(backup_app)
+    employee = Employee.query.one()
+    from datetime import date
+    db.session.add(DailyRecord(emp_id=employee.id, record_date=date(2026, 4, 8), actual_hours=8))
+    db.session.commit()
+    months = client.get(BASE).get_json()['months']
+    assert '2026-04' in {row['month'] for row in months}
+    detail = client.get(BASE + '/2026-04?summary=1')
+    assert detail.status_code == 200
+    assert detail.get_json()['missing']
