@@ -32,16 +32,16 @@ afterEach(() => {cleanup(); vi.resetAllMocks();});
 it('shows month quality and previews missing snapshots before confirmation', async () => {
   render(<MonthlyReferencesPage />);
   fireEvent.click(await screen.findByRole('button', {name: '补齐缺失资料'}));
-  const dialog = await screen.findByRole('dialog', {name: '确认保存本月资料'});
+  const dialog = await screen.findByRole('dialog', {name: '保存 2026-05 的快照'});
   expect(dialog).toHaveTextContent('D2');
   expect(dialog).toHaveTextContent('财务');
-  const apply = screen.getByRole('button', {name: '确认保存'});
-  expect(apply).toBeDisabled();
+  const apply = screen.getByRole('button', {name: '保存快照'});
+  expect(apply).toBeEnabled();
   expect(api.applyReferenceOperation).not.toHaveBeenCalled();
-  expect(screen.getByLabelText('我已核对以上变更')).toHaveFocus();
-  fireEvent.click(screen.getByLabelText('我已核对以上变更'));
+  expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', {name:'关闭确认窗口'})).toHaveFocus();
   fireEvent.click(apply);
-  await waitFor(() => expect(api.applyReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'capture'}, 'reviewed'));
+  await waitFor(() => expect(api.applyReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'capture'}, 'reviewed', expect.objectContaining({onProgress:expect.any(Function)})));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 });
 
@@ -58,8 +58,7 @@ it('invalidates a rejected preview and requires another comparison', async () =>
   render(<MonthlyReferencesPage />);
   fireEvent.click(await screen.findByRole('button', {name: '补齐缺失资料'}));
   await screen.findByRole('dialog');
-  fireEvent.click(screen.getByLabelText('我已核对以上变更'));
-  fireEvent.click(screen.getByRole('button', {name: '确认保存'}));
+  fireEvent.click(screen.getByRole('button', {name: '保存快照'}));
   expect(await screen.findByRole('alert')).toHaveTextContent('资料已发生变化');
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
@@ -87,7 +86,7 @@ it('shows saved names and relationships without evidence or editing controls', a
   fireEvent.click(screen.getByRole('button', {name: '查看资料 E1'}));
   expect(screen.queryByLabelText('修改为')).not.toBeInTheDocument();
   expect(screen.queryByLabelText('考勤统计')).not.toBeInTheDocument();
-  expect(api.fetchReferenceDetail).toHaveBeenCalledWith('2026-05', false);
+  expect(api.fetchReferenceDetail).toHaveBeenCalledWith('2026-05', false, expect.objectContaining({onProgress:expect.any(Function)}));
 });
 
 it('explains an uncaptured month and a fully saved month', async () => {
@@ -134,17 +133,18 @@ it('previews replacement and removed snapshots before rebuilding the selected mo
     ]});
   render(<MonthlyReferencesPage />);
   fireEvent.click(await screen.findByRole('button', {name: '重建本月快照'}));
-  const dialog = await screen.findByRole('dialog', {name: '确认重建本月快照'});
-  expect(api.previewReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'rebuild'});
+  const dialog = await screen.findByRole('dialog', {name: '重建 2026-05 的快照'});
+  expect(api.previewReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'rebuild'}, expect.objectContaining({onProgress:expect.any(Function)}));
   expect(dialog).toHaveTextContent('替换');
   expect(dialog).toHaveTextContent('最新姓名');
   expect(dialog).toHaveTextContent('旧人员');
-  expect(dialog).toHaveTextContent('删除旧快照');
-  const confirm = screen.getByRole('button', {name: '确认重建'});
-  expect(confirm).toBeDisabled();
-  fireEvent.click(screen.getByLabelText('我已核对以上变更'));
+  expect(dialog).toHaveTextContent('删除');
+  expect(within(dialog).getByRole('table')).toBeInTheDocument();
+  expect(dialog).toHaveTextContent('历史姓名');
+  const confirm = screen.getByRole('button', {name: '替换旧快照'});
+  expect(confirm).toBeEnabled();
   fireEvent.click(confirm);
-  await waitFor(() => expect(api.applyReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'rebuild'}, 'rebuild-reviewed'));
+  await waitFor(() => expect(api.applyReferenceOperation).toHaveBeenCalledWith('2026-05', {action: 'rebuild'}, 'rebuild-reviewed', expect.objectContaining({onProgress:expect.any(Function)})));
 });
 
 it('disables rebuilding locked snapshots but permits rebuilding complete snapshots', async () => {
@@ -155,4 +155,107 @@ it('disables rebuilding locked snapshots but permits rebuilding complete snapsho
   api.fetchReferenceDetail.mockResolvedValue({...detail, is_locked: true});
   render(<MonthlyReferencesPage />);
   expect(await screen.findByRole('button', {name: '重建本月快照'})).toBeDisabled();
+});
+
+it('shows server counts during rebuild preview and indeterminate commit progress in the dialog', async () => {
+  let report!: (value: unknown) => void;
+  let finish!: (value: unknown) => void;
+  api.previewReferenceOperation.mockImplementation((_month, _operation, options) => {
+    report = options.onProgress;
+    return new Promise(resolve => {finish = resolve;});
+  });
+  render(<MonthlyReferencesPage />);
+  fireEvent.click(await screen.findByRole('button', {name:'重建本月快照'}));
+  await waitFor(() => expect(report).toBeTypeOf('function'));
+  const {act} = await import('@testing-library/react');
+  act(() => report({status:'running', stage:'准备新快照', completed:3, total:8, percent:37.5}));
+  const progress = screen.getByRole('progressbar', {name:'快照处理进度'});
+  expect(progress).toHaveAttribute('aria-valuenow', '37.5');
+  expect(screen.getByText(/3 \/ 8/)).toBeInTheDocument();
+  act(() => finish({month:'2026-05', action:'rebuild', fingerprint:'reviewed', required_categories:[],
+    changes:[{kind:'employee', business_key:'E1', before:snapshot, after:{...snapshot, payload:{name:'新姓名'}}}]}));
+  await screen.findByRole('dialog');
+  api.applyReferenceOperation.mockImplementation((_month, _operation, _fingerprint, options) => {
+    options.onProgress({status:'running', stage:'正在提交保存', completed:0, total:0, percent:null});
+    return new Promise(() => {});
+  });
+  fireEvent.click(screen.getByRole('button', {name:'替换旧快照'}));
+  expect(screen.getByText('正在提交保存')).toBeInTheDocument();
+  expect(screen.getByRole('progressbar', {name:'快照处理进度'})).not.toHaveAttribute('aria-valuenow');
+  expect(screen.getByRole('button', {name:'替换旧快照'})).toBeDisabled();
+});
+
+it('shows clear category counts, named relationships and searchable change rows', async () => {
+  api.previewReferenceOperation.mockResolvedValue({month:'2026-05', action:'rebuild', fingerprint:'reviewed', required_categories:[], changes:[
+    {kind:'employee', business_key:'E1', before:{...snapshot, payload:{name:'历史姓名', dept_no:'D1'}}, after:{...snapshot, payload:{name:'新姓名', dept_no:'D2', is_manager:true}}},
+    {kind:'department', business_key:'D2', before:null, after:{...snapshot, kind:'department', business_key:'D2', payload:{dept_name:'财务'}}},
+  ]});
+  api.fetchReferenceDetail.mockResolvedValue({...detail, snapshots:[snapshot, {...snapshot, kind:'department', business_key:'D1', payload:{dept_name:'生产'}}]});
+  render(<MonthlyReferencesPage />);
+  fireEvent.click(await screen.findByRole('button', {name:'重建本月快照'}));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('生产');
+  expect(dialog).toHaveTextContent('财务');
+  expect(dialog).toHaveTextContent('管理人员');
+  expect(dialog).not.toHaveTextContent('最后一步');
+  expect(dialog.querySelector('details')).toBeNull();
+  expect(within(dialog).getByRole('button', {name:'员工（1）'})).toBeInTheDocument();
+  fireEvent.change(within(dialog).getByLabelText('搜索本次资料'), {target:{value:'不存在'}});
+  expect(dialog).not.toHaveTextContent('新姓名');
+  fireEvent.change(within(dialog).getByLabelText('搜索本次资料'), {target:{value:''}});
+  fireEvent.click(within(dialog).getByRole('button', {name:'部门（1）'}));
+  expect(within(dialog).getByRole('table')).toHaveTextContent('财务');
+  fireEvent.click(within(dialog).getByRole('button', {name:'取消'}));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(api.applyReferenceOperation).not.toHaveBeenCalled();
+});
+
+it('distinguishes a move between departments that have the same name', async () => {
+  const department = {...snapshot, kind:'department', payload:{dept_name:'生产部'}};
+  api.fetchReferenceDetail.mockResolvedValue({...detail, snapshots:[snapshot, {...department, business_key:'D1'}, {...department, business_key:'D2'}]});
+  api.previewReferenceOperation.mockResolvedValue({month:'2026-05', action:'rebuild', fingerprint:'reviewed', required_categories:[], changes:[
+    {kind:'employee', business_key:'E1', before:snapshot, after:{...snapshot, payload:{name:'历史姓名', dept_no:'D2'}}},
+  ]});
+  render(<MonthlyReferencesPage />);
+  fireEvent.click(await screen.findByRole('button', {name:'重建本月快照'}));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('生产部（D1）');
+  expect(dialog).toHaveTextContent('生产部（D2）');
+});
+
+it('uses fresh preview relationship names and sorts changed values as text', async () => {
+  const department = {...snapshot, kind:'department', business_key:'D1', payload:{dept_name:'页面旧名称'}};
+  api.fetchReferenceDetail.mockResolvedValue({...detail, snapshots:[snapshot, department]});
+  api.previewReferenceOperation.mockResolvedValue({month:'2026-05', action:'rebuild', fingerprint:'reviewed', required_categories:[], changes:[
+    {kind:'employee', business_key:'E1', before:snapshot, after:{...snapshot, payload:{name:'Zed', dept_no:'D1'}}},
+    {kind:'employee', business_key:'E2', before:null, after:{...snapshot, business_key:'E2', payload:{name:'Alpha', dept_no:'D1'}}},
+    {kind:'department', business_key:'D1', before:{...department, payload:{dept_name:'预览前名称'}}, after:{...department, payload:{dept_name:'预览后名称'}}},
+  ]});
+  render(<MonthlyReferencesPage />);
+  fireEvent.click(await screen.findByRole('button', {name:'重建本月快照'}));
+  const dialog = await screen.findByRole('dialog');
+  expect(dialog).toHaveTextContent('预览前名称');
+  expect(dialog).toHaveTextContent('预览后名称');
+  expect(dialog).not.toHaveTextContent('页面旧名称');
+  fireEvent.click(within(dialog).getByRole('button', {name:'姓名'}));
+  expect(within(dialog).getAllByRole('row')[1]).toHaveTextContent('Alpha');
+});
+
+it('keeps loaded data when a refresh is cancelled and never displays the internal abort error', async () => {
+  render(<MonthlyReferencesPage />);
+  await screen.findByText('历史姓名');
+  api.listReferenceMonths.mockRejectedValueOnce(new DOMException('signal is aborted without reason', 'AbortError'));
+  fireEvent.click(screen.getByRole('button', {name:'刷新资料'}));
+  await waitFor(() => expect(screen.getByRole('button', {name:'刷新资料'})).toBeEnabled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByText('历史姓名')).toBeInTheDocument();
+});
+
+it('does not display cancellation of a snapshot preview as an error', async () => {
+  api.previewReferenceOperation.mockRejectedValueOnce(new DOMException('signal is aborted without reason', 'AbortError'));
+  render(<MonthlyReferencesPage />);
+  fireEvent.click(await screen.findByRole('button', {name:'补齐缺失资料'}));
+  await waitFor(() => expect(screen.getByRole('button', {name:'补齐缺失资料'})).toBeEnabled());
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(api.applyReferenceOperation).not.toHaveBeenCalled();
 });

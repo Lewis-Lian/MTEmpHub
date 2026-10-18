@@ -29,6 +29,7 @@ from services.account_set_backup_schema import (
 MAX_UPLOAD = 100 * 1024 * 1024
 MAX_TOTAL = 500 * 1024 * 1024
 MAX_MEMBERS = 10000
+EXPORT_ROW_BATCH_SIZE = 250
 
 
 def file_digest(path):
@@ -51,7 +52,7 @@ def month_bounds(month):
     return start, end
 
 
-def scoped_rows(name, account, employee_ids=None):
+def scoped_rows(name, account, employee_ids=None, *, on_read=None):
     ds = V2_DATASETS[name]
     model = ds.model
     query = model.query
@@ -74,10 +75,32 @@ def scoped_rows(name, account, employee_ids=None):
         query = query.filter_by(year=start.year)
     if employee_ids is not None and hasattr(model, 'emp_id'):
         query = query.filter(model.emp_id.in_(employee_ids))
+    if on_read is not None:
+        return _read_export_rows(query, model, on_read)
     return query.order_by(model.id).all()
 
 
-def serialize_row(name, row, *, include_files=True):
+def _read_export_rows(query, model, on_read):
+    """Read bounded keyset pages so a large DB response cannot hide all progress."""
+    total = query.count()
+    rows, last_id = [], None
+    on_read(0, total)
+    while len(rows) < total:
+        page = query if last_id is None else query.filter(model.id > last_id)
+        batch = page.order_by(model.id).limit(EXPORT_ROW_BATCH_SIZE).all()
+        if not batch:
+            break
+        rows.extend(batch)
+        last_id = batch[-1].id
+        if len(rows) > total:
+            raise BackupError('读取期间备份数据发生变化，请重新导出')
+        on_read(len(rows), total)
+    if len(rows) != total:
+        raise BackupError('读取期间备份数据发生变化，请重新导出')
+    return rows
+
+
+def serialize_row(name, row, *, include_files=True, origins=None):
     ds = DATASETS[name]
     result = {field: serial(getattr(row, field)) for field in ds.fields}
     if hasattr(row, 'emp_id'):
@@ -87,12 +110,13 @@ def serialize_row(name, row, *, include_files=True):
         result['emp_no'] = employee.emp_no if employee else None
     for field, (out, model, natural) in REFS.get(name, {}).items():
         identifier = getattr(row, field)
-        ref = db.session.get(model, identifier) if identifier else None
-        if identifier and ref is None:
+        ref = db.session.get(model, identifier) if identifier is not None else None
+        if identifier is not None and ref is None:
             raise BackupError('关联资料缺失：%s' % out)
         result[out] = getattr(ref, natural) if ref else None
     if name in HISTORY:
-        mapping = AccountSetBackupOrigin.query.filter_by(dataset=name, local_id=row.id).first()
+        mapping = (AccountSetBackupOrigin.query.filter_by(dataset=name, local_id=row.id).first()
+                   if origins is None else origins.get(row.id))
         content = {key: value for key, value in result.items() if key != 'created_at'}
         if mapping and mapping.provenance.get('_content_hash') != digest(content):
             mapping = None
@@ -122,10 +146,26 @@ def serialize_rows(name, rows, *, include_files=True):
         if ids:
             references.extend(Employee.query.filter(Employee.id.in_(ids)).all())
     for field, (_, model, _) in REFS.get(name, {}).items():
-        ids = {getattr(row, field) for row in rows if getattr(row, field)}
+        ids = {getattr(row, field) for row in rows if getattr(row, field) is not None}
         if ids:
             references.extend(model.query.filter(model.id.in_(ids)).all())
-    return [serialize_row(name, row, include_files=include_files) for row in rows]
+    origins = None
+    if name in HISTORY:
+        origins = {}
+        identifiers = [row.id for row in rows]
+        if identifiers:
+            duplicate_ids = set()
+            for mapping in AccountSetBackupOrigin.query.filter(
+                    AccountSetBackupOrigin.dataset == name,
+                    AccountSetBackupOrigin.local_id.in_(identifiers)).all():
+                if mapping.local_id in origins:
+                    duplicate_ids.add(mapping.local_id)
+                origins.setdefault(mapping.local_id, mapping)
+            # Preserve the existing single-row lookup when several portable
+            # sources address one local record; query plans may order them differently.
+            for identifier in duplicate_ids:
+                origins[identifier] = AccountSetBackupOrigin.query.filter_by(dataset=name, local_id=identifier).first()
+    return [serialize_row(name, row, include_files=include_files, origins=origins) for row in rows]
 
 
 def _shared_avatar(avatar):
@@ -609,7 +649,7 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
         if progress:
             progress(phase=phase, completed=completed, total=total,
                      percent=completed * 100 // total if total else 100,
-                     stage=('读取备份数据：' if phase == 'data' else '校验备份数据：') + label)
+                     stage=('已读取备份数据：' if phase == 'data' else '已校验备份数据：') + label)
     if progress:
         progress(phase=phase, completed=0, total=total, percent=0, stage='准备读取全部所选范围')
     shared = collect_shared_backup(categories, progress=report)
@@ -617,8 +657,27 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
                categories=categories, dataset_versions=dict(DATASET_VERSIONS),
                shared=shared['shared'], monthly={}, cross_month={}, annual={}, coverage={}, _files=shared['_files'])
     file_bytes = sum(map(len, doc['_files'].values()))
+    labels = {'daily_records': '考勤日报', 'monthly_reports': '考勤月报', 'factory_rest': '厂休',
+              'account_set': '账套参数', 'snapshots': '人员资料快照', 'leave_records': '请假记录',
+              'overtime_records': '加班记录', 'daily_overrides': '逐日修正', 'employee_overrides': '员工月度修正',
+              'manager_overrides': '管理人员月度修正', 'override_history': '修正历史', 'sync_history': '同步历史',
+              'imports': '考勤导入记录', 'annual_leave': '年度年假', 'manager_stats': '管理人员年度统计'}
+    def reading(name, scope):
+        stage = ('读取备份数据：' if phase == 'data' else '校验备份数据：') + scope + '/' + labels.get(name, '业务记录')
+        if progress:
+            progress(phase=phase, completed=0, total=0, percent=None, stage=stage + '（正在查询）',
+                     unit='records', dataset=name)
+        def update(count, row_total):
+            if progress:
+                progress(phase=phase, completed=count, total=row_total,
+                         percent=count * 100 / row_total if row_total else 100,
+                         stage=stage, unit='records', dataset=name)
+        return update
     def encode(name, rows):
         nonlocal file_bytes
+        if progress:
+            progress(phase=phase, completed=0, total=0, percent=None,
+                     stage='整理' + labels.get(name, '业务记录') + '（共 ' + str(len(rows)) + ' 条）')
         try:
             items = serialize_rows(name, rows, include_files='archives' in selected) if name in DATASETS else [
                 {field: serial(getattr(row, field)) for field in V2_DATASETS[name].fields} for row in rows]
@@ -627,6 +686,9 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
         for source, item in zip(rows, items):
             item.update({field: serial(getattr(source, field)) for field in V2_DATASETS[name].fields})
             for field, (output, model, natural) in V2_REFS.get(name, {}).items():
+                # The V1 serializer already bulk-resolved these references.
+                if output in item:
+                    continue
                 identifier = getattr(source, field)
                 ref = db.session.get(model, identifier) if identifier is not None else None
                 if identifier is not None and ref is None:
@@ -661,13 +723,14 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
             ds = V2_DATASETS[name]
             if ds.scope in ('shared', 'year'):
                 continue
+            on_read = reading(name, account.month)
             if name == 'account_set':
                 block['account_set'] = encode(name, [account])[0]
                 block['source_locked'] = account.is_locked
             elif name == 'snapshots':
-                block['snapshots'] = encode(name, ds.model.query.filter_by(month=account.month).order_by(ds.model.id).all())
+                block['snapshots'] = encode(name, scoped_rows(name, account, on_read=on_read))
             else:
-                items = encode(name, scoped_rows(name, account))
+                items = encode(name, scoped_rows(name, account, on_read=on_read))
                 if ds.scope == 'interval':
                     existing = {canonical([row[field] for field in ds.key]): row
                                 for row in doc['cross_month'].setdefault(name, [])}
@@ -684,7 +747,9 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
         for name in names:
             ds = V2_DATASETS[name]
             if ds.scope == 'year':
-                doc['annual'].setdefault(year, {})[name] = encode(name, ds.model.query.filter_by(year=int(year)).order_by(ds.model.id).all())
+                on_read = reading(name, year + '年')
+                rows = _read_export_rows(ds.model.query.filter_by(year=int(year)), ds.model, on_read)
+                doc['annual'].setdefault(year, {})[name] = encode(name, rows)
                 report(year + '/' + name)
     for scope in _contents(doc):
         # Intervals cover a union of selected months, not the entire global dataset.
@@ -747,6 +812,10 @@ def export_multi_backup(account_set_ids, categories=None, progress=None):
     verification_total = 1
     def verification_progress(**work):
         nonlocal verification_total
+        if work.get('unit') == 'records' or work.get('percent') is None:
+            if progress:
+                progress(**work)
+            return
         verification_total = work['total'] + 1  # final unit verifies the downloadable ZIP
         if progress:
             progress(**{**work, 'total': verification_total,

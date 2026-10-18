@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { applyReferenceOperation, fetchReferenceDetail, listReferenceMonths, previewReferenceOperation,
-  type ReferenceDetail, type ReferenceKind, type ReferenceMonth, type ReferenceOperation,
+  type ReferenceProgress, type ReferenceDetail, type ReferenceKind, type ReferenceMonth, type ReferenceOperation,
   type ReferencePreview, type ReferenceSnapshot } from '../../api/monthlyReferences';
 import { clearQueryBootstrapCache } from '../../api/query';
 import { useNotification } from '../../components/feedback/Notification';
@@ -25,6 +25,7 @@ function displayValue(value: unknown, field = '') {
   }
   return displayBackupValue(value, field);
 }
+function cancelled(error: unknown) { return typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'; }
 function message(error: unknown) { return error instanceof Error ? error.message : '快照操作失败'; }
 
 export default function MonthlyReferencesPage() {
@@ -35,11 +36,22 @@ export default function MonthlyReferencesPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState<ReferenceProgress | null>(null);
+  const progressAbort = useRef<AbortController | null>(null);
+  function beginTracking() {
+    progressAbort.current?.abort();
+    const controller = new AbortController();
+    progressAbort.current = controller;
+    setProgress({status:'running', stage:'正在连接服务器', completed:0, total:0, percent:null});
+    return {signal:controller.signal, onProgress:(next: ReferenceProgress) => {if (!controller.signal.aborted) setProgress(next);}};
+  }
+  useEffect(() => () => {progressAbort.current?.abort();}, []);
   const [kind, setKind] = useState<ReferenceKind>('employee');
   const [keyword, setKeyword] = useState('');
   const [selected, setSelected] = useState<ReferenceSnapshot | null>(null);
   const [comparison, setComparison] = useState<{preview: ReferencePreview; operation: ReferenceOperation} | null>(null);
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [previewKind, setPreviewKind] = useState<ReferenceKind>('employee');
+  const [previewKeyword, setPreviewKeyword] = useState('');
   const revision = useRef(0);
   const dialogRef = useRef<HTMLElement>(null);
 
@@ -47,17 +59,18 @@ export default function MonthlyReferencesPage() {
   useEffect(() => {
     if (!activeDialog) return;
     const previous = document.activeElement as HTMLElement | null;
-    const target = activeDialog === 'confirm' ? 'input[type=checkbox]' : 'button';
+    const target = 'button';
     dialogRef.current?.querySelector<HTMLElement>(target)?.focus();
     return () => {previous?.focus();};
   }, [activeDialog]);
 
   useEffect(() => {
     let active = true;
-    listReferenceMonths().then(result => {
-      if (active) {setMonths(result.months); setMonth(result.months[0]?.month ?? '');}
-    }).catch(caught => {if (active) setError(message(caught));})
-      .finally(() => {if (active) setLoading(false);});
+    const tracking = beginTracking();
+    listReferenceMonths(tracking).then(result => {
+      if (active && !tracking.signal.aborted) {setMonths(result.months); setMonth(result.months[0]?.month ?? '');}
+    }).catch(caught => {if (active && !tracking.signal.aborted && !cancelled(caught)) setError(message(caught));})
+      .finally(() => {if (active && !tracking.signal.aborted) setLoading(false);});
     return () => {active = false;};
   }, []);
 
@@ -66,46 +79,60 @@ export default function MonthlyReferencesPage() {
     const version = ++revision.current;
     setLoading(true); setDetail(null); setSelected(null); setComparison(null); setError('');
 
-    fetchReferenceDetail(month, false).then(result => {
-      if (version === revision.current) setDetail(result);
-    }).catch(caught => {if (version === revision.current) setError(message(caught));})
-      .finally(() => {if (version === revision.current) setLoading(false);});
+    const tracking = beginTracking();
+    fetchReferenceDetail(month, false, tracking).then(result => {
+      if (version === revision.current && !tracking.signal.aborted) setDetail(result);
+    }).catch(caught => {if (version === revision.current && !tracking.signal.aborted && !cancelled(caught)) setError(message(caught));})
+      .finally(() => {if (version === revision.current && !tracking.signal.aborted) setLoading(false);});
     return () => {revision.current++;};
   }, [month]);
 
   async function reload() {
     setBusy(true); setError(''); setComparison(null);
     const version = ++revision.current;
+    const tracking = beginTracking();
     try {
-      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, false)]);
-      if (version === revision.current) {
+      const list = await listReferenceMonths(tracking);
+      if (tracking.signal.aborted) return;
+      const next = await fetchReferenceDetail(month, false, tracking);
+      if (version === revision.current && !tracking.signal.aborted) {
         setMonths(list.months); setDetail(next); setSelected(null);
       }
-    } catch (caught) {if (version === revision.current) {setError(message(caught)); setDetail(null);}}
-    finally {if (version === revision.current) setBusy(false);}
+    } catch (caught) {if (version === revision.current && !tracking.signal.aborted && !cancelled(caught)) {setError(message(caught)); setDetail(null);}}
+    finally {if (version === revision.current && !tracking.signal.aborted) setBusy(false);}
   }
 
   async function compare(operation: ReferenceOperation) {
     if (!detail || detail.is_locked || busy) return;
-    setBusy(true); setError(''); setAcknowledged(false);
-    try {setComparison({preview: await previewReferenceOperation(month, operation), operation});}
-    catch (caught) {setError(message(caught)); setComparison(null);}
-    finally {setBusy(false);}
+    setBusy(true); setError(''); setPreviewKeyword('');
+    const tracking = beginTracking();
+    try {
+      const preview = await previewReferenceOperation(month, operation, tracking);
+      if (tracking.signal.aborted) return;
+      setPreviewKind(preview.changes.some(row => row.kind === 'employee') ? 'employee' : preview.changes[0]?.kind ?? 'employee');
+      setComparison({preview, operation});
+    }
+    catch (caught) {if (!tracking.signal.aborted && !cancelled(caught)) {setError(message(caught)); setComparison(null);}}
+    finally {if (!tracking.signal.aborted) setBusy(false);}
   }
 
   async function apply() {
-    if (!comparison || !acknowledged || busy) return;
+    if (!comparison || busy) return;
     setBusy(true); setError('');
+    const tracking = beginTracking();
     try {
-      const result = await applyReferenceOperation(month, comparison.operation, comparison.preview.fingerprint);
+      const result = await applyReferenceOperation(month, comparison.operation, comparison.preview.fingerprint, tracking);
+      if (tracking.signal.aborted) return;
       clearQueryBootstrapCache(); setComparison(null); setSelected(null);
       notification.success(`${result.month} 快照操作完成，变更 ${result.changed_count} 条`);
       // A successful write is final even if the following read fails.
       setDetail(null);
-      const [list, next] = await Promise.all([listReferenceMonths(), fetchReferenceDetail(month, false)]);
-      setMonths(list.months); setDetail(next);
-    } catch (caught) {setError(message(caught)); setComparison(null);}
-    finally {setBusy(false);}
+      const list = await listReferenceMonths(tracking);
+      if (tracking.signal.aborted) return;
+      const next = await fetchReferenceDetail(month, false, tracking);
+      if (!tracking.signal.aborted) {setMonths(list.months); setDetail(next);}
+    } catch (caught) {if (!tracking.signal.aborted && !cancelled(caught)) {setError(message(caught)); setComparison(null);}}
+    finally {if (!tracking.signal.aborted) setBusy(false);}
   }
 
   function chooseSnapshot(row: ReferenceSnapshot) {
@@ -127,14 +154,67 @@ export default function MonthlyReferencesPage() {
     return String(row?.payload.dept_name ?? row?.payload.shift_name ?? `${key}（待补齐）`);
   }
   const rebuilding = comparison?.operation.action === 'rebuild';
-  const confirmTitle = rebuilding ? '确认重建本月快照' : '确认保存本月资料';
+  const confirmTitle = `${rebuilding ? '重建' : '保存'} ${comparison?.preview.month ?? month} 的快照`;
   function closeDialog() {if (comparison) setComparison(null); else setSelected(null);}
+
+  const previewChanges = comparison?.preview.changes ?? [];
+  const previewBefore = new Map(detail?.snapshots.map(row => [`${row.kind}:${row.business_key}`, row]));
+  for (const change of previewChanges) {
+    if (change.before) previewBefore.set(`${change.kind}:${change.business_key}`, change.before);
+  }
+  const previewAfter = new Map(previewBefore);
+  for (const change of previewChanges) {
+    const key = `${change.kind}:${change.business_key}`;
+    if (change.after) previewAfter.set(key, change.after); else previewAfter.delete(key);
+  }
+  function previewValue(row: ReferenceSnapshot | null, field: string, after: boolean) {
+    if (!row) return '—';
+    const value = row.payload[field];
+    if (value == null || value === '') return '未设置';
+    const relation = field === 'default_shift_no' ? 'shift' : ['dept_no', 'parent_no'].includes(field) ? 'department' : null;
+    if (relation && value) {
+      const related = (after ? previewAfter : previewBefore).get(`${relation}:${value}`);
+      return String(related?.payload.dept_name ?? related?.payload.shift_name ?? value);
+    }
+    return displayValue(value, field);
+  }
+  function previewCell(change: ReferencePreview['changes'][number], field: string) {
+    const oldValue = previewValue(change.before, field, false), newValue = previewValue(change.after, field, true);
+    const relationChanged = ['dept_no', 'default_shift_no', 'parent_no'].includes(field) && change.before?.payload[field] !== change.after?.payload[field];
+    const showIdentifier = relationChanged && oldValue === newValue;
+    if (change.before && change.after && (oldValue !== newValue || relationChanged)) return <span className="snapshot-cell-change"><span><small>原来</small>{oldValue}{showIdentifier && `（${change.before.payload[field]}）`}</span><span><small>改为</small>{newValue}{showIdentifier && `（${change.after.payload[field]}）`}</span></span>;
+    return change.after ? newValue : oldValue;
+  }
+  const previewFields = previewKind === 'employee' ? ['name', 'dept_no', 'default_shift_no']
+    : previewKind === 'department' ? ['dept_name', 'parent_no'] : ['shift_name', 'time_slots', 'is_cross_day'];
+  const displayedPreview = previewChanges.filter(change => change.kind === previewKind && (!previewKeyword ||
+    [change.business_key, ...previewFields.flatMap(field => [previewValue(change.before, field, false), previewValue(change.after, field, true)])].join(' ').includes(previewKeyword)));
+  const previewRows = displayedPreview.map(change => {
+    const result = !change.before ? '新增' : !change.after ? '删除' : '替换';
+    const otherFields = [...new Set([...Object.keys(change.before?.payload ?? {}), ...Object.keys(change.after?.payload ?? {})])]
+      .filter(field => change.before && change.after && !previewFields.includes(field) && !['emp_no', 'dept_no', 'shift_no'].includes(field)
+        && JSON.stringify(change.before?.payload[field]) !== JSON.stringify(change.after?.payload[field]));
+    return [<span className={`snapshot-result result-${result}`}>{result}</span>, change.business_key,
+      ...previewFields.map(field => previewCell(change, field)),
+      <div className="snapshot-other-changes">{otherFields.length ? otherFields.map(field => <div key={field}><strong>{label(field)}</strong>{previewCell(change, field)}</div>) : '—'}</div>];
+  });
+
+  const progressView = progress && <section className={`snapshot-progress ${progress.status}`} aria-label="快照操作进度" aria-live="polite">
+    <div className="snapshot-progress-heading"><span>{progress.stage}</span><strong>{progress.status === 'failed' ? '未完成' : progress.status === 'idle' ? '已取消' : progress.percent == null ? '处理中' : `${Math.floor(progress.percent)}%`}</strong></div>
+    <div className={`snapshot-progress-track ${progress.percent == null && progress.status === 'running' ? 'is-indeterminate' : ''}`} role="progressbar" aria-label="快照处理进度"
+      aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent ?? undefined} aria-valuetext={progress.percent == null ? progress.stage : undefined}>
+      <span style={{width:progress.percent == null ? undefined : `${progress.percent}%`}} />
+    </div>
+    {progress.total > 0 && progress.status === 'running' && <small>{progress.completed} / {progress.total} · 当前阶段已处理数量</small>}
+    {progress.status === 'running' && <small>显示当前阶段的实际进度</small>}
+  </section>;
 
   return <main className="snapshot-page" aria-label="月度快照管理">
     <div aria-hidden={!!activeDialog}>
       <header className="snapshot-header"><div><span className="snapshot-eyebrow">每个月的资料，单独留存</span><h2>快照管理</h2>
         <p>保存本月的员工、部门和班次资料，之后修改人员信息，旧月份仍使用当月保存的资料。</p></div>
         <button className="snapshot-button" disabled={busy || loading || !month || !!activeDialog} onClick={() => void reload()}>刷新资料</button></header>
+      {!activeDialog && progressView}
       {error && !activeDialog && <p className="snapshot-error" role="alert">{error}</p>}
       <section className="snapshot-month-bar" aria-label="选择月份">
         <label>账套月份<select value={month} disabled={navigationDisabled || !months.length} onChange={event => {
@@ -182,27 +262,19 @@ export default function MonthlyReferencesPage() {
         else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
       }}>
       {comparison ? <>
-        <div className="snapshot-dialog-head"><div><span className="snapshot-eyebrow">最后一步 · 核对后保存</span><h3>{confirmTitle}</h3></div>
+        <div className="snapshot-dialog-head"><div><h3>{confirmTitle}</h3><p className="snapshot-dialog-description">{rebuilding ? '用现在的资料重新生成这个月的快照，旧快照会被替换。' : '把现在的姓名、部门和班次保存到这个月，已有快照会保留。'}</p></div>
           <button className="snapshot-icon-button" aria-label="关闭确认窗口" disabled={busy} onClick={closeDialog}>×</button></div>
-        <div className="snapshot-dialog-body"><div className="snapshot-confirm-summary"><span>保存到 <strong>{comparison.preview.month}</strong></span><span>共 <strong>{comparison.preview.changes.length}</strong> 条资料</span></div>
-          <p>{rebuilding ? '将用当前员工、部门和班次资料替换本月旧快照，旧快照不再保留。本月考勤、刷卡和菜票业务记录仍保留，请核对后确认。' : '以下资料将保存到所选月份。已有记录会保留，请检查名称、部门和班次是否正确。'}</p>
-
-          <div className="snapshot-preview-list">{comparison.preview.changes.map(change => {
-            const record = change.after ?? change.before!;
-            if (!change.after) return <article key={`${change.kind}-${change.business_key}`}><h4>删除旧快照 · {String(record.payload.name ?? record.payload.dept_name ?? record.payload.shift_name ?? change.business_key)}<small>{KIND_LABELS[change.kind]} · {change.business_key}</small></h4></article>;
-            const fields = Object.entries(record.payload).filter(([key, item]) => !change.before || JSON.stringify(item) !== JSON.stringify(change.before.payload[key]));
-            const main = fields.filter(([key]) => change.before || MAIN_PREVIEW_FIELDS.has(key));
-            const extra = change.before ? [] : fields.filter(([key]) => !MAIN_PREVIEW_FIELDS.has(key));
-            const renderFields = (items: Array<[string, unknown]>) => <dl>{items.map(([key, item]) => <div key={key}><dt>{label(key)}</dt><dd>{change.before && <span className="snapshot-before">{displayValue(change.before.payload[key], key)} → </span>}{displayValue(item, key)}</dd></div>)}</dl>;
-            return <article key={`${change.kind}-${change.business_key}`}><h4>{String(change.after.payload.name ?? change.after.payload.dept_name ?? change.after.payload.shift_name ?? change.business_key)}<small>{KIND_LABELS[change.kind]} · {change.business_key}</small></h4>
-              {renderFields(main)}{!!extra.length && <details className="snapshot-archive-details"><summary>查看其他保存信息</summary>{renderFields(extra)}</details>}
-            </article>;
-          })}</div>
-          {!comparison.preview.changes.length && <p>没有需要保存的变更。</p>}
-          <label className="snapshot-acknowledgement"><input type="checkbox" checked={acknowledged} disabled={busy} onChange={event => setAcknowledged(event.target.checked)} />我已核对以上变更</label>
+        <div className="snapshot-dialog-body">{busy && progressView}
+          <div className="snapshot-impact" aria-label="本次处理结果">{['新增', '替换', '删除'].map((title, index) => <span key={title}>{title}<strong>{previewChanges.filter(row => index === 0 ? !row.before : index === 1 ? row.before && row.after : !row.after).length}</strong>条</span>)}</div>
+          <p>下表列出这次新增、替换或删除的资料。姓名、部门、班次及其他人员资料会一并保存，考勤、刷卡和菜票业务记录保留。</p>
+          <div className="snapshot-preview-tools"><div className="snapshot-type-buttons" role="group" aria-label="本次资料类型">{Object.entries(KIND_LABELS).map(([key, title]) => <button key={key} aria-pressed={previewKind === key} className={previewKind === key ? 'is-active' : ''} disabled={busy}
+            onClick={() => {setPreviewKind(key as ReferenceKind); setPreviewKeyword('');}}>{title}（{previewChanges.filter(row => row.kind === key).length}）</button>)}</div>
+            <label>搜索本次资料<input value={previewKeyword} disabled={busy} placeholder="工号、姓名或部门" onChange={event => setPreviewKeyword(event.target.value)} /></label></div>
+          <QueryTable headers={['本次处理', previewKind === 'employee' ? '工号' : '编号', ...previewFields.map(field => field === 'dept_no' ? '部门' : field === 'default_shift_no' ? '班次' : field === 'parent_no' ? '上级部门' : label(field)), {label:'其他资料变化', sortable:false}]}
+            rows={previewRows} sortRows={displayedPreview.map(change => [!change.before ? '新增' : !change.after ? '删除' : '替换', change.business_key, ...previewFields.map(field => previewValue(change.after ?? change.before, field, !!change.after)), ''])} emptyText={previewChanges.length ? '没有符合条件的资料，可切换类型或修改搜索内容。' : '本月快照与当前资料一致，无需保存。'} paginationKey={`${comparison.preview.fingerprint}-${previewKind}-${previewKeyword}`} />
         </div>
-        <div className="snapshot-dialog-footer"><button className="snapshot-button" disabled={busy} onClick={closeDialog}>返回检查</button>
-          <button className="snapshot-button snapshot-primary" disabled={busy || !acknowledged || !comparison.preview.changes.length} onClick={() => void apply()}>{rebuilding ? '确认重建' : '确认保存'}</button></div>
+        <div className="snapshot-dialog-footer"><span>{busy ? '正在处理，请等待完成' : `将保存到 ${comparison.preview.month}`}</span><button className="snapshot-button" disabled={busy} onClick={closeDialog}>取消</button>
+          <button className="snapshot-button snapshot-primary" disabled={busy || !previewChanges.length} onClick={() => void apply()}>{rebuilding ? '替换旧快照' : '保存快照'}</button></div>
       </> : selected && detail && <>
         <div className="snapshot-dialog-head"><div><span className="snapshot-eyebrow">{month} · {KIND_LABELS[selected.kind]}资料</span><h3>{String(selected.payload.name ?? selected.payload.dept_name ?? selected.payload.shift_name ?? selected.business_key)}<small>{selected.business_key}</small></h3></div>
           <button className="snapshot-icon-button" aria-label="关闭资料窗口" disabled={busy} onClick={closeDialog}>×</button></div>

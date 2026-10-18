@@ -42,7 +42,7 @@ export function cancelBackupPreview(token: string): Promise<unknown> {
 export interface BackupExportProgress {
   status: 'idle' | 'running' | 'ready' | 'failed' | 'completed';
   phase?: 'data' | 'packing' | 'verification' | 'download' | 'failed';
-  percent: number; stage: string; completed?: number; total?: number;
+  percent: number | null; stage: string; completed?: number; total?: number; unit?: 'records';
 }
 
 export function downloadAccountSetBackup(id: number, month: string, onProgress: (progress: BackupExportProgress) => void): Promise<void> {

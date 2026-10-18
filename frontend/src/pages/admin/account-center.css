@@ -1439,6 +1439,9 @@
 .acm-export-progress-heading strong { color: var(--acm-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .acm-export-progress-track { height: 7px; border-radius: 999px; overflow: hidden; background: #e0e7ff; margin-top: 10px; }
 .acm-export-progress-track span { display: block; height: 100%; background: var(--acm-primary); border-radius: inherit; }
+.backup-modal .acm-export-progress-track--indeterminate span { width: 30%; animation: backup-export-activity 1.4s ease-in-out infinite; }
+@keyframes backup-export-activity { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
+@media (prefers-reduced-motion: reduce) { .backup-modal .acm-export-progress-track--indeterminate span { animation: none; margin-left: 35%; } }
 .acm-export-progress p { margin: 8px 0 0; font-size: 11px; color: var(--acm-text-muted); }
 
 /* 账套设置：清晰的管理区与月度参数工作区 */

@@ -6,12 +6,11 @@ import { BACKUP_CATEGORIES, DATASET_LABELS, STATUS_LABELS, QUALITY_LABELS, EXITS
 
 const EMPTY_SELECTION: RestoreSelection = {months: [], categories: [], cross_month_keys: [], annual_keys: []};
 const MONTH_CATEGORIES = ['account_settings', 'attendance', 'meal_tickets', 'meal_ledgers'];
-const ARCHIVE_DATASETS = ['imports', 'meal_imports', 'meal_ledger_imports', 'meal_import_rows'];
 function explicitScope(row: MonthlyBackupRow) { return row.scope.startsWith('cross_month/') ? 'cross_month_keys' : row.scope.startsWith('year/') ? 'annual_keys' : null; }
 function selectedScope(row: MonthlyBackupRow, selection: RestoreSelection) {
   const categorySelected = row.dataset === 'snapshots' ? selection.categories.some(category => MONTH_CATEGORIES.includes(category)) : selection.categories.includes(row.category);
   const keyScope = explicitScope(row);
-  return categorySelected && (!row.month || selection.months.includes(row.month)) && (!keyScope || selection[keyScope].includes(row.row_key)) && (!ARCHIVE_DATASETS.includes(row.dataset) || selection.categories.includes('archives'));
+  return categorySelected && (!row.month || selection.months.includes(row.month)) && (!keyScope || selection[keyScope].includes(row.row_key));
 }
 
 export default function AccountSetBackupModal({onClose, onRestored, onReauthenticate = () => window.location.assign('/login')}: {
@@ -30,6 +29,7 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const dragDepth = useRef(0);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [customizing, setCustomizing] = useState(false);
   const [result, setResult] = useState<MonthlyBackupRestoreResult | null>(null);
   const [cacheWarning, setCacheWarning] = useState('');
   const notifiedTask = useRef('');
@@ -119,10 +119,36 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   const shown = filtered.slice(0, limit);
   const selectable = filtered.filter(row => row.enabled);
   const hiddenCount = [...checked].filter(key => !shown.some(row => row.row_key === key)).length;
-  const changes = preview?.rows.filter(row => row.enabled && row.status !== 'same' && (choices[row.row_key] ?? row.choice ?? row.default_choice) === 'backup') ?? [];
+  const changes = (valid ? preview?.rows : [])?.filter(row => row.enabled && row.status !== 'same' && (choices[row.row_key] ?? row.choice ?? row.default_choice) === 'backup') ?? [];
   const exiting = changes.filter(row => row.status === 'system_only' && EXITS_CURRENT.has(row.dataset));
   const deleting = changes.filter(row => row.status === 'system_only' && !EXITS_CURRENT.has(row.dataset));
   const outside = changes.filter(row => explicitScope(row) || row.affected_months.some(month => !selection.months.includes(month)));
+  const effectiveRows = preview?.rows.filter(row => row.enabled) ?? [];
+  const unselectedExplicit = preview?.rows.filter(row => { const scope = explicitScope(row); return scope && !selection[scope].includes(row.row_key); }) ?? [];
+  function actionSummary() {
+    if (!valid) return <p className="backup-scope-note">恢复范围已变化，重新核对完成后显示本次变更。</p>;
+    const groups = new Map<string, {category: string; dataset: string; added: number; replaced: number; exited: number; deleted: number}>();
+    changes.forEach(row => {
+      const key = `${row.category}/${row.dataset}`;
+      const group = groups.get(key) ?? {category: row.category, dataset: row.dataset, added: 0, replaced: 0, exited: 0, deleted: 0};
+      if (row.status === 'new') group.added++;
+      else if (row.status === 'changed') group.replaced++;
+      else if (EXITS_CURRENT.has(row.dataset)) group.exited++;
+      else group.deleted++;
+      groups.set(key, group);
+    });
+    return <div className="backup-confirm-card"><h4>{confirming ? '确认将执行的变更' : '本次恢复变更'}</h4>
+      <p>恢复月份：{selection.months.join('、') || '仅共享及明确条目'}；类别：{selection.categories.map(key => BACKUP_CATEGORIES[key]).join('、')}</p>
+      <div className="backup-confirm-counts">{[['新增记录',changes.filter(row => row.status === 'new').length],['替换记录',changes.filter(row => row.status === 'changed').length],['退出当前资料',exiting.length],['删除业务记录',deleting.length]].map(([label,count]) => <div key={label}><span>{label}</span><strong>{count}</strong></div>)}</div>
+      {!!groups.size ? <div className="backup-table-wrap"><table aria-label="本次恢复变更"><thead><tr><th>类别</th><th>数据</th><th>新增</th><th>替换</th><th>退出</th><th>删除</th></tr></thead><tbody>{[...groups.entries()].map(([key,group]) => <tr key={key}><td>{BACKUP_CATEGORIES[group.category] ?? '月度历史资料'}</td><td>{DATASET_LABELS[group.dataset] ?? '业务资料'}</td><td>{group.added}</td><td>{group.replaced}</td><td>{group.exited}</td><td>{group.deleted}</td></tr>)}</tbody></table></div> : <p>当前选择没有需要恢复的变更。</p>}
+      <p>保留系统 {effectiveRows.filter(row => (choices[row.row_key] ?? row.choice ?? row.default_choice) === 'system').length} 条，跳过 {effectiveRows.filter(row => (choices[row.row_key] ?? row.choice ?? row.default_choice) === 'skip').length} 条。仅统计已选恢复范围与当前采用方式。</p>
+    </div>;
+  }
+  function effects() { return valid && <>
+    {!!(exiting.length || deleting.length) && <p className="backup-error">退出当前资料保留本地身份及历史引用；删除业务记录会移除所选范围中的业务数据。请核对以下清单。</p>}
+    {removalList('退出当前资料',exiting)}{removalList('删除业务记录',deleting)}
+    {!!outside.length && <><h4>跨月 / 年度影响</h4><ul>{outside.map(row => <li key={row.row_key}>{rowLabel(row)}：影响 {row.affected_months.join('、') || '当前资料'}{row.year && '（全年）'}</li>)}</ul></>}
+  </>; }
   function blockers() {
     return !!preview?.blockers.length && <div role="alert" className="backup-error"><p>共 {preview.blockers.length} 项校验问题，已显示 {Math.min(blockerLimit, preview.blockers.length)} 项</p>{preview.blockers.slice(0, blockerLimit).map((item, index) => <div key={index}><p>{humanBackupMessage(item.message)}</p>
       {item.row_key && <p>相关记录：{rowsByKey.has(item.row_key) ? rowLabel(rowsByKey.get(item.row_key)!) : '所选业务记录'}</p>}
@@ -132,9 +158,9 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
   function removalList(title: string, list: MonthlyBackupRow[]) { return !!list.length && <><h4>{title}清单</h4><ul>{list.map(row => <li key={row.row_key}>{rowLabel(row)}{row.month && `（${row.month}）`}</li>)}</ul></>; }
 
   return <div className="acm-modal-backdrop"><div className="acm-modal-card backup-modal" role="dialog" aria-modal="true" aria-labelledby="backup-title">
-    <div className="acm-modal-head"><div className="backup-heading"><div><h3 id="backup-title">导入月度账套</h3><p>识别多月份备份，选择范围并核对差异后恢复</p></div></div><button className="acm-modal-close-btn" disabled={busy} aria-label="关闭备份导入" onClick={() => void close()}>×</button></div>
+    <div className="acm-modal-head"><div className="backup-heading"><div><h3 id="backup-title">导入月份备份</h3><p>识别多月份备份，选择范围并核对差异后恢复</p></div></div><button className="acm-modal-close-btn" disabled={busy} aria-label="关闭备份导入" onClick={() => void close()}>×</button></div>
     <div className="acm-modal-body">
-      <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '核对差异', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
+      <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '选择月份与核对变更', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
       {error && <p role="alert" className="backup-error">{error}</p>}
       {busy && <div className="backup-processing" role="status"><span className="backup-processing-spinner" aria-hidden="true" />
         {progress ? <div className="backup-processing-copy"><strong>{progress.stage}</strong>
@@ -153,6 +179,7 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
       {preview && !result && <>
         {!confirming && <>
           <fieldset disabled={busy} className="backup-options"><legend>识别到的月份</legend>{availableMonths.map(month => <label key={month}><input aria-label={`恢复月份 ${month}`} type="checkbox" checked={selection.months.includes(month)} onChange={event => changeSelection({...selection, months: event.target.checked ? [...selection.months, month] : selection.months.filter(value => value !== month)})} />{month}</label>)}</fieldset>
+          {customizing && <>
           <fieldset disabled={busy} className="backup-options"><legend>实际包含的类别</legend>{Object.entries(BACKUP_CATEGORIES).map(([key, label]) => <label key={key}><input aria-label={`恢复类别 ${label}`} type="checkbox" disabled={!availableCategories.includes(key)} checked={selection.categories.includes(key)} onChange={event => changeSelection({...selection, categories: event.target.checked ? [...selection.categories, key] : selection.categories.filter(value => value !== key), cross_month_keys: key === 'cross_month' && !event.target.checked ? [] : selection.cross_month_keys, annual_keys: key === 'annual_stats' && !event.target.checked ? [] : selection.annual_keys})} />{label}{!availableCategories.includes(key) && '（未包含）'}</label>)}</fieldset>
           <details className="backup-coverage"><summary>备份覆盖范围与完整性</summary><ul>{Object.entries(preview.coverage).map(([scope, coverage]) => {const parts = scope.split('/'); return <li key={scope}>{parts[0] === 'month' ? `${parts[1]} ` : parts[0] === 'year' ? `${parts[1]} 年 ` : parts[0] === 'cross_month' ? '跨月 ' : '当前 '}{DATASET_LABELS[parts[parts.length - 1]] ?? '业务资料'}：{coverage.included ? '已包含（included）' : '未包含（absent）'}，{coverage.complete ? '完整（complete）' : '不完整（incomplete）'}</li>;})}</ul></details>
           <p className="backup-scope-note">未包含或不完整的范围不能按缺失删除。旧包的关联资料只是子集；“未包含”不等于“空且完整”。未选月份和类别不会恢复。新增和冲突默认采用备份，完整所选范围的系统独有默认不保留。</p>
@@ -181,21 +208,22 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
               <label>采用方式<select aria-label={`采用方式 ${label}`} disabled={busy || !row.enabled} value={choices[row.row_key] ?? row.choice ?? row.default_choice} onChange={event => choose(row.row_key, event.target.value as BackupChoice)}>
                 <option value="backup" disabled={row.status === 'system_only' && (!coverage?.included || !coverage.complete)}>{row.status === 'system_only' ? EXITS_CURRENT.has(row.dataset) ? '按备份退出当前资料' : '按备份删除业务记录' : '采用备份'}</option><option value="system">{row.status === 'new' ? '不新增' : '保留系统'}</option><option value="skip">跳过</option>
               </select></label>
-              {!!row.fields.length && <details open={expanded.has(row.row_key)} onToggle={event => {const open = event.currentTarget.open; setExpanded(current => {if (current.has(row.row_key) === open) return current; const next = new Set(current); if (open) next.add(row.row_key); else next.delete(row.row_key); return next;});}}><summary>查看字段差异（{row.fields.length} 项）</summary>{expanded.has(row.row_key) && <div className="backup-table-wrap"><table><thead><tr><th>字段</th><th>系统值</th><th>备份值</th><th>差额</th></tr></thead><tbody>{row.fields.filter(field => field.name !== 'password_changed' && field.name !== 'password_hash').map(field => <tr key={field.name}><td>{fieldLabel(field)}</td><td>{displayBackupValue(field.system, field.name)}</td><td>{displayBackupValue(field.backup, field.name)}</td><td>{field.delta == null ? '—' : field.delta}</td></tr>)}</tbody></table></div>}</details>}
+              {!!row.fields.length && <details open={expanded.has(row.row_key)} onToggle={event => {const open = event.currentTarget.open; setExpanded(current => {if (current.has(row.row_key) === open) return current; const next = new Set(current); if (open) next.add(row.row_key); else next.delete(row.row_key); return next;});}}><summary>查看字段差异（{row.fields.length} 项）</summary>{expanded.has(row.row_key) && <div className="backup-table-wrap"><table aria-label="字段差异"><thead><tr><th>字段</th><th>系统值</th><th>备份值</th><th>差额</th></tr></thead><tbody>{row.fields.filter(field => field.name !== 'password_changed' && field.name !== 'password_hash').map(field => <tr key={field.name}><td>{fieldLabel(field)}</td><td>{displayBackupValue(field.system, field.name)}</td><td>{displayBackupValue(field.backup, field.name)}</td><td>{field.delta == null ? '—' : field.delta}</td></tr>)}</tbody></table></div>}</details>}
             </div>;
           })}</div>
           {filtered.length > limit && <button disabled={busy} onClick={() => setLimit(limit + 100)}>显示更多差异</button>}
-          {blockers()}
-          <div className="backup-toolbar backup-footer"><button disabled={busy} onClick={() => void refresh()}>重新预览</button><button className="backup-primary-btn" disabled={busy || !valid} onClick={() => setConfirming(true)}>查看导入确认</button></div>
+          </>}
+          {!customizing && actionSummary()}
+          {!customizing && <p className="backup-scope-note">未包含或不完整的范围不能按缺失删除。未选月份和类别不会恢复；新增和不一致记录默认采用备份，完整所选范围的系统独有记录默认退出或删除。可在自定义恢复内容中调整。</p>}
+          {!!unselectedExplicit.length && <p className="backup-scope-note">{unselectedExplicit.length} 条跨月或年度资料尚未选择，不会自动恢复。请进入“自定义恢复内容 / 逐条处理”逐条选择并核对影响月份。</p>}
+          {effects()}{blockers()}
+          <div className="backup-toolbar backup-footer"><button disabled={busy} onClick={() => void refresh()}>重新预览</button>{customizing ? <button className="backup-primary-btn" disabled={busy} onClick={() => setCustomizing(false)}>返回恢复概览</button> : <><button disabled={busy} onClick={() => setCustomizing(true)}>自定义恢复内容 / 逐条处理</button><button className="backup-primary-btn" disabled={busy || !valid} onClick={() => setConfirming(true)}>查看恢复确认</button></>}</div>
         </>}
         {confirming && <>
-          <div className="backup-confirm-card"><h4>确认将执行的变更</h4><p>恢复月份：{selection.months.join('、') || '仅共享及明确条目'}；类别：{selection.categories.map(key => BACKUP_CATEGORIES[key]).join('、')}</p><div className="backup-confirm-counts">{[['新增记录',changes.filter(row => row.status === 'new').length],['更新记录',changes.filter(row => row.status === 'changed').length],['退出当前资料',exiting.length],['删除业务记录',deleting.length]].map(([label,count]) => <div key={label}><span>{label}</span><strong>{count}</strong></div>)}</div></div>
-          <p>退出当前资料保留本地身份及历史引用；删除业务记录会移除所选范围中的业务数据。</p>
-          {removalList('退出当前资料',exiting)}{removalList('删除业务记录',deleting)}
-          {!!outside.length && <><h4>跨月 / 年度影响</h4><ul>{outside.map(row => <li key={row.row_key}>{rowLabel(row)}：影响 {row.affected_months.join('、') || '当前资料'}{row.year && '（全年）'}</li>)}</ul></>}
+          {actionSummary()}{effects()}
           {blockers()}
           <p className="backup-scope-note">系统会再次检查目标变化、依赖和实际锁定月份；失败时整次回滚。菜票仅恢复本地记录，不会重放充值或扣款。</p>
-          <div className="backup-toolbar backup-footer"><button disabled={busy} onClick={() => setConfirming(false)}>返回修改</button><button className="backup-primary-btn" disabled={busy || !valid || !!preview.blockers.length} onClick={() => void restore()}>确认导入</button></div>
+          <div className="backup-toolbar backup-footer"><button disabled={busy} onClick={() => setConfirming(false)}>返回修改</button><button className="backup-primary-btn" disabled={busy || !valid || !!preview.blockers.length} onClick={() => void restore()}>确认恢复</button></div>
         </>}
       </>}
       {result && <div className="backup-result"><h4>账套恢复完成</h4><p>月份：{result.months.join('、')}</p><div className="backup-result-counts">{[['新增',result.counts.new],['更新',result.counts.updated],['退出或删除',result.counts.deleted],['保留或跳过',result.counts.skipped]].map(([label,count]) => <div key={label}><strong>{count}</strong><span>{label}</span></div>)}</div>

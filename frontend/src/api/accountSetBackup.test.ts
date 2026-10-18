@@ -94,6 +94,25 @@ it('posts multi-month export scope and polls its task-bound progress', async () 
   expect(request).toHaveBeenCalledWith(expect.stringContaining('/api/admin/backups/export/progress?export_token='));
   DownloadXHR.instance.onload?.(); await task;
 });
+it('preserves unknown and measured stage progress without deriving a percentage from counters', async () => {
+  const { downloadMonthlyBackup } = await import('./accountSetBackup');
+  vi.useFakeTimers(); vi.stubGlobal('XMLHttpRequest', DownloadXHR);
+  const progress = vi.fn();
+  request.mockResolvedValueOnce({status:'running', phase:'data', percent:null, completed:0, total:0, stage:'统计备份记录'})
+    .mockResolvedValueOnce({status:'running', phase:'data', percent:37, completed:375, total:1000, unit:'records', stage:'读取备份数据'})
+    .mockResolvedValueOnce({status:'running', phase:'data', percent:null, completed:0, total:0, stage:'序列化备份数据'});
+  const task = downloadMonthlyBackup([1], ['attendance'], progress);
+  const failure = expect(task).rejects.toThrow('账套导出已取消');
+  await vi.advanceTimersByTimeAsync(500);
+  expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({percent:null, completed:0, total:0, stage:'统计备份记录'}));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({percent:37, completed:375, total:1000, unit:'records'}));
+  await vi.advanceTimersByTimeAsync(500);
+  expect(progress).toHaveBeenLastCalledWith(expect.objectContaining({percent:null, stage:'序列化备份数据'}));
+  DownloadXHR.instance.onabort?.();
+  await failure;
+  expect(vi.getTimerCount()).toBe(0);
+});
 it('uses the multi-month endpoints and sends only selection, choices and fingerprint', async () => {
   const api = await import('./accountSetBackup');
   const file = new File(['zip'], 'backup.zip');

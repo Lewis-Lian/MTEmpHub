@@ -315,3 +315,144 @@ def test_legacy_v2_archive_dataset_versions_remain_readable(multi_app):
         document['dataset_versions'][name] = 1
     normalized = normalize_backup(document)
     assert normalized['monthly']['2026-06']['datasets']['imports'][0]['file_key'] in document['_files']
+
+
+def test_collect_multi_batches_employee_lookups_for_many_attendance_rows(backup_app):
+    from sqlalchemy import event
+    from models.employee import Employee
+    employees = [Employee(emp_no=f'PERF{i:02}', name=f'人员{i}') for i in range(12)]
+    db.session.add_all(employees)
+    db.session.flush()
+    for day in range(1, 16):
+        for employee in employees:
+            db.session.add(DailyRecord(emp_id=employee.id, record_date=date(2026, 6, day), actual_hours=8))
+    db.session.commit()
+    db.session.expunge_all()
+    statements = []
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if 'from employees' in statement.lower():
+            statements.append(statement)
+    event.listen(db.engine, 'before_cursor_execute', record)
+    try:
+        document = service.collect_multi_backup([1], ['attendance'])
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', record)
+    records = document['monthly']['2026-06']['datasets']['daily_records']
+    assert len(records) == 181
+    assert len({row['emp_no'] for row in records}) == 13
+    assert len(statements) == 1, f'Employee lookups must be batched, got {len(statements)} queries'
+
+
+def test_collect_multi_batches_history_origin_lookups(backup_app):
+    from sqlalchemy import event
+    from models.attendance_override_history import AttendanceOverrideHistory
+    for index in range(30):
+        db.session.add(AttendanceOverrideHistory(emp_id=1, month='2026-06', override_type='employee',
+            action_type='update', after_values_json={'work_hours': index}))
+    db.session.commit()
+    db.session.expunge_all()
+    statements = []
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if 'from account_set_backup_origins' in statement.lower():
+            statements.append(statement)
+    event.listen(db.engine, 'before_cursor_execute', record)
+    try:
+        document = service.collect_multi_backup([1], ['attendance'])
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', record)
+    assert len(document['monthly']['2026-06']['datasets']['override_history']) == 30
+    assert len(statements) == 1, f'History origin lookups must be batched, got {len(statements)} queries'
+
+
+@pytest.mark.parametrize('present', [True, False])
+def test_batched_export_preserves_zero_id_reference_validation(backup_app, present):
+    from models.shift import Shift
+    if present:
+        db.session.add(Shift(id=0, shift_no='ZERO', shift_name='零号班次', time_slots=[]))
+    DailyRecord.query.first().shift_id = 0
+    db.session.commit()
+    db.session.expunge_all()
+    if present:
+        document = service.collect_multi_backup([1], ['attendance'])
+        assert document['monthly']['2026-06']['datasets']['daily_records'][0]['shift_no'] == 'ZERO'
+    else:
+        with pytest.raises(BackupError, match='关联资料缺失'):
+            service.collect_multi_backup([1], ['attendance'])
+
+
+def test_batched_history_preserves_origin_choice_when_local_id_has_multiple_sources(backup_app):
+    from sqlalchemy import text
+    from models.attendance_override_history import AttendanceOverrideHistory
+    from models.account_set_backup_restore import AccountSetBackupOrigin
+    for index in range(10):
+        db.session.add(AttendanceOverrideHistory(emp_id=1, month='2026-06', override_type='employee', action_type='update'))
+    db.session.commit()
+    rows = AttendanceOverrideHistory.query.order_by(AttendanceOverrideHistory.id).all()
+    original = service.serialize_row('override_history', rows[0])
+    content = {key: value for key, value in original.items() if key not in ('created_at', 'origin_key', 'provenance')}
+    for index in range(300):
+        db.session.add(AccountSetBackupOrigin(dataset='override_history' if index % 2 == 0 else 'imports',
+            origin_key=str(300-index).zfill(64), local_id=index % 15 + 1,
+            provenance={'_content_hash':service.digest(content), 'source':f'origin-{index}'}))
+    db.session.commit()
+    db.session.execute(text('ANALYZE'))
+    direct = [service.serialize_row('override_history', row) for row in rows]
+    assert service.serialize_rows('override_history', rows) == direct
+
+
+def test_export_announces_next_dataset_before_its_query(backup_app, monkeypatch):
+    reports = []
+    original = service.scoped_rows
+    def checked(name, *args, **kwargs):
+        if name == 'daily_records':
+            assert '考勤日报' in reports[-1]['stage']
+            assert reports[-1]['percent'] is None
+        return original(name, *args, **kwargs)
+    monkeypatch.setattr(service, 'scoped_rows', checked)
+    service.collect_multi_backup([1], ['attendance', 'account_settings'], progress=lambda **work: reports.append(work))
+
+
+def test_export_reads_attendance_in_bounded_batches_and_reports_actual_rows(backup_app):
+    from models.employee import Employee
+    from sqlalchemy import event
+    employees = [Employee(emp_no=f'BATCH{i}', name=f'批量人员{i}') for i in range(20)]
+    db.session.add_all(employees)
+    db.session.flush()
+    for day in range(1, 29):
+        for employee in employees:
+            db.session.add(DailyRecord(emp_id=employee.id, record_date=date(2026,6,day), actual_hours=8,
+                raw_data={'value':f'{employee.emp_no}-{day}', 'text':'abc'*100}))
+    db.session.commit()
+    db.session.expunge_all()
+    statements = []
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if 'from daily_records' in statement.lower() and 'count(' not in statement.lower():
+            statements.append(statement.lower())
+    reports = []
+    event.listen(db.engine, 'before_cursor_execute', record)
+    try:
+        document = service.collect_multi_backup([1], ['attendance'], progress=lambda **work: reports.append(work))
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', record)
+    rows = document['monthly']['2026-06']['datasets']['daily_records']
+    assert len(rows) == len({(row['emp_no'],row['record_date']) for row in rows}) == 561
+    assert all(row['raw_data']['text'] == 'abc'*100 for row in rows if row['emp_no'].startswith('BATCH'))
+    assert len(statements) >= 3
+    assert all('limit' in sql for sql in statements)
+    row_progress = [work for work in reports if work.get('unit') == 'records' and work.get('dataset') == 'daily_records']
+    assert any(0 < work['completed'] < work['total'] == 561 for work in row_progress)
+    assert row_progress[-1]['completed'] == row_progress[-1]['total'] == 561
+    assert all(work['percent'] == work['completed'] * 100 / work['total'] for work in row_progress if work['total'])
+
+
+def test_batched_export_refuses_an_incomplete_read(backup_app):
+    removed = False
+    def progress(**work):
+        nonlocal removed
+        if not removed and work.get('dataset') == 'daily_records' and work['total'] == 1:
+            DailyRecord.query.delete()
+            db.session.flush()
+            removed = True
+    with pytest.raises(BackupError, match='变化'):
+        service.collect_multi_backup([1], ['attendance'], progress=progress)
+    assert removed

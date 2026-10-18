@@ -641,7 +641,7 @@ describe("App smoke regression", () => {
     const { default: App } = await import("./App");
     render(<App />);
     fireEvent.click(await screen.findByRole("button", {name: /账套设置/}));
-    fireEvent.click(screen.getByRole("button", {name: /导出.*账套/}));
+    fireEvent.click(screen.getByRole("button", {name: "导出月份备份"}));
     expect(await screen.findByRole("dialog", {name: "导出多月份备份"})).toBeInTheDocument();
     expect(screen.getByLabelText("账号、密码与权限")).toBeChecked();
     fireEvent.click(screen.getByRole("button", {name: "开始导出"}));
@@ -682,12 +682,12 @@ describe("App smoke regression", () => {
     await query.fetchQueryBootstrap();
     const {default: App} = await import("./App"); render(<App />);
     fireEvent.click(await screen.findByRole("button",{name:/账套设置/}));
-    fireEvent.click(screen.getByRole("button",{name:"导入月度账套"}));
+    fireEvent.click(screen.getByRole("button",{name:"导入月份备份"}));
     fireEvent.change(screen.getByLabelText("选择账套备份"),{target:{files:[new File(["zip"],"backup.zip")]}});
     await screen.findByText("识别到的月份");
     const monthFetches = fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets").length;
     const importFetches = fetchMock.mock.calls.filter(([input]) => normalizePath(input) === "/api/admin/account-sets/1/imports").length;
-    fireEvent.click(screen.getByRole("button",{name:"查看导入确认"})); fireEvent.click(screen.getByRole("button",{name:"确认导入"}));
+    fireEvent.click(screen.getByRole("button",{name:"查看恢复确认"})); fireEvent.click(screen.getByRole("button",{name:"确认恢复"}));
     await screen.findByText("账套恢复完成"); expect(screen.getByText("旧文件清理稍后重试")).toBeInTheDocument();
     if (reauthentication) {
       expect(screen.getByRole("button",{name:"重新登录"})).toBeInTheDocument();
@@ -714,15 +714,15 @@ describe("App smoke regression", () => {
     expect(await screen.findByRole("button", { name: /账套设置/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /上传原始文档/ })).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: "导入月度账套" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /导出.*账套/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导入月份备份" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "导出月份备份" })).not.toBeInTheDocument();
 
     // 点击 ⚙️ 账套设置 打开弹窗
     fireEvent.click(screen.getByRole("button", { name: /账套设置/ }));
     expect(await screen.findByText("月度账套")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "创建" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "导入月度账套" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /导出.*账套/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导入月份备份" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "导出月份备份" })).toBeInTheDocument();
 
     // 关闭账套设置弹窗
     fireEvent.click(screen.getByRole("button", { name: "关闭" }));

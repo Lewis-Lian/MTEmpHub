@@ -1049,11 +1049,11 @@ export default function AdminDashboardPage() {
                     <div className="acm-backup-settings-actions">
                       <button className="acm-dock-item acm-dock-item--backup-export" type="button" title="选择月份与完整备份内容" disabled={!accountSets.length || isWorking} onClick={() => { setShowModal(null); setShowExport(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></svg>
-                        <span>{selectedAccountSet ? `导出 ${selectedAccountSet.month} 账套` : "导出月度账套"}</span>
+                        <span>导出月份备份</span>
                       </button>
                       <button className="acm-dock-item acm-dock-item--backup-import" type="button" disabled={isWorking} onClick={() => { setShowModal(null); setShowBackup(true); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 16v4h16v-4" /></svg>
-                        <span>导入月度账套</span>
+                        <span>导入月份备份</span>
                       </button>
                     </div>
 

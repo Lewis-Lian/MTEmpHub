@@ -12,6 +12,8 @@ from types import SimpleNamespace
 import re
 import shutil
 
+from services.monthly_reference_progress_service import progress_rows, report as report_progress
+
 from models import db
 from models.account_set import AccountSet, AccountSetImport
 from models.daily_record import DailyRecord
@@ -39,7 +41,8 @@ def _validate_month(month):
     date(int(month[:4]), int(month[5:]), 1)
 
 
-def _current_references():
+def _current_references(*, progress=None):
+    report_progress(progress, 'current', '读取当前基础资料')
     departments = {row.id: row for row in Department.query.order_by(Department.dept_no).all()}
     shifts = {row.id: row for row in Shift.query.order_by(Shift.shift_no).all()}
     assignments = {row.emp_id: shifts.get(row.shift_id) for row in EmployeeShiftAssignment.query.all()}
@@ -48,6 +51,8 @@ def _current_references():
     references = []
     manager_source = SystemSetting.get_value('manager_attendance_source', 'local')
     employee_source = SystemSetting.get_value('employee_attendance_source', 'local')
+    total = sum(len(items) for items in rows.values())
+    report_progress(progress, 'current', '整理当前基础资料', 0, total)
     for kind, items in rows.items():
         key_field = REFERENCE_FIELDS[kind][0]
         for row in items:
@@ -65,6 +70,7 @@ def _current_references():
                 parent = departments.get(row.parent_id)
                 payload['parent_no'] = parent.dept_no if parent else None
             references.append((kind, getattr(row, key_field), payload))
+            report_progress(progress, 'current', '整理当前基础资料', len(references), total)
     return references
 
 
@@ -88,14 +94,15 @@ def ensure_month_reference(month: str) -> None:
     validate_month_reference_relations(month)
 
 
-def validate_month_reference_relations(month: str) -> None:
+def validate_month_reference_relations(month: str, *, progress=None) -> None:
     """Check the final graph, including preserved history and newly captured rows."""
     _validate_month(month)
+    report_progress(progress, 'validate', '读取待校验快照关系')
     rows = MonthlyReferenceSnapshot.query.filter_by(month=month).order_by(
         MonthlyReferenceSnapshot.kind, MonthlyReferenceSnapshot.business_key).all()
     references = {(row.kind, row.business_key): row for row in rows}
     labels = {'employee': '员工', 'department': '部门', 'shift': '班次'}
-    for row in rows:
+    for row in progress_rows(rows, progress, 'validate', '校验快照关系'):
         if row.kind not in REFERENCE_FIELDS or not isinstance(row.payload, dict):
             raise ValueError(f'{month} 快照资料格式无效：{row.business_key}')
         natural = REFERENCE_FIELDS[row.kind][0]
@@ -114,7 +121,7 @@ def validate_month_reference_relations(month: str) -> None:
                 raise ValueError(f'{month} {labels[row.kind]} {row.business_key} 缺少{label}快照 {identifier}，请先核对并修正关联资料')
     parents = {row.business_key: row.payload.get('parent_no') for row in rows if row.kind == 'department'}
     checked = set()
-    for key in parents:
+    for key in progress_rows(list(parents), progress, 'validate_parents', '校验部门父链'):
         path, seen, cursor = [], set(), key
         while cursor and cursor not in checked:
             if cursor in seen:
@@ -253,7 +260,7 @@ def capture_business_month(month: str) -> None:
         ensure_month_reference(month)
 
 
-def reference_change_blockers(month: str, proposed: list, selected_categories: list) -> list:
+def reference_change_blockers(month: str, proposed: list, selected_categories: list, *, progress=None) -> list:
     """Stage 7 contract: proposed month snapshots require all existing consumers.
 
     This is deliberately conservative: a shared reference change may affect any
@@ -266,9 +273,10 @@ def reference_change_blockers(month: str, proposed: list, selected_categories: l
     from models.manager_attendance_override import ManagerAttendanceOverride
 
     _validate_month(month)
-    changed = [row for row in proposed if get_month_reference(month, row['kind'], row['business_key']) != row['payload']]
+    changed = [row for row in progress_rows(proposed, progress, 'consumers', '核对受影响快照') if get_month_reference(month, row['kind'], row['business_key']) != row['payload']]
     if not changed:
         return []
+    report_progress(progress, 'consumers', '核对受影响业务类别')
     required = set()
     start = date.fromisoformat(month + '-01')
     end = date(start.year + (start.month == 12), start.month % 12 + 1, 1)
@@ -289,7 +297,7 @@ def reference_change_blockers(month: str, proposed: list, selected_categories: l
 
 
 def correct_month_reference(month: str, kind: str, business_key: str, changes: dict,
-                            selected_categories: list) -> None:
+                            selected_categories: list, *, progress=None) -> None:
     """Explicit month-only correction; no commit, no current-reference mutation."""
     _validate_month(month)
     account = AccountSet.query.filter_by(month=month).first()
@@ -319,29 +327,32 @@ def correct_month_reference(month: str, kind: str, business_key: str, changes: d
             if reference is None:
                 raise ValueError('父部门不在该月资料中')
             parent = reference.get('parent_no')
-    blockers = reference_change_blockers(month, [{'kind': kind, 'business_key': business_key, 'payload': payload}], selected_categories)
+    blockers = reference_change_blockers(month, [{'kind': kind, 'business_key': business_key, 'payload': payload}], selected_categories, progress=progress)
     if blockers:
         raise ValueError(blockers[0]['reason'] + ' ' + ', '.join(blockers[0]['required_categories']))
+    report_progress(progress, 'write', '修正本月快照', 0, 1)
     row.payload = payload
     provenance = deepcopy(row.provenance)
     provenance.setdefault('fields', {}).update({field: 'explicit_month_correction' for field in changes})
     row.provenance = provenance
     # A correction proves only those fields; it cannot upgrade the whole baseline.
     row.quality = 'partial'
+    report_progress(progress, 'write', '修正本月快照', 1, 1)
+    report_progress(progress, 'flush', '保存并检查快照')
     db.session.flush()
 
 
-def reconcile_month_evidence(month: str, decisions: list, selected_categories: list, inspect_archives: bool = False) -> None:
+def reconcile_month_evidence(month: str, decisions: list, selected_categories: list, inspect_archives: bool = False, *, progress=None) -> None:
     """Choose exact scanned candidates explicitly, retaining their field sources.
 
     All choices are checked before writing. Ambiguous department names are
     rejected rather than mapped to an arbitrary current department.
     """
-    report = next((row for row in scan_legacy_month_references(inspect_archives)['months'] if row['month'] == month), None)
+    report = next((row for row in scan_legacy_month_references(inspect_archives, progress=progress)['months'] if row['month'] == month), None)
     if report is None:
         raise ValueError('月份没有可核对证据')
     prepared = []
-    for decision in decisions:
+    for decision in progress_rows(decisions, progress, 'evidence_check', '核对所选历史证据'):
         evidence = next((row for row in report['evidence'] if row['business_key'] == decision['business_key']
                          and row['field'] == decision['field']), None)
         candidate = next((row for row in evidence['candidates'] if row['value'] == decision['value']), None) if evidence else None
@@ -358,23 +369,24 @@ def reconcile_month_evidence(month: str, decisions: list, selected_categories: l
             raise ValueError('请先显式采集该月基线资料')
         payload = {**deepcopy(row.payload), field: value}
         if reference_change_blockers(month, [{'kind': 'employee', 'business_key': row.business_key,
-                                              'payload': payload}], selected_categories):
+                                              'payload': payload}], selected_categories, progress=progress):
             raise ValueError('月度资料由多个类别共享，请明确选择所有受影响类别')
         prepared.append((row, field, value, candidate))
     account = AccountSet.query.filter_by(month=month).first()
     if account and account.is_locked:
         raise ValueError('月份已锁定，请先解锁')
-    for row, field, value, candidate in prepared:
+    for row, field, value, candidate in progress_rows(prepared, progress, 'write', '保存历史证据修正'):
         row.payload = {**deepcopy(row.payload), field: value}
         provenance = deepcopy(row.provenance)
         provenance.setdefault('fields', {})[field] = {'source': 'explicit_evidence_selection',
                                                      'sources': deepcopy(candidate['sources'])}
         row.provenance = provenance
         row.quality = 'partial'
+    report_progress(progress, 'flush', '保存并检查快照')
     db.session.flush()
 
 
-def scan_legacy_month_references(inspect_archives: bool = False, *, include_evidence: bool = True) -> dict:
+def scan_legacy_month_references(inspect_archives: bool = False, *, include_evidence: bool = True, progress=None) -> dict:
     """Report missing snapshots and sourced candidates without flushing or writing.
 
     A source proves what was stored, not every field of an employee's past state.
@@ -394,12 +406,14 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                    EmployeeAttendanceOverride.month, ManagerAttendanceOverride.month, MealTicketBatch.month,
                    MealTicketImport.month, MealLedgerRecord.month, MealLedgerImport.month]
         statement = union(*(select(func.substr(column, 1, 7)) for column in columns))
+        report_progress(progress, 'discover', '查询已有业务月份')
         months = sorted(value for (value,) in db.session.execute(statement) if value)
-        for month in months:
+        for month in progress_rows(months, progress, 'discover', '核对已有业务月份'):
             _validate_month(month)
         return {'months': [{'month': month, 'evidence': [], 'archives': []} for month in months], 'warnings': []}
 
     with db.session.no_autoflush:
+        report_progress(progress, 'discover', '读取历史月份和员工索引')
         months = {row.month for row in AccountSet.query.all()}
         employees = {row.id: row.emp_no for row in Employee.query.all()}
         evidence = {}
@@ -427,16 +441,19 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                     add(month, employees.get(row.emp_id), field, raw.get(label),
                         {'table': row.__tablename__, 'id': row.id, 'field': column + '.' + label})
 
-        for row in DailyRecord.query.all():
+        report_progress(progress, 'evidence_daily', '读取日报历史证据')
+        for row in progress_rows(DailyRecord.query.all(), progress, 'evidence_daily', '核对日报历史证据'):
             month = row.record_date.strftime('%Y-%m')
             months.add(month)
             for column in ('raw_data', 'employee_payload', 'manager_payload'):
                 raw_evidence(month, row, column)
-        for row in MonthlyReport.query.all():
+        report_progress(progress, 'evidence_monthly', '读取月报历史证据')
+        for row in progress_rows(MonthlyReport.query.all(), progress, 'evidence_monthly', '核对月报历史证据'):
             months.add(row.report_month)
             for column in ('raw_data', 'employee_raw_data', 'manager_raw_data'):
                 raw_evidence(row.report_month, row, column)
-        for row in MealTicketItem.query.all():
+        report_progress(progress, 'evidence_tickets', '读取餐券历史证据')
+        for row in progress_rows(MealTicketItem.query.all(), progress, 'evidence_tickets', '核对餐券历史证据'):
             months.add(row.month)
             for field in ('name', 'dept_name', 'is_manager'):
                 add(row.month, row.emp_no_snapshot, field, getattr(row, field),
@@ -445,13 +462,16 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                               (EmployeeAttendanceOverride, 'month'), (ManagerAttendanceOverride, 'month'),
                               (MealTicketBatch, 'month'), (MealTicketImport, 'month'),
                               (MealLedgerRecord, 'month'), (MealLedgerImport, 'month')):
-            for row in model.query.all():
+            report_progress(progress, 'discover', '读取其他业务月份')
+            for row in progress_rows(model.query.all(), progress, 'discover', '核对其他业务月份'):
                 value = getattr(row, column)
                 months.add(value.strftime('%Y-%m') if isinstance(value, date) else value)
-        references = _current_references()
+        references = _current_references(progress=progress)
+        report_progress(progress, 'snapshots', '读取历史快照索引')
         snapshots = {(row.month, row.kind, row.business_key) for row in MonthlyReferenceSnapshot.query.all()}
         archives = {}
-        for row in AccountSetImport.query.all():
+        report_progress(progress, 'archives', '读取历史归档索引')
+        for row in progress_rows(AccountSetImport.query.all(), progress, 'archives', '核对历史归档'):
             account = db.session.get(AccountSet, row.account_set_id)
             if account:
                 entry = {'id': row.id, 'source_filename': row.source_filename,
@@ -463,6 +483,7 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                 try:
                     from services.import_pipeline import normalize_import_rows
                     from utils.helpers import clean_text
+                    report_progress(progress, 'archive_read', '读取历史归档文件')
                     normalized = normalize_import_rows(row.stored_path, file_type=row.file_type)
                     headers = next((items for items in normalized.rows[:8]
                                     if any(clean_text(value) in {'人员编号', '工号'} for value in items)), None)
@@ -471,7 +492,8 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                         continue
                     columns = {clean_text(value): index for index, value in enumerate(headers)}
                     emp_column = columns.get('人员编号', columns.get('工号'))
-                    for items in normalized.rows[normalized.rows.index(headers) + 1:]:
+                    for items in progress_rows(normalized.rows[normalized.rows.index(headers) + 1:], progress,
+                                               'archive_rows', '核对归档文件行'):
                         key = clean_text(items[emp_column]) if emp_column < len(items) else ''
                         if key not in set(employees.values()):
                             continue
@@ -489,7 +511,7 @@ def scan_legacy_month_references(inspect_archives: bool = False, *, include_evid
                     if normalized and normalized.cleanup_dir:
                         shutil.rmtree(normalized.cleanup_dir, ignore_errors=True)
         report = []
-        for month in sorted(months):
+        for month in progress_rows(sorted(months), progress, 'months', '汇总历史月份资料'):
             _validate_month(month)
             missing = {kind: [key for item_kind, key, _ in references
                               if item_kind == kind and (month, kind, key) not in snapshots]
