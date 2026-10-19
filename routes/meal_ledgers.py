@@ -2,12 +2,61 @@ from flask import Blueprint, g, jsonify, request, send_file
 
 from models import db
 from models.meal_ledger import MealLedgerRecord, MealLedgerImport
+from models.meal_guest_card import MealGuestCard, MealGuestRecharge
 from routes.auth_helpers import admin_required, page_permission_required, any_page_permission_required
 from routes.meal_tickets import handled
 from services import meal_ledger_service as ledger
 from services.meal_ticket_service import MealError, begin_write
 
 meal_ledgers_bp = Blueprint('meal_ledgers', __name__, url_prefix='/api/meal-ledgers')
+
+
+@meal_ledgers_bp.get('/guest-cards')
+@page_permission_required('meal_ledger_query')
+@handled
+def guest_cards():
+    from models.meal_guest_card import MealGuestCard
+    from services.meal_guest_card_service import serialize_card
+    return jsonify([serialize_card(card) for card in MealGuestCard.query.order_by(MealGuestCard.card_no).all()])
+
+
+@meal_ledgers_bp.post('/guest-cards')
+@admin_required
+@handled
+def create_guest_card():
+    from services.meal_guest_card_service import register, serialize_card
+    begin_write()
+    card = register(request.get_json(silent=True) or {}, g.current_user.username)
+    db.session.commit()
+    return jsonify(serialize_card(card))
+
+
+@meal_ledgers_bp.put('/guest-cards/<key>')
+@admin_required
+@handled
+def toggle_guest_card(key):
+    from models.meal_guest_card import MealGuestCard
+    from services.meal_guest_card_service import serialize_card
+    body = request.get_json(silent=True) or {}
+    if set(body) != {'is_active'} or type(body['is_active']) is not bool:
+        raise MealError('只支持修改客人卡启用状态')
+    begin_write()
+    card = MealGuestCard.query.filter_by(key=key).with_for_update().first()
+    if not card:
+        raise MealError('客人卡不存在',404)
+    card.is_active = body['is_active']
+    db.session.commit()
+    return jsonify(serialize_card(card))
+
+
+@meal_ledgers_bp.post('/records/<int:identifier>/recharge-check')
+@admin_required
+@handled
+def check_guest_recharge(identifier):
+    from services.meal_guest_card_service import check_recharge
+    result = check_recharge(identifier, request.get_json(silent=True) or {}, g.current_user.username)
+    db.session.commit()
+    return jsonify(result)
 
 
 @meal_ledgers_bp.get('/annual')

@@ -24,6 +24,7 @@ from models.manager_month_stat import ManagerMonthStat
 from models.dingtalk_sync_run import DingTalkSyncRun
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketAdjustment, MealTicketPayment, MealTicketImport, MealTicketImportRow, MealTicketFollowupTask, MealTicketFollowupAllocation
 from models.meal_ledger import MealLedgerRecord, MealLedgerImport
+from models.meal_guest_card import MealGuestCard, MealGuestRecharge
 
 
 class BackupError(ValueError):
@@ -127,6 +128,8 @@ from models.monthly_reference_snapshot import MonthlyReferenceSnapshot
 V2_DATASETS = dict(DATASETS)
 V2_DATASETS['meal_batches'] = replace(DATASETS['meal_batches'], fields=DATASETS['meal_batches'].fields + ('followup_state',))
 V2_DATASETS.update({
+    'meal_guest_cards': spec(MealGuestCard, 'key card_no emp_no name is_active operator created_at', 'key', 'shared'),
+    'meal_guest_recharges': spec(MealGuestRecharge, 'key month record_key source_key source_digest amount_cents occurred_at operator created_at', 'key', 'month'),
     'meal_followup_tasks': spec(MealTicketFollowupTask, 'key month batch_key item_key kind amount_cents status version source_snapshot offset_enabled skip_order operator operation_at created_at', 'key', 'month'),
     'meal_followup_allocations': spec(MealTicketFollowupAllocation, 'key month task_key payment_key amount_cents operator created_at', 'key', 'month'),
 })
@@ -165,7 +168,7 @@ DATASET_CATEGORIES = {
     'leave_records': 'cross_month', 'overtime_records': 'cross_month',
     'annual_leave': 'annual_stats', 'manager_stats': 'annual_stats',
     'snapshots': 'monthly_references',
-    **{name: ('meal_ledgers' if name.startswith('meal_ledger') else 'meal_tickets') for name in V2_DATASETS if name.startswith('meal_')},
+    **{name: ('meal_ledgers' if name.startswith(('meal_ledger', 'meal_guest')) else 'meal_tickets') for name in V2_DATASETS if name.startswith('meal_')},
 }
 DATASET_VERSIONS = {name: 1 for name in V2_DATASETS}
 DATASET_VERSIONS['meal_batches'] = 2
@@ -188,7 +191,7 @@ departments dingtalk_sync_runs employee_attendance_overrides employee_shift_assi
 employees leave_records manager_attendance_overrides manager_month_stats meal_ledger_imports
 meal_ledger_records meal_ticket_adjustments meal_ticket_batches meal_ticket_import_rows
 meal_ticket_imports meal_ticket_items meal_ticket_payments meal_ticket_followup_tasks
-meal_ticket_followup_allocations monthly_reference_snapshots
+meal_ticket_followup_allocations meal_guest_cards meal_guest_recharges monthly_reference_snapshots
 monthly_reports overtime_records shifts users user_employee_assignments user_department_assignments'''.split():
     _exclude(_table, 'id', '目标本地 ID；通过业务键重建，不能导入源 ID')
 _exclude('account_sets', 'is_active is_locked locked_at locked_by', '目标账套选择与锁定状态；恢复不得覆盖')

@@ -128,13 +128,13 @@ def export(report, month=None, year=None, accessible=None, filters=None):
             rows = [r for r in ledger.records(report, month=None if yearly else month, year=period if yearly else None) if not r.voided]
             if report == 'external':
                 sheet(book, '外来人员菜票领用', f'{period}外来人员纸质和充值菜票领用记录',
-                    ['月份', '日期', '填表人', '部门', '外来人员（部门）', '姓名', '时间', '天数', '发放金额（元）', '类别', '卡号', '备注'],
+                    ['月份', '日期', '填表人', '部门', '外来人员（部门）', '姓名', '时间', '天数', '发放金额（元）', '类别', '卡号', '备注', '应充值金额（元）', '到账状态'],
                     [[r.month, r.record_date.isoformat(), r.data.get('registrar') or r.operator, r.data['dept_name'], r.data['unit'], r.data['name'], r.data['period'],
-                        r.data['days'], r.amount_cents / 100, '充卡' if r.data['category'] == 'card' else '纸质', r.data['card_no'], r.data['remark']] for r in rows])
+                        r.data['days'], ledger.actual_external_cents(r) / 100, '充卡' if r.data['category'] == 'card' else '纸质', r.data['card_no'], r.data['remark'], r.amount_cents / 100, ledger.external_status_label(r)] for r in rows])
                 groups = {}
                 for r in rows:
                     key = (r.month, r.data['dept_name'], r.data['category'])
-                    groups[key] = groups.get(key, 0) + r.amount_cents
+                    groups[key] = groups.get(key, 0) + ledger.actual_external_cents(r)
                 sheet(book, '领用分类汇总', f'{period}领用分类汇总', ['月份', '部门', '类别', '发放金额（元）'],
                     [[selected, dept, '充卡' if category == 'card' else '纸质', value / 100] for (selected, dept, category), value in sorted(groups.items())])
             else:

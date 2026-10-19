@@ -178,7 +178,8 @@ def test_empty_shared_data_is_explicitly_complete(shared_app):
     db.drop_all()
     db.create_all()
     result = service.collect_shared_backup()
-    assert len(result['shared']) == 7
+    assert len(result['shared']) == 8
+    assert result['shared']['meal_guest_cards'] == []
     assert all(rows == [] for rows in result['shared'].values())
     assert all(scope == {'included': True, 'complete': True} for scope in result['coverage'].values())
 

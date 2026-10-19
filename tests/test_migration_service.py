@@ -109,3 +109,71 @@ def test_followup_business_rows_and_cursor_survive_whole_database_transfer(tmp_p
         import json
         assert json.loads(conn.execute(text('SELECT followup_state FROM meal_ticket_batches')).scalar())['current_task_key'] == 't'*32
     target.dispose()
+
+
+def test_guest_registry_links_and_actual_evidence_survive_database_switch(tmp_path):
+    """Exercise both switch paths locally with target foreign keys enabled."""
+    import json
+    from datetime import date, datetime
+    from models import db
+    from models.meal_guest_card import MealGuestCard, MealGuestRecharge
+    from models.meal_ledger import MealLedgerRecord
+    from services.migration_service import migrate_mysql_to_sqlite
+
+    source_url = 'sqlite:///' + str(tmp_path / 'guest-source.db')
+    mysql_target_url = 'sqlite:///' + str(tmp_path / 'guest-mysql.db')
+    sqlite_target_url = 'sqlite:///' + str(tmp_path / 'guest-sqlite.db')
+    source = create_engine(source_url)
+    db.metadata.create_all(source)
+    with source.begin() as conn:
+        conn.execute(MealGuestCard.__table__.insert(), dict(id=31, key='g'*32,
+            card_no='000099', emp_no='G001', name='固定来宾卡', is_active=False, operator='admin'))
+        conn.execute(MealLedgerRecord.__table__.insert(), dict(id=32, key='l'*32,
+            kind='external', month='2026-06', record_date=date(2026, 6, 2), amount_cents=3000,
+            data={'guest_card_key': 'g'*32, 'card_no': '000099', 'emp_no': 'G001',
+                  'name': '实际访客', 'category': 'card'},
+            request_key='guest-request', request_digest='d'*64, operator='admin', voided=True))
+        conn.execute(MealGuestRecharge.__table__.insert(), dict(id=33, key='r'*32,
+            month='2026-06', record_key='l'*32, source_key='card-meal:machine:recharge:1',
+            source_digest='e'*64, amount_cents=1200, occurred_at=datetime(2026, 6, 3, 10), operator='admin'))
+    source.dispose()
+
+    def transfer(function, source_url, target_url, mysql_target=False):
+        read_db, write_db = SQLAlchemy(), SQLAlchemy()
+        init_target = write_db.init_app
+        def init_fk_target(app):
+            init_target(app)
+            with app.app_context():
+                @event.listens_for(write_db.engine, 'connect')
+                def enable_foreign_keys(connection, record):
+                    connection.execute('PRAGMA foreign_keys=ON')
+                if mysql_target:
+                    write_db.engine.dialect.identifier_preparer = mysql.dialect().identifier_preparer
+                    @event.listens_for(write_db.engine, 'before_cursor_execute', retval=True)
+                    def mysql_boundary(connection, cursor, statement, parameters, context, executemany):
+                        if statement.startswith('ALTER TABLE') and 'AUTO_INCREMENT' in statement:
+                            return 'SELECT 1', ()
+                        return statement, parameters
+        with patch('flask_sqlalchemy.SQLAlchemy', side_effect=[read_db, write_db]), patch.object(
+                write_db, 'init_app', side_effect=init_fk_target), patch('flask_migrate.stamp'):
+            return function(source_url, target_url)
+
+    for function, origin, destination, mysql_target in [
+            (migrate_sqlite_to_mysql, source_url, mysql_target_url, True),
+            (migrate_mysql_to_sqlite, mysql_target_url, sqlite_target_url, False),
+            # Replacing an existing target must delete matching children first.
+            (migrate_mysql_to_sqlite, mysql_target_url, sqlite_target_url, False)]:
+        results = transfer(function, origin, destination, mysql_target)
+        assert {'table': 'meal_guest_cards', 'rows': 1, 'status': 'ok'} in results
+        assert {'table': 'meal_guest_recharges', 'rows': 1, 'status': 'ok'} in results
+        target = create_engine(destination)
+        with target.connect() as conn:
+            assert conn.execute(text('SELECT card_no, emp_no, name, is_active FROM meal_guest_cards')).one() == ('000099', 'G001', '固定来宾卡', 0)
+            record = conn.execute(text('SELECT data, voided FROM meal_ledger_records')).one()
+            assert json.loads(record[0])['guest_card_key'] == 'g'*32
+            assert json.loads(record[0])['name'] == '实际访客'
+            assert record[1] == 1
+            assert conn.execute(text('SELECT record_key, source_key, source_digest, amount_cents FROM meal_guest_recharges')).one() == (
+                'l'*32, 'card-meal:machine:recharge:1', 'e'*64, 1200)
+            assert conn.execute(text('PRAGMA foreign_key_check')).all() == []
+        target.dispose()

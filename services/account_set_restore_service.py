@@ -23,7 +23,8 @@ from services.account_set_backup_schema import (
     DATASETS, REFS, HISTORY, DELETE_ALLOWED, ACCOUNT_FIELDS, BackupError,
     BackupTargetChanged, digest, business_key, options_checked, serial, MEAL_DATASETS, FILE_DATASETS,
 )
-from services.account_set_backup_service import month_bounds, scoped_rows, serialize_row
+from services.account_set_backup_service import (month_bounds, scoped_rows, serialize_row,
+    reject_legacy_guest_links, require_legacy_guest_free_month)
 
 LABELS = {
     'actual_hours': '实际工时', 'expected_hours': '应出勤工时', 'absent_hours': '缺勤工时',
@@ -127,6 +128,8 @@ def fingerprint_target(document, account, existing):
 
 
 def build_preview(document, options):
+    reject_legacy_guest_links(document)
+    require_legacy_guest_free_month(document['month'])
     options = options_checked(options)
     account, existing = target_rows(document)
     rows = []

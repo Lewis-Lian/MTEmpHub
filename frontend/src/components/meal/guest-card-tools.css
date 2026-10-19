@@ -1,0 +1,64 @@
+.guest-card-registry {
+  font-size: 13px;
+}
+.guest-card-registry summary { cursor: pointer; font-weight: 600; }
+.guest-card-form, .guest-recharge-query, .guest-recharge-summary, .guest-recharge-actions {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.guest-card-form label, .guest-recharge-query label { display: grid; gap: 6px; }
+.guest-card-table-scroll { overflow-x: auto; margin-top: 16px; }
+.guest-card-table { width: 100%; border-collapse: collapse; text-align: left; }
+.guest-card-table th, .guest-card-table td { padding: 10px; border-bottom: 1px solid var(--ent-border-strong); }
+.guest-recharge-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 23, 42, .45);
+  z-index: var(--z-modal);
+}
+.guest-recharge-dialog {
+  width: min(800px, 100%);
+  max-height: 85dvh;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 24px;
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  box-shadow: var(--ent-shadow-modal);
+}
+.guest-recharge-dialog h2 { margin-top: 0; }
+.guest-recharge-summary { padding: 12px; background: var(--ent-secondary-bg); }
+.guest-recharge-source { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guest-recharge-actions { justify-content: flex-end; margin-top: 20px; }
+
+.guest-card-registry > p, .guest-recharge-dialog > p { color: var(--ent-text-secondary); font-size: 13px; line-height: 1.7; }
+.guest-card-form label, .guest-recharge-query label { color: var(--ent-text-secondary); font-size: 12px; }
+.guest-card-form label { flex: 1 1 180px; }
+.guest-card-form input { width: 100%; }
+.guest-recharge-query input {
+  padding: 8px 12px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius);
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  font: inherit;
+}
+.guest-recharge-query input:focus { outline: 2px solid var(--ent-border-focus); outline-offset: 2px; }
+.guest-card-table th { font-size: 12px; color: var(--ent-text-secondary); }
+.guest-card-table td { font-size: 13px; }
+.guest-recharge-summary { margin-bottom: 16px; border-radius: var(--ent-radius); font-size: 13px; }
+.guest-recharge-dialog h2 { font-size: 18px; }
+@media (max-width: 600px) {
+  .guest-recharge-dialog { padding: 18px; }
+  .guest-card-form label { flex-basis: 100%; }
+  .guest-recharge-source { max-width: 100px; }
+}
+.guest-card-table { min-width: 560px; }
+.guest-card-table th, .guest-card-table td { white-space: nowrap; }

@@ -21,6 +21,9 @@ def test_overtime_upgrade_after_legacy_schema_patch(tmp_path, existing_flags, le
     Migrate(app, db, directory=directory)
     with app.app_context():
         db.create_all()
+        # A pre-feature installation has no guest registry or actual evidence.
+        db.session.execute(text('DROP TABLE meal_guest_recharges'))
+        db.session.execute(text('DROP TABLE meal_guest_cards'))
         for flag in ('is_revoked', 'is_manual_edited'):
             if flag not in existing_flags:
                 db.session.execute(text(f'ALTER TABLE overtime_records DROP COLUMN {flag}'))
@@ -33,9 +36,9 @@ def test_overtime_upgrade_after_legacy_schema_patch(tmp_path, existing_flags, le
         columns = {column['name'] for column in inspect(db.engine).get_columns('overtime_records')}
         assert {'is_revoked', 'is_manual_edited'} <= columns
         version = db.session.execute(text('SELECT version_num FROM alembic_version')).scalar()
-        assert version == '20261009_account_state'
+        assert version == '20261019_guest_cards'
         meal_columns = {column['name'] for column in inspect(db.engine).get_columns('meal_ticket_batches')}
         assert 'reconciliation' in meal_columns
-        assert {'meal_ledger_records', 'meal_ledger_imports'} <= set(inspect(db.engine).get_table_names())
+        assert {'meal_ledger_records', 'meal_ledger_imports', 'meal_guest_cards', 'meal_guest_recharges'} <= set(inspect(db.engine).get_table_names())
         db.session.remove()
         db.drop_all()

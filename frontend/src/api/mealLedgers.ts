@@ -6,7 +6,24 @@ export interface LedgerRecord {
   name: string; emp_no: string; dept_name: string; card_no: string; remark: string;
   category: "card" | "paper"; unit: string; period: string; days: string;
   registrar: string; operator: string; voided: boolean; void_reason: string | null;
+  guest_card_key?: string | null; actual_amount?: number;
+  recharge_status?: "manual" | "pending" | "partial" | "complete";
+  recharges?: Array<{ source_key: string; date: string; amount: number }>;
 }
+export interface GuestCard { key: string; card_no: string; emp_no: string; name: string; is_active: boolean }
+export interface GuestRechargeCandidate {
+  source_key: string; date: string; amount: number; matched: boolean; occupied: boolean;
+}
+export interface GuestRechargeCheck { record: LedgerRecord; candidates: GuestRechargeCandidate[] }
+export const fetchGuestCards = () => apiRequest<GuestCard[]>("/api/meal-ledgers/guest-cards");
+export const createGuestCard = (body: Pick<GuestCard, "card_no" | "emp_no" | "name">) =>
+  apiRequest<GuestCard>("/api/meal-ledgers/guest-cards", { method: "POST", body });
+export const updateGuestCard = (key: string, is_active: boolean) =>
+  apiRequest<GuestCard>(`/api/meal-ledgers/guest-cards/${encodeURIComponent(key)}`, { method: "PUT", body: { is_active } });
+export const checkGuestRecharge = (id: number, end_date: string, source_keys?: string[]) =>
+  apiRequest<GuestRechargeCheck>(`/api/meal-ledgers/records/${id}/recharge-check`, {
+    method: "POST", body: { end_date, ...(source_keys === undefined ? {} : { source_keys }) },
+  });
 export interface DepartmentLedger {
   month: string; status: string;
   items: Array<{ dept_name: string; count: number; due_amount: number; paid_amount: number;

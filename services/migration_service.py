@@ -41,7 +41,9 @@ MIGRATION_ORDER = [
     "meal_ticket_followup_allocations",
     "meal_ticket_imports",
     "meal_ticket_import_rows",
+    "meal_guest_cards",
     "meal_ledger_records",
+    "meal_guest_recharges",
     "meal_ledger_imports",
 ]
 
@@ -196,8 +198,8 @@ def migrate_mysql_to_sqlite(mysql_url: str, sqlite_url: str) -> list[dict]:
         except Exception as exc:
             logger.warning("迁移 stamp 失败（不影响本次数据写入）: %s", exc)
 
-        # 先清空目标表数据（DELETE 可在事务中回滚）
-        for table_name in MIGRATION_ORDER:
+        # 按子表到父表清空目标数据，保留外键约束与事务回滚能力。
+        for table_name in reversed(MIGRATION_ORDER):
             write_db.session.execute(text(f"DELETE FROM {table_name}"))
 
         # 单事务写入所有表，全部成功才 commit，任何失败则整体回滚

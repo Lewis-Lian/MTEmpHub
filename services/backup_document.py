@@ -318,3 +318,53 @@ def _validate_v2_rows(present, versions):
                         or not len('default:') < len(preset) <= 255
                         or any(row[field] is not None for field in ('avatar_file_key', 'avatar_sha256', 'avatar_size'))):
                     raise BackupError('内置头像引用无效')
+
+
+def validate_guest_records(records):
+    """Validate guest portable identities and funds without reading local IDs."""
+    from services.account_set_backup_schema import canonical
+    errors = []
+    cards = records.get('meal_guest_cards', {})
+    ledger = records.get('meal_ledger_records', {})
+    def block(code, key, message, required=()):
+        errors.append((code, key, message, required))
+    for key, value in ledger.values():
+        data = value['data']
+        if not isinstance(data, dict):
+            continue  # Unlinked legacy ledger JSON retains its original codec.
+        identifier = data.get('guest_card_key')
+        if identifier is None:
+            continue
+        card = cards.get(identifier) if isinstance(identifier, str) else None
+        if not card:
+            block('meal_guest_missing_card', key, '缺少关联来宾卡登记', ['shared/meal_guest_cards/' + canonical([identifier])])
+        if (value['kind'] != 'external' or data.get('category') != 'card'
+                or type(value['amount_cents']) is not int or value['amount_cents'] <= 0):
+            block('meal_guest_invalid_record', key, '来宾卡只能关联正金额的外来人员充卡记录')
+        if card and any(data.get(field) != card[1][field] for field in ('card_no', 'emp_no')):
+            block('meal_guest_card_snapshot', key, '外来人员充卡记录的卡号、工号与关联来宾卡不一致', [card[0]])
+    totals, sources = {}, {}
+    for name, field in [('meal_payments', 'request_key'), ('meal_ledger_records', 'source_key')]:
+        for key, value in records.get(name, {}).values():
+            if value.get(field):
+                sources[value[field]] = key
+    for key, value in records.get('meal_guest_recharges', {}).values():
+        if value['source_key'] in sources:
+            block('meal_guest_source_conflict', key, '同一充值来源不能重复计入员工充值、台账清零或来宾卡充值', [sources[value['source_key']]])
+        sources[value['source_key']] = key
+        if type(value['amount_cents']) is not int or value['amount_cents'] <= 0:
+            block('meal_guest_invalid_amount', key, '来宾卡实际充值金额必须为正整数分')
+        record = ledger.get(value['record_key'])
+        if not record:
+            block('meal_guest_missing_record', key, '来宾卡充值流水缺少关联台账', [value['record_key']])
+            continue
+        if value['month'] != record[1]['month']:
+            block('meal_guest_month_mismatch', key, '来宾卡充值流水与关联台账业务月份不一致', [record[0]])
+        data = record[1]['data']
+        if (record[1]['kind'] != 'external' or not isinstance(data, dict)
+                or data.get('category') != 'card' or not data.get('guest_card_key')):
+            block('meal_guest_invalid_recharge', key, '来宾卡充值流水必须关联已绑定来宾卡的外来人员充卡记录', [record[0]])
+        totals[value['record_key']] = totals.get(value['record_key'], 0) + value['amount_cents']
+        if totals[value['record_key']] > record[1]['amount_cents']:
+            block('meal_guest_excess_recharge', key, '来宾卡实际充值合计超过登记的预计金额', [record[0]])
+    return errors

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../api/client";
-import { businessMonth, fetchAnnual, fetchLedger, money, saveLedger, voidLedger,
-  type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord } from "../api/mealLedgers";
+import { businessMonth, fetchAnnual, fetchLedger, fetchGuestCards, money, saveLedger, voidLedger,
+  type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord, type GuestCard } from "../api/mealLedgers";
+import { GuestCardRegistry, GuestRechargeDialog } from "../components/meal/GuestCardTools";
 import QueryTable from "../components/query/QueryTable";
 import MonthPicker from "../components/common/MonthPicker";
 import LoadingState from "../components/feedback/LoadingState";
@@ -20,20 +21,30 @@ const titles = {
 
 const descriptions = {
   department: "部门发放合计包含员工净实际发放、客人卡充值和纸质菜票，外来领用自动计入承担费用的部门。",
-  external: "完成客人卡充值或发放纸质菜票后登记，按实际发放月份计入承担费用的部门；纸质金额填写票面总额。",
+  external: "选择客人卡登记本次领用，再查询数据库核对充值；已核对到账计入承担部门。纸质金额填写票面总额。",
   clearance: "在菜票软件完成余额清零后登记，卡余额即当次取款金额，不影响菜票发放结清。",
   annual: "按实际业务月份汇总。纸质领用单列，收回取实际清零记录，消费未录入保持空值。",
 };
 
 const initialForm = () => ({
-  name: "", emp_no: "", dept_name: "", card_no: "", amount: "", category: "card",
+  guest_card_key: "", name: "", emp_no: "", dept_name: "", card_no: "", amount: "", category: "card",
   unit: "", period: "", days: "", registrar: "", remark: "", floor2: "", floor3: "", date: ""
 });
+
+const externalDate = (month: string) => {
+  const now = new Date();
+  return month === businessMonth() ? `${month}-${String(now.getDate()).padStart(2, "0")}` : "";
+};
+
+const actualAmount = (record: LedgerRecord) => record.actual_amount ?? record.amount;
+const rechargeLabel = {manual:"手工登记", pending:"未充值", partial:"部分到账", complete:"已到账"};
 
 export default function MealLedgerPage({ kind }: { kind: View }) {
   const recordKind: LedgerKind = kind === "annual" ? "consumption" : kind;
   const [month, setMonth] = useState(businessMonth);
   const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [cards, setCards] = useState<GuestCard[]>([]);
+  const [rechargeTarget, setRechargeTarget] = useState<LedgerRecord | null>(null);
   const [records, setRecords] = useState<LedgerRecord[]>([]);
   const [department, setDepartment] = useState<DepartmentLedger | null>(null);
   const [annual, setAnnual] = useState<AnnualLedger | null>(null);
@@ -47,15 +58,18 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [voidTarget, setVoidTarget] = useState<LedgerRecord | null>(null);
+  const [detailTarget, setDetailTarget] = useState<LedgerRecord | null>(null);
   const [voidReason, setVoidReason] = useState("");
+  const detailDialog = useRef<HTMLElement>(null);
   const request = useRef({ signature: "", key: "" });
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true); setError(""); setDepartment(null); setAnnual(null); setRecords([]);
     const data = kind === "annual" ? fetchAnnual(year) : kind === "department" ? fetchLedger<DepartmentLedger>(kind, month) : fetchLedger<LedgerRecord[]>(kind, month);
-    Promise.all([apiRequest<{ role: string }>("/api/auth/me"), data]).then(([user, result]) => {
+    Promise.all([apiRequest<{ role: string }>("/api/auth/me"), data, kind === "external" ? fetchGuestCards() : Promise.resolve([])]).then(([user, result, guestCards]) => {
       if (cancelled) return;
+      setCards(guestCards);
       setAdmin(user.role === "admin");
       if (kind === "annual") setAnnual(result as AnnualLedger);
       else if (kind === "department") setDepartment(result as DepartmentLedger);
@@ -65,7 +79,28 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     return () => { cancelled = true; };
   }, [kind, month, year, refresh]);
 
-  useEffect(() => { setForm(initialForm()); setMessage(""); }, [kind]);
+  useEffect(() => {
+    setForm({ ...initialForm(), date: kind === "external" ? externalDate(month) : "" });
+    setMessage("");
+  }, [kind]);
+
+  useEffect(() => { setDetailTarget(null); setRechargeTarget(null); }, [kind, month]);
+
+  useEffect(() => {
+    if (!detailTarget) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const dialog = detailDialog.current;
+    dialog?.querySelector("button")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDetailTarget(null);
+      if (event.key === "Tab") {
+        event.preventDefault();
+        dialog?.querySelector("button")?.focus();
+      }
+    };
+    dialog?.addEventListener("keydown", onKey);
+    return () => { dialog?.removeEventListener("keydown", onKey); previous?.focus(); };
+  }, [detailTarget]);
 
   const field = (key: keyof ReturnType<typeof initialForm>, label: string, type = "text") => (
     <label>
@@ -73,6 +108,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       <input
         type={type}
         step={type === "number" ? "0.01" : undefined}
+        disabled={kind === "external" && !!form.guest_card_key && (key === "emp_no" || key === "card_no")}
         required={type === "date" || (kind === "external" && key === "dept_name")}
         value={form[key]}
         onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
@@ -93,15 +129,15 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       if (request.current.signature !== signature) request.current = { signature, key: crypto.randomUUID() };
       await saveLedger(recordKind, { ...body, request_key: request.current.key });
       request.current = { signature: "", key: "" };
-      setForm(initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
+      setForm(kind === "external" ? { ...initialForm(), date: form.date, dept_name: form.dept_name, category: form.category, guest_card_key: form.guest_card_key, card_no: form.card_no, emp_no: form.emp_no } : initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
     });
   }
 
-  const visible = records.filter(r => (!search || `${r.emp_no}${r.name}${r.dept_name}${r.card_no}`.includes(search)) && (!category || r.category === category));
+  const visible = records.filter(r => (!search || `${r.emp_no}${r.name}${r.dept_name}${r.card_no}${kind === "external" ? r.unit : ""}`.includes(search)) && (!category || r.category === category));
 
   const validRecords = visible.filter(r => !r.voided);
   const voidedRecords = visible.filter(r => r.voided);
-  const validTotalAmount = validRecords.reduce((sum, r) => sum + r.amount, 0);
+  const validTotalAmount = validRecords.reduce((sum, r) => sum + (kind === "external" ? actualAmount(r) : r.amount), 0);
 
   return (
     <section className="meal-ticket-page meal-ledger-page">
@@ -115,7 +151,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               <span className="meal-ticket-month-picker-label">{kind === "department" ? "充值月份" : "业务月份"}</span>
               <MonthPicker ariaLabel={kind === "department" ? "充值月份" : "业务月份"} value={month}
                 disabled={busy} format="YYYY-MM" className="meal-ticket-month-picker"
-                onChange={value => { if (value !== month) { setMonth(value); setForm(f => ({...f, date:""})); } }} />
+                onChange={value => { if (value !== month) { setMonth(value); setForm(f => ({...f, date: kind === "external" ? externalDate(value) : ""})); } }} />
             </div>}
           </div>
         </div>
@@ -180,32 +216,72 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
             </section>
           )}
 
-          {(kind === "external" || kind === "clearance") && (
+          {kind === "external" && (
+            <>
+              <section className="meal-ticket-panel meal-ledger-external-summary" aria-label="记录概览统计">
+                <span>当前筛选 · 有效 {validRecords.length} 条</span>
+                <span>发放合计 <strong>¥{money(validTotalAmount)}</strong></span>
+                <span>充卡 <b>¥{money(validRecords.filter(r => r.category === "card").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
+                <span>纸质 <b>¥{money(validRecords.filter(r => r.category === "paper").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
+                {voidedRecords.length > 0 && <span>已作废 {voidedRecords.length} 条</span>}
+              </section>
+              {admin && <div className="meal-ticket-panel meal-ledger-guest-manager">
+                <GuestCardRegistry cards={cards} onChanged={async () => { setCards(await fetchGuestCards()); }} />
+              </div>}
+              {admin && <div className="meal-ticket-panel meal-ledger-form-card meal-ledger-quick-entry">
+                <div className="meal-ledger-card-header"><div>
+                  <h2><LedgerBookIcon />快速登记</h2>
+                  <p>填写本次领用，保存后可继续登记下一笔。</p>
+                </div></div>
+                <form onSubmit={e => { e.preventDefault(); void save(); }}>
+                  <fieldset disabled={busy} className="meal-ledger-quick-fields">
+                    <div className="meal-ledger-grid meal-ledger-quick-grid">
+                      {field("date", "处理日期", "date")}
+                      {field("name", "姓名")}
+                      {field("dept_name", "承担费用的部门")}
+                      <label>类别<select value={form.category} onChange={e => setForm(f => ({...f, category:e.target.value, guest_card_key:"", card_no:"", emp_no:""}))}>
+                        <option value="card">充卡</option><option value="paper">纸质</option>
+                      </select></label>
+                      {field("amount", form.guest_card_key ? "应充值金额" : "发放金额", "number")}
+                      {form.category === "card" && <label className="meal-ledger-grid-full">客人卡
+                        <select value={form.guest_card_key} onChange={e => {
+                          const card = cards.find(card => card.key === e.target.value);
+                          setForm(f => ({...f, guest_card_key:card?.key || "", card_no:card?.card_no || "", emp_no:card?.emp_no || ""}));
+                        }}><option value="">手工登记（不核对数据库）</option>
+                          {cards.filter(card => card.is_active).map(card => <option key={card.key} value={card.key}>{card.name} · {card.card_no} · {card.emp_no}</option>)}
+                        </select>
+                      </label>}
+                    </div>
+                    <details className="meal-ledger-extra-fields">
+                      <summary>补充信息 <span>卡号、单位、服务期间、备注等（选填）</span></summary>
+                      <div className="meal-ledger-grid">
+                        {field("card_no", "卡号")}{field("emp_no", "人员编号")}{field("unit", "外来单位/人员")}
+                        {field("period", "服务期间")}{field("days", "天数")}{field("registrar", "填表人")}
+                        <div className="meal-ledger-grid-full">{field("remark", "备注")}</div>
+                      </div>
+                    </details>
+                  </fieldset>
+                  <div className="meal-ledger-form-footer">
+                    <p>金额单位：元；纸质菜票填写票面总额。</p>
+                    <button className="meal-ticket-button is-primary" disabled={busy}>保存记录</button>
+                  </div>
+                </form>
+              </div>}
+            </>
+          )}
+
+          {kind === "clearance" && (
             <section className="meal-ledger-stats" aria-label="记录概览统计">
               <div className="meal-ledger-stat-card is-green">
-                <span className="meal-ledger-stat-label">{kind === "clearance" ? "有效清零总额" : "有效发放总额"}</span>
+                <span className="meal-ledger-stat-label">有效清零总额</span>
                 <strong className="meal-ledger-stat-value">¥{money(validTotalAmount)}</strong>
-                <p className="meal-ledger-stat-sub">{kind === "clearance" ? "月末实际清零取款金额" : "有效登记总金额"}</p>
+                <p className="meal-ledger-stat-sub">月末实际清零取款金额</p>
               </div>
               <div className="meal-ledger-stat-card is-blue">
                 <span className="meal-ledger-stat-label">有效记录数</span>
                 <strong className="meal-ledger-stat-value">{validRecords.length}<small>条</small></strong>
                 <p className="meal-ledger-stat-sub">正常入账记录</p>
               </div>
-              {kind === "external" && (
-                <>
-                  <div className="meal-ledger-stat-card is-blue">
-                    <span className="meal-ledger-stat-label">充卡金额</span>
-                    <strong className="meal-ledger-stat-value">¥{money(validRecords.filter(r => r.category === "card").reduce((s, r) => s + r.amount, 0))}</strong>
-                    <p className="meal-ledger-stat-sub">充卡领用记录</p>
-                  </div>
-                  <div className="meal-ledger-stat-card is-amber">
-                    <span className="meal-ledger-stat-label">纸质领用金额</span>
-                    <strong className="meal-ledger-stat-value">¥{money(validRecords.filter(r => r.category === "paper").reduce((s, r) => s + r.amount, 0))}</strong>
-                    <p className="meal-ledger-stat-sub">纸质票据发放</p>
-                  </div>
-                </>
-              )}
               {voidedRecords.length > 0 && (
                 <div className="meal-ledger-stat-card is-rose">
                   <span className="meal-ledger-stat-label">已作废记录</span>
@@ -283,15 +359,34 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                   </div>
                 </div>
                 <div className="meal-ticket-toolbar meal-ticket-filters meal-ledger-filters">
-                  <label className="meal-ledger-search">搜索记录<input placeholder="工号、姓名、部门或卡号" value={search} onChange={e => setSearch(e.target.value)} /></label>
+                  <label className="meal-ledger-search">搜索记录<input placeholder={kind === "external" ? "姓名、单位、部门或卡号" : "工号、姓名、部门或卡号"} value={search} onChange={e => setSearch(e.target.value)} /></label>
                   {kind === "external" && <label>领用类别<select value={category} onChange={e => setCategory(e.target.value)}>
                     <option value="">全部类别</option><option value="card">充卡</option><option value="paper">纸质</option>
                   </select></label>}
                 </div>
-                <QueryTable
+                {kind === "external" ? <QueryTable
+                  headers={["日期", "领用人 / 单位", "承担部门", "类别", "金额（元）", {label:"操作", sortable:false}]}
+                  sortRows={visible.map(r => [r.date, r.name || r.unit, r.dept_name, r.category === "card" ? "充卡" : "纸质", r.amount, null])}
+                  rows={visible.map(r => [
+                    r.date,
+                    <div className="meal-ledger-recipient"><strong>{r.name || r.unit || "—"}</strong>
+                      {r.name && r.unit && <small>{r.unit}</small>}
+                      {r.voided && <span className="meal-ledger-status-tag is-voided">已作废</span>}
+                    </div>,
+                    r.dept_name,
+                    <span className={`meal-ledger-status-tag ${r.category === "card" ? "is-info" : "is-draft"}`}>{r.category === "card" ? "充卡" : "纸质"}</span>,
+                    <div className="meal-ledger-recipient"><strong>{money(r.amount)}</strong>
+                      {r.guest_card_key && <><small>已到账 {money(actualAmount(r))}</small><small>{rechargeLabel[r.recharge_status ?? "pending"]}</small></>}
+                    </div>,
+                    <div className="meal-ledger-row-actions">
+                      <button className="meal-ticket-button" onClick={() => setDetailTarget(r)}>详情</button>
+                      {admin && r.guest_card_key && !r.voided && <button className="meal-ticket-button" disabled={busy} onClick={() => setRechargeTarget(r)}>核对充值</button>}
+                      {admin && !r.voided && <button className="meal-ticket-button" disabled={busy} onClick={() => { setVoidTarget(r); setVoidReason(""); }}>作废</button>}
+                    </div>
+                  ])}
+                /> : <QueryTable
                   headers={[
                     "日期", "工号", "姓名", "部门",
-                    ...(kind === "external" ? ["类别", "外来单位", "期间", "天数"] : []),
                     "卡号", "金额", "备注", "状态", "操作"
                   ]}
                   rows={visible.map(r => [
@@ -299,7 +394,6 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                     r.emp_no,
                     r.name,
                     r.dept_name,
-                    ...(kind === "external" ? [r.category === "card" ? "充卡" : "纸质", r.unit || "—", r.period || "—", r.days || "—"] : []),
                     r.card_no,
                     money(r.amount),
                     r.remark || "—",
@@ -310,19 +404,19 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                       </button>
                     ) : "—"
                   ])}
-                />
+                />}
               </>
             )}
           </div>
 
           {/* 管理员登记表单 */}
-          {admin && kind !== "department" && (
+          {admin && kind !== "department" && kind !== "external" && (
             <div className="meal-ticket-panel meal-ledger-form-card">
               <div className="meal-ledger-card-header">
                 <div>
                   <h2>
                     <LedgerBookIcon />
-                    {kind === "annual" ? "录入月度消费" : kind === "external" ? "登记外来人员领用" : "登记月末取款"}
+                    {kind === "annual" ? "录入月度消费" : "登记月末取款"}
                   </h2>
                   <p>已保存记录保留历史。月度消费再次保存时，会替代本月有效登记并保留旧版本。</p>
                 </div>
@@ -332,9 +426,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                   <legend>人员信息</legend>
                   <div className="meal-ledger-grid">
                     {field("name", "姓名")}{field("emp_no", "人员编号")}
-                    {field("dept_name", kind === "external" ? "承担费用的部门" : "部门")}
+                    {field("dept_name", "部门")}
                     {field("card_no", "卡号")}
-                    {kind === "external" && field("unit", "外来单位/人员")}
                   </div>
                 </fieldset>}
                 <fieldset className="meal-ledger-fieldset">
@@ -349,11 +442,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                       {field("floor2", "二楼消费金额", "number")}{field("floor3", "三楼消费金额", "number")}
                     </> : <>
                       {field("date", "处理日期", "date")}
-                      {kind === "external" && <label>类别<select value={form.category} onChange={e => setForm(f => ({...f,category:e.target.value}))}>
-                        <option value="card">充卡</option><option value="paper">纸质</option>
-                      </select></label>}
                       {field("amount", kind === "clearance" ? "清零取款金额" : "发放金额", "number")}
-                      {kind === "external" && <>{field("period", "服务期间")}{field("days", "天数")}{field("registrar", "填表人")}</>}
                     </>}
                   </div>
                 </fieldset>
@@ -371,6 +460,33 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           )}
         </>
       )}
+
+      {detailTarget && <div className="meal-ticket-modal">
+        <section ref={detailDialog} className="meal-ledger-void-dialog meal-ledger-detail-dialog" role="dialog" aria-modal="true" aria-label="领用记录详情">
+          <div className="meal-ledger-card-header"><h2>领用记录详情</h2><button className="meal-ticket-button" onClick={() => setDetailTarget(null)}>关闭</button></div>
+          <dl className="meal-ledger-detail-grid">
+            {[
+              ["日期", detailTarget.date], ["姓名", detailTarget.name], ["外来单位/人员", detailTarget.unit],
+              ["承担费用的部门", detailTarget.dept_name], ["类别", detailTarget.category === "card" ? "充卡" : "纸质"],
+              [detailTarget.guest_card_key ? "应充值金额（元）" : "发放金额（元）", money(detailTarget.amount)], ["人员编号", detailTarget.emp_no], ["卡号", detailTarget.card_no],
+              ["服务期间", detailTarget.period], ["天数", detailTarget.days], ["填表人", detailTarget.registrar],
+              ["操作人", detailTarget.operator], ["备注", detailTarget.remark],
+              ...(detailTarget.guest_card_key ? [["已到账金额（元）", money(actualAmount(detailTarget))], ["充值状态", rechargeLabel[detailTarget.recharge_status ?? "pending"]]] : []),
+              ["状态", detailTarget.voided ? "已作废" : "有效"],
+              ...(detailTarget.voided ? [["作废原因", detailTarget.void_reason]] : [])
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || "—"}</dd></div>)}
+          </dl>
+          {!!detailTarget.recharges?.length && <section className="meal-ledger-recharge-evidence" aria-label="已匹配充值流水">
+            <h3>已匹配充值流水</h3>
+            <ul>{detailTarget.recharges.map(row => <li key={row.source_key}>
+              <span>{row.date.replace("T", " ")} · {money(row.amount)} 元</span><small>{row.source_key}</small>
+            </li>)}</ul>
+          </section>}
+        </section>
+      </div>}
+
+      {rechargeTarget && <GuestRechargeDialog record={rechargeTarget} onClose={() => setRechargeTarget(null)}
+        onUpdated={record => { setRecords(rows => rows.map(row => row.id === record.id ? record : row)); }} />}
 
       {/* 作废确认弹窗 */}
       {voidTarget && (

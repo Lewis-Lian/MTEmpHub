@@ -4,6 +4,7 @@ from datetime import date, datetime, timedelta
 from models import db
 from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketPayment
 from models.meal_ledger import MealLedgerRecord
+from models.meal_guest_card import MealGuestCard, MealGuestRecharge
 from models.system_setting import SystemSetting
 from services.card_db_client import CardDBClient, CardDBClientError, card_db_config_from_settings, card_db_configured
 from services.meal_ticket_service import MealError, begin_write, batch_for_write, cents, digest
@@ -59,6 +60,9 @@ def reconcile(body, operator):
     batch = batch_for_write(identifier,version)
     if batch.status != 'confirmed':
         raise MealError('请先确认核算再核对数据库流水',409)
+    # Share guest-account locks with external ledger matching, including accounts
+    # that also appear in this employee batch.
+    MealGuestCard.query.filter(MealGuestCard.emp_no.in_({r.get('emp_no') for r in records})).order_by(MealGuestCard.key).with_for_update().all()
     items = MealTicketItem.query.filter_by(batch_key=batch.key).all()
     by_number = {item.emp_no_snapshot:item for item in items}
     if len(by_number) != len(items):
@@ -139,6 +143,8 @@ def reconcile(body, operator):
         if not item:
             report['unmatched'] += 1
             continue
+        if MealGuestRecharge.query.filter_by(source_key=request_key).first():
+            raise MealError('该充值流水已计入客人领用，不能重复计入员工账目',409)
         existing = MealTicketPayment.query.filter_by(request_key=request_key).first()
         if existing:
             if existing.item_key != item.key:

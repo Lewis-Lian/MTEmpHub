@@ -37,6 +37,12 @@ def validated(kind, body):
         raise MealError('日期须属于所选业务月份')
     data = {key: text_field(body, key) for key in (
         'emp_no', 'name', 'dept_name', 'card_no', 'remark', 'registrar', 'unit', 'period', 'days')}
+    if body.get('guest_card_key'):
+        if kind != 'external':
+            raise MealError('客人卡只用于外来领用')
+        from services.meal_guest_card_service import card_for_record
+        card = card_for_record(body)
+        data.update(guest_card_key=card.key, card_no=card.card_no, emp_no=card.emp_no)
     amount = 0
     slot = None
     if kind in ('external', 'clearance'):
@@ -73,9 +79,11 @@ def serialize(record):
     for key in ('floor2', 'floor3', 'historical'):
         if key + '_cents' in data:
             data[key + '_amount'] = data.pop(key + '_cents') / 100
+    from services.meal_guest_card_service import evidence
+    actual = evidence(record) if record.kind == 'external' else {}
     return {'id': record.id, 'key': record.key, 'kind': record.kind, 'month': record.month,
         'date': record.record_date.isoformat(), 'amount': record.amount_cents / 100,
-        **data, 'operator': record.operator, 'created_at': record.created_at.isoformat(),
+        **data, **actual, 'operator': record.operator, 'created_at': record.created_at.isoformat(),
         'voided': record.voided, 'void_reason': record.void_reason, 'source_key': record.source_key}
 
 
@@ -142,7 +150,8 @@ def departments(month, accessible=None):
                 continue
             name = record.data.get('dept_name') or '未分配部门'
             amounts = guests.setdefault(name, {'card':0, 'paper':0})
-            amounts[record.data['category']] += record.amount_cents
+            from services.meal_guest_card_service import actual_cents
+            amounts[record.data['category']] += actual_cents(record)
         known = {r['dept_name'] for r in rows}
         for name in guests.keys() - known:
             rows.append({'dept_name':name, 'count':0, 'due_amount':0, 'paid_amount':0})
@@ -174,7 +183,8 @@ def annual(year):
     for index in range(1, 13):
         month = f'{year:04d}-{index:02d}'
         employee = sum(p.amount_cents for p in payments if p.payment_date.month == index)
-        card = sum(r.amount_cents for r in external if not r.voided and r.month == month and r.data['category'] == 'card')
+        from services.meal_guest_card_service import actual_cents
+        card = sum(actual_cents(r) for r in external if not r.voided and r.month == month and r.data['category'] == 'card')
         paper = sum(r.amount_cents for r in external if not r.voided and r.month == month and r.data['category'] == 'paper')
         recovered = sum(r.amount_cents for r in clearance if not r.voided and r.month == month)
         consume = consumption.get(month)
@@ -191,3 +201,13 @@ def annual(year):
         for key in months[0] if key != 'month'}
     return {'year': year, 'months': months, 'totals': totals,
         'consumption_months': sum(r['consumption_amount'] is not None for r in months)}
+
+
+def actual_external_cents(record):
+    from services.meal_guest_card_service import actual_cents
+    return actual_cents(record)
+
+
+def external_status_label(record):
+    from services.meal_guest_card_service import evidence
+    return {'manual':'手工登记', 'pending':'未充值', 'partial':'部分到账', 'complete':'已到账'}[evidence(record)['recharge_status']]

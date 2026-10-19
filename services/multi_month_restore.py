@@ -27,7 +27,8 @@ ORDER = ['departments', 'shifts', 'employees', 'account_set', 'users',
          'annual_leave', 'manager_stats', 'override_history', 'sync_history', 'imports',
          'meal_batches', 'meal_items', 'meal_adjustments', 'meal_payments',
          'meal_followup_tasks', 'meal_followup_allocations',
-         'meal_imports', 'meal_import_rows', 'meal_ledger_imports', 'meal_ledger_records']
+         'meal_imports', 'meal_import_rows', 'meal_guest_cards', 'meal_ledger_imports', 'meal_ledger_records',
+         'meal_guest_recharges']
 
 
 def _fields(name, value, month):
@@ -137,6 +138,8 @@ def restore_multi_backup(document, selection, choices, fingerprint, operator_id,
                 if row['dataset'] == 'meal_ledger_records' and obj and value:
                     obj.active_slot = obj.source_key = None
                     obj.request_key = uuid.uuid4().hex
+                if row['dataset'] == 'meal_guest_recharges' and obj and value:
+                    obj.source_key = uuid.uuid4().hex
                 if row['dataset'] == 'meal_imports' and obj and value:
                     obj.file_digest = uuid.uuid4().hex
             db.session.flush()

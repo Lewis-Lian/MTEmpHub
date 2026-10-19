@@ -344,7 +344,8 @@ def _validate(final, target, source, rows, changes, selection, document, account
                 require(key, value, 'dept_no', 'departments', 'missing_department', allow_inactive=name == 'user_department_assignments')
             require(key, value, 'profile_dept_no', 'departments', 'missing_department')
             grants = name in ('user_employee_assignments', 'user_department_assignments')
-            require(key, value, 'emp_no', 'employees', 'missing_employee', historical=not shared, allow_inactive=grants)
+            if name != 'meal_guest_cards':
+                require(key, value, 'emp_no', 'employees', 'missing_employee', historical=not shared, allow_inactive=grants)
             require(key, value, 'shift_no', 'shifts', 'missing_shift', historical=not shared)
             require(key, value, 'username' if name != 'users' else '_none', 'users', 'missing_user', allow_inactive=grants)
             require(key, value, 'account_month', 'account_set', 'missing_account')
@@ -450,7 +451,8 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
         for key, value in records.values():
             for field, parent in (('batch_key', 'meal_batches'), ('item_key', 'meal_items'),
                                   ('import_key', 'meal_imports'), ('reversal_of', 'meal_payments'),
-                                  ('task_key', 'meal_followup_tasks'), ('payment_key', 'meal_payments')):
+                                  ('task_key', 'meal_followup_tasks'), ('payment_key', 'meal_payments'),
+                                  ('record_key', 'meal_ledger_records')):
                 reference(key, value, field, parent)
             if name == 'meal_ledger_records':
                 reference(key, {**value, 'import_key': value['data'].get('import_key')}, 'import_key', 'meal_ledger_imports')
@@ -496,6 +498,8 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
             block('meal_history_mismatch', r['row_key'], '采用备份资金记录时仍保留了备份之外的历史，请统一选择该明细的资金记录', extra)
     # Validate actual unique constraints and cross-ledger source deduplication.
     for name, fields in {
+        'meal_guest_cards': [('card_no',), ('emp_no',)],
+        'meal_guest_recharges': [('source_key',)],
         'meal_followup_allocations': [('task_key', 'payment_key')],
         'meal_items': [('batch_key', 'emp_no')],
         'meal_payments': [('request_key',), ('reversal_of',)],
@@ -515,10 +519,21 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
     from services.meal_ticket_followup_validation import validate_followup_records
     for code, key, message, required in validate_followup_records(current):
         block(code, key, message, required)
+    _validate_guest_cards(current, changes, block)
     payments = {v['request_key']: key for key, v in current['meal_payments'].values()}
     for key, value in current['meal_ledger_records'].values():
         if value.get('source_key') in payments:
             block('meal_ledger_unique_conflict', key, '同一来源不能同时计入台账清零与发放扣回', [payments[value['source_key']]])
+
+
+def _validate_guest_cards(current, changes, block):
+    from services.backup_document import validate_guest_records
+    for row in changes:
+        if row['dataset'] == 'meal_guest_cards' and row['system'] and row['backup']:
+            if any(row['system'][field] != row['backup'][field] for field in ('card_no', 'emp_no', 'name')):
+                block('meal_guest_identity_changed', row['row_key'], '已登记来宾卡的卡号、工号与名称不可修改')
+    for code, key, message, required in validate_guest_records(current):
+        block(code, key, message, required)
 
 
 def _validate_historical_isolation(final, target, entries, changes, block):

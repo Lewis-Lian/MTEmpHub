@@ -245,10 +245,30 @@ def collect_shared_backup(categories=None, progress=None):
             'coverage': {'shared/' + name: {'included': True, 'complete': True} for name in shared}}
 
 
+def reject_legacy_guest_links(document):
+    """V1 cannot carry the registry or actual payment evidence behind a link."""
+    datasets = document.get('datasets', {}) if isinstance(document, dict) else {}
+    rows = datasets.get('meal_ledger_records', []) if isinstance(datasets, dict) else []
+    if isinstance(rows, list) and any(isinstance(row, dict) and isinstance(row.get('data'), dict)
+            and row['data'].get('guest_card_key') is not None for row in rows):
+        raise BackupError('旧版单月备份不支持来宾卡关联与实际充值，请使用多月份备份')
+
+
+def require_legacy_guest_free_month(month):
+    """Protect both legacy exports and legacy restores over newer guest data."""
+    from models.meal_guest_card import MealGuestRecharge
+    from models.meal_ledger import MealLedgerRecord
+    if (MealGuestRecharge.query.filter_by(month=month).first() is not None
+            or any(isinstance(data, dict) and data.get('guest_card_key') is not None
+                   for (data,) in db.session.query(MealLedgerRecord.data).filter_by(month=month))):
+        raise BackupError('该月份包含来宾卡关联或实际充值，请使用多月份备份')
+
+
 def collect_backup(account_set_id, progress=None, phase="data"):
     account = db.session.get(AccountSet, account_set_id)
     if account is None:
         raise BackupError('账套不存在')
+    require_legacy_guest_free_month(account.month)
     datasets, employee_ids, shift_ids = {}, set(), set()
     def report_data():
         if progress:
@@ -353,6 +373,7 @@ def validate_document(document):
     if not isinstance(document, dict) or document.get('format_version') != 1:
         raise BackupError('不支持的备份版本')
     start, end = month_bounds(document.get('month'))
+    reject_legacy_guest_links(document)
     datasets = document.get('datasets')
     if isinstance(datasets, dict):
         for name in MEAL_DATASETS:
@@ -763,6 +784,16 @@ def collect_multi_backup(account_set_ids, categories=None, progress=None, *, pha
             if name in records:
                 records[name].update({v['key']:(scope + '/' + v['key'], v) for v in values})
         errors = validate_followup_records(records)
+        if errors:
+            raise BackupError('；'.join(error[2] for error in errors))
+    if 'meal_ledgers' in selected:
+        from services.backup_document import validate_guest_records
+        records = {name: {} for name in V2_DATASETS if name.startswith('meal_')}
+        for scope, values in _contents(normalized).items():
+            name = scope.split('/')[-1]
+            if name in records:
+                records[name].update({v['key']: (scope + '/' + v['key'], v) for v in values})
+        errors = validate_guest_records(records)
         if errors:
             raise BackupError('；'.join(error[2] for error in errors))
     return normalized
