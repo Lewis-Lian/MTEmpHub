@@ -485,12 +485,20 @@ describe("菜票中心", () => {
     let current = { ...batch, status: "confirmed", items: [{ ...batch.items[0], paid_amount: 176, difference: 0 }] };
     request.mockImplementation((path: string) => {
       if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
+      if (path === "/api/meal-tickets/attendance-recalculation/preview") return Promise.resolve({
+        batch_id: 1, version: 1, source_digest: "same", rows: [{ item_id: 1, emp_no: "001", name: "员工甲", previous_days: 22, days: 22, amount: 0, excluded: false }], issues: [], total_amount: 0, new_people: [],
+      });
       if (path === "/api/meal-tickets/adjustments") current = { ...current, version: 2, items: [{ ...current.items[0], adjustment_amount: 8, due_amount: 184, difference: 8 }] };
       if (path === "/api/meal-tickets/payments") current = { ...current, version: 3, items: [{ ...current.items[0], paid_amount: 184, difference: 0 }] };
       return Promise.resolve(current);
     });
     render(<MemoryRouter><MealTicketPage view="payments" /></MemoryRouter>);
     await screen.findByRole("button", { name: "导入补扣清单" });
+    expect(screen.getByLabelText("金额概览")).toHaveTextContent("176.00");
+    fireEvent.click(screen.getByRole("button", { name: "重算考勤数据" }));
+    const recalc = within(await screen.findByRole("dialog", { name: "考勤重算差额" }));
+    expect(recalc.getByText(/本次没有金额变化，无需重复补发或扣回/)).toBeInTheDocument();
+    fireEvent.click(recalc.getByRole("button", { name: "取消" }));
     fireEvent.click(screen.getByLabelText("显示全部人员"));
     expect(screen.getByRole("region", { name: "整月结清检查" })).toHaveTextContent("本月账目已结清");
     expect(screen.queryByRole("button", { name: "重算草稿" })).not.toBeInTheDocument();

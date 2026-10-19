@@ -80,7 +80,7 @@ def batch_for_write(identifier, version):
     return batch
 
 
-def source_snapshot(month, progress=None):
+def source_snapshot(month, progress=None, meal_rules=None):
     # These are the very same final result builders used by the query pages.
     from routes.query_core import _build_final_rows
     first = date.fromisoformat(month + '-01')
@@ -138,7 +138,8 @@ def source_snapshot(month, progress=None):
             base = int((days * 800).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
         except (InvalidOperation, ValueError, TypeError):
             error, days, base = '实际打卡天数字段异常，请先修正考勤', Decimal(0), 0
-        if deduction_enabled:
+        rule = meal_rules.get(emp.id, meal_rules[None]) if meal_rules else {}
+        if rule.get('abnormal_deduction_enabled', deduction_enabled):
             exempt = bool(emp.is_manager or emp.meal_ticket_as_manager)
             abnormal_dates = sorted({view.record_date.isoformat() for view in views.get(emp.id, [])
                 if view.record_date and _raw_punch_count(view) in {1, 3}}) if not exempt else []
@@ -249,11 +250,25 @@ def adjustment(batch, item_id, amount, reason, operator):
     db.session.flush()
 
 
+def batch_source_snapshot(batch, progress=None):
+    # Confirmed months retain their last calculation rule across settings changes
+    # and restores. Legacy snapshots without the rule used days * 8; their manual
+    # deductions are separate adjustments and must not be applied a second time.
+    rules = {}
+    for item in MealTicketItem.query.filter_by(batch_key=batch.key).order_by(MealTicketItem.id):
+        source = item.source.get('attendance_recalculation', {}).get('source', item.source)
+        rules[item.emp_id] = {'abnormal_deduction_enabled':bool(
+            source.get('meal_ticket_rule', {}).get('abnormal_deduction_enabled', False))}
+    if rules:
+        rules[None] = next(iter(rules.values()))
+    return source_snapshot(batch.month, progress=progress, meal_rules=rules)
+
+
 def attendance_recalculation_preview(batch, source_rows=None):
     if batch.status != 'confirmed':
         raise MealError('请先完成月度核算，再重算考勤补扣', 409)
     if source_rows is None:
-        source_rows = source_snapshot(batch.month)
+        source_rows = batch_source_snapshot(batch)
     current = {row['emp_id']:row for row in source_rows}
     items = MealTicketItem.query.filter_by(batch_key=batch.key).order_by(MealTicketItem.emp_no_snapshot).all()
     rows, issues = [], []
@@ -290,7 +305,7 @@ def supplement_person(batch, emp_id, source_digest, reason, operator):
     reason = required_text(reason, '补入原因')
     if MealTicketItem.query.filter_by(batch_key=batch.key, emp_id=emp_id).first():
         raise MealError('该人员已在本月核算名单中，请刷新后核对', 409)
-    rows = source_snapshot(batch.month)
+    rows = batch_source_snapshot(batch)
     if source_digest != digest(rows):
         raise MealError('考勤或人员资料已变化，请重新预览后补入', 409)
     data = next((row for row in rows if row['emp_id'] == emp_id), None)
@@ -310,7 +325,7 @@ def supplement_person(batch, emp_id, source_digest, reason, operator):
 
 
 def recalculate_attendance(batch, source_digest, operator):
-    source_rows = source_snapshot(batch.month)
+    source_rows = batch_source_snapshot(batch)
     preview = attendance_recalculation_preview(batch, source_rows)
     if source_digest != preview['source_digest']:
         raise MealError('考勤或人员资料已变化，请重新预览考勤差额', 409)
@@ -485,7 +500,8 @@ def serialize_batch(batch, accessible=None, check_source=False, progress=None):
         account = db.session.get(AccountSet, batch.account_set_id)
         changed = batch.status == 'confirmed' and not account.is_locked
         if not changed:
-            sources = source_snapshot(batch.month, progress=progress) if progress else source_snapshot(batch.month)
+            sources = (batch_source_snapshot(batch, progress=progress) if batch.status == 'confirmed'
+                       else source_snapshot(batch.month, progress=progress))
             changed = digest(sources) != batch.source_digest
     from services.meal_ticket_reconciliation import database_status
     if progress:

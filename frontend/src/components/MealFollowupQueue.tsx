@@ -53,6 +53,8 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
   const pending = state?.tasks.filter(task => task.status === "pending" || task.status === "skipped") ?? [];
   const awaiting = state?.tasks.filter(task => task.status === "awaiting" || task.status === "partial") ?? [];
   const verified = state?.tasks.filter(task => task.status === "verified") ?? [];
+  const filteredPending = pending.filter(task => `${task.emp_no} ${task.name} ${task.dept_name}`.includes(search.trim()));
+  const paymentTasks = [...pending, ...awaiting].filter(task => onRegister || task.candidates?.payments.length);
   const current = pending.find(task => task.key === state?.current_task_key) ?? pending[0];
   const currentKey = useRef<string | undefined>(undefined);
   currentKey.current = current?.key;
@@ -95,10 +97,10 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
   }
   return <section className="meal-ticket-panel meal-followup-queue" aria-label="逐人办理">
     <div className="meal-ticket-section-heading"><h2>逐人办理</h2><button className="meal-ticket-button" disabled={busy || working || Boolean(state?.baseline_required)} onClick={() => void write("refresh")}>刷新操作清单</button></div>
-    <p>当前抵消方式：{state?.queue_offset_enabled == null ? "尚未生成清单" : state.queue_offset_enabled ? "补发与扣款按净额抵消" : "补发与扣款分别办理"}。开关在项目更多设置中修改。</p>
-    {state?.settings_changed && <p role="alert">设置已变化，请刷新操作清单</p>}
-    {stale && state && !state.settings_changed && <p role="alert">金额或清单已变化，请刷新操作清单后办理。</p>}
-    {state?.baseline_required && <p role="alert">{state.baseline_reason}</p>}
+    <p className="meal-followup-description">当前抵消方式：{state?.queue_offset_enabled == null ? "尚未生成清单" : state.queue_offset_enabled ? "补发与扣款按净额抵消" : "补发与扣款分别办理"}。开关在项目更多设置中修改。</p>
+    {state?.settings_changed && <p className="meal-ticket-alert" role="alert">设置已变化，请刷新操作清单</p>}
+    {stale && state && !state.settings_changed && <p className="meal-ticket-alert" role="alert">金额或清单已变化，请刷新操作清单后办理。</p>}
+    {state?.baseline_required && <p className="meal-ticket-alert" role="alert">{state.baseline_reason}</p>}
     {state?.baseline_required && stale && <button className="meal-ticket-button" disabled={busy || working} onClick={() => void write("reload")}>重新读取核对基线</button>}
     {!!state?.baseline_items?.length && <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => {
       setBaselineValues(Object.fromEntries(state.baseline_items!.map(item => [item.item_key,
@@ -107,35 +109,55 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
     }}>确认旧月剩余基线</button>}
     {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
     {!state && <p>正在读取服务端操作清单。</p>}
-    {current && <section className="meal-followup-card" aria-label="当前办理任务">
-      <div className="meal-ticket-actions"><strong>工号 {current.emp_no}</strong><button className="meal-ticket-button" disabled={disabled} onClick={() => void copy(current.emp_no, "工号")}>复制工号</button></div>
-      <p>{current.name} · {current.dept_name}</p>
-      <div className="meal-ticket-actions"><strong>{direction(current)} {money(current.remaining_cents)} 元</strong><button className="meal-ticket-button" disabled={disabled} onClick={() => void copy(money(current.remaining_cents), "金额")}>复制金额</button></div>
-      <p role="status">{copied}</p>
-      <div className="meal-ticket-actions"><button className="meal-ticket-button" disabled={disabled || current.status === "skipped"} onClick={() => void write("skip", current)}>暂时跳过</button><button className="meal-ticket-button is-primary" disabled={disabled} onClick={() => void write("complete", current)}>已完成{direction(current)}，下一人</button></div>
-    </section>}
-    {state && !current && <p>{state.baseline_required ? "需核对后生成清单。" : "当前没有待操作项；以实际流水核对结果为准。"}</p>}
-    <p>本轮已操作 {awaiting.length + verified.length} / {pending.length + awaiting.length + verified.length} 项</p>
-    <p>完成按钮仅保存外部操作声明，不登记实际到账。流水可能延迟，请先核对，勿据此再次充值或取款。</p>
-    <section aria-label="办理名单"><h3>办理名单</h3><label>搜索办理任务<input value={search} onChange={e => setSearch(e.target.value)} placeholder="工号 / 姓名 / 部门" /></label>
-      <ul>{pending.filter(task => `${task.emp_no} ${task.name} ${task.dept_name}`.includes(search.trim())).map(task => <li key={task.key}><button className="meal-ticket-button is-link" disabled={disabled} aria-pressed={task.key === currentKey.current} onClick={() => void write("select", task)}>{task.emp_no} {task.name} · {direction(task)} {money(task.remaining_cents)} 元{task.status === "skipped" ? " · 暂时跳过" : ""}</button></li>)}</ul>
-    </section>
-    <section aria-label="待核对任务"><h3>待核对任务</h3><ul>{awaiting.map(task => <li key={task.key}>
-      <p>{task.emp_no} {task.name} · {direction(task)} · {task.status === "partial" ? "部分到账" : "待核对"} · 已匹配 {money(task.allocated_cents)} 元 · 剩余 {money(task.remaining_cents)} 元</p>
-      <div className="meal-ticket-actions">{task.status === "awaiting" && task.allocated_cents === 0 && <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => void write("undo", task)}>未实际操作，撤销标记</button>}
-        <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => { setRetry(task); setReason(""); }}>确认尚未到账，重新办理</button></div>
-    </li>)}</ul></section>
-    <section aria-label="实际流水关联"><h3>实际流水核对</h3>{[...pending, ...awaiting].map(task => <div key={task.key}>
-      {onRegister && <button className="meal-ticket-button" disabled={busy || working || stale || (pending.includes(task) && disabled)} onClick={() => onRegister(task)}>登记实际{direction(task)} · {task.emp_no}</button>}
-      {!!task.candidates?.payments.length && <>
-        <p>{task.emp_no} {task.name} · 待确认实际流水关联；请逐笔核实人员、方向及凭证，关联不会新建支付。</p>
-        <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => {
-          setLink(task); setPaymentKey(""); setLinkAmount("");
-        }}>关联实际流水 · {task.emp_no} {direction(task)}</button>
-      </>}
-    </div>)}</section>
-    {baselineOpen && state && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="确认旧月剩余基线" className="meal-ticket-operation-dialog">
-      <h3>确认旧月剩余基线</h3><p>先核对全部实际流水。默认仅列已证实净差额；历史补扣不自动重发。分别办理须核实两个方向的剩余金额，并填写依据。</p>
+    <div className="meal-followup-workspace">
+      <section className="meal-followup-card" aria-label="当前办理任务">
+        <div className="meal-followup-block-heading"><h3>当前办理</h3><span className="meal-ticket-badge">待办理 {pending.length} 项</span></div>
+        {current ? <>
+          <div className="meal-followup-person"><strong>{current.name}</strong><span>{current.dept_name}</span></div>
+          <div className="meal-ticket-actions"><span className="meal-followup-employee-number">工号 {current.emp_no}</span><button className="meal-ticket-button is-link" disabled={disabled} onClick={() => void copy(current.emp_no, "工号")}>复制工号</button></div>
+          <div className={`meal-followup-amount${current.kind === "refund" ? " is-refund" : ""}`}><strong>{direction(current)} {money(current.remaining_cents)} 元</strong><button className="meal-ticket-button" disabled={disabled} onClick={() => void copy(money(current.remaining_cents), "金额")}>复制金额</button></div>
+          <p className="meal-followup-copy-status" role="status">{copied}</p>
+          <div className="meal-ticket-actions meal-followup-current-actions"><button className="meal-ticket-button" disabled={disabled || current.status === "skipped"} onClick={() => void write("skip", current)}>暂时跳过</button><button className="meal-ticket-button is-primary" disabled={disabled} onClick={() => void write("complete", current)}>已完成{direction(current)}，下一人</button></div>
+        </> : <p className="meal-followup-empty">{state?.baseline_required ? "需核对后生成清单。" : state ? "当前没有待操作项；以实际流水核对结果为准。" : "正在读取当前任务。"}</p>}
+        <div className="meal-followup-progress"><strong>本轮已操作 {awaiting.length + verified.length} / {pending.length + awaiting.length + verified.length} 项</strong><p>完成按钮仅保存外部操作声明，不登记实际到账。流水可能延迟，请先核对，勿据此再次充值或取款。</p></div>
+      </section>
+      <section className="meal-followup-block" aria-label="办理名单">
+        <div className="meal-followup-block-heading"><h3>办理名单</h3><span>{filteredPending.length} 项</span></div>
+        <label className="meal-followup-search">搜索办理任务<input value={search} onChange={e => setSearch(e.target.value)} placeholder="工号 / 姓名 / 部门" /></label>
+        <ul className="meal-followup-task-list">{filteredPending.map(task => <li key={task.key}><button className="meal-followup-task" disabled={disabled} aria-pressed={task.key === currentKey.current} onClick={() => void write("select", task)}>
+          <span className="meal-followup-task-person"><strong>{task.name}</strong><small>{task.emp_no} · {task.dept_name}</small></span>
+          <span className="meal-followup-task-amount">{direction(task)} {money(task.remaining_cents)} 元{task.status === "skipped" && <small>暂时跳过</small>}</span>
+        </button></li>)}</ul>
+        {!filteredPending.length && <p className="meal-followup-empty">{search.trim() ? "没有匹配的办理任务" : "暂无待办理任务"}</p>}
+      </section>
+    </div>
+    <div className="meal-followup-review-grid">
+      <section className="meal-followup-block" aria-label="待核对任务">
+        <div className="meal-followup-block-heading"><h3>待核对任务</h3><span>{awaiting.length} 项</span></div>
+        <ul className="meal-followup-review-list">{awaiting.map(task => <li key={task.key}>
+          <p>{task.emp_no} {task.name} · {direction(task)} · {task.status === "partial" ? "部分到账" : "待核对"} · 已匹配 {money(task.allocated_cents)} 元 · 剩余 {money(task.remaining_cents)} 元</p>
+          <div className="meal-ticket-actions">{task.status === "awaiting" && task.allocated_cents === 0 && <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => void write("undo", task)}>未实际操作，撤销标记</button>}
+            <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => { setRetry(task); setReason(""); }}>确认尚未到账，重新办理</button></div>
+        </li>)}</ul>
+        {!awaiting.length && <p className="meal-followup-empty">暂无待核对任务</p>}
+      </section>
+      <section className="meal-followup-block" aria-label="实际流水关联">
+        <div className="meal-followup-block-heading"><h3>实际流水核对</h3><span>{paymentTasks.length} 项</span></div>
+        <div className="meal-followup-review-list">{paymentTasks.map(task => <div className="meal-followup-payment" key={task.key}>
+          <p className="meal-followup-payment-person"><strong>{task.name}</strong><span>{task.emp_no} · {direction(task)}</span></p>
+          {onRegister && <button className="meal-ticket-button" disabled={busy || working || stale || (pending.includes(task) && disabled)} onClick={() => onRegister(task)}>登记实际{direction(task)} · {task.emp_no}</button>}
+          {!!task.candidates?.payments.length && <>
+            <p>{task.emp_no} {task.name} · 待确认实际流水关联；请逐笔核实人员、方向及凭证，关联不会新建支付。</p>
+            <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => {
+              setLink(task); setPaymentKey(""); setLinkAmount("");
+            }}>关联实际流水 · {task.emp_no} {direction(task)}</button>
+          </>}
+        </div>)}</div>
+        {!paymentTasks.length && <p className="meal-followup-empty">暂无需要关联的实际流水</p>}
+      </section>
+    </div>
+    {baselineOpen && state && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="确认旧月剩余基线" className="meal-ticket-operation-dialog meal-followup-dialog meal-followup-baseline-dialog" aria-busy={working}>
+      <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">历史月份核对</span><h2>确认旧月剩余基线</h2><p>先核对全部实际流水，再确认每人的剩余金额。</p></header>
       <form onSubmit={e => {
         e.preventDefault();
         const baselines = Object.fromEntries((state.baseline_items ?? []).map(item => [item.item_key, {
@@ -144,19 +166,29 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
         }]));
         void write("refresh", undefined, undefined, { baselines });
       }}>
-        {state.baseline_items?.map(item => <fieldset key={item.item_key}><legend>{item.emp_no} {item.name} · 应发 {money(item.due_cents)} / 净已发 {money(item.paid_cents)} 元</legend>
-          {(["recharge", "refund"] as const).map(kind => <label key={kind}>{item.emp_no} {kind === "recharge" ? "待充值" : "待取款"}（元）<input type="number" required min="0" step="0.01" disabled={working}
-            value={baselineValues[item.item_key]?.[kind] ?? ""} onChange={e => setBaselineValues(values => ({ ...values, [item.item_key]: { ...values[item.item_key], [kind]: e.target.value } }))} /></label>)}
-        </fieldset>)}
-        <label>基线核实说明<textarea required maxLength={500} disabled={working} value={baselineReason} onChange={e => setBaselineReason(e.target.value)} /></label>
-        {error && <p role="alert">{error}</p>}
-        <button className="meal-ticket-button" disabled={busy || working || stale || !baselineReason.trim()}>核实并生成清单</button>
-        <button type="button" className="meal-ticket-button" disabled={working} onClick={() => setBaselineOpen(false)}>取消</button>
+        <div className="meal-followup-dialog-body">
+          <p className="meal-followup-notice">默认仅列已证实净差额，历史补扣不自动重发。分别办理时，请核实待充值、待取款两个方向的剩余金额，并填写依据。</p>
+          <div className="meal-followup-table-heading"><strong>人员剩余金额</strong><span>{state.baseline_items?.length ?? 0} 人 · 单位：元</span></div>
+          <div className="meal-followup-table-scroll" role="region" aria-label="基线人员金额" tabIndex={0}>
+            <table className="meal-followup-baseline-table">
+              <thead><tr><th scope="col">工号</th><th scope="col">姓名</th><th scope="col">应发</th><th scope="col">净已发</th><th scope="col">待充值</th><th scope="col">待取款</th></tr></thead>
+              <tbody>{state.baseline_items?.map(item => <tr key={item.item_key}>
+                <td>{item.emp_no}</td><th scope="row">{item.name}</th><td>{money(item.due_cents)}</td><td>{money(item.paid_cents)}</td>
+                {(["recharge", "refund"] as const).map(kind => <td key={kind}><input aria-label={`${item.emp_no} ${kind === "recharge" ? "待充值" : "待取款"}（元）`} type="number" required min="0" step="0.01" disabled={working}
+                  value={baselineValues[item.item_key]?.[kind] ?? ""} onChange={e => setBaselineValues(values => ({ ...values, [item.item_key]: { ...values[item.item_key], [kind]: e.target.value } }))} /></td>)}
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <label>基线核实说明<textarea required maxLength={500} placeholder="填写核对依据及剩余金额的确认情况" disabled={working} value={baselineReason} onChange={e => setBaselineReason(e.target.value)} /></label>
+          {error && <p className="meal-ticket-alert is-error" role="alert">{error}</p>}
+        </div>
+        <footer className="meal-followup-dialog-footer"><button type="button" className="meal-ticket-button" disabled={working} onClick={() => setBaselineOpen(false)}>取消</button><button className="meal-ticket-button is-primary" disabled={busy || working || stale || !baselineReason.trim()}>核实并生成清单</button></footer>
       </form>
     </section></div>}
-    {link && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="关联实际流水" className="meal-ticket-operation-dialog">
-      <h3>关联实际流水</h3><p>{link.emp_no} {link.name} · {direction(link)} · 剩余 {money(link.remaining_cents)} 元</p>
+    {link && <div className="meal-ticket-modal"><section role="dialog" aria-modal="true" aria-label="关联实际流水" className="meal-ticket-operation-dialog meal-followup-dialog" aria-busy={working}>
+      <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">实际流水核对</span><h2>关联实际流水</h2><p>{link.emp_no} {link.name} · {direction(link)} · 剩余 {money(link.remaining_cents)} 元</p></header>
       <form onSubmit={e => { e.preventDefault(); void write("allocation", link, undefined, { payment_key: paymentKey, amount_cents: Math.round(Number(linkAmount) * 100) }); }}>
+        <div className="meal-followup-dialog-body"><p className="meal-followup-notice">请核实流水的人员、方向及凭证。关联已有流水不会新建支付。</p>
         <label>实际流水<select required disabled={working} value={paymentKey} onChange={e => {
           setPaymentKey(e.target.value);
           const candidate = link.candidates?.payments.find(payment => payment.payment_key === e.target.value);
@@ -164,17 +196,17 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
         }}><option value="">请选择已核实流水</option>{link.candidates?.payments.map(payment => <option key={payment.payment_key} value={payment.payment_key}>{payment.date} · 可用 {money(payment.available_cents)} 元 · {payment.reference}</option>)}</select></label>
         <label>关联金额（元）<input required type="number" step="0.01" min="0.01" max={money(Math.min(link.remaining_cents, link.candidates?.payments.find(payment => payment.payment_key === paymentKey)?.available_cents ?? 0))}
           disabled={working} value={linkAmount} onChange={e => setLinkAmount(e.target.value)} /></label>
-        {error && <p role="alert">{error}</p>}
-        <button className="meal-ticket-button" disabled={busy || working || stale || !paymentKey || Number(linkAmount) <= 0}>确认关联</button>
-        <button type="button" className="meal-ticket-button" disabled={working} onClick={() => setLink(null)}>取消</button>
+        {error && <p className="meal-ticket-alert is-error" role="alert">{error}</p>}</div>
+        <footer className="meal-followup-dialog-footer"><button type="button" className="meal-ticket-button" disabled={working} onClick={() => setLink(null)}>取消</button><button className="meal-ticket-button is-primary" disabled={busy || working || stale || !paymentKey || Number(linkAmount) <= 0}>确认关联</button></footer>
       </form>
     </section></div>}
-    {!!verified.length && <details><summary>已核对 {verified.length} 项</summary><ul>{verified.map(task => <li key={task.key}>{task.emp_no} {task.name} · {direction(task)} {money(task.allocated_cents)} 元 · 已核对</li>)}</ul></details>}
-    {retry && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog" role="dialog" aria-modal="true" aria-label="确认重新办理">
-      <h3>确认重新办理</h3><p>流水可能延迟。请确认尚未到账后，仅重新办理剩余 {money(retry.remaining_cents)} 元；本操作不会冲正或删除真实流水。</p>
-      <label>重新办理原因<textarea required value={reason} maxLength={500} onChange={e => setReason(e.target.value)} /></label>
-      {error && <p role="alert">{error}</p>}
-      <div className="meal-ticket-actions"><button className="meal-ticket-button" disabled={busy || working || stale || !reason.trim()} onClick={() => void write("retry", retry, reason.trim())}>确认重新办理</button><button className="meal-ticket-button" disabled={working} onClick={() => setRetry(null)}>取消</button></div>
+    {!!verified.length && <details className="meal-followup-verified"><summary>已核对 {verified.length} 项</summary><ul>{verified.map(task => <li key={task.key}>{task.emp_no} {task.name} · {direction(task)} {money(task.allocated_cents)} 元 · 已核对</li>)}</ul></details>}
+    {retry && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog meal-followup-dialog" role="dialog" aria-modal="true" aria-label="确认重新办理" aria-busy={working}>
+      <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">重新办理</span><h2>确认重新办理</h2><p>{retry.emp_no} {retry.name} · {direction(retry)} · 剩余 {money(retry.remaining_cents)} 元</p></header>
+      <div className="meal-followup-dialog-body"><p className="meal-followup-notice">流水可能延迟。请确认尚未到账后，仅重新办理剩余 {money(retry.remaining_cents)} 元；本操作不会冲正或删除真实流水。</p>
+      <label>重新办理原因<textarea required disabled={working} value={reason} maxLength={500} onChange={e => setReason(e.target.value)} /></label>
+      {error && <p className="meal-ticket-alert is-error" role="alert">{error}</p>}</div>
+      <footer className="meal-followup-dialog-footer"><button className="meal-ticket-button" disabled={working} onClick={() => setRetry(null)}>取消</button><button className="meal-ticket-button is-primary" disabled={busy || working || stale || !reason.trim()} onClick={() => void write("retry", retry, reason.trim())}>确认重新办理</button></footer>
     </section></div>}
   </section>;
 }

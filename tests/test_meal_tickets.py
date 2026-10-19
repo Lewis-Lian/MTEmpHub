@@ -153,29 +153,53 @@ class MealTicketTests(unittest.TestCase):
         with patch('services.meal_ticket_service.build_manager_rows', return_value=[{'emp_id':self.emp_id, 'punch_days':22}]):
             self.assertEqual(self.generate()['items'][0]['base_amount'], 176)
 
-    def test_enabled_deduction_recalculates_paid_batch_once_and_preserves_payments(self):
+    def test_confirmed_deduction_rule_survives_global_toggle_and_recalculates_only_new_anomalies(self):
+        from models.daily_record import DailyRecord
+        self.add_punch_records()
+        self.set_deduction(True)
+        batch = self.confirm(self.generate())
+        batch = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'160', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'已充值', 'request_key':'abnormal-paid'}).get_json()
+        payments = batch['items'][0]['payments']
+        self.set_deduction(False)
+        preview = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(preview['total_amount'], 0)
+        with self.app.app_context():
+            record = DailyRecord.query.filter_by(emp_id=self.emp_id, record_date=date(2026,8,3)).one()
+            record.raw_data = {'刷卡时间数据':'08:00'}
+            db.session.commit()
+        preview = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(preview['rows'][0]['amount'], -8)
+        batch = self.post('/attendance-recalculation', {'batch_id':batch['id'], 'version':batch['version'],
+            'source_digest':preview['source_digest']}).get_json()
+        self.assertEqual(batch['items'][0]['due_amount'], 152)
+        self.assertEqual(batch['items'][0]['payments'], payments)
+        again = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(again['total_amount'], 0)
+
+    def test_settled_manual_deduction_is_not_reapplied_when_global_rule_is_enabled(self):
         self.add_punch_records()
         batch = self.confirm(self.generate())
-        response = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
-            'item_id':batch['items'][0]['id'], 'amount':'176', 'kind':'recharge',
-            'date':'2026-09-05', 'reference':'已充值', 'request_key':'abnormal-paid'})
-        self.assertEqual(response.status_code, 200)
-        batch = response.get_json()
-        self.assertFalse(batch['source_changed'])
+        batch = self.post('/adjustments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'-16', 'reason':'异常刷卡'}).get_json()
+        batch = self.post('/payments', {'batch_id':batch['id'], 'version':batch['version'],
+            'item_id':batch['items'][0]['id'], 'amount':'160', 'kind':'recharge',
+            'date':'2026-09-05', 'reference':'已发放并扣除异常', 'request_key':'manual-deduction-paid'}).get_json()
         self.set_deduction(True)
-        changed = self.client.get('/api/meal-tickets?recharge_month=2026-09', headers=self.headers).get_json()
-        self.assertTrue(changed['source_changed'])
-        self.assertEqual(changed['items'][0]['due_amount'], 176)
         preview = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
-        self.assertEqual(preview['rows'][0]['amount'], -16)
-        result = self.post('/attendance-recalculation', {'batch_id':batch['id'], 'version':batch['version'], 'source_digest':preview['source_digest']})
-        self.assertEqual(result.status_code, 200, result.get_json())
-        batch = result.get_json()
-        item = batch['items'][0]
-        self.assertEqual((item['base_amount'], item['due_amount'], item['paid_amount'], item['difference']), (176, 160, 176, -16))
-        self.assertEqual(len(item['payments']), 1)
-        again = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
-        self.assertEqual(again['rows'][0]['amount'], 0)
+        self.assertEqual(preview['total_amount'], 0)
+        self.assertEqual(preview['issues'], [])
+        with self.app.app_context():
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 23
+            db.session.commit()
+        preview = self.post('/attendance-recalculation/preview', {'batch_id':batch['id'], 'version':batch['version']}).get_json()
+        self.assertEqual(preview['rows'][0]['amount'], 8)
+        updated = self.post('/attendance-recalculation', {'batch_id':batch['id'], 'version':batch['version'],
+            'source_digest':preview['source_digest']}).get_json()
+        self.assertEqual(updated['items'][0]['due_amount'], 168)
+        self.assertEqual(updated['items'][0]['adjustments'][0]['amount'], -16)
+        self.assertEqual(updated['items'][0]['payments'], batch['items'][0]['payments'])
 
     def adjustment_workbook(self, rows, headers=None):
         book = Workbook()

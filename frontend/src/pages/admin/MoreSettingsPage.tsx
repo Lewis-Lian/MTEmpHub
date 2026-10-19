@@ -46,7 +46,7 @@ export default function MoreSettingsPage() {
         <div>
           <h3 id="meal-deduction-title" className="settings-card-title">异常考勤天数扣除</h3>
           <p className="settings-card-desc">开启后，普通员工每天打卡 1 次或 3 次，每个异常考勤日扣除 8 元菜票。管理人员，以及人员管理中勾选“是否按管理人员计算菜票”的员工免扣。</p>
-          <p className="settings-card-desc">默认关闭。修改后，草稿需重新核算；已确认或已充值月份需在“后续补扣与对账”中重算并确认差额，实际充值记录保留。</p>
+          <p className="settings-card-desc">默认关闭。修改后，草稿需重新核算；已确认或已充值月份沿用原核算规则，考勤重算只登记增量，已有补扣和实际充值记录保留。</p>
         </div>
         <div className="settings-source-switch-row">
           <button type="button" role="switch" aria-label="异常考勤天数扣除"

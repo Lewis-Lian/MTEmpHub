@@ -370,7 +370,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     (!departmentNames.length || departmentNames.includes(i.dept_name)) && (!type || i.is_manager === (type === "manager")) &&
     (!paymentStatus || (paymentStatus === "issue" ? hasIssue(i) : paymentStatus === "excluded" ? i.excluded && i.due_amount === 0
       : paymentStatus === "refund" ? i.difference < 0 : paymentStatus === "settled" ? i.difference === 0 && !(i.excluded && i.due_amount === 0) : i.difference > 0)));
-  const total = (field: "due_amount" | "paid_amount" | "difference") => rows.reduce((sum, i) => sum + i[field], 0);
+  const total = (field: "due_amount" | "paid_amount" | "difference") => (batch?.items ?? []).reduce((sum, i) => sum + i[field], 0);
   const departmentRows = new Map<string, MealDepartment>();
   for (const item of rows) {
     const summary = departmentRows.get(item.dept_name) ?? { dept_name: item.dept_name, count: 0,
@@ -536,7 +536,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       <h2>登记补扣</h2><p>单人或批量只登记调整，表格导入按工号匹配；实际办理在下方当前任务卡片完成。</p>
       <button className={`meal-ticket-button${batch.source_changed ? " is-primary" : ""}`} disabled={busy} onClick={previewAttendance}>重算考勤数据</button>
     </section>}
-    {paymentView && admin && confirmed && batch && <MealFollowupQueue key={`${month}:${batch.id}`} month={month} batchVersion={batch.version}
+    {paymentView && admin && confirmed && batch && <MealFollowupQueue key={`followup:${month}:${batch.id}`} month={month} batchVersion={batch.version}
       refreshRevision={queueRevision} busy={busy} onStateChange={setFollowupState}
       onRegister={!databaseEnabled ? task => {
         const item = batch.items.find(item => item.emp_no === task.emp_no);
@@ -548,7 +548,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           if (id === generation.current) setBatch(current => current && next && current.id === next.id && current.version > next.version ? current : next);
         }).catch(e => { if (id === generation.current) setError(e instanceof Error ? e.message : "账目刷新失败"); });
       }} />}
-    {paymentView && admin && confirmed && batch && <MealAdjustmentImport key={`${month}:${batch.id}`} batch={batch} busy={busy}
+    {paymentView && admin && confirmed && batch && <MealAdjustmentImport key={`adjustment-import:${month}:${batch.id}`} batch={batch} busy={busy}
       onBusyChange={setBusy} onImported={next => { setBatch(next); setQueueRevision(value => value + 1); }} />}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
     {busy && !target && !bulk && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
@@ -684,10 +684,10 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     </section></div>}
     {attendancePreview && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog" role="dialog" aria-modal="true" aria-busy={busy} aria-label="考勤重算差额">
       <h2>考勤重算差额 · {batch?.month}</h2>
-      <p>按最新考勤与上次核算考勤的差值登记补扣。原基础金额、手工补扣和实际充值流水保留，本月不发选择保留。</p>
+      <p>按该月原核算规则计算新旧考勤的差额。原基础金额、手工补扣和实际充值流水保留，本月不发选择保留。</p>
       <QueryTable headers={["工号", "姓名", "上次打卡天数", "最新打卡天数", "本次补发 / 扣除（元）"]}
         rows={attendancePreview.rows.map(row => [row.emp_no, row.name, row.previous_days, row.days, row.excluded ? "本月不发 · 0.00" : money(row.amount)])} />
-      <p>本次合计调整 {money(attendancePreview.total_amount)} 元；正数补发，负数扣除。确认后仍需完成实际补发或扣回并核对结清。</p>
+      <p>本次合计调整 {money(attendancePreview.total_amount)} 元；{attendancePreview.rows.some(row => row.amount !== 0) ? "正数补发，负数扣除。确认后仍需完成实际补发或扣回并核对结清。" : "本次没有金额变化，无需重复补发或扣回。"}</p>
       {attendancePreview.issues.length > 0 && <div className="meal-ticket-alert is-error"><p>以下人员需核对，暂不能登记本次重算：</p><ul>{attendancePreview.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></div>}
       {!!attendancePreview.new_people?.length && <>
         <h3>新增人员核对</h3>
