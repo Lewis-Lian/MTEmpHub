@@ -5,13 +5,14 @@ import MealTicketQueryPage from "./query/MealTicketQueryPage";
 import MealLedgerPage from "./MealLedgerPage";
 import MealDownloadPage from "./MealDownloadPage";
 
+const departmentRows = [{id:1,dept_no:"D01",dept_name:"接待部",parent_id:null}, {id:2,dept_no:"D02",dept_name:"工程部",parent_id:null}];
 const request = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) => p }));
 
 describe("菜票查询与台账页面", () => {
   beforeEach(() => request.mockReset());
   it("台账月份面板切换业务月份后重新读取记录并清空处理日期", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
     render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
     await screen.findByRole("button", {name:"保存记录"});
     fireEvent.change(screen.getByLabelText("处理日期"), {target:{value:"2026-08-20"}});
@@ -23,7 +24,7 @@ describe("菜票查询与台账页面", () => {
     expect(request).toHaveBeenCalledWith(`/api/meal-ledgers/external?month=${new Date().getFullYear()}-07`);
   });
   it("月份未更改时离开月份输入框保留处理日期", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
     render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
     await screen.findByRole("button", {name:"保存记录"});
     fireEvent.change(screen.getByLabelText("处理日期"), {target:{value:"2026-10-08"}});
@@ -47,6 +48,7 @@ describe("菜票查询与台账页面", () => {
     let rows: object[] = [];
     request.mockImplementation((path: string, options?: { body?: object; method?: string }) => {
       if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([]);
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
       if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
       if (options?.method === "POST") {
         const record = { id: 1, ...options.body, amount: 20, voided: false };
@@ -90,6 +92,7 @@ describe("菜票查询与台账页面", () => {
     let rows: object[] = [];
     request.mockImplementation((path: string, options?: { body?: Record<string, unknown>; method?: string }) => {
       if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([]);
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
       if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
       if (path === "/api/meal-ledgers/external" && options?.method === "POST") {
         const record = {id:1,...options.body,amount:200,voided:false};
@@ -109,12 +112,12 @@ describe("菜票查询与台账页面", () => {
     fireEvent.click(screen.getByRole("button",{name:"保存记录"}));
     await screen.findByText("记录已保存");
     expect(screen.getByText("访客甲")).toBeInTheDocument();
-    expect(screen.getByText("接待部")).toBeInTheDocument();
+    expect(screen.getByRole("cell", {name:"接待部"})).toBeInTheDocument();
     expect(screen.getAllByText(category === "card" ? "充卡" : "纸质").length).toBeGreaterThan(2);
   });
 
   it("精简领用列表仍可按领用人和类别排序", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : [
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : [
       {id:1,date:"2026-10-19",name:"Beta",dept_name:"接待部",category:"paper",amount:20,voided:false},
       {id:2,date:"2026-10-18",name:"Alpha",dept_name:"接待部",category:"card",amount:10,voided:false}
     ]));
@@ -129,7 +132,7 @@ describe("菜票查询与台账页面", () => {
   });
 
   it("外来领用默认当天并在连续登记时保留日期、部门和类别", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
     render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
     await screen.findByRole("button", {name:"保存记录"});
     const now = new Date();
@@ -150,7 +153,7 @@ describe("菜票查询与台账页面", () => {
   });
 
   it("只读账号可通过详情查看收起的历史字段及作废原因", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : [{
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : [{
       id:1,date:"2026-10-08",name:"访客甲",unit:"合作公司",dept_name:"接待部",category:"paper",amount:200,
       emp_no:"G001",card_no:"C001",period:"10月上旬",days:"3",registrar:"经办甲",operator:"admin",
       remark:"会议接待",voided:true,void_reason:"重复登记",guest_card_key:"guest-1",actual_amount:200,recharge_status:"complete",
@@ -159,9 +162,18 @@ describe("菜票查询与台账页面", () => {
     render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
     fireEvent.click(await screen.findByRole("button", {name:"详情"}));
     const detail = within(screen.getByRole("dialog", {name:"领用记录详情"}));
+    const body = screen.getByRole("region", {name:"领用记录内容"});
+    expect(body).toHaveFocus();
+    const close = detail.getByRole("button", {name:"关闭"});
+    close.focus();
+    fireEvent.keyDown(close, {key:"Tab"});
+    expect(body).toHaveFocus();
+    fireEvent.keyDown(body, {key:"Tab", shiftKey:true});
+    expect(close).toHaveFocus();
     for (const text of ["G001","C001","合作公司","10月上旬","3","经办甲","admin","会议接待","重复登记"])
       expect(detail.getByText(text)).toBeInTheDocument();
     expect(detail.getByText("card-meal:example:recharge:17")).toBeInTheDocument();
+    expect(request).not.toHaveBeenCalledWith("/api/admin/departments");
     expect(screen.queryByRole("button", {name:"保存记录"})).not.toBeInTheDocument();
     expect(screen.queryByRole("button", {name:"作废"})).not.toBeInTheDocument();
     fireEvent.click(detail.getByRole("button", {name:"关闭"}));
@@ -171,6 +183,7 @@ describe("菜票查询与台账页面", () => {
   it("选择固定客人卡保存访客领用，待到账金额不提前计入发放统计", async () => {
     let rows: object[] = [];
     request.mockImplementation((path: string, options?: {method?:string;body?:Record<string,unknown>}) => {
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
       if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
       if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([{key:"guest-1",name:"客人卡01",card_no:"0009001",emp_no:"G001",is_active:true}]);
       if (path === "/api/meal-ledgers/external" && options?.method === "POST") {
@@ -194,8 +207,71 @@ describe("菜票查询与台账页面", () => {
     expect(within(screen.getByRole("region", {name:"记录概览统计"})).getAllByText("¥0.00")).toHaveLength(3);
   });
 
+  it.each([
+    ["2026-10-19", "2026-10-19", "1"],
+    ["2026-02-28", "2026-03-01", "2"],
+    ["2028-02-28", "2028-03-01", "3"],
+    ["2026-12-31", "2027-01-02", "3"],
+  ])("服务日期 %s 至 %s 自动带出包含首尾的天数", async (start, end, days) => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"} : path === "/api/admin/departments" ? departmentRows : []));
+    render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+    await screen.findByRole("button", {name:"保存记录"});
+    fireEvent.click(screen.getByText("补充信息"));
+    fireEvent.change(screen.getByLabelText("服务开始日期"), {target:{value:start}});
+    fireEvent.change(screen.getByLabelText("服务结束日期"), {target:{value:end}});
+    expect(screen.getByLabelText("天数")).toHaveValue(days);
+    fireEvent.change(screen.getByLabelText("服务结束日期"), {target:{value:""}});
+    expect(screen.getByLabelText("天数")).toHaveValue("");
+  });
+
+  it("服务结束早于开始时清空天数并阻止保存", async () => {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"} : path === "/api/admin/departments" ? departmentRows : []));
+    render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+    await screen.findByRole("button", {name:"保存记录"});
+    fireEvent.click(screen.getByText("补充信息"));
+    fireEvent.change(screen.getByLabelText("服务开始日期"), {target:{value:"2026-10-20"}});
+    fireEvent.change(screen.getByLabelText("服务结束日期"), {target:{value:"2026-10-19"}});
+    expect(screen.getByLabelText("天数")).toHaveValue("");
+    expect(screen.getByRole("button", {name:"保存记录"})).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("结束日期不能早于开始日期");
+  });
+
+  it("选择承担部门并保存外来单位、日期范围及手调天数，详情保留原值", async () => {
+    let rows: object[] = [];
+    request.mockImplementation((path: string, options?: {method?:string;body?:object}) => {
+      if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
+      if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([]);
+      if (options?.method === "POST") {
+        const record = {id:1,...options.body,amount:100,voided:false};
+        rows = [record]; return Promise.resolve(record);
+      }
+      return Promise.resolve(rows);
+    });
+    render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+    await screen.findByRole("button", {name:"保存记录"});
+    const department = screen.getByLabelText("承担费用的部门");
+    fireEvent.focus(department);
+    fireEvent.change(department, {target:{value:"工程"}});
+    fireEvent.click(screen.getByRole("button", {name:"工程部"}));
+    expect(department).toHaveValue("工程部");
+    fireEvent.change(screen.getByLabelText("姓名"), {target:{value:"来访甲"}});
+    fireEvent.change(screen.getByLabelText("发放金额"), {target:{value:"100"}});
+    fireEvent.click(screen.getByText("补充信息"));
+    fireEvent.change(screen.getByLabelText("外来单位（部门）"), {target:{value:"合作公司"}});
+    fireEvent.change(screen.getByLabelText("服务开始日期"), {target:{value:"2026-10-19"}});
+    fireEvent.change(screen.getByLabelText("服务结束日期"), {target:{value:"2026-10-20"}});
+    fireEvent.change(screen.getByLabelText("天数"), {target:{value:"1.5"}});
+    fireEvent.click(screen.getByRole("button", {name:"保存记录"}));
+    await screen.findByRole("button", {name:"详情"});
+    fireEvent.click(screen.getByRole("button", {name:"详情"}));
+    const detail = within(screen.getByRole("dialog", {name:"领用记录详情"}));
+    for (const text of ["合作公司", "工程部", "2026-10-19 至 2026-10-20", "1.5"])
+      expect(detail.getByText(text)).toBeInTheDocument();
+  });
+
   it("管理员查看部门汇总时没有手工登记和历史导入入口，保留已有历史数据", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : {
       month:"2026-09",status:"confirmed",items:[{dept_name:"接待部",count:1,due_amount:1000,paid_amount:1000,
         external_card_amount:200,external_paper_amount:100,total_paid_amount:1300,
         registrar:"历史经办人",remark:"历史说明",historical_amount:1300}]
@@ -213,7 +289,7 @@ describe("菜票查询与台账页面", () => {
   });
 
   it("部门统计展示员工及两类客人金额，合计包含纸质菜票", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : {
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"readonly"} : {
       month:"2026-09",status:"confirmed",items:[{dept_name:"接待部",count:1,due_amount:1000,paid_amount:1000,
         external_card_amount:200,external_paper_amount:100,total_paid_amount:1300,
         registrar:"",remark:"",historical_amount:null}]
@@ -232,6 +308,7 @@ describe("菜票查询与台账页面", () => {
   it.each(["external", "annual", "clearance"] as const)("%s 页面没有历史导入入口，保留业务登记", async kind => {
     request.mockImplementation((path: string) => {
       if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([]);
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
       if (path === "/api/auth/me") return Promise.resolve({role:"admin"});
       return Promise.resolve(kind === "annual" ? {
         year:2026,months:[],consumption_months:0,
@@ -249,7 +326,7 @@ describe("菜票查询与台账页面", () => {
   });
 
   it("台账只读账号可以查记录但没有登记、导入或作废按钮", async () => {
-    request.mockImplementation((path: string) => Promise.resolve(path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? { role: "readonly" } : [
+    request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? { role: "readonly" } : [
       { id: 1, date: "2026-09-30", emp_no: "001", name: "员工甲", dept_name: "生产部", amount: 20, voided: false },
     ]));
     render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
@@ -263,6 +340,7 @@ describe("菜票查询与台账页面", () => {
     let record = { id: 1, date: "2026-09-30", emp_no: "001", name: "员工甲", dept_name: "生产部", amount: 20, voided: false, void_reason: "" };
     request.mockImplementation((path: string, options?: { body?: { reason?: string } }) => {
       if (path === "/api/meal-ledgers/guest-cards") return Promise.resolve([]);
+      if (path === "/api/admin/departments") return Promise.resolve(departmentRows);
       if (path === "/api/auth/me") return Promise.resolve({ role: "admin" });
       if (path === "/api/meal-ledgers/records/1/void") {
         record = { ...record, voided: true, void_reason: options?.body?.reason ?? "" };

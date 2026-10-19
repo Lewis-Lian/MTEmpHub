@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import type { AdminDepartment } from "../../types/admin";
+import "../../styles/components/employee-picker.css";
 
 
 interface DepartmentPickerProps {
@@ -9,6 +10,7 @@ interface DepartmentPickerProps {
   value: string;
   onChange: (value: string) => void;
   valueMode?: "id" | "name";
+  required?: boolean;
   placeholder?: string;
   title?: string;
   pickerTitle?: string;
@@ -35,6 +37,7 @@ export default function DepartmentPicker({
   value,
   onChange,
   valueMode = "id",
+  required = false,
   placeholder = "选择部门",
   title = "选择部门",
   pickerTitle = "选择部门",
@@ -243,6 +246,7 @@ export default function DepartmentPicker({
         <div className="input-group input-group-sm">
           <input
             autoComplete="off"
+            required={required}
             className="form-control"
             id={inputId}
             onBlur={closeQuickList}

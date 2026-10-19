@@ -73,8 +73,9 @@ def check_recharge(identifier, body, operator):
         end_exclusive = end + timedelta(days=1)
     except (TypeError,ValueError,OverflowError):
         raise MealError('核对结束日期无效')
-    if end < record.record_date:
-        raise MealError('结束日期不能早于领用日期')
+    start = date.fromisoformat(record.month + '-01')
+    if end < start:
+        raise MealError('结束日期不能早于业务月份月初')
     selected = body.get('source_keys',[])
     if not isinstance(selected,list) or any(not isinstance(key,str) for key in selected) or len(set(selected)) != len(selected):
         raise MealError('充值流水选择无效')
@@ -84,7 +85,7 @@ def check_recharge(identifier, body, operator):
     database_id = digest({'host':config['host'].casefold(), 'port':config.get('port') or 1433,
                           'database':config['database']})[:24]
     try:
-        remote = CardDBClient(config).meal_records(record.record_date,end_exclusive)
+        remote = CardDBClient(config).meal_records(start,end_exclusive)
     except CardDBClientError:
         raise MealError('数据库读取失败，充值状态未更新，请检查连接后重试',502) from None
     candidates = {}
@@ -95,7 +96,7 @@ def check_recharge(identifier, body, operator):
         if type(row.get('id')) is not int or not isinstance(time,datetime):
             raise MealError('充值流水字段异常',409)
         amount = cents(row.get('amount'))
-        if amount < 0 or not record.record_date <= time.date() <= end:
+        if amount < 0 or not start <= time.date() <= end:
             raise MealError('充值流水日期或金额异常',409)
         if not amount:
             continue

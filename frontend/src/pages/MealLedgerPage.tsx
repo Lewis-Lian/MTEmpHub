@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { fetchAdminDepartments } from "../api/admin";
+import type { AdminDepartment } from "../types/admin";
+import DepartmentPicker from "../components/query/DepartmentPicker";
 import { apiRequest } from "../api/client";
 import { businessMonth, fetchAnnual, fetchLedger, fetchGuestCards, money, saveLedger, voidLedger,
   type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord, type GuestCard } from "../api/mealLedgers";
@@ -9,6 +12,7 @@ import LoadingState from "../components/feedback/LoadingState";
 import { LedgerBookIcon, AlertTriangleIcon } from "../components/icons";
 import "./meal-ticket.css";
 import "./meal-ledger.css";
+import "./meal-external.css";
 
 type View = "department" | "external" | "clearance" | "annual";
 
@@ -43,6 +47,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const recordKind: LedgerKind = kind === "annual" ? "consumption" : kind;
   const [month, setMonth] = useState(businessMonth);
   const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [departments, setDepartments] = useState<AdminDepartment[]>([]);
+  const [serviceRange, setServiceRange] = useState({start:"", end:""});
   const [cards, setCards] = useState<GuestCard[]>([]);
   const [rechargeTarget, setRechargeTarget] = useState<LedgerRecord | null>(null);
   const [records, setRecords] = useState<LedgerRecord[]>([]);
@@ -67,8 +73,10 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     let cancelled = false;
     setLoading(true); setError(""); setDepartment(null); setAnnual(null); setRecords([]);
     const data = kind === "annual" ? fetchAnnual(year) : kind === "department" ? fetchLedger<DepartmentLedger>(kind, month) : fetchLedger<LedgerRecord[]>(kind, month);
-    Promise.all([apiRequest<{ role: string }>("/api/auth/me"), data, kind === "external" ? fetchGuestCards() : Promise.resolve([])]).then(([user, result, guestCards]) => {
+    Promise.all([apiRequest<{ role: string }>("/api/auth/me"), data, kind === "external" ? fetchGuestCards() : Promise.resolve([])]).then(async ([user, result, guestCards]) => {
+      const availableDepartments = kind === "external" && user.role === "admin" ? await fetchAdminDepartments() : [];
       if (cancelled) return;
+      setDepartments(availableDepartments);
       setCards(guestCards);
       setAdmin(user.role === "admin");
       if (kind === "annual") setAnnual(result as AnnualLedger);
@@ -80,6 +88,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   }, [kind, month, year, refresh]);
 
   useEffect(() => {
+    setServiceRange({start:"", end:""});
     setForm({ ...initialForm(), date: kind === "external" ? externalDate(month) : "" });
     setMessage("");
   }, [kind]);
@@ -90,20 +99,22 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     if (!detailTarget) return;
     const previous = document.activeElement as HTMLElement | null;
     const dialog = detailDialog.current;
-    dialog?.querySelector("button")?.focus();
+    dialog?.querySelector<HTMLElement>("[tabindex='0']")?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setDetailTarget(null);
       if (event.key === "Tab") {
-        event.preventDefault();
-        dialog?.querySelector("button")?.focus();
+        const controls = Array.from(dialog?.querySelectorAll<HTMLElement>("[tabindex='0'], button") ?? []);
+        const target = event.shiftKey && document.activeElement === controls[0] ? controls[controls.length - 1]
+          : !event.shiftKey && document.activeElement === controls[controls.length - 1] ? controls[0] : null;
+        if (target) { event.preventDefault(); target.focus(); }
       }
     };
     dialog?.addEventListener("keydown", onKey);
     return () => { dialog?.removeEventListener("keydown", onKey); previous?.focus(); };
   }, [detailTarget]);
 
-  const field = (key: keyof ReturnType<typeof initialForm>, label: string, type = "text") => (
-    <label>
+  const field = (key: keyof ReturnType<typeof initialForm>, label: string, type = "text", className?: string) => (
+    <label className={className}>
       {label}
       <input
         type={type}
@@ -116,6 +127,16 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     </label>
   );
 
+  const incompleteServiceRange = Boolean((serviceRange.start || serviceRange.end)
+    && (!serviceRange.start || !serviceRange.end || serviceRange.end < serviceRange.start));
+
+  function changeServiceRange(start: string, end: string) {
+    setServiceRange({start, end});
+    const valid = start && end && end >= start;
+    const days = valid ? String(Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${start}T00:00:00Z`)) / 86400000) + 1) : "";
+    setForm(f => ({...f, period:valid ? `${start} 至 ${end}` : "", days}));
+  }
+
   async function operate(task: () => Promise<void>) {
     setBusy(true); setError(""); setMessage("");
     try { await task(); } catch (e) { setError(e instanceof Error ? e.message : "操作失败"); }
@@ -123,12 +144,17 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   }
 
   async function save() {
+    if (kind === "external" && (!form.dept_name || incompleteServiceRange)) {
+      setError(!form.dept_name ? "请选择承担费用的部门" : "请选择有效、完整的服务起止日期");
+      return;
+    }
     await operate(async () => {
       const body = { ...form, month, date: form.date || (kind === "annual" || kind === "department" ? `${month}-01` : "") };
       const signature = JSON.stringify(body);
       if (request.current.signature !== signature) request.current = { signature, key: crypto.randomUUID() };
       await saveLedger(recordKind, { ...body, request_key: request.current.key });
       request.current = { signature: "", key: "" };
+      setServiceRange({start:"", end:""});
       setForm(kind === "external" ? { ...initialForm(), date: form.date, dept_name: form.dept_name, category: form.category, guest_card_key: form.guest_card_key, card_no: form.card_no, emp_no: form.emp_no } : initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
     });
   }
@@ -140,7 +166,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const validTotalAmount = validRecords.reduce((sum, r) => sum + (kind === "external" ? actualAmount(r) : r.amount), 0);
 
   return (
-    <section className="meal-ticket-page meal-ledger-page">
+    <section className={`meal-ticket-page meal-ledger-page${kind === "external" ? " is-external" : ""}`}>
       <header className="meal-ticket-heading meal-ticket-header-combined meal-ticket-panel">
         <div className="meal-ticket-header-title-group">
           <h1>{titles[kind]}</h1>
@@ -219,8 +245,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           {kind === "external" && (
             <>
               <section className="meal-ticket-panel meal-ledger-external-summary" aria-label="记录概览统计">
-                <span>当前筛选 · 有效 {validRecords.length} 条</span>
-                <span>发放合计 <strong>¥{money(validTotalAmount)}</strong></span>
+                <span className="meal-external-count">当前筛选 · 有效 {validRecords.length} 条</span>
+                <span className="meal-external-total">发放合计 <strong>¥{money(validTotalAmount)}</strong></span>
                 <span>充卡 <b>¥{money(validRecords.filter(r => r.category === "card").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
                 <span>纸质 <b>¥{money(validRecords.filter(r => r.category === "paper").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
                 {voidedRecords.length > 0 && <span>已作废 {voidedRecords.length} 条</span>}
@@ -230,20 +256,27 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               </div>}
               {admin && <div className="meal-ticket-panel meal-ledger-form-card meal-ledger-quick-entry">
                 <div className="meal-ledger-card-header"><div>
-                  <h2><LedgerBookIcon />快速登记</h2>
+                  <h2><span className="meal-external-section-icon"><LedgerBookIcon /></span>快速登记</h2>
                   <p>填写本次领用，保存后可继续登记下一笔。</p>
                 </div></div>
                 <form onSubmit={e => { e.preventDefault(); void save(); }}>
                   <fieldset disabled={busy} className="meal-ledger-quick-fields">
-                    <div className="meal-ledger-grid meal-ledger-quick-grid">
-                      {field("date", "处理日期", "date")}
+                    <div className="meal-ledger-grid meal-ledger-quick-grid meal-external-form-grid">
                       {field("name", "姓名")}
-                      {field("dept_name", "承担费用的部门")}
-                      <label>类别<select value={form.category} onChange={e => setForm(f => ({...f, category:e.target.value, guest_card_key:"", card_no:"", emp_no:""}))}>
+                      {field("unit", "外来单位（部门）")}
+                      <div className="meal-ledger-department-field">
+                        <label htmlFor="meal-ledger-cost-department">承担费用的部门</label>
+                        <DepartmentPicker departments={departments} value={form.dept_name} valueMode="name" required
+                          inputId="meal-ledger-cost-department" placeholder="搜索或选择部门" title="选择承担费用的部门"
+                          pickerTitle="选择承担费用的部门" modalClassName="department-picker-modal meal-external-department-modal" rootOptionLabel="未选择部门" quickEmptyValueLabel="未选择部门" selectedEmptyLabel="未选择部门"
+                          onChange={dept_name => setForm(f => ({...f, dept_name}))} />
+                      </div>
+                      {field("date", "处理日期", "date")}
+                      <label className="meal-external-field-narrow">类别<select value={form.category} onChange={e => setForm(f => ({...f, category:e.target.value, guest_card_key:"", card_no:"", emp_no:""}))}>
                         <option value="card">充卡</option><option value="paper">纸质</option>
                       </select></label>
-                      {field("amount", form.guest_card_key ? "应充值金额" : "发放金额", "number")}
-                      {form.category === "card" && <label className="meal-ledger-grid-full">客人卡
+                      {field("amount", form.guest_card_key ? "应充值金额" : "发放金额", "number", "meal-external-field-narrow")}
+                      {form.category === "card" && <label>客人卡
                         <select value={form.guest_card_key} onChange={e => {
                           const card = cards.find(card => card.key === e.target.value);
                           setForm(f => ({...f, guest_card_key:card?.key || "", card_no:card?.card_no || "", emp_no:card?.emp_no || ""}));
@@ -251,19 +284,33 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                           {cards.filter(card => card.is_active).map(card => <option key={card.key} value={card.key}>{card.name} · {card.card_no} · {card.emp_no}</option>)}
                         </select>
                       </label>}
+                      <div className="meal-ledger-service-period">
+                        <span>服务期间</span>
+                        <div className="meal-ledger-period-inputs">
+                          <label>开始日期<input aria-label="服务开始日期" type="date" value={serviceRange.start}
+                            max={serviceRange.end || undefined} required={!!serviceRange.end}
+                            onChange={e => changeServiceRange(e.target.value, serviceRange.end)} /></label>
+                          <span aria-hidden="true">至</span>
+                          <label>结束日期<input aria-label="服务结束日期" type="date" value={serviceRange.end}
+                            min={serviceRange.start || undefined} required={!!serviceRange.start}
+                            onChange={e => changeServiceRange(serviceRange.start, e.target.value)} /></label>
+                        </div>
+                        <small>包含首尾日期，天数可手动调整。</small>
+                        {serviceRange.start && serviceRange.end && serviceRange.end < serviceRange.start && <small role="alert">结束日期不能早于开始日期</small>}
+                      </div>
+                      {field("days", "天数", "text", "meal-external-days-field")}
                     </div>
                     <details className="meal-ledger-extra-fields">
-                      <summary>补充信息 <span>卡号、单位、服务期间、备注等（选填）</span></summary>
+                      <summary><span>补充信息</span><small>卡号、人员编号、填表人、备注（选填）</small></summary>
                       <div className="meal-ledger-grid">
-                        {field("card_no", "卡号")}{field("emp_no", "人员编号")}{field("unit", "外来单位/人员")}
-                        {field("period", "服务期间")}{field("days", "天数")}{field("registrar", "填表人")}
+                        {field("card_no", "卡号")}{field("emp_no", "人员编号")}{field("registrar", "填表人")}
                         <div className="meal-ledger-grid-full">{field("remark", "备注")}</div>
                       </div>
                     </details>
                   </fieldset>
                   <div className="meal-ledger-form-footer">
                     <p>金额单位：元；纸质菜票填写票面总额。</p>
-                    <button className="meal-ticket-button is-primary" disabled={busy}>保存记录</button>
+                    <button className="meal-ticket-button is-primary" disabled={busy || incompleteServiceRange}>保存记录</button>
                   </div>
                 </form>
               </div>}
@@ -375,13 +422,13 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                     </div>,
                     r.dept_name,
                     <span className={`meal-ledger-status-tag ${r.category === "card" ? "is-info" : "is-draft"}`}>{r.category === "card" ? "充卡" : "纸质"}</span>,
-                    <div className="meal-ledger-recipient"><strong>{money(r.amount)}</strong>
-                      {r.guest_card_key && <><small>已到账 {money(actualAmount(r))}</small><small>{rechargeLabel[r.recharge_status ?? "pending"]}</small></>}
+                    <div className="meal-ledger-recipient meal-external-amount"><strong>{money(r.amount)}</strong>
+                      {r.guest_card_key && <><small>已到账 {money(actualAmount(r))}</small><span className={`meal-external-state is-${r.recharge_status ?? "pending"}`}>{rechargeLabel[r.recharge_status ?? "pending"]}</span></>}
                     </div>,
                     <div className="meal-ledger-row-actions">
-                      <button className="meal-ticket-button" onClick={() => setDetailTarget(r)}>详情</button>
-                      {admin && r.guest_card_key && !r.voided && <button className="meal-ticket-button" disabled={busy} onClick={() => setRechargeTarget(r)}>核对充值</button>}
-                      {admin && !r.voided && <button className="meal-ticket-button" disabled={busy} onClick={() => { setVoidTarget(r); setVoidReason(""); }}>作废</button>}
+                      <button className="meal-ticket-button meal-external-text-button" onClick={() => setDetailTarget(r)}>详情</button>
+                      {admin && r.guest_card_key && !r.voided && <button className="meal-ticket-button meal-external-check-button" disabled={busy} onClick={() => setRechargeTarget(r)}>核对充值</button>}
+                      {admin && !r.voided && <button className="meal-ticket-button meal-external-text-button is-danger-text" disabled={busy} onClick={() => { setVoidTarget(r); setVoidReason(""); }}>作废</button>}
                     </div>
                   ])}
                 /> : <QueryTable
@@ -462,11 +509,12 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       )}
 
       {detailTarget && <div className="meal-ticket-modal">
-        <section ref={detailDialog} className="meal-ledger-void-dialog meal-ledger-detail-dialog" role="dialog" aria-modal="true" aria-label="领用记录详情">
-          <div className="meal-ledger-card-header"><h2>领用记录详情</h2><button className="meal-ticket-button" onClick={() => setDetailTarget(null)}>关闭</button></div>
+        <section ref={detailDialog} className="meal-ledger-detail-dialog meal-external-dialog" role="dialog" aria-modal="true" aria-label="领用记录详情">
+          <header className="meal-external-dialog-header"><div><h2>领用记录详情</h2><p>{detailTarget.name || detailTarget.unit} · {detailTarget.date}</p></div><span className={`meal-external-state is-${detailTarget.voided ? "voided" : "complete"}`}>{detailTarget.voided ? "已作废" : "有效记录"}</span></header>
+          <div className="meal-external-dialog-body" role="region" aria-label="领用记录内容" tabIndex={0}>
           <dl className="meal-ledger-detail-grid">
             {[
-              ["日期", detailTarget.date], ["姓名", detailTarget.name], ["外来单位/人员", detailTarget.unit],
+              ["日期", detailTarget.date], ["姓名", detailTarget.name], ["外来单位（部门）", detailTarget.unit],
               ["承担费用的部门", detailTarget.dept_name], ["类别", detailTarget.category === "card" ? "充卡" : "纸质"],
               [detailTarget.guest_card_key ? "应充值金额（元）" : "发放金额（元）", money(detailTarget.amount)], ["人员编号", detailTarget.emp_no], ["卡号", detailTarget.card_no],
               ["服务期间", detailTarget.period], ["天数", detailTarget.days], ["填表人", detailTarget.registrar],
@@ -482,6 +530,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               <span>{row.date.replace("T", " ")} · {money(row.amount)} 元</span><small>{row.source_key}</small>
             </li>)}</ul>
           </section>}
+          </div>
+          <footer className="meal-external-dialog-footer"><button className="meal-ticket-button" onClick={() => setDetailTarget(null)}>关闭</button></footer>
         </section>
       </div>}
 
@@ -491,14 +541,10 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       {/* 作废确认弹窗 */}
       {voidTarget && (
         <div className="meal-ticket-modal">
-          <section className="meal-ledger-void-dialog" role="dialog" aria-modal="true" aria-label="作废台账记录">
+          <section className={`meal-ledger-void-dialog${kind === "external" ? " meal-external-void-dialog" : ""}`} role="dialog" aria-modal="true" aria-label="作废台账记录">
             <div className="meal-ledger-void-header">
               <AlertTriangleIcon />
               <h2>作废 {voidTarget.name} 的记录</h2>
-            </div>
-            <div className="meal-ledger-void-details">
-              <div>人员：<strong>{voidTarget.name} ({voidTarget.emp_no})</strong> · 部门：<strong>{voidTarget.dept_name}</strong></div>
-              <div>金额：<strong>¥{money(voidTarget.amount)}</strong> · 卡号：<strong>{voidTarget.card_no}</strong> · 日期：<strong>{voidTarget.date}</strong></div>
             </div>
             <form onSubmit={e => {
               e.preventDefault();
@@ -508,23 +554,23 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 setRefresh(n => n + 1);
               });
             }}>
-              <label>
-                作废原因
-                <input
-                  required
-                  placeholder="请输入作废原因（例如：误登重复记录）"
-                  value={voidReason}
-                  onChange={e => setVoidReason(e.target.value)}
-                />
-              </label>
+              <div className={kind === "external" ? "meal-external-void-body" : undefined}>
+                {kind === "external" && <p className="meal-external-void-hint">请核对本次领用并填写作废原因，原记录和充值依据会保留。</p>}
+                <div className="meal-ledger-void-details">
+                  <div>人员：<strong>{voidTarget.name} ({voidTarget.emp_no})</strong> · 部门：<strong>{voidTarget.dept_name}</strong></div>
+                  <div>金额：<strong>¥{money(voidTarget.amount)}</strong> · 卡号：<strong>{voidTarget.card_no}</strong> · 日期：<strong>{voidTarget.date}</strong></div>
+                </div>
+                <label>
+                  作废原因
+                  <input
+                    required
+                    placeholder="请输入作废原因（例如：误登重复记录）"
+                    value={voidReason}
+                    onChange={e => setVoidReason(e.target.value)}
+                  />
+                </label>
+              </div>
               <div className="meal-ticket-actions" style={{ marginTop: "16px", justifyContent: "flex-end" }}>
-                <button
-                  type="submit"
-                  className="meal-ticket-button is-danger"
-                  disabled={busy || !voidReason.trim()}
-                >
-                  确认作废
-                </button>
                 <button
                   type="button"
                   className="meal-ticket-button"
@@ -532,6 +578,13 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                   onClick={() => setVoidTarget(null)}
                 >
                   取消
+                </button>
+                <button
+                  type="submit"
+                  className="meal-ticket-button is-danger"
+                  disabled={busy || !voidReason.trim()}
+                >
+                  确认作废
                 </button>
               </div>
             </form>

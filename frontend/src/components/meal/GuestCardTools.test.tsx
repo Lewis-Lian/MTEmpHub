@@ -65,9 +65,24 @@ describe("客人卡工具", () => {
     expect(request).toHaveBeenLastCalledWith("/api/meal-ledgers/records/12/recharge-check", {method:"POST", body:{end_date:"2026-10-12"}});
     fireEvent.click(selectable);
     fireEvent.click(screen.getByRole("button", {name:"确认选中充值"}));
-    await screen.findByText("实际充值：40.00 元");
+    await waitFor(() => expect(screen.getByLabelText("实际充值")).toHaveTextContent("40.00"));
     expect(request).toHaveBeenLastCalledWith("/api/meal-ledgers/records/12/recharge-check", {method:"POST", body:{end_date:"2026-10-12", source_keys:["source-1"]}});
     expect(updated).toHaveBeenLastCalledWith(expect.objectContaining({actual_amount:40}));
+  });
+
+  it("从业务月月初核对，允许查询领用前的当月充值", async () => {
+    request.mockResolvedValue({record,candidates:[]});
+    render(<GuestRechargeDialog record={record} onClose={vi.fn()} onUpdated={vi.fn()} />);
+    expect(screen.getByText("查询起始日期：2026-10-01")).toBeInTheDocument();
+    const end = screen.getByLabelText("查询截止日期");
+    expect(end).toHaveAttribute("min", "2026-10-01");
+    fireEvent.change(end, {target:{value:"2026-10-01"}});
+    expect(screen.getByRole("button", {name:"查询充值"})).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", {name:"查询充值"}));
+    await screen.findByText("该日期范围内暂无充值流水");
+    expect(request).toHaveBeenCalledWith("/api/meal-ledgers/records/12/recharge-check", {method:"POST",body:{end_date:"2026-10-01"}});
+    fireEvent.change(end, {target:{value:"2026-09-30"}});
+    expect(screen.getByRole("button", {name:"查询充值"})).toBeDisabled();
   });
 
   it("更改日期清空查询结果与选择，失败显示错误并保留已核对金额", async () => {
@@ -80,7 +95,7 @@ describe("客人卡工具", () => {
     expect(screen.getByRole("button", {name:"确认选中充值"})).toBeDisabled();
     fireEvent.click(screen.getByRole("button", {name:"查询充值"}));
     expect(await screen.findByRole("alert")).toHaveTextContent("充值数据库不可用");
-    expect(screen.getByText("实际充值：40.00 元")).toBeInTheDocument();
+    expect(screen.getByLabelText("实际充值")).toHaveTextContent("40.00");
   });
 
   it("对话框限制焦点并支持 Escape 关闭和恢复原焦点", () => {

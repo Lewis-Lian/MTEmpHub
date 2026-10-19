@@ -170,3 +170,24 @@ class GuestCardTests(unittest.TestCase):
             response = self.post('/reconcile', {'batch_id':batch['id'],'version':batch['version'],
                 'start_date':'2026-09-01','end_date':'2026-09-30'})
             self.assertEqual(response.status_code,409,response.get_json())
+
+    def test_recharge_lookup_starts_at_business_month_first_and_matches_prepaid_funds(self):
+        from datetime import date
+        self.enable_database()
+        record = self.linked(self.card())  # September 30 visit, prepaid September 1.
+        remote = [dict(source='recharge',id=31,emp_no='G001',time=datetime(2026,9,1,10),amount='100')]
+        with patch('services.meal_guest_card_service.CardDBClient.meal_records',return_value=remote) as read:
+            result = self.check(record)
+            self.assertEqual(result.status_code,200,result.get_json())
+            read.assert_called_with(date(2026,9,1),date(2026,10,1))
+            key = result.get_json()['candidates'][0]['source_key']
+            matched = self.check(record,[key])
+            self.assertEqual(matched.status_code,200,matched.get_json())
+            self.assertEqual(matched.get_json()['record']['recharge_status'],'complete')
+        # The range may end before the visit, but never before its business month.
+        with patch('services.meal_guest_card_service.CardDBClient.meal_records',return_value=remote):
+            response = self.client.post(f'/api/meal-ledgers/records/{record["id"]}/recharge-check',
+                json={'end_date':'2026-09-10'},headers=self.headers)
+            self.assertEqual(response.status_code,200,response.get_json())
+            self.assertEqual(self.client.post(f'/api/meal-ledgers/records/{record["id"]}/recharge-check',
+                json={'end_date':'2026-08-31'},headers=self.headers).status_code,400)
