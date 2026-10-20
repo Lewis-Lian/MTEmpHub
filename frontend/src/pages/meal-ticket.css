@@ -1300,8 +1300,37 @@
 /* 加载进度 */
 .meal-ticket-loading {
   color: var(--ent-blue);
-  background: linear-gradient(135deg, var(--ent-blue-light), var(--ent-bg));
+  background: var(--ent-bg);
   font-size: 13px;
+}
+
+.meal-ticket-loading-modal {
+  z-index: var(--z-modal);
+  background: rgba(15, 23, 42, .45);
+  backdrop-filter: blur(4px);
+  animation: meal-ticket-modal-fade .18s ease-out;
+}
+
+.meal-ticket-loading-dialog {
+  width: min(440px, calc(100vw - 32px)) !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 24px 28px !important;
+  background: var(--ent-bg) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius-lg) !important;
+  box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.18), 0 8px 12px -4px rgba(0, 0, 0, 0.08) !important;
+  animation: meal-ticket-dialog-zoom .2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes meal-ticket-modal-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes meal-ticket-dialog-zoom {
+  from { opacity: 0; transform: scale(.94); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .meal-ticket-loading-heading {
@@ -2120,6 +2149,12 @@
   border-color: var(--ent-border-focus);
 }
 
+.meal-followup-import-toolbar.is-dragover {
+  border-color: var(--ent-blue) !important;
+  background: var(--ent-blue-light) !important;
+  box-shadow: 0 0 0 3px var(--ent-blue-focus) !important;
+}
+
 .meal-followup-import-toolbar .meal-ticket-export-summary {
   display: flex;
   align-items: center;
@@ -2874,6 +2909,109 @@
   background: rgba(37, 99, 235, 0.18) !important;
   border-color: var(--ent-blue) !important;
   color: #60a5fa !important;
+}
+
+/* 补扣导入拖拽区域 */
+.meal-adjustment-upload-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meal-adjustment-file-label-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-adjustment-dropzone {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 28px 20px;
+  border: 2px dashed var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  background: var(--ent-secondary-bg);
+  cursor: pointer;
+  text-align: center;
+  transition: var(--ent-transition);
+}
+
+.meal-adjustment-dropzone:hover {
+  border-color: var(--ent-border-focus);
+  background: var(--ent-bg);
+}
+
+.meal-adjustment-dropzone.is-dragover {
+  border-color: var(--ent-blue) !important;
+  background: var(--ent-blue-light) !important;
+  box-shadow: 0 0 0 3px var(--ent-blue-focus) !important;
+  transform: scale(1.008);
+}
+
+.meal-adjustment-dropzone.has-file {
+  border-style: solid;
+  border-color: rgba(37, 99, 235, 0.35);
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.06) 0%, rgba(59, 130, 246, 0.01) 100%);
+}
+
+.meal-adjustment-dropzone-icon {
+  color: var(--ent-blue);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.meal-adjustment-dropzone:hover .meal-adjustment-dropzone-icon,
+.meal-adjustment-dropzone.is-dragover .meal-adjustment-dropzone-icon {
+  transform: translateY(-2px);
+}
+
+.meal-adjustment-dropzone-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meal-adjustment-dropzone-text strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-adjustment-dropzone-text span {
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-adjustment-file-name {
+  color: var(--ent-blue) !important;
+  word-break: break-all;
+}
+
+.meal-adjustment-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+[data-theme="dark"] .meal-adjustment-dropzone {
+  border-color: var(--ent-border-strong);
+  background: var(--ent-secondary-bg);
+}
+
+[data-theme="dark"] .meal-adjustment-dropzone.has-file {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.4);
 }
 
 /* 弹窗固定标题与操作区，内容区独立滚动 */

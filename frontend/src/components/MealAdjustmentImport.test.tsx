@@ -66,3 +66,25 @@ it("discards the preview when the selected file changes", async () => {
   fireEvent.change(screen.getByLabelText("补扣 Excel 文件"), { target: { files: [new File(["other"], "第二份.xlsx")] } });
   expect(screen.queryByRole("button", { name: "确认导入补扣" })).toBeNull();
 });
+
+it("supports dragging and dropping file onto toolbar and within modal", async () => {
+  render(<MealAdjustmentImport batch={batch} busy={false} onBusyChange={vi.fn()} onImported={vi.fn()} />);
+  const toolbar = screen.getByRole("region", { name: "批量导入补扣" });
+  const file1 = new File(["data1"], "拖拽补扣.xlsx");
+
+  fireEvent.dragOver(toolbar, { dataTransfer: { files: [file1] } });
+  fireEvent.drop(toolbar, { dataTransfer: { files: [file1] } });
+
+  expect(screen.getByRole("dialog", { name: "批量导入补扣" })).toBeInTheDocument();
+  expect(screen.getByText("拖拽补扣.xlsx")).toBeInTheDocument();
+
+  const dropzone = screen.getByRole("button", { name: /拖拽区域/ });
+  const file2 = new File(["data2"], "弹窗拖拽.xlsx");
+
+  fireEvent.dragOver(dropzone, { dataTransfer: { files: [file2] } });
+  fireEvent.drop(dropzone, { dataTransfer: { files: [file2] } });
+
+  expect(screen.getByText("弹窗拖拽.xlsx")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "预览导入" }));
+  await screen.findByText("异常天数扣除");
+});

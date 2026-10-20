@@ -562,13 +562,13 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
     {paymentView && admin && confirmed && batch && <MealAdjustmentImport key={`adjustment-import:${month}:${batch.id}`} batch={batch} busy={busy}
       onBusyChange={setBusy} onImported={next => { setBatch(next); setQueueRevision(value => value + 1); }} />}
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
-    {busy && !target && !bulk && <section role="status" className="meal-ticket-loading meal-ticket-panel" aria-live="polite">
+    {busy && !target && !bulk && <div className="meal-ticket-modal meal-ticket-loading-modal"><section role="status" className="meal-ticket-loading meal-ticket-panel meal-ticket-loading-dialog" aria-live="polite">
       <div className="meal-ticket-loading-heading"><span><i className="meal-ticket-loading-dot" aria-hidden="true" />{loadProgress?.text ?? "正在提交并等待处理结果"}</span><strong>{progressPercent === null ? "处理中" : `${loadProgress?.phase ? "当前阶段 " : ""}${progressPercent}%`}</strong></div>
       <div className={`meal-ticket-progress-track${progressPercent === null ? " is-indeterminate" : ""}`} role="progressbar" aria-label={loadProgress?.label ?? "操作进度"} aria-valuetext={loadProgress?.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent ?? undefined}>
         <span style={progressPercent === null ? undefined : { width: `${progressPercent}%` }} />
       </div>
       <p>{loadProgress?.phase ? loadProgress.total > 0 ? `当前阶段已完成 ${loadProgress.completed} / ${loadProgress.total} 人` : "正在执行当前阶段，完成后自动进入下一阶段。" : loadProgress ? `已完成 ${loadProgress.completed} / ${loadProgress.total} 项请求` : "处理完成后会自动更新账目，请稍候。"}</p>
-    </section>}
+    </section></div>}
     {!historical && batch?.source_changed && <p className="meal-ticket-alert">{confirmed ? paymentView ? "源考勤或人员资料已变化。请在第一步重算考勤数据，核对差额后登记补扣；原核算和实际充值金额保留。" : "源考勤或人员资料已变化。请前往后续补扣与对账页核对差额；原核算和实际充值金额保留。" : "源考勤或人员资料已变化，草稿请重算。"}</p>}
     {!historical && !busy && (paymentView ? !confirmed : !batch) && <div className="meal-ticket-empty meal-ticket-panel"><h2>{paymentView ? "请先完成月度核算" : "本月尚无核算记录"}</h2><p>{paymentView ? "在月度发放页生成草稿、处理补扣并确认核算后，再处理后续补扣与对账。" : "该充值月尚无核算记录，请在计算与核对区域计算对应上月考勤的草稿。"}</p>{paymentView && <Link className="meal-ticket-button is-primary" to={`/meal-tickets/calculation?recharge_month=${month}`}>前往月度发放</Link>}</div>}
     {!historical && showBatch && batch && <>
