@@ -2067,93 +2067,994 @@
 }
 .meal-ticket-low-frequency { margin-left: 16px; font-size: 12px; }
 
-/* 后续补扣与对账 */
-.meal-followup-queue { display: grid; gap: 16px; }
-.meal-followup-queue .meal-followup-description { margin: 0; color: var(--ent-text-secondary); font-size: 13px; }
+/* 后续补扣与对账专属美化与增强样式 */
+
+/* 步骤 1：登记补扣面板 */
+.meal-followup-register-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  padding: 18px 24px;
+  transition: var(--ent-transition);
+}
+
+.meal-followup-register-header-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.meal-followup-register-header-line h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ent-text);
+}
+
+.meal-followup-register-info p {
+  margin: 4px 0 0;
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* 步骤 1：批量导入补扣工具栏 */
+.meal-followup-import-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding: 16px 20px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: var(--ent-transition);
+}
+
+.meal-followup-import-toolbar:hover {
+  border-color: var(--ent-border-focus);
+}
+
+.meal-followup-import-toolbar .meal-ticket-export-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.meal-followup-import-icon-badge {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+  flex-shrink: 0;
+}
+
+.meal-followup-import-text strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-followup-import-text p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+}
+
+/* 步骤 2：逐人办理容器 */
+.meal-followup-queue {
+  display: grid;
+  gap: 20px;
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: var(--ent-radius-lg);
+  padding: 24px;
+}
+
+.meal-followup-queue .meal-ticket-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  margin-bottom: 4px;
+}
+
+.meal-followup-queue .meal-ticket-section-heading h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ent-text);
+  letter-spacing: -0.01em;
+}
+
+.meal-followup-description {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 0;
+  padding: 4px 12px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  border-radius: 999px;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.meal-followup-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: var(--ent-radius);
+}
+
+/* 核心工作区：左右双栏 */
 .meal-followup-workspace,
-.meal-followup-review-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-.meal-followup-card,
-.meal-followup-block { min-width: 0; padding: 20px; border: 1px solid var(--ent-border-strong); border-radius: 12px; background: var(--ent-bg); }
-.meal-followup-card { border-color: var(--ent-blue-focus); }
+.meal-followup-review-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+}
+
+/* 左侧：当前办理卡片 */
+.meal-followup-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--ent-border-strong);
+  border-top: 3px solid var(--ent-blue);
+  border-radius: 14px;
+  background: var(--ent-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  position: relative;
+  transition: var(--ent-transition);
+}
+
+.meal-followup-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 6px rgba(0, 0, 0, 0.03);
+}
+
 .meal-followup-block-heading,
-.meal-followup-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.meal-followup-block-heading h3 { margin: 0; font-size: 15px; }
+.meal-followup-table-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.meal-followup-heading-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meal-followup-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ent-blue);
+  box-shadow: 0 0 0 3px var(--ent-blue-light);
+  display: inline-block;
+}
+
+.meal-followup-block-heading h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ent-text);
+}
+
 .meal-followup-block-heading > span,
-.meal-followup-table-heading > span { color: var(--ent-text-secondary); font-size: 12px; }
-.meal-followup-person { display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin: 20px 0 8px; }
-.meal-followup-person strong { font-size: 24px; }
-.meal-followup-person > span,
-.meal-followup-employee-number { color: var(--ent-text-secondary); font-size: 13px; }
-.meal-followup-amount { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; padding: 16px; border-radius: 8px; background: var(--ent-blue-light); }
-.meal-followup-amount strong { font-size: 24px; color: var(--ent-blue); font-variant-numeric: tabular-nums; }
-.meal-followup-amount.is-refund { background: rgba(217, 119, 6, .1); }
-.meal-followup-amount.is-refund strong { color: #b45309; }
-.meal-followup-copy-status { min-height: 20px; margin: 6px 0; color: var(--ent-text-secondary); font-size: 12px; }
-.meal-followup-current-actions { justify-content: flex-end; }
-.meal-followup-progress { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--ent-border); font-size: 13px; }
-.meal-followup-progress p { margin: 8px 0 0; color: var(--ent-text-secondary); font-size: 12px; line-height: 1.7; }
-.meal-followup-search input { width: 100%; box-sizing: border-box; }
-.meal-followup-queue .meal-followup-task-list,
-.meal-followup-queue .meal-followup-review-list { margin: 0; padding: 0; list-style: none; }
-.meal-followup-queue .meal-followup-task-list { max-height: 340px; overflow: auto; margin-top: 12px; }
-.meal-followup-task-list li + li { margin-top: 6px; }
-.meal-followup-task { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 12px; border: 1px solid transparent; border-radius: 8px; background: var(--ent-secondary-bg); color: var(--ent-text); text-align: left; font: inherit; cursor: pointer; }
-.meal-followup-task:hover:not(:disabled),
-.meal-followup-task[aria-pressed="true"] { border-color: var(--ent-blue-focus); background: var(--ent-blue-light); }
-.meal-followup-task:disabled { cursor: not-allowed; opacity: .65; }
-.meal-followup-task-person,
-.meal-followup-task-amount { display: grid; gap: 5px; font-size: 13px; }
-.meal-followup-task-person { min-width: 0; overflow-wrap: anywhere; }
-.meal-followup-task-amount { flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; }
-.meal-followup-task small { color: var(--ent-text-secondary); font-size: 12px; }
-.meal-followup-review-list > li,
-.meal-followup-payment { padding: 14px 0; }
-.meal-followup-review-list > li + li,
-.meal-followup-payment + .meal-followup-payment { border-top: 1px solid var(--ent-border); }
-.meal-followup-review-list p { margin: 0 0 12px; font-size: 13px; line-height: 1.7; color: var(--ent-text-secondary); }
-.meal-followup-payment-person { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; }
-.meal-followup-payment-person strong { color: var(--ent-text); }
-.meal-followup-empty { margin: 0; padding: 28px 12px; text-align: center; color: var(--ent-text-secondary); font-size: 13px; line-height: 1.7; }
-.meal-followup-verified { padding-top: 12px; border-top: 1px solid var(--ent-border); font-size: 13px; }
-.meal-followup-verified summary { cursor: pointer; color: var(--ent-text-secondary); }
-.meal-followup-verified li { padding: 6px 0; }
+.meal-followup-table-heading > span {
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+}
+
+/* 办理人员信息 */
+.meal-followup-person {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 12px 0 10px;
+}
+
+.meal-followup-avatar {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--ent-blue), #60a5fa);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px var(--ent-blue-focus);
+  flex-shrink: 0;
+}
+
+.meal-followup-person-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.meal-followup-person-meta strong {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--ent-text);
+  line-height: 1.2;
+}
+
+.meal-followup-dept-chip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 1px 8px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-emp-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.meal-followup-employee-number {
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.meal-followup-copy-chip {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px !important;
+  font-size: 12px !important;
+  border-radius: 6px !important;
+  background: var(--ent-secondary-bg) !important;
+  color: var(--ent-blue) !important;
+  border: 1px solid var(--ent-border) !important;
+  transition: var(--ent-transition);
+}
+
+.meal-followup-copy-chip:hover:not(:disabled) {
+  background: var(--ent-blue-light) !important;
+  border-color: var(--ent-blue) !important;
+}
+
+/* 核心金额展示区 */
+.meal-followup-amount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 18px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.07) 0%, rgba(59, 130, 246, 0.02) 100%);
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  box-shadow: inset 0 1px 2px rgba(37, 99, 235, 0.04);
+}
+
+.meal-followup-amount-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meal-followup-amount-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ent-blue);
+}
+
+.meal-followup-amount strong {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ent-blue);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.meal-followup-amount.is-refund {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.09) 0%, rgba(245, 158, 11, 0.02) 100%);
+  border-color: rgba(217, 119, 6, 0.22);
+  box-shadow: inset 0 1px 2px rgba(217, 119, 6, 0.04);
+}
+
+.meal-followup-amount.is-refund .meal-followup-amount-label {
+  color: #b45309;
+}
+
+.meal-followup-amount.is-refund strong {
+  color: #b45309;
+}
+
+.meal-followup-amount-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: var(--ent-radius);
+  background: var(--ent-bg);
+  border: 1px solid var(--ent-border-strong);
+  color: var(--ent-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.meal-followup-amount-copy:hover:not(:disabled) {
+  border-color: var(--ent-blue);
+  color: var(--ent-blue);
+}
+
+/* 复制状态提示 */
+.meal-followup-copy-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  margin: 6px 0 12px;
+  color: #059669;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* 当前任务操作按钮 */
+.meal-followup-current-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.meal-followup-btn-skip {
+  padding: 8px 16px;
+  font-size: 13px;
+  border-radius: var(--ent-radius);
+}
+
+.meal-followup-btn-complete {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--ent-radius);
+  box-shadow: 0 2px 6px var(--ent-blue-focus);
+}
+
+.meal-followup-btn-complete:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* 轮次进度条 */
+.meal-followup-progress {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--ent-border);
+}
+
+.meal-followup-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.meal-followup-progress-header strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-followup-progress-pill {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.meal-followup-progress-bar {
+  width: 100%;
+  height: 6px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.meal-followup-progress-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--ent-blue), #60a5fa);
+  border-radius: 999px;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.meal-followup-progress p {
+  margin: 6px 0 0;
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+/* 右侧：办理名单卡片 */
+.meal-followup-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 14px;
+  background: var(--ent-bg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+}
+
+.meal-followup-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.meal-followup-search-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.meal-followup-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--ent-text-tertiary);
+  pointer-events: none;
+}
+
+.meal-followup-search-wrapper input {
+  width: 100%;
+  height: 38px;
+  padding: 6px 12px 6px 36px;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 10px;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text);
+  font-size: 13px;
+  box-sizing: border-box;
+  transition: var(--ent-transition);
+}
+
+.meal-followup-search-wrapper input:focus {
+  outline: none;
+  border-color: var(--ent-border-focus);
+  background: var(--ent-bg);
+  box-shadow: 0 0 0 3px var(--ent-blue-focus);
+}
+
+/* 名单列表 */
+.meal-followup-task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 2px 2px 2px 0;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ent-border-strong) transparent;
+}
+
+.meal-followup-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--ent-border);
+  border-left: 3px solid transparent;
+  border-radius: 10px;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: var(--ent-transition);
+}
+
+.meal-followup-task:hover:not(:disabled) {
+  border-color: var(--ent-border-strong);
+  background: var(--ent-bg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transform: translateY(-1px);
+}
+
+.meal-followup-task[aria-pressed="true"] {
+  border-color: var(--ent-blue-focus);
+  border-left-color: var(--ent-blue);
+  background: var(--ent-blue-light);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+}
+
+.meal-followup-task-person {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.meal-followup-task-person strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ent-text);
+}
+
+.meal-followup-task-person small {
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-task-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.meal-followup-task-amount-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--ent-blue);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-followup-task-amount.is-refund .meal-followup-task-amount-tag {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.meal-followup-skipped-tag {
+  font-size: 11px;
+  color: var(--ent-text-tertiary);
+}
+
+/* 下半部分：核对与关联网格 */
+.meal-followup-review-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.meal-followup-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.meal-followup-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ent-border);
+  border-radius: 10px;
+  background: var(--ent-secondary-bg);
+  transition: var(--ent-transition);
+}
+
+.meal-followup-review-item:hover {
+  background: var(--ent-bg);
+  border-color: var(--ent-border-strong);
+}
+
+.meal-followup-review-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.meal-followup-review-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.meal-followup-review-user strong {
+  font-size: 14px;
+  color: var(--ent-text);
+}
+
+.meal-followup-direction-chip {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ent-blue-light);
+  color: var(--ent-blue);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.meal-followup-direction-chip.is-refund {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+}
+
+.meal-followup-review-details {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* 实际流水核对卡片 */
+.meal-followup-payment {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--ent-border);
+  border-radius: 10px;
+  background: var(--ent-secondary-bg);
+}
+
+.meal-followup-payment-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.meal-followup-payment-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.meal-followup-payment-person strong {
+  font-size: 14px;
+  color: var(--ent-text);
+}
+
+.meal-followup-payment-person span {
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-payment-candidates {
+  padding-top: 10px;
+  border-top: 1px dashed var(--ent-border-strong);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meal-followup-payment-candidates p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ent-text-secondary);
+  line-height: 1.6;
+}
+
+/* 已核对项折叠面板 */
+.meal-followup-verified {
+  margin-top: 8px;
+  padding: 14px 18px;
+  border: 1px solid var(--ent-border);
+  border-radius: 10px;
+  background: var(--ent-secondary-bg);
+  font-size: 13px;
+}
+
+.meal-followup-verified summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--ent-text-secondary);
+  transition: color 0.15s;
+}
+
+.meal-followup-verified summary:hover {
+  color: var(--ent-text);
+}
+
+.meal-followup-verified ul {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  color: var(--ent-text-secondary);
+}
+
+.meal-followup-verified li {
+  padding: 4px 0;
+}
+
+.meal-followup-empty {
+  margin: 0;
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--ent-text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* 查看全部人员切换开关 (paymentView 专用) */
+.meal-ticket-show-all-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  background: var(--ent-secondary-bg);
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ent-text);
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+  transition: var(--ent-transition);
+}
+
+.meal-ticket-show-all-toggle:hover {
+  border-color: var(--ent-border-focus);
+  background: var(--ent-bg);
+}
+
+.meal-ticket-show-all-toggle input[type="checkbox"] {
+  accent-color: var(--ent-blue);
+  cursor: pointer;
+}
 
 /* 弹窗固定标题与操作区，内容区独立滚动 */
-.meal-ticket-modal > .meal-followup-dialog { display: flex; flex-direction: column; max-height: calc(100dvh - 48px); padding: 0; overflow: hidden; }
-.meal-ticket-modal > .meal-followup-baseline-dialog { width: min(960px, 100%); }
-.meal-followup-dialog .meal-ticket-operation-heading { flex-shrink: 0; margin: 0; padding: 20px 24px 16px; }
-.meal-followup-dialog form { min-height: 0; gap: 0; }
-.meal-followup-dialog-body { display: grid; gap: 16px; min-height: 0; padding: 20px 24px; overflow-y: auto; }
-.meal-followup-dialog-body > p { margin: 0; }
-.meal-followup-dialog .meal-followup-notice { padding: 12px 14px; border-radius: 8px; background: var(--ent-secondary-bg); font-size: 12px; line-height: 1.7; }
-.meal-followup-dialog label { align-items: stretch; font-size: 13px; }
+.meal-ticket-modal > .meal-followup-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--ent-radius-lg);
+  box-shadow: var(--ent-shadow-modal);
+}
+
+.meal-ticket-modal > .meal-followup-baseline-dialog {
+  width: min(960px, 100%);
+}
+
+.meal-followup-dialog .meal-ticket-operation-heading {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--ent-border);
+}
+
+.meal-followup-dialog form {
+  min-height: 0;
+  gap: 0;
+}
+
+.meal-followup-dialog-body {
+  display: grid;
+  gap: 18px;
+  min-height: 0;
+  padding: 22px 26px;
+  overflow-y: auto;
+}
+
+.meal-followup-dialog-body > p {
+  margin: 0;
+}
+
+.meal-followup-dialog .meal-followup-notice {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--ent-secondary-bg);
+  border-left: 3px solid var(--ent-blue);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.meal-followup-dialog label {
+  align-items: stretch;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .meal-followup-dialog input,
 .meal-followup-dialog select,
-.meal-followup-dialog textarea { width: 100%; min-width: 0; box-sizing: border-box; }
-.meal-followup-dialog textarea { min-height: 80px; }
-.meal-followup-table-heading { margin: 0; font-size: 13px; }
-.meal-followup-table-scroll { max-height: 42dvh; overflow: auto; border: 1px solid var(--ent-border-strong); border-radius: 8px; }
-.meal-followup-baseline-table { width: 100%; min-width: 640px; border-collapse: separate; border-spacing: 0; font-size: 13px; font-variant-numeric: tabular-nums; }
-.meal-followup-baseline-table th,
-.meal-followup-baseline-table td { padding: 10px 12px; border-bottom: 1px solid var(--ent-border); text-align: right; white-space: nowrap; }
-.meal-followup-baseline-table thead th { position: sticky; top: 0; z-index: 1; background: var(--ent-secondary-bg); color: var(--ent-text-secondary); font-size: 12px; font-weight: 600; }
-.meal-followup-baseline-table :is(th, td):nth-child(-n+2) { text-align: left; }
-.meal-followup-baseline-table tbody th { font-weight: 600; }
-.meal-followup-baseline-table tr:last-child > * { border-bottom: 0; }
-.meal-followup-baseline-table tbody tr:hover { background: var(--ent-secondary-bg); }
-.meal-followup-baseline-table td:nth-last-child(-n+2) { width: 128px; }
-.meal-followup-baseline-table input { padding: 8px 10px; text-align: right; font: inherit; font-variant-numeric: tabular-nums; }
-.meal-followup-dialog-footer { display: flex; flex-shrink: 0; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--ent-border-strong); background: var(--ent-bg); }
+.meal-followup-dialog textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border-radius: var(--ent-radius);
+  border: 1px solid var(--ent-border-strong);
+  padding: 8px 12px;
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  font: inherit;
+}
 
-[data-theme="dark"] .meal-followup-amount.is-refund strong { color: #fbbf24; }
+.meal-followup-dialog textarea {
+  min-height: 80px;
+}
+
+.meal-followup-table-heading {
+  margin: 0;
+  font-size: 13px;
+}
+
+.meal-followup-table-scroll {
+  max-height: 42dvh;
+  overflow: auto;
+  border: 1px solid var(--ent-border-strong);
+  border-radius: 10px;
+}
+
+.meal-followup-baseline-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-followup-baseline-table th,
+.meal-followup-baseline-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--ent-border);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.meal-followup-baseline-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--ent-secondary-bg);
+  color: var(--ent-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.meal-followup-baseline-table :is(th, td):nth-child(-n+2) {
+  text-align: left;
+}
+
+.meal-followup-baseline-table tbody th {
+  font-weight: 600;
+}
+
+.meal-followup-baseline-table tr:last-child > * {
+  border-bottom: 0;
+}
+
+.meal-followup-baseline-table tbody tr:hover {
+  background: var(--ent-secondary-bg);
+}
+
+.meal-followup-baseline-table td:nth-last-child(-n+2) {
+  width: 128px;
+}
+
+.meal-followup-baseline-table input {
+  padding: 8px 10px;
+  text-align: right;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.meal-followup-dialog-footer {
+  display: flex;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 26px;
+  border-top: 1px solid var(--ent-border-strong);
+  background: var(--ent-bg);
+}
+
+/* 深色模式适配 */
+[data-theme="dark"] .meal-followup-card {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .meal-followup-amount {
+  background: rgba(37, 99, 235, 0.12);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+
+[data-theme="dark"] .meal-followup-amount.is-refund {
+  background: rgba(217, 119, 6, 0.15);
+  border-color: rgba(217, 119, 6, 0.35);
+}
+
+[data-theme="dark"] .meal-followup-amount.is-refund strong {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .meal-followup-amount.is-refund .meal-followup-amount-label {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .meal-followup-task-amount.is-refund .meal-followup-task-amount-tag {
+  background: rgba(217, 119, 6, 0.2);
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .meal-followup-direction-chip.is-refund {
+  background: rgba(217, 119, 6, 0.2);
+  color: #fbbf24;
+}
 
 @media (max-width: 800px) {
   .meal-followup-workspace,
-  .meal-followup-review-grid { grid-template-columns: minmax(0, 1fr); }
+  .meal-followup-review-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
   .meal-followup-card,
-  .meal-followup-block { padding: 16px; }
-  .meal-followup-amount strong { font-size: 20px; }
+  .meal-followup-block {
+    padding: 18px;
+  }
+  .meal-followup-amount strong {
+    font-size: 22px;
+  }
   .meal-followup-dialog .meal-ticket-operation-heading,
-  .meal-followup-dialog-body { padding: 16px; }
-  .meal-followup-dialog-footer { padding: 12px 16px; }
+  .meal-followup-dialog-body {
+    padding: 16px;
+  }
+  .meal-followup-dialog-footer {
+    padding: 12px 16px;
+  }
 }

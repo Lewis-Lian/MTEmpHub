@@ -96,8 +96,16 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
     } finally { locked.current = false; if (active.current) setWorking(false); }
   }
   return <section className="meal-ticket-panel meal-followup-queue" aria-label="逐人办理">
-    <div className="meal-ticket-section-heading"><h2>逐人办理</h2><button className="meal-ticket-button" disabled={busy || working || Boolean(state?.baseline_required)} onClick={() => void write("refresh")}>刷新操作清单</button></div>
-    <p className="meal-followup-description">当前抵消方式：{state?.queue_offset_enabled == null ? "尚未生成清单" : state.queue_offset_enabled ? "补发与扣款按净额抵消" : "补发与扣款分别办理"}。开关在项目更多设置中修改。</p>
+    <div className="meal-ticket-section-heading">
+      <div>
+        <h2>逐人办理</h2>
+        <p className="meal-followup-description">当前抵消方式：{state?.queue_offset_enabled == null ? "尚未生成清单" : state.queue_offset_enabled ? "补发与扣款按净额抵消" : "补发与扣款分别办理"}。开关在项目更多设置中修改。</p>
+      </div>
+      <button className="meal-ticket-button meal-followup-refresh-btn" disabled={busy || working || Boolean(state?.baseline_required)} onClick={() => void write("refresh")}>
+        <svg className="meal-button-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+        刷新操作清单
+      </button>
+    </div>
     {state?.settings_changed && <p className="meal-ticket-alert" role="alert">设置已变化，请刷新操作清单</p>}
     {stale && state && !state.settings_changed && <p className="meal-ticket-alert" role="alert">金额或清单已变化，请刷新操作清单后办理。</p>}
     {state?.baseline_required && <p className="meal-ticket-alert" role="alert">{state.baseline_reason}</p>}
@@ -111,47 +119,133 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
     {!state && <p>正在读取服务端操作清单。</p>}
     <div className="meal-followup-workspace">
       <section className="meal-followup-card" aria-label="当前办理任务">
-        <div className="meal-followup-block-heading"><h3>当前办理</h3><span className="meal-ticket-badge">待办理 {pending.length} 项</span></div>
+        <div className="meal-followup-block-heading">
+          <div className="meal-followup-heading-title">
+            <span className="meal-followup-indicator-dot" aria-hidden="true" />
+            <h3>当前办理</h3>
+          </div>
+          <span className="meal-ticket-badge is-primary">待办理 {pending.length} 项</span>
+        </div>
         {current ? <>
-          <div className="meal-followup-person"><strong>{current.name}</strong><span>{current.dept_name}</span></div>
-          <div className="meal-ticket-actions"><span className="meal-followup-employee-number">工号 {current.emp_no}</span><button className="meal-ticket-button is-link" disabled={disabled} onClick={() => void copy(current.emp_no, "工号")}>复制工号</button></div>
-          <div className={`meal-followup-amount${current.kind === "refund" ? " is-refund" : ""}`}><strong>{direction(current)} {money(current.remaining_cents)} 元</strong><button className="meal-ticket-button" disabled={disabled} onClick={() => void copy(money(current.remaining_cents), "金额")}>复制金额</button></div>
-          <p className="meal-followup-copy-status" role="status">{copied}</p>
-          <div className="meal-ticket-actions meal-followup-current-actions"><button className="meal-ticket-button" disabled={disabled || current.status === "skipped"} onClick={() => void write("skip", current)}>暂时跳过</button><button className="meal-ticket-button is-primary" disabled={disabled} onClick={() => void write("complete", current)}>已完成{direction(current)}，下一人</button></div>
+          <div className="meal-followup-person">
+            <div className="meal-followup-avatar" aria-hidden="true">
+              {current.name.charAt(0)}
+            </div>
+            <div className="meal-followup-person-meta">
+              <strong>{current.name}</strong>
+              <span className="meal-followup-dept-chip">{current.dept_name}</span>
+            </div>
+          </div>
+          <div className="meal-ticket-actions meal-followup-emp-row">
+            <span className="meal-followup-employee-number">工号 {current.emp_no}</span>
+            <button className="meal-ticket-button is-link meal-followup-copy-chip" disabled={disabled} onClick={() => void copy(current.emp_no, "工号")}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              复制工号
+            </button>
+          </div>
+          <div className={`meal-followup-amount${current.kind === "refund" ? " is-refund" : ""}`}>
+            <div className="meal-followup-amount-content">
+              <span className="meal-followup-amount-label">{current.kind === "refund" ? "待取款扣回" : "待充值发放"}</span>
+              <strong>{direction(current)} {money(current.remaining_cents)} 元</strong>
+            </div>
+            <button className="meal-ticket-button meal-followup-amount-copy" disabled={disabled} onClick={() => void copy(money(current.remaining_cents), "金额")}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+              复制金额
+            </button>
+          </div>
+          <p className="meal-followup-copy-status" role="status">
+            {copied && <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg> {copied}</>}
+          </p>
+          <div className="meal-ticket-actions meal-followup-current-actions">
+            <button className="meal-ticket-button meal-followup-btn-skip" disabled={disabled || current.status === "skipped"} onClick={() => void write("skip", current)}>暂时跳过</button>
+            <button className="meal-ticket-button is-primary meal-followup-btn-complete" disabled={disabled} onClick={() => void write("complete", current)}>
+              <span>已完成{direction(current)}，下一人</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </button>
+          </div>
         </> : <p className="meal-followup-empty">{state?.baseline_required ? "需核对后生成清单。" : state ? "当前没有待操作项；以实际流水核对结果为准。" : "正在读取当前任务。"}</p>}
-        <div className="meal-followup-progress"><strong>本轮已操作 {awaiting.length + verified.length} / {pending.length + awaiting.length + verified.length} 项</strong><p>完成按钮仅保存外部操作声明，不登记实际到账。流水可能延迟，请先核对，勿据此再次充值或取款。</p></div>
+        <div className="meal-followup-progress">
+          <div className="meal-followup-progress-header">
+            <strong>本轮已操作 {awaiting.length + verified.length} / {pending.length + awaiting.length + verified.length} 项</strong>
+            <span className="meal-followup-progress-pill">
+              {pending.length + awaiting.length + verified.length > 0 ? Math.round(((awaiting.length + verified.length) / (pending.length + awaiting.length + verified.length)) * 100) : 0}%
+            </span>
+          </div>
+          <div className="meal-followup-progress-bar" aria-hidden="true">
+            <span className="meal-followup-progress-fill" style={{ width: `${pending.length + awaiting.length + verified.length > 0 ? ((awaiting.length + verified.length) / (pending.length + awaiting.length + verified.length)) * 100 : 0}%` }} />
+          </div>
+          <p>完成按钮仅保存外部操作声明，不登记实际到账。流水可能延迟，请先核对，勿据此再次充值或取款。</p>
+        </div>
       </section>
       <section className="meal-followup-block" aria-label="办理名单">
-        <div className="meal-followup-block-heading"><h3>办理名单</h3><span>{filteredPending.length} 项</span></div>
-        <label className="meal-followup-search">搜索办理任务<input value={search} onChange={e => setSearch(e.target.value)} placeholder="工号 / 姓名 / 部门" /></label>
+        <div className="meal-followup-block-heading">
+          <div className="meal-followup-heading-title">
+            <h3>办理名单</h3>
+          </div>
+          <span className="meal-ticket-badge">{filteredPending.length} 项</span>
+        </div>
+        <label className="meal-followup-search">
+          <span className="meal-followup-search-label">搜索办理任务</span>
+          <div className="meal-followup-search-wrapper">
+            <svg className="meal-followup-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="工号 / 姓名 / 部门" />
+          </div>
+        </label>
         <ul className="meal-followup-task-list">{filteredPending.map(task => <li key={task.key}><button className="meal-followup-task" disabled={disabled} aria-pressed={task.key === currentKey.current} onClick={() => void write("select", task)}>
-          <span className="meal-followup-task-person"><strong>{task.name}</strong><small>{task.emp_no} · {task.dept_name}</small></span>
-          <span className="meal-followup-task-amount">{direction(task)} {money(task.remaining_cents)} 元{task.status === "skipped" && <small>暂时跳过</small>}</span>
+          <span className="meal-followup-task-person">
+            <strong>{task.name}</strong>
+            <small>{task.emp_no} · {task.dept_name}</small>
+          </span>
+          <span className={`meal-followup-task-amount${task.kind === "refund" ? " is-refund" : ""}`}>
+            <span className="meal-followup-task-amount-tag">{direction(task)} {money(task.remaining_cents)} 元</span>
+            {task.status === "skipped" && <small className="meal-followup-skipped-tag">暂时跳过</small>}
+          </span>
         </button></li>)}</ul>
         {!filteredPending.length && <p className="meal-followup-empty">{search.trim() ? "没有匹配的办理任务" : "暂无待办理任务"}</p>}
       </section>
     </div>
     <div className="meal-followup-review-grid">
-      <section className="meal-followup-block" aria-label="待核对任务">
-        <div className="meal-followup-block-heading"><h3>待核对任务</h3><span>{awaiting.length} 项</span></div>
-        <ul className="meal-followup-review-list">{awaiting.map(task => <li key={task.key}>
-          <p>{task.emp_no} {task.name} · {direction(task)} · {task.status === "partial" ? "部分到账" : "待核对"} · 已匹配 {money(task.allocated_cents)} 元 · 剩余 {money(task.remaining_cents)} 元</p>
-          <div className="meal-ticket-actions">{task.status === "awaiting" && task.allocated_cents === 0 && <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => void write("undo", task)}>未实际操作，撤销标记</button>}
-            <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => { setRetry(task); setReason(""); }}>确认尚未到账，重新办理</button></div>
+      <section className="meal-followup-block meal-followup-review-block" aria-label="待核对任务">
+        <div className="meal-followup-block-heading">
+          <h3>待核对任务</h3>
+          <span className="meal-ticket-badge is-warning">{awaiting.length} 项</span>
+        </div>
+        <ul className="meal-followup-review-list">{awaiting.map(task => <li key={task.key} className="meal-followup-review-item">
+          <div className="meal-followup-review-item-header">
+            <div className="meal-followup-review-user">
+              <strong>{task.emp_no} {task.name}</strong>
+              <span className={`meal-ticket-badge ${task.status === "partial" ? "is-info" : "is-warning"}`}>
+                {task.status === "partial" ? "部分到账" : "待核对"}
+              </span>
+            </div>
+            <span className={`meal-followup-direction-chip ${task.kind === "refund" ? "is-refund" : ""}`}>
+              {direction(task)}
+            </span>
+          </div>
+          <p className="meal-followup-review-details">{task.emp_no} {task.name} · {direction(task)} · {task.status === "partial" ? "部分到账" : "待核对"} · 已匹配 {money(task.allocated_cents)} 元 · 剩余 {money(task.remaining_cents)} 元</p>
+          <div className="meal-ticket-actions meal-followup-review-actions">
+            {task.status === "awaiting" && task.allocated_cents === 0 && <button className="meal-ticket-button is-link" disabled={busy || working || stale} onClick={() => void write("undo", task)}>未实际操作，撤销标记</button>}
+            <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => { setRetry(task); setReason(""); }}>确认尚未到账，重新办理</button>
+          </div>
         </li>)}</ul>
         {!awaiting.length && <p className="meal-followup-empty">暂无待核对任务</p>}
       </section>
-      <section className="meal-followup-block" aria-label="实际流水关联">
-        <div className="meal-followup-block-heading"><h3>实际流水核对</h3><span>{paymentTasks.length} 项</span></div>
+      <section className="meal-followup-block meal-followup-review-block" aria-label="实际流水核对">
+        <div className="meal-followup-block-heading">
+          <h3>实际流水核对</h3>
+          <span className="meal-ticket-badge">{paymentTasks.length} 项</span>
+        </div>
         <div className="meal-followup-review-list">{paymentTasks.map(task => <div className="meal-followup-payment" key={task.key}>
-          <p className="meal-followup-payment-person"><strong>{task.name}</strong><span>{task.emp_no} · {direction(task)}</span></p>
-          {onRegister && <button className="meal-ticket-button" disabled={busy || working || stale || (pending.includes(task) && disabled)} onClick={() => onRegister(task)}>登记实际{direction(task)} · {task.emp_no}</button>}
-          {!!task.candidates?.payments.length && <>
+          <div className="meal-followup-payment-header">
+            <p className="meal-followup-payment-person"><strong>{task.name}</strong><span>{task.emp_no} · {direction(task)}</span></p>
+            {onRegister && <button className="meal-ticket-button is-primary" disabled={busy || working || stale || (pending.includes(task) && disabled)} onClick={() => onRegister(task)}>登记实际{direction(task)} · {task.emp_no}</button>}
+          </div>
+          {!!task.candidates?.payments.length && <div className="meal-followup-payment-candidates">
             <p>{task.emp_no} {task.name} · 待确认实际流水关联；请逐笔核实人员、方向及凭证，关联不会新建支付。</p>
             <button className="meal-ticket-button" disabled={busy || working || stale} onClick={() => {
               setLink(task); setPaymentKey(""); setLinkAmount("");
             }}>关联实际流水 · {task.emp_no} {direction(task)}</button>
-          </>}
+          </div>}
         </div>)}</div>
         {!paymentTasks.length && <p className="meal-followup-empty">暂无需要关联的实际流水</p>}
       </section>

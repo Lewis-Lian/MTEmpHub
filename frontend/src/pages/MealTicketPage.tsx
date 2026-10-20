@@ -532,9 +532,20 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         {admin && !hasPaymentHistory && hasAttendanceRecalculation && <p className="meal-ticket-export-hint">已完成后续考勤重算或人员补入，请继续通过后续补扣处理。</p>}
       </section>}
     </div>}
-    {paymentView && admin && confirmed && batch && <section className="meal-ticket-panel" aria-label="登记补扣">
-      <h2>登记补扣</h2><p>单人或批量只登记调整，表格导入按工号匹配；实际办理在下方当前任务卡片完成。</p>
-      <button className={`meal-ticket-button${batch.source_changed ? " is-primary" : ""}`} disabled={busy} onClick={previewAttendance}>重算考勤数据</button>
+    {paymentView && admin && confirmed && batch && <section className="meal-ticket-panel meal-followup-register-panel" aria-label="登记补扣">
+      <div className="meal-ticket-section-heading">
+        <div className="meal-followup-register-info">
+          <div className="meal-followup-register-header-line">
+            <h2>登记补扣</h2>
+            {batch.source_changed && <span className="meal-ticket-badge is-warning">考勤源数据已变动</span>}
+          </div>
+          <p>单人或批量只登记调整，表格导入按工号匹配；实际办理在下方当前任务卡片完成。</p>
+        </div>
+        <button className={`meal-ticket-button${batch.source_changed ? " is-primary" : ""}`} disabled={busy} onClick={previewAttendance}>
+          <svg className="meal-button-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/></svg>
+          重算考勤数据
+        </button>
+      </div>
     </section>}
     {paymentView && admin && confirmed && batch && <MealFollowupQueue key={`followup:${month}:${batch.id}`} month={month} batchVersion={batch.version}
       refreshRevision={queueRevision} busy={busy} onStateChange={setFollowupState}
@@ -616,7 +627,7 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         <span>菜票数据库核对未启用，当前按已登记发放检查结清。可在“数据来源与同步”中开启共享连接的菜票核对。</span>
       </div>}
       {<ResultContainer {...(!paymentView ? { className: "meal-ticket-result-details", open: !settlementComplete && (!confirmed || !databaseEnabled || monthlyStage === "settlement"), key: `${month}:${monthlyStage}:${settlementComplete}` } : {})}>{!paymentView && <summary>{settlementComplete ? "查看核算明细" : confirmed ? "核算结果与实际差额" : "核对人员与金额"}</summary>}<section ref={personnel} className="meal-ticket-panel" aria-label={resultView === "person" ? "人员明细" : "部门汇总"}><div className="meal-ticket-section-heading"><div><h2>{resultView === "person" ? "人员明细" : "部门汇总"}</h2><p>{resultView === "department" ? "按当前筛选范围汇总，点击部门查看对应人员明细。" : !confirmed ? "第 2 步：先核对金额，补扣填正数为补发、负数为扣除。" : paymentView ? "默认显示差额或未完成任务人员；搜索其他人员可追加补扣。实际流水及合法更正在人员详情查看。" : databaseEnabled ? "菜票软件发放后，读取数据库自动更新到账；后续调整请前往补扣与对账页。" : "第 4 步：充值成功后选择人员登记；后续调整请前往补扣与对账页。"}</p></div><div className="meal-ticket-actions"><div className="meal-ticket-view-switch" role="group" aria-label="结果表视图"><button className="meal-ticket-button" aria-pressed={resultView === "person"} onClick={() => changeResultView("person")}>人员明细</button><button className="meal-ticket-button" aria-pressed={resultView === "department"} onClick={() => changeResultView("department")}>部门汇总</button></div><span className="meal-ticket-count">{resultView === "person" ? `${rows.length} 人` : `${departmentRows.size} 个部门`}</span></div></div>
-      {paymentView && <label><input type="checkbox" checked={showAllPeople} onChange={e => setShowAllPeople(e.target.checked)} />显示全部人员</label>}
+      {paymentView && <label className="meal-ticket-show-all-toggle"><input type="checkbox" checked={showAllPeople} onChange={e => setShowAllPeople(e.target.checked)} /><span>显示全部人员</span></label>}
       <div className="meal-ticket-toolbar meal-ticket-filters">
         <div className="meal-ticket-picker-field"><span>人员筛选</span><EmployeePicker departments={pickerDepartments} employees={pickerEmployees} selectedIds={filterEmployeeIds} onChange={ids => { setFilterEmployeeIds(ids); setDepartmentNames([]); changeResultView("person"); }} label="人员筛选" showFieldChrome={false} emptyHint={paymentView ? "默认显示差额或未完成任务人员，可搜索其他人员。" : "未选择时显示本月全部人员。"} /></div>
         <div className="meal-ticket-picker-field"><span>核算部门</span><DepartmentMultiPicker departments={pickerDepartments} selectedIds={pickerDepartments.filter(dept => departmentNames.includes(dept.dept_name)).map(dept => dept.id)} onChange={ids => { setDepartmentNames(pickerDepartments.filter(dept => ids.includes(dept.id)).map(dept => dept.dept_name)); setFilterEmployeeIds([]); changeResultView("department"); }} label="核算部门" showFieldChrome={false} /></div>

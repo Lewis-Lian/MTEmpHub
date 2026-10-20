@@ -497,12 +497,9 @@ def serialize_batch(batch, accessible=None, check_source=False, progress=None):
             progress(stage='汇总人员补扣与充值', completed=len(items), total=len(records))
     changed = False
     if check_source:
-        account = db.session.get(AccountSet, batch.account_set_id)
-        changed = batch.status == 'confirmed' and not account.is_locked
-        if not changed:
-            sources = (batch_source_snapshot(batch, progress=progress) if batch.status == 'confirmed'
-                       else source_snapshot(batch.month, progress=progress))
-            changed = digest(sources) != batch.source_digest
+        sources = (batch_source_snapshot(batch, progress=progress) if batch.status == 'confirmed'
+                   else source_snapshot(batch.month, progress=progress))
+        changed = digest(sources) != batch.source_digest
     from services.meal_ticket_reconciliation import database_status
     if progress:
         progress(stage='读取数据库核对配置', completed=0, total=0)

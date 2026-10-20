@@ -1147,7 +1147,7 @@ class MealTicketTests(unittest.TestCase):
             p=build_preview(document,{})
             self.assertTrue(validate_selection(document,{},p['rows'],{}))
 
-    def test_unlock_and_equal_total_source_correction_are_visible(self):
+    def test_unlock_alone_does_not_report_changed_source(self):
         from models.daily_attendance_override import DailyAttendanceOverride
         from datetime import date
         batch=self.generate()
@@ -1158,7 +1158,30 @@ class MealTicketTests(unittest.TestCase):
         self.confirm(self.generate())
         with self.app.app_context():
             AccountSet.query.first().is_locked=False; db.session.commit()
-        self.assertTrue(self.client.get('/api/meal-tickets?recharge_month=2026-09',headers=self.headers).get_json()['source_changed'])
+        self.assertFalse(self.client.get('/api/meal-tickets?recharge_month=2026-09',headers=self.headers).get_json()['source_changed'])
+
+    def test_attendance_recalculation_clears_changed_source_with_unlocked_account(self):
+        batch = self.confirm(self.generate())
+        with self.app.app_context():
+            AccountSet.query.first().is_locked = False
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 23
+            db.session.commit()
+        url = '/api/meal-tickets?recharge_month=2026-09'
+        self.assertTrue(self.client.get(url, headers=self.headers).get_json()['source_changed'])
+        body = {'batch_id':batch['id'], 'version':batch['version']}
+        preview = self.post('/attendance-recalculation/preview', body).get_json()
+        response = self.post('/attendance-recalculation', {**body, 'source_digest':preview['source_digest']})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        recalculated = response.get_json()
+        self.assertFalse(recalculated['source_changed'])
+        self.assertFalse(self.client.get(url, headers=self.headers).get_json()['source_changed'])
+        self.assertEqual(recalculated['items'][0]['base_amount'], 176)
+        self.assertEqual(recalculated['items'][0]['due_amount'], 184)
+        with self.app.app_context():
+            self.assertFalse(AccountSet.query.first().is_locked)
+            EmployeeAttendanceOverride.query.filter_by(emp_id=self.emp_id).one().actual_attendance_days = 24
+            db.session.commit()
+        self.assertTrue(self.client.get(url, headers=self.headers).get_json()['source_changed'])
 
     def test_conflicting_year_requires_explicit_confirmation(self):
         book=Workbook(); s=book.active; s.title='员工充值记录'
