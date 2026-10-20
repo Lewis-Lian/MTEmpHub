@@ -1,12 +1,14 @@
 /* 菜票中心公共样式 */
 
 .meal-ticket-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 20px;
   width: 100%;
   max-width: 1440px;
   min-width: 0;
+  min-height: calc(100vh - 140px);
   margin: 0 auto;
   padding: 20px 24px 32px;
   box-sizing: border-box;
@@ -1304,15 +1306,26 @@
   font-size: 13px;
 }
 
-.meal-ticket-loading-modal {
-  z-index: var(--z-modal);
-  background: rgba(15, 23, 42, .45);
-  backdrop-filter: blur(4px);
+.meal-ticket-modal.meal-ticket-loading-modal {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 50 !important;
+  background: rgba(15, 23, 42, .28) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 24px !important;
+  border-radius: var(--ent-radius-lg) !important;
   animation: meal-ticket-modal-fade .18s ease-out;
 }
 
 .meal-ticket-loading-dialog {
-  width: min(440px, calc(100vw - 32px)) !important;
+  position: sticky !important;
+  top: 32vh !important;
+  margin: 0 auto !important;
+  width: min(440px, calc(100% - 32px)) !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
   padding: 24px 28px !important;

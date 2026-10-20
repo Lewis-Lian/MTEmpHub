@@ -230,13 +230,15 @@ it('数据库模式月度固定四阶段，步骤条不提供操作',async()=>{
   expect(within(flow).queryByRole('button')).not.toBeInTheDocument();
 });
 
-it('数据库模式后续补扣三阶段导航无按钮，核对只有一个入口', async () => {
+it('后续补扣按阶段显示，进入结果后核对只有一个入口', async () => {
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:batch));
   render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
   await screen.findByText('员工甲');
   const flow=screen.getByRole('list',{name:'后续补扣流程'});
   expect(within(flow).getAllByRole('heading').map(step=>step.textContent)).toEqual(['登记补扣','逐人办理','核对结果']);
   expect(within(flow).queryByRole('button')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button',{name:'核对结果'})).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByRole('button',{name:'下一步：核对结果'}));
   expect(screen.getAllByRole('button',{name:'核对结果'})).toHaveLength(1);
 });
 it.each([false,true])('后续页按真实金额显示结果，结清状态为 %s，仍能登记补扣',async settled=>{
@@ -245,15 +247,15 @@ it.each([false,true])('后续页按真实金额显示结果，结清状态为 %s
   render(<ConfirmProvider><MemoryRouter><MealTicketPage view="payments"/></MemoryRouter></ConfirmProvider>);
   await screen.findByRole('button',{name:'导入补扣清单'});
   if (settled) {
-    await screen.findByText('本月账目已结清');
+    expect(screen.queryByRole('region',{name:'整月结清检查'})).not.toBeInTheDocument();
     expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
     expect(screen.queryByText('员工甲')).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('显示全部人员'));
-  } else expect(screen.getByRole('region',{name:'到账核对'})).toBeInTheDocument();
+  } else expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
   expect(screen.getByRole('button',{name:'补扣'})).toBeEnabled();
   expect(request.mock.calls.some(([path])=>path==='/api/meal-tickets/reconcile')).toBe(false);
 });
-it('后续保存补扣自动刷新清单，不需要手动下一步', async () => {
+it('后续保存补扣自动刷新清单，确认下一步后进入办理', async () => {
   let current={...batch,items:[{...item,paid_amount:176,difference:0}]};
   const empty = {batch_id:1,batch_version:2,offset_enabled:true,settings_digest:'s',queue_offset_enabled:true,settings_changed:false,baseline_required:false,baseline_reason:'',current_task_key:null,tasks:[]};
   const task = {key:'task',item_key:'i',emp_no:'001',name:'员工甲',dept_name:'生产部',kind:'recharge',status:'pending',amount_cents:1600,allocated_cents:0,remaining_cents:1600,version:1};
@@ -270,6 +272,7 @@ it('后续保存补扣自动刷新清单，不需要手动下一步', async () =
   fireEvent.change(screen.getByLabelText('调整金额（元）'),{target:{value:'16'}});
   fireEvent.click(screen.getByRole('button',{name:'线长补卡'}));
   fireEvent.click(screen.getByRole('button',{name:'保存补扣'}));
+  fireEvent.click(await screen.findByRole('button',{name:'下一步：逐人办理'}));
   await screen.findByRole('button',{name:'已完成充值，下一人'});
   expect(screen.getByRole('list',{name:'后续补扣流程'}).querySelector('[aria-current="step"]')).toHaveTextContent('逐人办理');
   expect(request).toHaveBeenCalledWith('/api/meal-tickets/followup-tasks/refresh',expect.objectContaining({body:expect.objectContaining({version:3,settings_digest:'s'})}));

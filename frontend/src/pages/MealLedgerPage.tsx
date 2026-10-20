@@ -50,6 +50,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [serviceRange, setServiceRange] = useState({start:"", end:""});
   const [cards, setCards] = useState<GuestCard[]>([]);
+  const [externalStep, setExternalStep] = useState<"register" | "recharge" | "ledger">("register");
   const [rechargeTarget, setRechargeTarget] = useState<LedgerRecord | null>(null);
   const [records, setRecords] = useState<LedgerRecord[]>([]);
   const [department, setDepartment] = useState<DepartmentLedger | null>(null);
@@ -93,7 +94,10 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     setMessage("");
   }, [kind]);
 
-  useEffect(() => { setDetailTarget(null); setRechargeTarget(null); }, [kind, month]);
+  useEffect(() => {
+    setExternalStep("register"); setDetailTarget(null); setRechargeTarget(null);
+    if (kind === "external") { setSearch(""); setCategory(""); }
+  }, [kind, month]);
 
   useEffect(() => {
     if (!detailTarget) return;
@@ -153,13 +157,23 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
       const signature = JSON.stringify(body);
       if (request.current.signature !== signature) request.current = { signature, key: crypto.randomUUID() };
       await saveLedger(recordKind, { ...body, request_key: request.current.key });
+      if (kind === "external") {
+        setExternalStep(form.category === "card" && form.guest_card_key ? "recharge" : "ledger");
+        setSearch(""); setCategory("");
+      }
       request.current = { signature: "", key: "" };
       setServiceRange({start:"", end:""});
       setForm(kind === "external" ? { ...initialForm(), date: form.date, dept_name: form.dept_name, category: form.category, guest_card_key: form.guest_card_key, card_no: form.card_no, emp_no: form.emp_no } : initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
     });
   }
 
-  const visible = records.filter(r => (!search || `${r.emp_no}${r.name}${r.dept_name}${r.card_no}${kind === "external" ? r.unit : ""}`.includes(search)) && (!category || r.category === category));
+  const externalStage = admin ? externalStep : "ledger";
+  const pendingRecharges = records.filter(record => record.guest_card_key && !record.voided && record.recharge_status !== "complete");
+  const listedRecords = kind === "external" && externalStage === "recharge" ? pendingRecharges : records;
+  function changeExternalStep(step: typeof externalStep) {
+    setExternalStep(step); setSearch(""); setCategory("");
+  }
+  const visible = listedRecords.filter(r => (!search || `${r.emp_no}${r.name}${r.dept_name}${r.card_no}${kind === "external" ? r.unit : ""}`.includes(search)) && (!category || r.category === category));
 
   const validRecords = visible.filter(r => !r.voided);
   const voidedRecords = visible.filter(r => r.voided);
@@ -191,6 +205,26 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
         <LoadingState message="正在读取台账…" />
       ) : (
         <>
+          {kind === "external" && <div className="meal-ticket-flow">
+            <ol className="meal-ticket-workflow" aria-label="外来人员领用流程">
+              {[
+                {id:"register", title:"登记领用", text:"选择领用类别、客人卡和承担部门，填写本次金额。"},
+                {id:"recharge", title:"核对充值", text:"在菜票软件实际充值后，查询并确认对应流水；纸质及手工领用跳过。"},
+                {id:"ledger", title:"查看台账", text:"核对实际发放金额、承担部门和领用明细。"},
+              ].map(step => <li key={step.id} className={externalStage === step.id ? "is-current" : ""}
+                aria-current={externalStage === step.id ? "step" : undefined}>
+                <div className="meal-ticket-step-heading"><span className="meal-ticket-step-number">{step.id === "register" ? 1 : step.id === "recharge" ? 2 : 3}</span><h2>{step.title}</h2></div>
+                <p className="meal-ticket-step-description">{step.text}</p>
+              </li>)}
+            </ol>
+            {admin && <div className="meal-ticket-actions" aria-label="领用步骤切换">
+              {externalStage !== "register" && <button className="meal-ticket-button" disabled={busy} onClick={() => changeExternalStep("register")}>继续登记领用</button>}
+              {externalStage !== "recharge" && pendingRecharges.length > 0 && <button className="meal-ticket-button" disabled={busy} onClick={() => changeExternalStep("recharge")}>查看待核对充值（{pendingRecharges.length} 条）</button>}
+              {externalStage !== "ledger" && <button className="meal-ticket-button" disabled={busy} onClick={() => changeExternalStep("ledger")}>
+                {externalStage === "recharge" ? pendingRecharges.length ? "稍后核对，查看台账" : "下一步：查看台账" : "查看已有台账"}
+              </button>}
+            </div>}
+          </div>}
           {/* KPI 指标概览卡片 */}
           {kind === "department" && department && (
             <section className="meal-ledger-stats" aria-label="部门发放统计">
@@ -244,24 +278,39 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
 
           {kind === "external" && (
             <>
-              <section className="meal-ticket-panel meal-ledger-external-summary" aria-label="记录概览统计">
-                <span className="meal-external-count">当前筛选 · 有效 {validRecords.length} 条</span>
-                <span className="meal-external-total">发放合计 <strong>¥{money(validTotalAmount)}</strong></span>
-                <span>充卡 <b>¥{money(validRecords.filter(r => r.category === "card").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
-                <span>纸质 <b>¥{money(validRecords.filter(r => r.category === "paper").reduce((s, r) => s + actualAmount(r), 0))}</b></span>
-                {voidedRecords.length > 0 && <span>已作废 {voidedRecords.length} 条</span>}
-              </section>
-              {admin && <div className="meal-ticket-panel meal-ledger-guest-manager">
+              {externalStage === "ledger" && <section className="meal-ledger-stats meal-ledger-external-summary" aria-label="记录概览统计">
+                <div className="meal-ledger-stat-card is-green">
+                  <span className="meal-ledger-stat-label">发放总额合计</span>
+                  <strong className="meal-ledger-stat-value">¥{money(validTotalAmount)}</strong>
+                  <p className="meal-ledger-stat-sub">有效领用实际发放/到账总额</p>
+                </div>
+                <div className="meal-ledger-stat-card is-blue">
+                  <span className="meal-ledger-stat-label">客人充卡发放</span>
+                  <strong className="meal-ledger-stat-value">¥{money(validRecords.filter(r => r.category === "card").reduce((s, r) => s + actualAmount(r), 0))}</strong>
+                  <p className="meal-ledger-stat-sub">固定客人卡已到账金额</p>
+                </div>
+                <div className="meal-ledger-stat-card is-amber">
+                  <span className="meal-ledger-stat-label">纸质菜票发放</span>
+                  <strong className="meal-ledger-stat-value">¥{money(validRecords.filter(r => r.category === "paper").reduce((s, r) => s + actualAmount(r), 0))}</strong>
+                  <p className="meal-ledger-stat-sub">领用纸质菜票票面合计</p>
+                </div>
+                <div className="meal-ledger-stat-card">
+                  <span className="meal-ledger-stat-label">记录概览</span>
+                  <strong className="meal-ledger-stat-value">{validRecords.length}<small>条有效</small></strong>
+                  <p className="meal-ledger-stat-sub">{voidedRecords.length > 0 ? `另有 ${voidedRecords.length} 条已作废记录` : "本月所有记录均正常有效"}</p>
+                </div>
+              </section>}
+              {admin && externalStage === "register" && <div className="meal-ticket-panel meal-ledger-guest-manager">
                 <GuestCardRegistry cards={cards} onChanged={async () => { setCards(await fetchGuestCards()); }} />
               </div>}
-              {admin && <div className="meal-ticket-panel meal-ledger-form-card meal-ledger-quick-entry">
+              {admin && externalStage === "register" && <div className="meal-ticket-panel meal-ledger-form-card meal-ledger-quick-entry">
                 <div className="meal-ledger-card-header"><div>
                   <h2><span className="meal-external-section-icon"><LedgerBookIcon /></span>快速登记</h2>
-                  <p>填写本次领用，保存后可继续登记下一笔。</p>
+                  <p>填写本次领用；客人卡保存后核对充值，纸质及手工领用保存后查看台账。</p>
                 </div></div>
                 <form onSubmit={e => { e.preventDefault(); void save(); }}>
                   <fieldset disabled={busy} className="meal-ledger-quick-fields">
-                    <div className="meal-ledger-grid meal-ledger-quick-grid meal-external-form-grid">
+                    <div className={`meal-ledger-grid meal-ledger-quick-grid meal-external-form-grid is-${form.category}`}>
                       {field("name", "姓名")}
                       {field("unit", "外来单位（部门）")}
                       <div className="meal-ledger-department-field">
@@ -340,7 +389,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           )}
 
           {/* 表格数据展示区域 */}
-          <div className={`meal-ticket-panel meal-ledger-list is-${kind}`}>
+          {(kind !== "external" || externalStage !== "register") && <div className={`meal-ticket-panel meal-ledger-list is-${kind}`}>
             {kind === "department" && department && (
               <>
                 <div className="meal-ticket-section-heading">
@@ -401,7 +450,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               <>
                 <div className="meal-ticket-section-heading">
                   <div>
-                    <h2>{kind === "external" ? "领用明细列表" : "取款记录列表"}</h2>
+                    <h2>{kind === "external" ? externalStage === "recharge" ? "待核对充值" : "领用明细列表" : "取款记录列表"}</h2>
                     <p>当前筛选有效金额 {money(validTotalAmount)} 元 · {visible.length} 条（包含作废历史）</p>
                   </div>
                 </div>
@@ -454,7 +503,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 />}
               </>
             )}
-          </div>
+          </div>}
 
           {/* 管理员登记表单 */}
           {admin && kind !== "department" && kind !== "external" && (

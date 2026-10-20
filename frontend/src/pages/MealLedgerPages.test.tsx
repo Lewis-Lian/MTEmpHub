@@ -113,7 +113,7 @@ describe("菜票查询与台账页面", () => {
     await screen.findByText("记录已保存");
     expect(screen.getByText("访客甲")).toBeInTheDocument();
     expect(screen.getByRole("cell", {name:"接待部"})).toBeInTheDocument();
-    expect(screen.getAllByText(category === "card" ? "充卡" : "纸质").length).toBeGreaterThan(2);
+    expect(screen.getByRole("cell", {name:category === "card" ? "充卡" : "纸质"})).toBeInTheDocument();
   });
 
   it("精简领用列表仍可按领用人和类别排序", async () => {
@@ -144,6 +144,7 @@ describe("菜票查询与台账页面", () => {
     fireEvent.change(screen.getByLabelText("发放金额"), {target:{value:"200"}});
     fireEvent.click(screen.getByRole("button", {name:"保存记录"}));
     await screen.findByText("记录已保存");
+    fireEvent.click(screen.getByRole("button", {name:"继续登记领用"}));
     await screen.findByRole("button", {name:"保存记录"});
     expect(screen.getByLabelText("处理日期")).toHaveValue(today);
     expect(screen.getByLabelText("承担费用的部门")).toHaveValue("接待部");
@@ -203,8 +204,11 @@ describe("菜票查询与台账页面", () => {
     await screen.findByText("来访甲");
     expect(screen.getByText("未充值")).toBeInTheDocument();
     expect(screen.getByRole("button", {name:"核对充值"})).toBeInTheDocument();
-    expect(screen.getByLabelText("客人卡")).toHaveValue("guest-1");
+    expect(screen.queryByLabelText("客人卡")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name:"稍后核对，查看台账"}));
     expect(within(screen.getByRole("region", {name:"记录概览统计"})).getAllByText("¥0.00")).toHaveLength(3);
+    fireEvent.click(screen.getByRole("button", {name:"继续登记领用"}));
+    expect(screen.getByLabelText("客人卡")).toHaveValue("guest-1");
   });
 
   it.each([
@@ -349,6 +353,7 @@ describe("菜票查询与台账页面", () => {
       return Promise.resolve([record]);
     });
     render(<MemoryRouter><MealLedgerPage kind={kind} /></MemoryRouter>);
+    if (kind === "external") fireEvent.click(await screen.findByRole("button", {name:"查看已有台账"}));
     fireEvent.click(await screen.findByRole("button", { name: "作废" }));
     expect(screen.getByRole("button", { name: "确认作废" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("作废原因"), { target: { value: "重复录入" } });
