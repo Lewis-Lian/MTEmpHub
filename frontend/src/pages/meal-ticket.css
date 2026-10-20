@@ -2123,18 +2123,7 @@
 .meal-followup-import-toolbar .meal-ticket-export-summary {
   display: flex;
   align-items: center;
-  gap: 14px;
-}
-
-.meal-followup-import-icon-badge {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  background: var(--ent-blue-light);
-  color: var(--ent-blue);
-  flex-shrink: 0;
+  gap: 12px;
 }
 
 .meal-followup-import-text strong {
@@ -2215,7 +2204,6 @@
   min-width: 0;
   padding: 24px;
   border: 1px solid var(--ent-border-strong);
-  border-top: 3px solid var(--ent-blue);
   border-radius: 14px;
   background: var(--ent-bg);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
@@ -2543,14 +2531,17 @@
 .meal-followup-search-icon {
   position: absolute;
   left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--ent-text-tertiary);
   pointer-events: none;
+  z-index: 1;
 }
 
-.meal-followup-search-wrapper input {
+.meal-ticket-page .meal-followup-search-wrapper input:not([type="checkbox"]) {
   width: 100%;
   height: 38px;
-  padding: 6px 12px 6px 36px;
+  padding: 6px 12px 6px 36px !important;
   border: 1px solid var(--ent-border-strong);
   border-radius: 10px;
   background: var(--ent-secondary-bg);
@@ -2560,7 +2551,7 @@
   transition: var(--ent-transition);
 }
 
-.meal-followup-search-wrapper input:focus {
+.meal-ticket-page .meal-followup-search-wrapper input:not([type="checkbox"]):focus {
   outline: none;
   border-color: var(--ent-border-focus);
   background: var(--ent-bg);
@@ -2829,31 +2820,60 @@
 }
 
 /* 查看全部人员切换开关 (paymentView 专用) */
-.meal-ticket-show-all-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  background: var(--ent-secondary-bg);
-  border: 1px solid var(--ent-border-strong);
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--ent-text);
-  cursor: pointer;
-  user-select: none;
-  width: fit-content;
-  transition: var(--ent-transition);
+.meal-ticket-page label.meal-ticket-show-all-toggle {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  align-self: flex-end !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  box-sizing: border-box !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 14px !important;
+  background: var(--ent-bg) !important;
+  border: 1px solid var(--ent-border-strong) !important;
+  border-radius: var(--ent-radius) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--ent-text) !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  flex: 0 0 auto !important;
+  transition: var(--ent-transition) !important;
 }
 
-.meal-ticket-show-all-toggle:hover {
-  border-color: var(--ent-border-focus);
-  background: var(--ent-bg);
+.meal-ticket-page label.meal-ticket-show-all-toggle:hover {
+  border-color: var(--ent-border-focus) !important;
 }
 
-.meal-ticket-show-all-toggle input[type="checkbox"] {
-  accent-color: var(--ent-blue);
-  cursor: pointer;
+.meal-ticket-page label.meal-ticket-show-all-toggle:has(input:checked) {
+  background: var(--ent-blue-light) !important;
+  border-color: var(--ent-blue) !important;
+  color: var(--ent-blue) !important;
+  font-weight: 600 !important;
+}
+
+.meal-ticket-page label.meal-ticket-show-all-toggle input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  accent-color: var(--ent-blue) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+
+[data-theme="dark"] .meal-ticket-page label.meal-ticket-show-all-toggle {
+  background: var(--ent-bg) !important;
+  border-color: var(--ent-border-strong) !important;
+  color: var(--ent-text) !important;
+}
+
+[data-theme="dark"] .meal-ticket-page label.meal-ticket-show-all-toggle:has(input:checked) {
+  background: rgba(37, 99, 235, 0.18) !important;
+  border-color: var(--ent-blue) !important;
+  color: #60a5fa !important;
 }
 
 /* 弹窗固定标题与操作区，内容区独立滚动 */
