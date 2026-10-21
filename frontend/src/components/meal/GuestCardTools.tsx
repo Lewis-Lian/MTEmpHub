@@ -10,13 +10,15 @@ export function GuestCardRegistry({ cards, onChanged }: {
   cards: GuestCard[]; onChanged: () => Promise<void> | void;
 }) {
   const [identity, setIdentity] = useState({ card_no: "", emp_no: "", name: "" });
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const editingCard = cards.find(card => card.key === editingKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function save(action: () => Promise<unknown>, clear = false) {
     setBusy(true); setError("");
     try {
       await action();
-      if (clear) setIdentity({ card_no: "", emp_no: "", name: "" });
+      if (clear) { setIdentity({ card_no: "", emp_no: "", name: "" }); setEditingKey(null); }
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "客人卡保存失败");
@@ -24,25 +26,34 @@ export function GuestCardRegistry({ cards, onChanged }: {
   }
   return <details className="guest-card-registry">
     <summary><span>客人卡管理</span><small>{cards.filter(card => card.is_active).length} 张可用</small></summary>
-    <p>维护可重复借用的固定卡片账户。卡号、数据库人员编号和卡片名称新增后不可修改。</p>
+    <p>维护可重复借用的固定卡片账户。名称可修改；已有领用历史的卡片不能修改卡号和数据库人员编号。</p>
+    {editingCard && <p>正在编辑：{editingCard.name}{editingCard.has_history ? "（已有领用历史，仅可修改名称）" : ""}</p>}
     <form className="guest-card-form" onSubmit={event => {
       event.preventDefault();
-      if (!busy) void save(() => createGuestCard({
-        card_no: identity.card_no.trim(), emp_no: identity.emp_no.trim(), name: identity.name.trim(),
-      }), true);
+      if (busy) return;
+      const values = { card_no: identity.card_no.trim(), emp_no: identity.emp_no.trim(), name: identity.name.trim() };
+      void save(() => editingCard ? updateGuestCard(editingCard.key, values) : createGuestCard(values), true);
     }}>
       {([['card_no', '客人卡号'], ['emp_no', '数据库人员编号'], ['name', '客人卡名称']] as const).map(([key, label]) =>
-        <label key={key}>{label}<input className="form-control" required disabled={busy} value={identity[key]}
+        <label key={key}>{label}<input className="form-control" required maxLength={key === "name" ? 100 : 50}
+          disabled={busy || (!!editingCard?.has_history && key !== "name")} value={identity[key]}
           onChange={event => setIdentity({ ...identity, [key]: event.target.value })} /></label>)}
-      <button className="meal-ticket-button is-primary" disabled={busy || Object.values(identity).some(value => !value.trim())}>新增客人卡</button>
+      <div className="guest-card-form-actions">
+        <button className="meal-ticket-button is-primary" disabled={busy || Object.values(identity).some(value => !value.trim())}>{editingCard ? "保存修改" : "新增客人卡"}</button>
+        {editingCard && <button className="meal-ticket-button" type="button" disabled={busy} onClick={() => {
+          setEditingKey(null); setIdentity({ card_no: "", emp_no: "", name: "" }); setError("");
+        }}>取消编辑</button>}
+      </div>
     </form>
     {error && <p role="alert">{error}</p>}
     <div className="guest-card-table-scroll"><table className="guest-card-table"><thead><tr>
       <th>卡号</th><th>数据库编号</th><th>卡片名称</th><th>状态</th><th>操作</th>
     </tr></thead><tbody>{cards.map(card => <tr key={card.key}>
       <td>{card.card_no}</td><td>{card.emp_no}</td><td>{card.name}</td><td><span className={`meal-external-state is-${card.is_active ? "complete" : "voided"}`}>{card.is_active ? "启用" : "停用"}</span></td>
-      <td><button type="button" className="meal-ticket-button" disabled={busy} aria-label={`${card.is_active ? "停用" : "启用"} ${card.name}`}
-        onClick={() => void save(() => updateGuestCard(card.key, !card.is_active))}>{card.is_active ? "停用" : "启用"}</button></td>
+      <td><div className="guest-card-form-actions"><button type="button" className="meal-ticket-button" disabled={busy} aria-label={`编辑 ${card.name}`} onClick={() => {
+        setEditingKey(card.key); setIdentity({ card_no:card.card_no, emp_no:card.emp_no, name:card.name }); setError("");
+      }}>编辑</button><button type="button" className="meal-ticket-button" disabled={busy} aria-label={`${card.is_active ? "停用" : "启用"} ${card.name}`}
+        onClick={() => void save(() => updateGuestCard(card.key, {is_active:!card.is_active}))}>{card.is_active ? "停用" : "启用"}</button></div></td>
     </tr>)}</tbody></table></div>
     {cards.length === 0 && <p>暂无客人卡</p>}
   </details>;

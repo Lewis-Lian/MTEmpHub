@@ -269,3 +269,31 @@ def test_legacy_preview_cannot_replace_target_with_guest_matches(backup_app):
     seed_guest()
     with pytest.raises(BackupError, match='多月份备份'):
         build_preview(document, {})
+
+def test_registry_name_change_restores_without_rewriting_history(backup_app):
+    card, record, _ = seed_guest()
+    document = collect_multi_backup([1])
+    document['shared']['meal_guest_cards'][0]['name'] = '新的卡片名称'
+    preview = build_multi_preview(document, SELECTION)
+    assert not preview['blockers']
+    restore_multi_backup(document, SELECTION, {}, preview['fingerprint'], 1)
+    db.session.refresh(card)
+    db.session.refresh(record)
+    assert card.name == '新的卡片名称'
+    assert record.data['name'] == '实际访客'
+
+
+def test_unused_registry_identity_change_roundtrips(backup_app):
+    from models.meal_guest_card import MealGuestCard
+    card = MealGuestCard(card_no='00001', emp_no='G01', name='未使用卡', operator='admin')
+    db.session.add(card)
+    db.session.commit()
+    document = collect_multi_backup([1])
+    document['shared']['meal_guest_cards'][0].update(card_no='00002', emp_no='G02', name='改名卡')
+    preview = build_multi_preview(document, SELECTION)
+    assert not preview['blockers']
+    restore_multi_backup(document, SELECTION, {}, preview['fingerprint'], 1)
+    db.session.refresh(card)
+    assert (card.card_no, card.emp_no, card.name) == ('00002', 'G02', '改名卡')
+    exported = read_backup(export_multi_backup([1], ['meal_ledgers']), normalized=True)
+    assert exported['shared']['meal_guest_cards'][0]['card_no'] == '00002'

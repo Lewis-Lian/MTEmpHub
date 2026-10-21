@@ -44,6 +44,51 @@ class GuestCardTests(unittest.TestCase):
         rows = self.client.get('/api/meal-ledgers/guest-cards',headers=self.headers).get_json()
         self.assertEqual([r['key'] for r in rows],[card['key']])
 
+    def test_edit_unused_card_preserves_key_and_leading_zeros(self):
+        card = self.card()
+        response = self.client.put('/api/meal-ledgers/guest-cards/' + card['key'], headers=self.headers,
+            json={'card_no':'0009002', 'emp_no':'G002', 'name':'改名客人卡'})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        updated = response.get_json()
+        self.assertEqual((updated['key'], updated['card_no'], updated['emp_no'], updated['name']),
+                         (card['key'], '0009002', 'G002', '改名客人卡'))
+        self.assertFalse(updated['has_history'])
+
+    def test_used_card_allows_name_changes_but_keeps_identity_and_history(self):
+        card = self.card()
+        record = self.linked(card)
+        response = self.client.put('/api/meal-ledgers/guest-cards/' + card['key'], headers=self.headers,
+            json={'card_no':card['card_no'], 'emp_no':card['emp_no'], 'name':'新名称'})
+        self.assertEqual(response.status_code, 200, response.get_json())
+        self.assertTrue(response.get_json()['has_history'])
+        for changes in ({'card_no':'different'}, {'emp_no':'different'}):
+            response = self.client.put('/api/meal-ledgers/guest-cards/' + card['key'], headers=self.headers, json=changes)
+            self.assertEqual(response.status_code, 409, response.get_json())
+        from models import db
+        from models.meal_ledger import MealLedgerRecord
+        with self.app.app_context():
+            saved = db.session.get(MealLedgerRecord, record['id'])
+            self.assertEqual((saved.data['card_no'], saved.data['emp_no'], saved.data['name']),
+                             (card['card_no'], card['emp_no'], record['name']))
+            saved.voided = True
+            db.session.commit()
+        response = self.client.put('/api/meal-ledgers/guest-cards/' + card['key'], headers=self.headers, json={'emp_no':'different'})
+        self.assertEqual(response.status_code, 409)
+
+    def test_edit_rejects_duplicate_and_invalid_card_fields_without_partial_changes(self):
+        card = self.card()
+        self.card(card_no='other-card', emp_no='OTHER')
+        for changes, status in [({'card_no':'other-card'},409), ({'emp_no':'OTHER'},409),
+                                ({'name':'   '},400), ({'card_no':'x'*51},400),
+                                ({'is_active':'false'},400), ({'unknown':'x'},400), ({},400)]:
+            response = self.client.put('/api/meal-ledgers/guest-cards/' + card['key'], headers=self.headers, json=changes)
+            self.assertEqual(response.status_code, status, response.get_json())
+        self.assertEqual(self.client.put('/api/meal-ledgers/guest-cards/missing', headers=self.headers, json={'name':'改名'}).status_code, 404)
+        cards = self.client.get('/api/meal-ledgers/guest-cards', headers=self.headers).get_json()
+        unchanged = next(row for row in cards if row['key'] == card['key'])
+        self.assertEqual((unchanged['card_no'], unchanged['emp_no'], unchanged['name']),
+                         (card['card_no'], card['emp_no'], card['name']))
+
     def test_linked_pending_is_not_actual_department_spending(self):
         record = self.linked(self.card())
         self.assertEqual(record['emp_no'],'G001')
@@ -154,6 +199,7 @@ class GuestCardTests(unittest.TestCase):
             headers={'Authorization':'Bearer '+generate_token(viewer)}
         self.assertEqual(self.client.get('/api/meal-ledgers/guest-cards',headers=headers).status_code,200)
         self.assertEqual(self.client.post('/api/meal-ledgers/guest-cards',json={},headers=headers).status_code,403)
+        self.assertEqual(self.client.put('/api/meal-ledgers/guest-cards/missing',json={'name':'改名'},headers=headers).status_code,403)
         self.assertEqual(self.client.post('/api/meal-ledgers/records/1/recharge-check',json={},headers=headers).status_code,403)
 
     def test_staff_reconcile_cannot_reuse_guest_source(self):

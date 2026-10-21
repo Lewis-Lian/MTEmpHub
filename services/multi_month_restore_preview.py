@@ -519,19 +519,21 @@ def _validate_meals(final, target, source, entries, rows, changes, block):
     from services.meal_ticket_followup_validation import validate_followup_records
     for code, key, message, required in validate_followup_records(current):
         block(code, key, message, required)
-    _validate_guest_cards(current, changes, block)
+    _validate_guest_cards(current, before, changes, block)
     payments = {v['request_key']: key for key, v in current['meal_payments'].values()}
     for key, value in current['meal_ledger_records'].values():
         if value.get('source_key') in payments:
             block('meal_ledger_unique_conflict', key, '同一来源不能同时计入台账清零与发放扣回', [payments[value['source_key']]])
 
 
-def _validate_guest_cards(current, changes, block):
+def _validate_guest_cards(current, before, changes, block):
     from services.backup_document import validate_guest_records
+    used = {value['data'].get('guest_card_key') for _, value in before.get('meal_ledger_records', {}).values()
+            if isinstance(value.get('data'), dict) and isinstance(value['data'].get('guest_card_key'), str)}
     for row in changes:
         if row['dataset'] == 'meal_guest_cards' and row['system'] and row['backup']:
-            if any(row['system'][field] != row['backup'][field] for field in ('card_no', 'emp_no', 'name')):
-                block('meal_guest_identity_changed', row['row_key'], '已登记来宾卡的卡号、工号与名称不可修改')
+            if row['system']['key'] in used and any(row['system'][field] != row['backup'][field] for field in ('card_no', 'emp_no')):
+                block('meal_guest_identity_changed', row['row_key'], '已有领用历史的来宾卡不能修改卡号或工号')
     for code, key, message, required in validate_guest_records(current):
         block(code, key, message, required)
 

@@ -127,6 +127,11 @@
   white-space: nowrap;
 }
 
+.guest-card-form-actions {
+  display: flex;
+  gap: 8px;
+}
+
 /* 客人卡数据表格 */
 .guest-card-table-scroll {
   overflow-x: auto;

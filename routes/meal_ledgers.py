@@ -34,17 +34,10 @@ def create_guest_card():
 @meal_ledgers_bp.put('/guest-cards/<key>')
 @admin_required
 @handled
-def toggle_guest_card(key):
-    from models.meal_guest_card import MealGuestCard
-    from services.meal_guest_card_service import serialize_card
-    body = request.get_json(silent=True) or {}
-    if set(body) != {'is_active'} or type(body['is_active']) is not bool:
-        raise MealError('只支持修改客人卡启用状态')
+def update_guest_card(key):
+    from services.meal_guest_card_service import update, serialize_card
     begin_write()
-    card = MealGuestCard.query.filter_by(key=key).with_for_update().first()
-    if not card:
-        raise MealError('客人卡不存在',404)
-    card.is_active = body['is_active']
+    card = update(key, request.get_json(silent=True))
     db.session.commit()
     return jsonify(serialize_card(card))
 

@@ -52,6 +52,42 @@ describe("客人卡工具", () => {
     expect(request).toHaveBeenLastCalledWith("/api/meal-ledgers/guest-cards/guest-1", {method:"PUT", body:{is_active:true}});
   });
 
+  it("编辑未使用卡回填资料，保存后回到新增模式，取消不提交", async () => {
+    request.mockResolvedValue({});
+    const changed = vi.fn();
+    render(<GuestCardRegistry cards={[{key:"guest-1", card_no:"009001", emp_no:"G01", name:"客人甲", is_active:true, has_history:false}]} onChanged={changed} />);
+    fireEvent.click(screen.getByText("客人卡管理"));
+    fireEvent.click(screen.getByRole("button", {name:"编辑 客人甲"}));
+    expect(screen.getByLabelText("客人卡号")).toHaveValue("009001");
+    expect(screen.getByLabelText("数据库人员编号")).toHaveValue("G01");
+    fireEvent.change(screen.getByLabelText("客人卡号"), {target:{value:"009002"}});
+    fireEvent.change(screen.getByLabelText("数据库人员编号"), {target:{value:"G02"}});
+    fireEvent.change(screen.getByLabelText("客人卡名称"), {target:{value:" 新名称 "}});
+    fireEvent.click(screen.getByRole("button", {name:"保存修改"}));
+    await waitFor(() => expect(changed).toHaveBeenCalledOnce());
+    expect(request).toHaveBeenCalledWith("/api/meal-ledgers/guest-cards/guest-1", {method:"PUT", body:{card_no:"009002", emp_no:"G02", name:"新名称"}});
+    expect(screen.getByLabelText("客人卡名称")).toHaveValue("");
+    fireEvent.click(screen.getByRole("button", {name:"编辑 客人甲"}));
+    fireEvent.click(screen.getByRole("button", {name:"取消编辑"}));
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", {name:"新增客人卡"})).toBeInTheDocument();
+  });
+
+  it("有历史的停用卡只允许改名称，失败保留编辑内容", async () => {
+    request.mockRejectedValueOnce(new Error("保存失败"));
+    render(<GuestCardRegistry cards={[{key:"guest-1", card_no:"9001", emp_no:"G01", name:"客人甲", is_active:false, has_history:true}]} onChanged={vi.fn()} />);
+    fireEvent.click(screen.getByText("客人卡管理"));
+    fireEvent.click(screen.getByRole("button", {name:"编辑 客人甲"}));
+    expect(screen.getByLabelText("客人卡号")).toBeDisabled();
+    expect(screen.getByLabelText("数据库人员编号")).toBeDisabled();
+    expect(screen.getByLabelText("客人卡名称")).not.toBeDisabled();
+    fireEvent.change(screen.getByLabelText("客人卡名称"), {target:{value:"改名"}});
+    fireEvent.click(screen.getByRole("button", {name:"保存修改"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("保存失败");
+    expect(screen.getByLabelText("客人卡名称")).toHaveValue("改名");
+    expect(screen.getByRole("button", {name:"保存修改"})).toBeEnabled();
+  });
+
   it("按可延长的日期查询，只能确认未占用且未匹配的充值", async () => {
     request.mockResolvedValueOnce({record, candidates}).mockResolvedValueOnce({record:{...record, actual_amount:40, recharge_status:"partial"}, candidates});
     const updated = vi.fn();

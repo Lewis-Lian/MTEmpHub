@@ -10,7 +10,7 @@ export interface LedgerRecord {
   recharge_status?: "manual" | "pending" | "partial" | "complete";
   recharges?: Array<{ source_key: string; date: string; amount: number }>;
 }
-export interface GuestCard { key: string; card_no: string; emp_no: string; name: string; is_active: boolean }
+export interface GuestCard { key: string; card_no: string; emp_no: string; name: string; is_active: boolean; has_history?: boolean }
 export interface GuestRechargeCandidate {
   source_key: string; date: string; amount: number; matched: boolean; occupied: boolean;
 }
@@ -18,8 +18,8 @@ export interface GuestRechargeCheck { record: LedgerRecord; candidates: GuestRec
 export const fetchGuestCards = () => apiRequest<GuestCard[]>("/api/meal-ledgers/guest-cards");
 export const createGuestCard = (body: Pick<GuestCard, "card_no" | "emp_no" | "name">) =>
   apiRequest<GuestCard>("/api/meal-ledgers/guest-cards", { method: "POST", body });
-export const updateGuestCard = (key: string, is_active: boolean) =>
-  apiRequest<GuestCard>(`/api/meal-ledgers/guest-cards/${encodeURIComponent(key)}`, { method: "PUT", body: { is_active } });
+export const updateGuestCard = (key: string, body: Partial<Pick<GuestCard, "card_no" | "emp_no" | "name" | "is_active">>) =>
+  apiRequest<GuestCard>(`/api/meal-ledgers/guest-cards/${encodeURIComponent(key)}`, { method: "PUT", body });
 export const checkGuestRecharge = (id: number, end_date: string, source_keys?: string[]) =>
   apiRequest<GuestRechargeCheck>(`/api/meal-ledgers/records/${id}/recharge-check`, {
     method: "POST", body: { end_date, ...(source_keys === undefined ? {} : { source_keys }) },

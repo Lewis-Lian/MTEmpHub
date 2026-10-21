@@ -10,8 +10,39 @@ from services.meal_ticket_reconciliation import database_status, DATABASE_REQUES
 from services.meal_ticket_service import MealError, begin_write, cents, digest, required_text
 
 
+def has_history(card):
+    return db.session.query(MealLedgerRecord.query.filter(
+        MealLedgerRecord.data['guest_card_key'].as_string() == card.key).exists()).scalar()
+
+
 def serialize_card(card):
-    return {field:getattr(card, field) for field in ('key','card_no','emp_no','name','is_active')}
+    return {**{field:getattr(card, field) for field in ('key','card_no','emp_no','name','is_active')},
+            'has_history':has_history(card)}
+
+
+def update(key, body):
+    if not isinstance(body, dict) or not body or set(body) - {'card_no','emp_no','name','is_active'}:
+        raise MealError('请选择有效的客人卡资料')
+    values = {field:required_text(body[field], label, limit) for field, label, limit in (
+        ('card_no','卡号',50), ('emp_no','数据库人员编号',50), ('name','客人卡名称',100)) if field in body}
+    if 'is_active' in body:
+        if type(body['is_active']) is not bool:
+            raise MealError('客人卡启用状态无效')
+        values['is_active'] = body['is_active']
+    card = MealGuestCard.query.filter_by(key=key).with_for_update().first()
+    if not card:
+        raise MealError('客人卡不存在',404)
+    identity_changed = any(field in values and values[field] != getattr(card, field) for field in ('card_no','emp_no'))
+    if identity_changed and has_history(card):
+        raise MealError('已有领用历史，不能修改卡号或数据库人员编号',409)
+    if MealGuestCard.query.filter(MealGuestCard.key != key, db.or_(
+            MealGuestCard.card_no == values.get('card_no',card.card_no),
+            MealGuestCard.emp_no == values.get('emp_no',card.emp_no))).first():
+        raise MealError('卡号或数据库人员编号已登记',409)
+    for field, value in values.items():
+        setattr(card,field,value)
+    db.session.flush()
+    return card
 
 
 def register(body, operator):
