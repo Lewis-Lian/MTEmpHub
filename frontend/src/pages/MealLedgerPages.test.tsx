@@ -353,7 +353,7 @@ describe("菜票查询与台账页面", () => {
       return Promise.resolve([record]);
     });
     render(<MemoryRouter><MealLedgerPage kind={kind} /></MemoryRouter>);
-    if (kind === "external") fireEvent.click(await screen.findByRole("button", {name:"查看已有台账"}));
+    fireEvent.click(await screen.findByRole("button", {name:"查看已有台账"}));
     fireEvent.click(await screen.findByRole("button", { name: "作废" }));
     expect(screen.getByRole("button", { name: "确认作废" })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("作废原因"), { target: { value: "重复录入" } });
@@ -366,4 +366,43 @@ describe("菜票查询与台账页面", () => {
     } else await screen.findByText("已作废：重复录入");
     expect(screen.getByText("员工甲")).toBeInTheDocument();
   });
+});
+
+it("月末取款页查询确认后显示自动入账台账，手工登记为补充", async () => {
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2,"0")}`;
+  const record = {id:1,kind:"clearance",month,date:`${month}-20`,name:"员工甲",emp_no:"001",dept_name:"生产部",card_no:"C001",amount:20,remark:"数据库清零流水12",voided:false};
+  let rows: typeof record[] = [];
+  request.mockImplementation(async (path: string) => {
+    if (path === "/api/auth/me") return {role:"admin"};
+    if (path.endsWith("/preview")) return {month,start_date:`${month}-01`,end_date:`${month}-31`,source_digest:"source",rows:[
+      {...record,date:`${month}-20T10:00:00`,source_key:"source12",status:"available"}]};
+    if (path.endsWith("/confirm")) { rows = [record]; return {month,added:1,existing:0}; }
+    return rows;
+  });
+  render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button",{name:"查询取款流水"}));
+  expect(screen.queryByRole("region",{name:"记录概览统计"})).not.toBeInTheDocument();
+  fireEvent.click(await screen.findByLabelText("选择清零流水 source12"));
+  fireEvent.click(screen.getByRole("button",{name:"确认清零并入账"}));
+  await screen.findByRole("heading",{name:"取款记录列表"});
+  expect(screen.getByRole("region",{name:"记录概览统计"})).toHaveTextContent("20.00");
+  expect(screen.getByText("员工甲")).toBeInTheDocument();
+  expect(screen.getByText("手工补充登记")).toBeInTheDocument();
+});
+
+it("取款查询未返回时切换台账，不遗留忙碌状态或显示旧查询结果", async () => {
+  let finish!: (value: unknown) => void;
+  request.mockImplementation(async (path: string) => {
+    if (path === "/api/auth/me") return {role:"admin"};
+    if (path.endsWith("/preview")) return new Promise(resolve => { finish = resolve; });
+    return [];
+  });
+  const view = render(<MemoryRouter><MealLedgerPage kind="clearance" /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole("button",{name:"查询取款流水"}));
+  expect(screen.getByRole("button",{name:"查询取款流水"})).toBeDisabled();
+  view.rerender(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
+  await waitFor(() => expect(screen.getByRole("button",{name:"保存记录"})).toBeEnabled());
+  finish({month:"2026-09",start_date:"2026-09-01",end_date:"2026-09-30",source_digest:"old",rows:[]});
+  await waitFor(() => expect(screen.queryByRole("region",{name:"数据库清零入账"})).not.toBeInTheDocument());
 });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { fetchAdminDepartments } from "../api/admin";
 import type { AdminDepartment } from "../types/admin";
 import DepartmentPicker from "../components/query/DepartmentPicker";
@@ -6,6 +6,7 @@ import { apiRequest } from "../api/client";
 import { businessMonth, fetchAnnual, fetchLedger, fetchGuestCards, money, saveLedger, voidLedger,
   type AnnualLedger, type DepartmentLedger, type LedgerKind, type LedgerRecord, type GuestCard } from "../api/mealLedgers";
 import { GuestCardRegistry, GuestRechargeDialog } from "../components/meal/GuestCardTools";
+import MealClearanceImport, { type ClearanceStage } from "../components/meal/MealClearanceImport";
 import QueryTable from "../components/query/QueryTable";
 import MonthPicker from "../components/common/MonthPicker";
 import LoadingState from "../components/feedback/LoadingState";
@@ -26,7 +27,7 @@ const titles = {
 const descriptions = {
   department: "部门发放合计包含员工净实际发放、客人卡充值和纸质菜票，外来领用自动计入承担费用的部门。",
   external: "选择客人卡登记本次领用，再查询数据库核对充值；已核对到账计入承担部门。纸质金额填写票面总额。",
-  clearance: "在菜票软件完成余额清零后登记，卡余额即当次取款金额，不影响菜票发放结清。",
+  clearance: "查询真实取款流水，确认月末余额清零后自动入账；手工登记作为补充，不影响菜票发放结清。",
   annual: "按实际业务月份汇总。纸质领用单列，收回取实际清零记录，消费未录入保持空值。",
 };
 
@@ -50,6 +51,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const [departments, setDepartments] = useState<AdminDepartment[]>([]);
   const [serviceRange, setServiceRange] = useState({start:"", end:""});
   const [cards, setCards] = useState<GuestCard[]>([]);
+  const [clearanceStage, setClearanceStage] = useState<ClearanceStage>("query");
   const [externalStep, setExternalStep] = useState<"register" | "recharge" | "ledger">("register");
   const [rechargeTarget, setRechargeTarget] = useState<LedgerRecord | null>(null);
   const [records, setRecords] = useState<LedgerRecord[]>([]);
@@ -68,6 +70,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const [detailTarget, setDetailTarget] = useState<LedgerRecord | null>(null);
   const [voidReason, setVoidReason] = useState("");
   const detailDialog = useRef<HTMLElement>(null);
+  const ledgerRevision = useRef(0);
   const request = useRef({ signature: "", key: "" });
 
   useEffect(() => {
@@ -95,7 +98,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   }, [kind]);
 
   useEffect(() => {
-    setExternalStep("register"); setDetailTarget(null); setRechargeTarget(null);
+    ledgerRevision.current += 1; setBusy(false);
+    setClearanceStage("query"); setExternalStep("register"); setDetailTarget(null); setRechargeTarget(null);
     if (kind === "external") { setSearch(""); setCategory(""); }
   }, [kind, month]);
 
@@ -161,6 +165,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
         setExternalStep(form.category === "card" && form.guest_card_key ? "recharge" : "ledger");
         setSearch(""); setCategory("");
       }
+      if (kind === "clearance") setClearanceStage("ledger");
       request.current = { signature: "", key: "" };
       setServiceRange({start:"", end:""});
       setForm(kind === "external" ? { ...initialForm(), date: form.date, dept_name: form.dept_name, category: form.category, guest_card_key: form.guest_card_key, card_no: form.card_no, emp_no: form.emp_no } : initialForm()); setRefresh(n => n + 1); setMessage("记录已保存");
@@ -178,6 +183,9 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
   const validRecords = visible.filter(r => !r.voided);
   const voidedRecords = visible.filter(r => r.voided);
   const validTotalAmount = validRecords.reduce((sum, r) => sum + (kind === "external" ? actualAmount(r) : r.amount), 0);
+
+  const showClearanceLedger = kind !== "clearance" || !admin || clearanceStage === "ledger";
+  const ManualContainer = kind === "clearance" ? "details" : Fragment;
 
   return (
     <section className={`meal-ticket-page meal-ledger-page${kind === "external" ? " is-external" : ""}`}>
@@ -225,6 +233,13 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
               </button>}
             </div>}
           </div>}
+          {kind === "clearance" && admin && <MealClearanceImport key={month} month={month} stage={clearanceStage}
+            onStageChange={setClearanceStage} busy={busy} onBusyChange={setBusy}
+            onImported={async () => {
+              const revision = ledgerRevision.current;
+              const rows = await fetchLedger<LedgerRecord[]>("clearance", month);
+              if (revision === ledgerRevision.current) setRecords(rows);
+            }} />}
           {/* KPI 指标概览卡片 */}
           {kind === "department" && department && (
             <section className="meal-ledger-stats" aria-label="部门发放统计">
@@ -366,7 +381,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
             </>
           )}
 
-          {kind === "clearance" && (
+          {kind === "clearance" && showClearanceLedger && (
             <section className="meal-ledger-stats" aria-label="记录概览统计">
               <div className="meal-ledger-stat-card is-green">
                 <span className="meal-ledger-stat-label">有效清零总额</span>
@@ -389,7 +404,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
           )}
 
           {/* 表格数据展示区域 */}
-          {(kind !== "external" || externalStage !== "register") && <div className={`meal-ticket-panel meal-ledger-list is-${kind}`}>
+          {showClearanceLedger && (kind !== "external" || externalStage !== "register") && <div className={`meal-ticket-panel meal-ledger-list is-${kind}`}>
             {kind === "department" && department && (
               <>
                 <div className="meal-ticket-section-heading">
@@ -507,6 +522,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
 
           {/* 管理员登记表单 */}
           {admin && kind !== "department" && kind !== "external" && (
+            <ManualContainer>
+            {kind === "clearance" && <summary className="meal-ticket-button">手工补充登记</summary>}
             <div className="meal-ticket-panel meal-ledger-form-card">
               <div className="meal-ledger-card-header">
                 <div>
@@ -553,6 +570,7 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
                 </div>
               </form>
             </div>
+            </ManualContainer>
           )}
         </>
       )}

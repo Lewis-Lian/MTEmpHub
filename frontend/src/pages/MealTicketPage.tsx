@@ -1,3 +1,4 @@
+import QueryProgressOverlay, { TaskProgress } from "../components/feedback/QueryProgressOverlay";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchMe } from "../api/auth";
@@ -617,13 +618,6 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       }} />}
 
     {error && <div role="alert" className="meal-ticket-alert is-error">{error}</div>}
-    {busy && !target && !bulk && <div className="meal-ticket-modal meal-ticket-loading-modal"><section role="status" className="meal-ticket-loading meal-ticket-panel meal-ticket-loading-dialog" aria-live="polite">
-      <div className="meal-ticket-loading-heading"><span><i className="meal-ticket-loading-dot" aria-hidden="true" />{loadProgress?.text ?? "正在提交并等待处理结果"}</span><strong>{progressPercent === null ? "处理中" : `${loadProgress?.phase ? "当前阶段 " : ""}${progressPercent}%`}</strong></div>
-      <div className={`meal-ticket-progress-track${progressPercent === null ? " is-indeterminate" : ""}`} role="progressbar" aria-label={loadProgress?.label ?? "操作进度"} aria-valuetext={loadProgress?.text} aria-valuemin={0} aria-valuemax={100} aria-valuenow={progressPercent ?? undefined}>
-        <span style={progressPercent === null ? undefined : { width: `${progressPercent}%` }} />
-      </div>
-      <p>{loadProgress?.phase ? loadProgress.total > 0 ? `当前阶段已完成 ${loadProgress.completed} / ${loadProgress.total} 人` : "正在执行当前阶段，完成后自动进入下一阶段。" : loadProgress ? `已完成 ${loadProgress.completed} / ${loadProgress.total} 项请求` : "处理完成后会自动更新账目，请稍候。"}</p>
-    </section></div>}
     {!historical && (!paymentView || registering) && batch?.source_changed && <p className="meal-ticket-alert">{confirmed ? paymentView ? "源考勤或人员资料已变化。请在第一步重算考勤数据，核对差额后登记补扣；原核算和实际充值金额保留。" : "源考勤或人员资料已变化。请前往后续补扣与对账页核对差额；原核算和实际充值金额保留。" : "源考勤或人员资料已变化，草稿请重算。"}</p>}
     {!historical && !busy && (paymentView ? !confirmed : !batch) && <div className="meal-ticket-empty meal-ticket-panel"><h2>{paymentView ? "请先完成月度核算" : "本月尚无核算记录"}</h2><p>{paymentView ? "在月度发放页生成草稿、处理补扣并确认核算后，再处理后续补扣与对账。" : "该充值月尚无核算记录，请在计算与核对区域计算对应上月考勤的草稿。"}</p>{paymentView && <Link className="meal-ticket-button is-primary" to={`/meal-tickets/calculation?recharge_month=${month}`}>前往月度发放</Link>}</div>}
     {!historical && showBatch && batch && <>
@@ -707,11 +701,11 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         <p className="meal-ticket-reason-hint">原因或说明必填，常用语可继续编辑。</p>
         {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
         {(bulk || busy) && <div className="meal-ticket-operation-progress" role="status" aria-live="polite">
-          <div className="meal-ticket-loading-heading"><span>{busy ? loadProgress?.text ?? "正在提交并等待处理结果" : error ? "未完成人员可继续重试" : "准备就绪，等待确认"}</span><strong>{bulk ? `${progressPercent ?? 0}%` : "处理中"}</strong></div>
-          <div className={`meal-ticket-progress-track${bulk ? "" : " is-indeterminate"}`} role="progressbar" aria-label={loadProgress?.label ?? (!bulk ? "操作进度" : participationForm ? "批量核算处理进度" : action === "adjustments" ? "批量补扣进度" : bulk ? "批量充值进度" : "操作进度")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={bulk ? progressPercent ?? 0 : undefined}>
-            <span style={bulk ? { width: `${progressPercent ?? 0}%` } : undefined} />
-          </div>
+          <TaskProgress active={busy} progress={bulk ? progressPercent ?? 0 : null} status={error ? "failed" : busy ? "running" : "pending"}
+            text={busy ? loadProgress?.text ?? "正在提交并等待处理结果" : error ? "未完成人员可继续重试" : "准备就绪，等待确认"}
+            label={loadProgress?.label ?? (!bulk ? "操作进度" : participationForm ? "批量核算处理进度" : action === "adjustments" ? "批量补扣进度" : "批量充值进度")}>
           <p>{busy && loadProgress ? `已完成 ${loadProgress.completed} / ${loadProgress.total} 人，请等待处理完成。` : busy ? "处理完成后会自动更新账目。" : `待处理 ${bulkItems.length} 人，进度按实际成功人数更新。`}</p>
+          </TaskProgress>
         </div>}
         <div className="meal-ticket-actions"><button className="meal-ticket-button is-primary" disabled={busy || !reason.trim() || (bulk && !bulkItems.length)} type="submit">{participationForm ? `确认${participationLabel}` : action === "adjustments" ? "保存补扣" : "确认登记"}</button><button className="meal-ticket-button" type="button" disabled={busy} onClick={() => { setTarget(null); setBulk(false); }}>取消</button></div>
       </form>
@@ -883,5 +877,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         </div>}
       </section>}
     </>}
+    {busy && !target && !bulk && <QueryProgressOverlay active progress={progressPercent} status="running" label={loadProgress?.label ?? "操作进度"} text={loadProgress?.text ?? "正在提交并等待处理结果"}>
+        <p>{loadProgress?.phase ? loadProgress.total > 0 ? `当前阶段已完成 ${loadProgress.completed} / ${loadProgress.total} 人` : "正在执行当前阶段，完成后自动进入下一阶段。" : loadProgress ? `已完成 ${loadProgress.completed} / ${loadProgress.total} 项请求` : "处理完成后会自动更新账目，请稍候。"}</p>
+      </QueryProgressOverlay>}
   </main>;
 }

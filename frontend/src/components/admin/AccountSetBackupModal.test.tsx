@@ -41,7 +41,7 @@ it('shows real stage counts while uploading and removes progress when the previe
   renderModal();
   fireEvent.change(screen.getByLabelText('选择账套备份'), {target:{files:[new File(['zip'],'backup.zip')]}});
   act(() => report({phase:'target',stage:'读取本地数据',completed:25,total:100,percent:25,status:'running'}));
-  expect(screen.getByRole('progressbar')).toHaveAttribute('value', '25');
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25');
   expect(screen.getByText(/25 \/ 100 条记录/)).toBeInTheDocument();
   expect(screen.getByText(/已耗时/)).toBeInTheDocument();
   act(() => report({phase:'dependencies',stage:'校验关联关系',completed:0,total:0,percent:null,status:'running'}));

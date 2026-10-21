@@ -187,8 +187,9 @@
   bottom: 0;
   left: 0;
   height: 3px;
-  background: currentColor;
-  opacity: 0.18;
+  background: linear-gradient(90deg, #3b82f6, #4f46e5, #8b5cf6);
+  border-radius: 999px;
+  opacity: 0.65;
   width: 100%;
   transform-origin: left;
   animation: notification-progress linear forwards;

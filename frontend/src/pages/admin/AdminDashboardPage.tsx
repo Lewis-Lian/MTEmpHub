@@ -92,7 +92,7 @@ export default function AdminDashboardPage() {
   const [dragOverIndex, setDragOverIndex] = useState<Array<boolean>>(() => Array.from({ length: 6 }, () => false));
   const [attendanceSettings, setAttendanceSettings] = useState<AdminAttendanceSettings | null>(null);
   const [progressVisible, setProgressVisible] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<number | null>(null);
   const [loadingText, setLoadingText] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -104,7 +104,7 @@ export default function AdminDashboardPage() {
     setUploadFiles(Array.from({ length: 6 }, () => null));
     setDragOverIndex(Array.from({ length: 6 }, () => false));
     setProgressVisible(false);
-    setProgress(0);
+    setProgress(null);
     setLoadingText("");
   };
 
@@ -283,7 +283,7 @@ export default function AdminDashboardPage() {
     }
 
     setProgressVisible(true);
-    setProgress(0);
+    setProgress(null);
     setLoadingText(
       mode === "employee"
         ? "正在对员工考勤进行汇总与数据结算..."
@@ -368,7 +368,7 @@ export default function AdminDashboardPage() {
   return (
     <section className="account-center-page" aria-label="账套管理工作台">
       <QueryProgressOverlay
-        active={progressVisible}
+        active={progressVisible && !showModal}
         className="query-progress-overlay-page"
         progress={progress}
         text={loadingText}
@@ -801,24 +801,18 @@ export default function AdminDashboardPage() {
                         }
                         void runAction(async () => {
                           setProgressVisible(true);
-                          setProgress(0);
+                          setProgress(null);
                           setLoadingText("正在创建新账套...");
-                          let current = 0;
-                          const interval = setInterval(() => {
-                            current += Math.floor(Math.random() * 15) + 5;
-                            if (current >= 95) current = 95;
-                            setProgress(current);
-                          }, 80);
                           try {
                             const payload = await createAccountSet(createMonth);
                             setCreateMonth("");
-                            clearInterval(interval);
+
                             setProgress(100);
                             setLoadingText("新账套创建成功！");
                             notification.success(`创建成功：${payload.account_set.name}`);
                             await reloadAccountSets(payload.account_set.id);
                           } catch (caughtError) {
-                            clearInterval(interval);
+
                             notification.error(caughtError instanceof ApiError ? caughtError.message : "创建账套失败");
                           } finally {
                             setTimeout(() => {
@@ -879,7 +873,7 @@ export default function AdminDashboardPage() {
                           void runAction(async () => {
                             if (!selectedAccountSet) return;
                             setProgressVisible(true);
-                            setProgress(0);
+                            setProgress(null);
                             setLoadingText("正在设置当前激活账套...");
                             try {
                               await activateAccountSet(selectedAccountSet.id);
@@ -916,7 +910,7 @@ export default function AdminDashboardPage() {
                               });
                               if (!isConfirmed) return;
                               setProgressVisible(true);
-                              setProgress(0);
+                              setProgress(null);
                               setLoadingText("正在解锁当前账套...");
                               try {
                                 await unlockAccountSet(selectedAccountSet.id);
@@ -947,7 +941,7 @@ export default function AdminDashboardPage() {
                               });
                               if (!isConfirmed) return;
                               setProgressVisible(true);
-                              setProgress(0);
+                              setProgress(null);
                               setLoadingText("正在锁定当前账套...");
                               try {
                                 await lockAccountSet(selectedAccountSet.id);
@@ -982,7 +976,7 @@ export default function AdminDashboardPage() {
                             });
                             if (!isConfirmed) return;
                             setProgressVisible(true);
-                            setProgress(0);
+                            setProgress(null);
                             setLoadingText("正在清空已导入数据...");
                             try {
                               const result = await resetAccountSetImported(selectedAccountSet.id);
@@ -1014,7 +1008,7 @@ export default function AdminDashboardPage() {
                             });
                             if (!isConfirmed) return;
                             setProgressVisible(true);
-                            setProgress(0);
+                            setProgress(null);
                             setLoadingText("正在删除该账套...");
                             try {
                               await deleteAccountSet(selectedAccountSet.id);
@@ -1170,7 +1164,7 @@ export default function AdminDashboardPage() {
                           void runAction(async () => {
                             if (!selectedAccountSet) return;
                             setProgressVisible(true);
-                            setProgress(0);
+                            setProgress(null);
                             setLoadingText("正在保存账套参数与厂休明细...");
                             try {
                               const payload: { monthly_benefit_days: string; factory_rest_entries?: AdminAccountSetFactoryRestEntry[] } = {
@@ -1364,12 +1358,12 @@ export default function AdminDashboardPage() {
                       }
 
                       setProgressVisible(true);
-                      setProgress(0);
+                      setProgress(null);
                       setLoadingText("正在上传原始文件...");
 
                       try {
                         const response = await uploadAccountSetRawFiles(selectedAccountSet.id, files, (percent) => {
-                          setProgress(percent);
+                          setProgress(percent >= 100 ? null : percent);
                           if (percent >= 100) {
                             setLoadingText("上传完成，正在归档原始文件...");
                           }

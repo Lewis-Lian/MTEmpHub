@@ -69,47 +69,9 @@ export default function EmployeeDashboardPage() {
   const [hasQueried, setHasQueried] = useState(false);
 
   // 进度条控制状态
-  const [progress, setProgress] = useState(0);
-  const [progressVisible, setProgressVisible] = useState(false);
   const [loadingText, setLoadingText] = useState("正在为您查询考勤数据...");
 
-  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
   useMonthQueryBootstrap(selectedMonth, setBootstrap, setError);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
-    let fadeTimer: ReturnType<typeof setTimeout>;
-    let resetTimer: ReturnType<typeof setTimeout>;
-
-    if (isQuerying) {
-      setProgressVisible(true);
-      setProgress(10);
-      timer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(timer);
-            return 90;
-          }
-          const step = (100 - prev) * 0.15;
-          return Math.min(90, Math.round(prev + step));
-        });
-      }, 150);
-    } else if (progressVisible) {
-      setProgress(100);
-      fadeTimer = setTimeout(() => {
-        setProgressVisible(false);
-        resetTimer = setTimeout(() => {
-          setProgress(0);
-        }, 300); // 确保淡出动画结束后清零
-      }, 400);
-    }
-
-    return () => {
-      clearInterval(timer);
-      clearTimeout(fadeTimer);
-      clearTimeout(resetTimer);
-    };
-  }, [isQuerying]);
 
   useEffect(() => {
     let mounted = true;
@@ -287,7 +249,7 @@ export default function EmployeeDashboardPage() {
       </aside>
 
       <section className="query-workspace">
-        <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
+        <QueryProgressOverlay active={isQuerying} progress={null} text={loadingText} />
         {hasQueried ? (
           <QueryResultPanel>
             <QueryTable

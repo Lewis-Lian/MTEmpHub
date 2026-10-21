@@ -173,8 +173,8 @@ export default function MealFollowupQueue({ month, batchVersion, refreshRevision
               {pending.length + awaiting.length + verified.length > 0 ? Math.round(((awaiting.length + verified.length) / (pending.length + awaiting.length + verified.length)) * 100) : 0}%
             </span>
           </div>
-          <div className="meal-followup-progress-bar" aria-hidden="true">
-            <span className="meal-followup-progress-fill" style={{ width: `${pending.length + awaiting.length + verified.length > 0 ? ((awaiting.length + verified.length) / (pending.length + awaiting.length + verified.length)) * 100 : 0}%` }} />
+          <div className="query-progress-track" aria-hidden="true">
+            <span className="query-progress-fill" style={{ transform: `scaleX(${pending.length + awaiting.length + verified.length > 0 ? (awaiting.length + verified.length) / (pending.length + awaiting.length + verified.length) : 0})` }} />
           </div>
           <p>完成按钮仅保存外部操作声明，不登记实际到账。流水可能延迟，请先核对，勿据此再次充值或取款。</p>
         </div>

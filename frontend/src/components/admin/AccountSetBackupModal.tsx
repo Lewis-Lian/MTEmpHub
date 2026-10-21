@@ -1,3 +1,4 @@
+import { TaskProgress } from "../feedback/QueryProgressOverlay";
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../../api/client';
 import { uploadMonthlyBackup, refreshMonthlyBackupPreview, confirmMonthlyBackupRestore, cancelMonthlyBackupPreview,
@@ -162,12 +163,12 @@ export default function AccountSetBackupModal({onClose, onRestored, onReauthenti
     <div className="acm-modal-body">
       <ol className="backup-steps" aria-label="导入步骤">{['选择备份', '选择月份与核对变更', '确认恢复'].map((label, index) => <li key={label} className={index === (result || confirming ? 2 : preview ? 1 : 0) ? 'is-current' : ''}><span>{index + 1}</span>{label}</li>)}</ol>
       {error && <p role="alert" className="backup-error">{error}</p>}
-      {busy && <div className="backup-processing" role="status"><span className="backup-processing-spinner" aria-hidden="true" />
-        {progress ? <div className="backup-processing-copy"><strong>{progress.stage}</strong>
-          <p>{(progress.total ?? 0) > 0 && `${(progress.completed ?? 0).toLocaleString()} / ${progress.total!.toLocaleString()} ${['upload', 'unpacking'].includes(progress.phase ?? '') ? '字节' : progress.phase === 'completed' ? '项' : '条记录'} · `}
-            已耗时 {elapsed} 秒{progress.percent !== null && ` · 当前阶段 ${Math.floor(progress.percent)}%`}</p>
-          <progress className="backup-import-progress" aria-label="当前阶段进度" max={100} value={progress.percent ?? undefined} />
-        </div> : <p>{confirming ? '正在恢复账套数据' : preview ? '正在重新核对差异' : '正在上传并解析备份'}</p>}
+      {busy && <div role="status" aria-live="polite">
+        <TaskProgress active={busy} progress={progress?.percent ?? null} status="running" label="当前阶段进度"
+          text={progress?.stage ?? (confirming ? '正在恢复账套数据' : preview ? '正在重新核对差异' : '正在上传并解析备份')}>
+          <p>{(progress?.total ?? 0) > 0 && `${(progress?.completed ?? 0).toLocaleString()} / ${progress!.total!.toLocaleString()} ${['upload', 'unpacking'].includes(progress?.phase ?? '') ? '字节' : progress?.phase === 'completed' ? '项' : '条记录'} · `}
+            已耗时 {elapsed} 秒</p>
+        </TaskProgress>
       </div>}
       {!preview && <div className={`backup-upload-zone${dragging ? ' is-dragging' : ''}`} role="region" aria-label="上传账套备份" aria-busy={busy}
         onDragEnter={event => {event.preventDefault(); if (!busy && event.dataTransfer.types.includes('Files')) {dragDepth.current++; setDragging(true);}}}

@@ -1,3 +1,4 @@
+import { TaskProgress } from "../../components/feedback/QueryProgressOverlay";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -51,12 +52,12 @@ export default function AttendanceSourceSettingsPage() {
   const cardFormSeeded = useRef(false);
   const employeePollRef = useRef<any>(null);
   const managerPollRef = useRef<any>(null);
-  const [employeeProgress, setEmployeeProgress] = useState<{ active: boolean; percent: number; stage: string }>({
+  const [employeeProgress, setEmployeeProgress] = useState<{ active: boolean; percent: number | null; stage: string; status?: "running" | "completed" | "failed" }>({
     active: false,
     percent: 0,
     stage: "",
   });
-  const [managerProgress, setManagerProgress] = useState<{ active: boolean; percent: number; stage: string }>({
+  const [managerProgress, setManagerProgress] = useState<{ active: boolean; percent: number | null; stage: string; status?: "running" | "completed" | "failed" }>({
     active: false,
     percent: 0,
     stage: "",
@@ -254,7 +255,7 @@ export default function AttendanceSourceSettingsPage() {
     setAttendanceResult(null);
     setHistoryLoading(false);
     setHistoryError("");
-    setManagerProgress({ active: true, percent: 5, stage: "正在连接钉钉并准备同步..." });
+    setManagerProgress({ active: true, status: "running", percent: null, stage: "正在连接钉钉并准备同步..." });
 
     if (employeePollRef.current) clearInterval(employeePollRef.current);
     managerPollRef.current = setInterval(() => {
@@ -262,11 +263,12 @@ export default function AttendanceSourceSettingsPage() {
         fetchSyncProgress(selectedAttendanceAccount, "manager")
           .then((prog) => {
             if (prog && prog.status !== "idle") {
-              setManagerProgress({
+              setManagerProgress(prev => prev.status !== "running" ? prev : ({
                 active: true,
+                status: "running",
                 percent: prog.percent,
                 stage: prog.stage || "正在同步管理人员考勤...",
-              });
+              }));
             }
           })
           .catch(() => {});
@@ -277,13 +279,13 @@ export default function AttendanceSourceSettingsPage() {
     try {
       const result = await syncManagerAttendance(selectedAttendanceAccount);
       if (sequence !== requestSequence.current) return;
-      setManagerProgress({ active: true, percent: 100, stage: "管理人员考勤同步完成" });
+      setManagerProgress({ active: true, percent: 100, status: result.status === "success" || result.status === "partial" ? "completed" : "failed", stage: result.status === "success" || result.status === "partial" ? "管理人员考勤同步完成" : "管理人员考勤同步失败" });
       setAttendanceResult(result);
       if (result.status === "success") notification.success("管理人员考勤同步成功");
       else if (result.status === "partial") notification.warning(result.message || "同步完成，但存在未匹配记录");
       else notification.error(result.message || "同步失败");
     } catch (err: any) {
-      setManagerProgress((prev) => ({ ...prev, stage: "同步异常中断" }));
+      setManagerProgress((prev) => ({ ...prev, status: "failed", stage: "同步异常中断" }));
       handleAdminApiError(err, "管理人员考勤同步失败");
     } finally {
       if (managerPollRef.current) {
@@ -303,7 +305,7 @@ export default function AttendanceSourceSettingsPage() {
     setEmployeeResult(null);
     setEmployeeHistoryLoading(false);
     setEmployeeHistoryError("");
-    setEmployeeProgress({ active: true, percent: 5, stage: "正在连接考勤机数据库..." });
+    setEmployeeProgress({ active: true, status: "running", percent: null, stage: "正在连接考勤机数据库..." });
 
     if (employeePollRef.current) clearInterval(employeePollRef.current);
     employeePollRef.current = setInterval(() => {
@@ -311,11 +313,12 @@ export default function AttendanceSourceSettingsPage() {
         fetchSyncProgress(selectedEmployeeAccount, "employee")
           .then((prog) => {
             if (prog && prog.status !== "idle") {
-              setEmployeeProgress({
+              setEmployeeProgress(prev => prev.status !== "running" ? prev : ({
                 active: true,
+                status: "running",
                 percent: prog.percent,
                 stage: prog.stage || "正在同步员工考勤...",
-              });
+              }));
             }
           })
           .catch(() => {});
@@ -326,13 +329,13 @@ export default function AttendanceSourceSettingsPage() {
     try {
       const result = await syncEmployeeAttendance(selectedEmployeeAccount);
       if (sequence !== employeeSequence.current) return;
-      setEmployeeProgress({ active: true, percent: 100, stage: "员工考勤同步完成" });
+      setEmployeeProgress({ active: true, percent: 100, status: result.status === "success" || result.status === "partial" ? "completed" : "failed", stage: result.status === "success" || result.status === "partial" ? "员工考勤同步完成" : "员工考勤同步失败" });
       setEmployeeResult(result);
       if (result.status === "success") notification.success("员工考勤同步成功");
       else if (result.status === "partial") notification.warning(result.message || "同步完成，但存在未匹配记录");
       else notification.error(result.message || "同步失败");
     } catch (err: any) {
-      setEmployeeProgress((prev) => ({ ...prev, stage: "同步异常中断" }));
+      setEmployeeProgress((prev) => ({ ...prev, status: "failed", stage: "同步异常中断" }));
       if (err?.status === 401 || err?.status === 403) {
         handleAdminApiError(err, "员工考勤同步失败");
       } else {
@@ -590,30 +593,7 @@ export default function AttendanceSourceSettingsPage() {
                   </div>
                 )}
 
-                {employeeProgress.active && (
-                  <div
-                    className="settings-progress-card"
-                    role="progressbar"
-                    aria-valuenow={employeeProgress.percent}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="员工考勤同步进度"
-                  >
-                    <div className="settings-progress-header">
-                      <div className="settings-progress-info">
-                        <span className="settings-progress-spinner" aria-hidden="true" />
-                        <span className="settings-progress-stage">{employeeProgress.stage}</span>
-                      </div>
-                      <span className="settings-progress-percent">{employeeProgress.percent}%</span>
-                    </div>
-                    <div className="settings-progress-track">
-                      <div
-                        className="settings-progress-fill"
-                        style={{ width: `${Math.max(3, Math.min(100, employeeProgress.percent))}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                {employeeProgress.active && <div role="status" aria-live="polite"><TaskProgress active={employeeProgress.active} progress={employeeProgress.percent} status={employeeProgress.status ?? "running"} label="员工考勤同步进度" text={employeeProgress.stage} /></div>}
 
                 {authUser?.role === "admin" && employeeHistoryLoading && (
                   <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>正在加载员工同步记录...</p>
@@ -778,30 +758,7 @@ export default function AttendanceSourceSettingsPage() {
                   </div>
                 )}
 
-                {managerProgress.active && (
-                  <div
-                    className="settings-progress-card"
-                    role="progressbar"
-                    aria-valuenow={managerProgress.percent}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="管理人员考勤同步进度"
-                  >
-                    <div className="settings-progress-header">
-                      <div className="settings-progress-info">
-                        <span className="settings-progress-spinner" aria-hidden="true" />
-                        <span className="settings-progress-stage">{managerProgress.stage}</span>
-                      </div>
-                      <span className="settings-progress-percent">{managerProgress.percent}%</span>
-                    </div>
-                    <div className="settings-progress-track">
-                      <div
-                        className="settings-progress-fill"
-                        style={{ width: `${Math.max(3, Math.min(100, managerProgress.percent))}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+                {managerProgress.active && <div role="status" aria-live="polite"><TaskProgress active={managerProgress.active} progress={managerProgress.percent} status={managerProgress.status ?? "running"} label="管理人员考勤同步进度" text={managerProgress.stage} /></div>}
 
                 {authUser?.role === "admin" && authChecked && attendanceAccounts.length === 0 && (
                   <p style={{ color: "#6b7280", fontSize: 13, margin: 0 }}>暂无可用账套。</p>

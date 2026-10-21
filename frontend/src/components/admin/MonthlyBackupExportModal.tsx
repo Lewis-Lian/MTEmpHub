@@ -1,3 +1,4 @@
+import { TaskProgress } from "../feedback/QueryProgressOverlay";
 import { useEffect, useState } from 'react';
 import { downloadMonthlyBackup, type BackupExportProgress } from '../../api/accountSetBackup';
 import { BACKUP_CATEGORIES } from './backupLabels';
@@ -39,10 +40,11 @@ export default function MonthlyBackupExportModal({accountSets, initialId, onClos
       <p>保留业务数据、导入记录和当月人员资料，不附带导入时的原始文件。</p>
       <p>ZIP 备份上传限制为 100 MiB。超限请减少导出月份或内容后重试。</p>
       {error && <p role="alert" className="backup-error">{error}</p>}
-      {progress && <div className="acm-export-progress" role="status"><div className="acm-export-progress-heading"><span>{progress.stage}</span><strong>{receiving ? '接收中' : indeterminate ? '处理中' : `${Math.floor(progress.percent ?? 0)}%`}</strong></div>
-        <div className={`acm-export-progress-track${indeterminate ? ' acm-export-progress-track--indeterminate' : ''}`} role="progressbar" aria-label="账套导出当前阶段进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={indeterminate ? undefined : progress.percent ?? undefined}><span style={indeterminate ? undefined : {width: `${progress.percent}%`}} /></div>
+      {progress && <div role="status" aria-live="polite">
+        <TaskProgress active={busy} progress={indeterminate ? null : progress.percent} status={error ? 'failed' : progress.status === 'ready' ? 'running' : progress.status} label="账套导出当前阶段进度" text={progress.stage}>
         {progress.unit === 'records' && progress.completed !== undefined && progress.total !== undefined && progress.total > 0 && <p>{progress.completed.toLocaleString()} / {progress.total.toLocaleString()} 条记录</p>}
         <p>{indeterminate ? '当前阶段处理中，暂无法计算完成比例' : '显示当前阶段的实际完成进度'}{busy && ` · 已用时 ${elapsed} 秒`}</p>
+        </TaskProgress>
       </div>}
       <div className="backup-toolbar backup-footer"><button className="backup-primary-btn" disabled={busy || !selectedIds.length || !categories.length} onClick={() => void download()}>开始导出</button><button disabled={busy} onClick={onClose}>关闭</button></div>
     </div>

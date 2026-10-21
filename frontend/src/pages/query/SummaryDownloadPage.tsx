@@ -138,7 +138,6 @@ export default function SummaryDownloadPage() {
 
   // 进度条状态
   const [progressVisible, setProgressVisible] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
 
   useMonthQueryBootstrap(selectedMonth, setBootstrap, setError);
@@ -175,13 +174,8 @@ export default function SummaryDownloadPage() {
 
   // 下载进度条定时器：组件卸载时清理，避免卸载后 setState。
   const downloadTimersRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const downloadIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     return () => {
-      if (downloadIntervalRef.current) {
-        clearInterval(downloadIntervalRef.current);
-        downloadIntervalRef.current = null;
-      }
       if (downloadTimersRef.current) {
         clearTimeout(downloadTimersRef.current);
         downloadTimersRef.current = null;
@@ -266,31 +260,11 @@ export default function SummaryDownloadPage() {
     if (includeMgrDeptHours) query.set("mgr_dept_hours_headers", mgrDeptHoursHeaders.join(","));
 
     setProgressVisible(true);
-    setProgress(0);
-    setLoadingText("正在为您生成并下载汇总工作簿...");
+    setLoadingText("下载请求已提交，请在浏览器中查看下载状态。");
+    window.location.href = buildDownloadUrl("/api/query/summary-download/export", query);
+    if (downloadTimersRef.current) clearTimeout(downloadTimersRef.current);
+    downloadTimersRef.current = setTimeout(() => setProgressVisible(false), 500);
 
-    let current = 0;
-    downloadIntervalRef.current = setInterval(() => {
-      current += Math.floor(Math.random() * 15) + 5;
-      if (current >= 99) {
-        current = 99;
-      }
-      setProgress(current);
-    }, 150);
-
-    downloadTimersRef.current = setTimeout(() => {
-      if (downloadIntervalRef.current) {
-        clearInterval(downloadIntervalRef.current);
-        downloadIntervalRef.current = null;
-      }
-      setProgress(100);
-      setLoadingText("下载已准备就绪！");
-      window.location.href = buildDownloadUrl("/api/query/summary-download/export", query);
-
-      downloadTimersRef.current = setTimeout(() => {
-        setProgressVisible(false);
-      }, 500);
-    }, 1500);
   }
 
   if (isLoading) {
@@ -351,7 +325,7 @@ export default function SummaryDownloadPage() {
 
   return (
     <section className="legacy-page-section summary-download-container">
-      <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
+      <QueryProgressOverlay active={progressVisible} progress={null} text={loadingText} />
 
       {/* 载入高级页内 CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
@@ -360,11 +334,6 @@ export default function SummaryDownloadPage() {
           max-width: 1200px;
           margin: 0 auto;
           animation: fadeIn 0.4s ease-out;
-        }
-        .summary-download-container .query-progress-overlay {
-          position: absolute !important;
-          inset: 0 !important;
-          border-radius: 0 !important;
         }
         @keyframes fadeIn {
           from { opacity: 0; transform: translateY(8px); }

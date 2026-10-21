@@ -73,7 +73,7 @@ export default function ManagerMonthStatPage({
   const [hasQueried, setHasQueried] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [progressVisible, setProgressVisible] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState<number | null>(null);
   const [loadingText, setLoadingText] = useState("");
 
   useEffect(() => {
@@ -109,42 +109,6 @@ export default function ManagerMonthStatPage({
     String(row.remark ?? ""),
     <button className="account-action-button" onClick={() => openEdit(row)} type="button">编辑</button>,
   ]);
-
-  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
-    let fadeTimer: ReturnType<typeof setTimeout>;
-    let resetTimer: ReturnType<typeof setTimeout>;
-
-    if (isQuerying) {
-      setProgressVisible(true);
-      setProgress(10);
-      timer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(timer);
-            return 90;
-          }
-          const step = (100 - prev) * 0.15;
-          return Math.min(90, Math.round(prev + step));
-        });
-      }, 150);
-    } else if (progressVisible) {
-      setProgress(100);
-      fadeTimer = setTimeout(() => {
-        setProgressVisible(false);
-        resetTimer = setTimeout(() => {
-          setProgress(0);
-        }, 300);
-      }, 400);
-    }
-
-    return () => {
-      clearInterval(timer);
-      clearTimeout(fadeTimer);
-      clearTimeout(resetTimer);
-    };
-  }, [isQuerying]);
 
   async function loadRows() {
     if (!year) {
@@ -229,14 +193,8 @@ export default function ManagerMonthStatPage({
 
     try {
       setProgressVisible(true);
-      setProgress(0);
+      setProgress(null);
       setLoadingText("正在上传并处理导入，请稍候...");
-      let current = 0;
-      const interval = setInterval(() => {
-        current += Math.floor(Math.random() * 15) + 5;
-        if (current >= 95) current = 95;
-        setProgress(current);
-      }, 150);
 
       const result = await apiRequest<{
         imported?: number;
@@ -247,7 +205,7 @@ export default function ManagerMonthStatPage({
         body: formData,
         method: "POST",
       });
-      clearInterval(interval);
+
       setProgress(100);
       setLoadingText("导入处理完成！");
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -352,7 +310,7 @@ export default function ManagerMonthStatPage({
       </aside>
 
       <section className="query-workspace">
-        <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
+        <QueryProgressOverlay active={isQuerying || progressVisible} progress={isQuerying ? null : progress} text={loadingText} />
         {hasQueried ? (
           <QueryResultPanel>
             <QueryTable
@@ -424,7 +382,6 @@ export default function ManagerMonthStatPage({
           </div>
         </div>
       ) : null}
-
 
     </div>
   );

@@ -57,6 +57,8 @@ def reconcile(body, operator):
     # The remote read finishes before taking the local write lock. Recheck version
     # under that lock so an overlapping adjustment cannot reconcile a stale view.
     begin_write()
+    from services.meal_clearance_service import lock_classification, store_clearance
+    lock_classification()
     batch = batch_for_write(identifier,version)
     if batch.status != 'confirmed':
         raise MealError('请先确认核算再核对数据库流水',409)
@@ -128,15 +130,8 @@ def reconcile(body, operator):
                     'name':item.name if item else row['emp_no'], 'date':time.date().isoformat(), 'amount':amount/100})
                 continue
             if not posted and action == 'clearance':
-                from services.meal_ledger_service import create
-                if any(not r.voided and r.month == time.strftime('%Y-%m') and r.data.get('emp_no') == row['emp_no'] and r.amount_cents == amount
-                       for r in MealLedgerRecord.query.filter_by(kind='clearance').all()):
-                    raise MealError('本月已有同人员同金额取款记录，请先核对手工/导入与数据库是否重复', 409)
-                record = create('clearance', {'month':time.strftime('%Y-%m'), 'date':time.date().isoformat(),
-                    'emp_no':row['emp_no'], 'name':item.name if item else row['emp_no'],
-                    'dept_name':item.dept_name if item else '', 'amount':amount/100,
-                    'remark':f'数据库清零流水 {row["id"]}', 'request_key':'db-clearance:' + digest(request_key)}, operator, request_key)
-                record.data = {**record.data, 'database_digest':content}
+                store_clearance(row, request_key, content, operator,
+                    item.name if item else row['emp_no'], item.dept_name if item else '')
                 report['clearance_added'] += 1
                 report['sources']['refund'] += 1
                 continue

@@ -1,3 +1,4 @@
+import { TaskProgress } from "../../components/feedback/QueryProgressOverlay";
 import { useEffect, useRef, useState } from 'react';
 import { applyReferenceOperation, fetchReferenceDetail, listReferenceMonths, previewReferenceOperation,
   type ReferenceProgress, type ReferenceDetail, type ReferenceKind, type ReferenceMonth, type ReferenceOperation,
@@ -200,13 +201,10 @@ export default function MonthlyReferencesPage() {
   });
 
   const progressView = progress && <section className={`snapshot-progress ${progress.status}`} aria-label="快照操作进度" aria-live="polite">
-    <div className="snapshot-progress-heading"><span>{progress.stage}</span><strong>{progress.status === 'failed' ? '未完成' : progress.status === 'idle' ? '已取消' : progress.percent == null ? '处理中' : `${Math.floor(progress.percent)}%`}</strong></div>
-    <div className={`snapshot-progress-track ${progress.percent == null && progress.status === 'running' ? 'is-indeterminate' : ''}`} role="progressbar" aria-label="快照处理进度"
-      aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent ?? undefined} aria-valuetext={progress.percent == null ? progress.stage : undefined}>
-      <span style={{width:progress.percent == null ? undefined : `${progress.percent}%`}} />
-    </div>
+    <TaskProgress active={busy} progress={progress.percent} status={progress.status} label="快照处理进度" text={progress.stage}>
     {progress.total > 0 && progress.status === 'running' && <small>{progress.completed} / {progress.total} · 当前阶段已处理数量</small>}
     {progress.status === 'running' && <small>显示当前阶段的实际进度</small>}
+    </TaskProgress>
   </section>;
 
   return <main className="snapshot-page" aria-label="月度快照管理">

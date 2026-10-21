@@ -1594,7 +1594,7 @@ describe("App smoke regression", () => {
     expect(await screen.findAllByText("0")).toHaveLength(2);
     expect(screen.queryByText("人员类型")).not.toBeInTheDocument();
     expect(screen.queryByText("选择")).not.toBeInTheDocument();
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     const selectAll = screen.getByLabelText("全选") as HTMLInputElement;
     expect(selectAll.checked).toBe(false);
     fireEvent.click(selectAll);

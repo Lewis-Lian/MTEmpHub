@@ -87,16 +87,8 @@
   .snapshot-filters label { flex: 1; min-width: 0; }
   .snapshot-filters input, .snapshot-filters select { width: 100%; min-width: 0; box-sizing: border-box; }
 }
-.snapshot-progress { padding: 14px 16px; margin-bottom: 18px; background: #f8fafc; border: 1px solid var(--snapshot-line); border-radius: 10px; }
-.snapshot-progress-heading { display: flex; justify-content: space-between; gap: 16px; font-size: 13px; margin-bottom: 10px; }
-.snapshot-progress-heading strong { white-space: nowrap; color: var(--snapshot-accent); }
-.snapshot-progress-track { height: 7px; background: #e2e8f0; overflow: hidden; border-radius: 6px; }
-.snapshot-progress-track > span { display: block; height: 100%; background: var(--snapshot-accent); border-radius: inherit; }
-.snapshot-progress small { display: block; font-size: 11px; color: var(--snapshot-muted); margin-top: 8px; }
-.snapshot-progress.failed .snapshot-progress-heading strong { color: #b91c1c; }
-.snapshot-progress-track.is-indeterminate > span { width: 30%; animation: snapshot-progress-wait 1.4s ease-in-out infinite; }
-@keyframes snapshot-progress-wait { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
-@media (prefers-reduced-motion: reduce) { .snapshot-progress-track.is-indeterminate > span { animation: none; } }
+.snapshot-progress { margin-bottom: 18px; }
+.snapshot-progress small { display: block; }
 
 .snapshot-dialog-head .snapshot-dialog-description { font-size: 13px; margin-top: 10px; }
 .snapshot-impact { display: flex; flex-wrap: wrap; gap: 24px; padding: 14px 18px; margin-bottom: 16px; background: #eef2ff; border-radius: 9px; font-size: 13px; }

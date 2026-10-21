@@ -48,3 +48,14 @@ export function businessMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 }
 export const money = (value: number | null | undefined) => value == null ? "未录入" : value.toFixed(2);
+
+export interface ClearancePreview {
+  month: string; start_date: string; end_date: string; source_digest: string;
+  rows: Array<{ source_key: string; emp_no: string; name: string; dept_name: string; card_no: string;
+    date: string; amount: number; status: "available" | "registered" | "refunded" | "manual_conflict" | "voided" }>;
+}
+export interface ClearanceResult { month: string; added: number; existing: number }
+export const previewClearance = (body: { month: string; start_date: string; end_date: string }) =>
+  apiRequest<ClearancePreview>("/api/meal-ledgers/clearance/preview", { method: "POST", body });
+export const confirmClearance = (body: { month: string; start_date: string; end_date: string; source_digest: string; source_keys: string[] }) =>
+  apiRequest<ClearanceResult>("/api/meal-ledgers/clearance/confirm", { method: "POST", body });

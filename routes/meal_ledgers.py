@@ -59,6 +59,24 @@ def check_guest_recharge(identifier):
     return jsonify(result)
 
 
+@meal_ledgers_bp.post('/clearance/preview')
+@admin_required
+@handled
+def preview_clearance():
+    from services.meal_clearance_service import preview_clearance
+    return jsonify(preview_clearance(request.get_json(silent=True) or {}))
+
+
+@meal_ledgers_bp.post('/clearance/confirm')
+@admin_required
+@handled
+def confirm_clearance():
+    from services.meal_clearance_service import confirm_clearance
+    result = confirm_clearance(request.get_json(silent=True) or {}, g.current_user.username)
+    db.session.commit()
+    return jsonify(result)
+
+
 @meal_ledgers_bp.get('/annual')
 @page_permission_required('meal_ledger_query')
 @handled

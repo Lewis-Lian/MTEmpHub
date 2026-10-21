@@ -241,7 +241,7 @@ export default function QueryTable({
         </div>
         <div className="master-modal-body">
           {isModalLoading ? (
-            <QueryProgressOverlay active progress={42} text="正在加载详情，请稍后..." />
+            <QueryProgressOverlay active progress={null} text="正在加载详情，请稍后..." />
           ) : null}
           {!isModalLoading && modalError ? <p className="legacy-inline-error">{modalError}</p> : null}
           {!isModalLoading && !modalError ? modalBodyContent : null}

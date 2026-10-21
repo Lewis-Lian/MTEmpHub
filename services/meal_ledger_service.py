@@ -89,6 +89,9 @@ def serialize(record):
 
 def create(kind, body, operator, source_key=None):
     month, day, amount, data, slot = validated(kind, body)
+    if kind == 'clearance':
+        from services.meal_clearance_service import lock_classification
+        lock_classification()
     request_key = required_text(body.get('request_key'), '请求标识', 100)
     content = digest([kind, month, day.isoformat(), amount, data, source_key])
     old = MealLedgerRecord.query.filter_by(request_key=request_key).first()
@@ -96,6 +99,11 @@ def create(kind, body, operator, source_key=None):
         if old.request_digest != content:
             raise MealError('同一请求标识的内容不一致', 409)
         return old
+    if kind == 'clearance' and not (source_key or '').startswith('card-meal:'):
+        if any((record.source_key or '').startswith('card-meal:')
+               and record.data.get('emp_no') == data['emp_no'] and record.amount_cents == amount
+               for record in MealLedgerRecord.query.filter_by(kind='clearance', month=month, voided=False)):
+            raise MealError('该人员同金额已有数据库清零记录，请核对避免重复手工登记', 409)
     if source_key and MealLedgerRecord.query.filter_by(source_key=source_key).first():
         raise MealError('该来源记录已经登记，请核对避免重复计入', 409)
     if slot:

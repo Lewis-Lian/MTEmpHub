@@ -3904,7 +3904,7 @@ input[type="checkbox"] {
    ========================================================================== */
 .query-progress-overlay {
   position: absolute !important;
-  inset: 0 !important;
+  inset: var(--query-progress-inset, 0) !important;
   z-index: var(--z-loading) !important;
   display: grid !important;
   place-items: center !important;
@@ -3949,12 +3949,12 @@ input[type="checkbox"] {
 
 .query-progress-overlay-page {
   position: absolute !important;
-  inset: 0 !important;
+  inset: var(--query-progress-inset, 0) !important;
   border-radius: 0 !important;
 }
 
 .query-progress-overlay-modal {
-  border-radius: 12px !important;
+  border-radius: 0 !important;
 }
 
 .query-progress-heading {
@@ -4080,37 +4080,6 @@ input[type="checkbox"] {
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.3), 0 0 8px rgba(79, 70, 229, 0.5) !important;
 }
 
-.query-progress-stages {
-  display: flex !important;
-  justify-content: space-between !important;
-  gap: 8px !important;
-  margin-top: 10px !important;
-}
-
-.query-progress-stage {
-  color: var(--ent-text-tertiary) !important;
-  font-size: 11px !important;
-  font-weight: 600 !important;
-  line-height: 1.3 !important;
-  padding: 2px 4px !important;
-  transition: color 0.25s ease, transform 0.25s ease !important;
-}
-
-.query-progress-stage.is-reached {
-  color: #4f46e5 !important;
-  font-weight: 650 !important;
-}
-
-.query-progress-stage.is-current {
-  color: var(--ent-blue) !important;
-  font-weight: 750 !important;
-  transform: translateY(-1px) !important;
-}
-
-.query-progress-stage.is-pending {
-  color: var(--ent-text-tertiary) !important;
-}
-
 .query-progress-footer {
   display: flex !important;
   align-items: center !important;
@@ -4166,7 +4135,6 @@ input[type="checkbox"] {
   .query-progress-card,
   .query-progress-fill,
   .query-progress-milestone,
-  .query-progress-stage,
   .query-progress-check {
     transition: none !important;
     animation: none !important;
@@ -5615,3 +5583,41 @@ input[type="checkbox"] {
   background: #ccd6e4; border-radius: 4px;
 }
 .attendance-override-calendar-modal .master-modal-body::-webkit-scrollbar-thumb:hover { background: #b3c1d6; }
+
+/* 页面遮罩与内嵌任务共用同一张进度卡。 */
+.query-progress-card-inline {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  transform: none !important;
+}
+.query-progress-overlay > .query-progress-card {
+  width: min(400px, 100%) !important;
+}
+.query-progress-track.is-indeterminate .query-progress-fill {
+  width: 35% !important;
+  animation: query-progress-sweep 1.8s ease-in-out infinite !important;
+}
+.query-progress-details {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ent-text-secondary);
+  overflow-wrap: anywhere;
+}
+.query-progress-details p { margin: 4px 0; }
+.query-progress-card.is-stopped .query-progress-percent { color: #b45309 !important; }
+.query-progress-card.is-still .query-progress-pulse-dot::after,
+.query-progress-card.is-stopped .query-progress-pulse-dot::after { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .query-progress-track.is-indeterminate .query-progress-fill {
+    animation: none !important;
+    left: 32.5% !important;
+  }
+}
+
+/* Keep task masks relative to the complete dialog, including its header and footer. */
+.acm-modal-card:has(> .query-progress-overlay),
+.master-modal:has(> .query-progress-overlay),
+[role="dialog"]:has(> .query-progress-overlay) {
+  position: relative;
+}

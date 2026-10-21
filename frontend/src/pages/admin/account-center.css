@@ -1361,19 +1361,6 @@
 .backup-steps li span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #f1f5f9; font-weight: 700; }
 .backup-steps .is-current { color: var(--acm-primary); font-weight: 650; }
 .backup-steps .is-current span { color: #fff; background: var(--acm-primary); box-shadow: 0 3px 8px rgba(79, 70, 229, .2); }
-.backup-processing { display: flex; align-items: center; gap: 16px; padding: 18px 20px; margin-bottom: 16px; border: 1px solid #c7d2fe; border-radius: 14px; background: linear-gradient(115deg, #eef2ff, #f8faff); box-shadow: 0 4px 16px rgba(79, 70, 229, .06); }
-.backup-processing-spinner { flex-shrink: 0; width: 30px; height: 30px; border: 3px solid #dbe1ff; border-top-color: var(--acm-primary); border-radius: 50%; animation: backup-processing-spin 1s linear infinite; }
-.backup-processing-copy { flex: 1; min-width: 0; }
-.backup-processing-copy strong { color: var(--acm-primary); font-size: 14px; }
-.backup-import-progress { display: block; width: 100%; height: 8px; accent-color: var(--acm-primary); }
-.backup-processing-copy p { margin: 6px 0 12px; color: var(--acm-text-secondary); font-size: 12px; line-height: 1.6; }
-.backup-processing-track { display: block; height: 4px; overflow: hidden; border-radius: 8px; background: #dfe5ff; }
-.backup-processing-track > span { display: block; width: 35%; height: 100%; border-radius: inherit; background: #818cf8; animation: backup-processing-slide 1.6s ease-in-out infinite alternate; }
-@keyframes backup-processing-spin { to { transform: rotate(360deg); } }
-@keyframes backup-processing-slide { from { transform: translateX(-100%); } to { transform: translateX(285%); } }
-@media (prefers-reduced-motion: reduce) {
-  .backup-processing-spinner, .backup-processing-track > span { animation: none; }
-}
 .backup-upload-zone { display: flex; flex-direction: column; align-items: center; text-align: center; border: 1.5px dashed #c7d2fe; background: linear-gradient(145deg, #f8faff, #fff); border-radius: 18px; padding: 42px 20px; }
 .backup-upload-zone.is-dragging { border-color: var(--acm-primary); background: #eef2ff; box-shadow: inset 0 0 0 1px var(--acm-primary); }
 .backup-upload-icon { color: var(--acm-primary); background: #eef2ff; padding: 18px; border-radius: 20px; }
@@ -1433,17 +1420,6 @@
 
 .acm-backup-settings-hint { margin: 0 0 14px; color: var(--acm-text-secondary); font-size: 12.5px; line-height: 1.6; }
 .acm-backup-settings-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.acm-export-progress { margin-top: 16px; padding: 14px; border: 1px solid #c7d2fe; border-radius: 12px; background: #f5f7ff; }
-.acm-export-progress-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; color: var(--acm-text-secondary); }
-.acm-export-progress-heading span { overflow-wrap: anywhere; }
-.acm-export-progress-heading strong { color: var(--acm-primary); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.acm-export-progress-track { height: 7px; border-radius: 999px; overflow: hidden; background: #e0e7ff; margin-top: 10px; }
-.acm-export-progress-track span { display: block; height: 100%; background: var(--acm-primary); border-radius: inherit; }
-.backup-modal .acm-export-progress-track--indeterminate span { width: 30%; animation: backup-export-activity 1.4s ease-in-out infinite; }
-@keyframes backup-export-activity { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
-@media (prefers-reduced-motion: reduce) { .backup-modal .acm-export-progress-track--indeterminate span { animation: none; margin-left: 35%; } }
-.acm-export-progress p { margin: 8px 0 0; font-size: 11px; color: var(--acm-text-muted); }
-
 /* 账套设置：清晰的管理区与月度参数工作区 */
 .acm-modal-card--settings { max-width: 1040px; max-height: calc(100dvh - 24px); overflow: hidden; }
 .acm-modal-card--settings .acm-modal-head { flex-shrink: 0; padding: 12px 20px; }

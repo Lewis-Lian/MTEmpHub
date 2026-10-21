@@ -68,7 +68,7 @@ it.each([
   expect(screen.getByText(stage)).toBeInTheDocument();
   expect(screen.getByText('处理中')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
-  expect(screen.getByRole('progressbar')).toHaveClass('acm-export-progress-track--indeterminate');
+  expect(screen.getByRole('progressbar')).toHaveClass('is-indeterminate');
   expect(screen.queryByText(/(?:null|0)%/)).not.toBeInTheDocument();
 });
 it('shows measured record progress then clears it when the next stage has no measured total', () => {
@@ -99,7 +99,7 @@ it('keeps a measured zero percent determinate', () => {
   fireEvent.click(screen.getByRole('button', {name: '开始导出'}));
   expect(screen.getByText('0%')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0');
-  expect(screen.getByRole('progressbar')).not.toHaveClass('acm-export-progress-track--indeterminate');
+  expect(screen.getByRole('progressbar')).not.toHaveClass('is-indeterminate');
 });
 it('rounds the visible percentage down while retaining measured progress for the bar', () => {
   download.mockImplementation((_ids, _categories, progress) => {
@@ -111,7 +111,6 @@ it('rounds the visible percentage down while retaining measured progress for the
   expect(screen.getByText('1%')).toBeInTheDocument();
   expect(screen.queryByText('1.375137513751375%')).not.toBeInTheDocument();
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1.375137513751375');
-  expect(screen.getByRole('progressbar').firstElementChild).toHaveStyle({width: '1.375137513751375%'});
 });
 it('updates elapsed time before the first poll without inventing a percentage and stops after completion', async () => {
   vi.useFakeTimers();
@@ -139,7 +138,7 @@ it('keeps downloads with an unknown content length indeterminate', () => {
   });
   render(<MonthlyBackupExportModal accountSets={[{id: 1, month: '2026-09'}]} initialId={1} onClose={() => {}} />);
   fireEvent.click(screen.getByRole('button', {name: '开始导出'}));
-  expect(screen.getByText('接收中')).toBeInTheDocument();
+  expect(screen.getByText('下载备份（已接收 512 字节）')).toBeInTheDocument();
   expect(screen.getByRole('progressbar')).not.toHaveAttribute('aria-valuenow');
-  expect(screen.getByRole('progressbar')).toHaveClass('acm-export-progress-track--indeterminate');
+  expect(screen.getByRole('progressbar')).toHaveClass('is-indeterminate');
 });

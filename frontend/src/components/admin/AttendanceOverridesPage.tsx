@@ -87,8 +87,6 @@ export default function AttendanceOverridesPage({
   const [rows, setRows] = useState<AttendanceOverrideRow[]>([]);
   const [hasQueried, setHasQueried] = useState(false);
   const [editingRow, setEditingRow] = useState<AttendanceOverrideRow | null>(null);
-  const [progressVisible, setProgressVisible] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [loadingText, setLoadingText] = useState("");
 
   useMonthQueryBootstrap(selectedMonth, setBootstrap);
@@ -160,42 +158,6 @@ export default function AttendanceOverridesPage({
       </button>
     ),
   ]);
-
-  // 驱动极光流光进度条的自动递增与冲刺淡出逻辑
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval>;
-    let fadeTimer: ReturnType<typeof setTimeout>;
-    let resetTimer: ReturnType<typeof setTimeout>;
-
-    if (isQuerying) {
-      setProgressVisible(true);
-      setProgress(10);
-      timer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 90) {
-            clearInterval(timer);
-            return 90;
-          }
-          const step = (100 - prev) * 0.15;
-          return Math.min(90, Math.round(prev + step));
-        });
-      }, 150);
-    } else if (progressVisible) {
-      setProgress(100);
-      fadeTimer = setTimeout(() => {
-        setProgressVisible(false);
-        resetTimer = setTimeout(() => {
-          setProgress(0);
-        }, 300);
-      }, 400);
-    }
-
-    return () => {
-      clearInterval(timer);
-      clearTimeout(fadeTimer);
-      clearTimeout(resetTimer);
-    };
-  }, [isQuerying]);
 
   async function handleQuery() {
     if (!selectedMonth) {
@@ -299,7 +261,7 @@ export default function AttendanceOverridesPage({
       </aside>
 
       <section className="query-workspace">
-        <QueryProgressOverlay active={progressVisible} progress={progress} text={loadingText} />
+        <QueryProgressOverlay active={isQuerying} progress={null} text={loadingText} />
         {hasQueried ? (
           <QueryResultPanel>
             <QueryTable

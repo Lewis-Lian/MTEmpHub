@@ -1299,113 +1299,9 @@
   color: #be123c;
 }
 
-/* 加载进度 */
-.meal-ticket-loading {
-  color: var(--ent-blue);
-  background: var(--ent-bg);
-  font-size: 13px;
-}
-
-.meal-ticket-modal.meal-ticket-loading-modal {
-  position: absolute !important;
-  inset: 0 !important;
-  z-index: 50 !important;
-  background: rgba(15, 23, 42, .28) !important;
-  backdrop-filter: blur(3px) !important;
-  -webkit-backdrop-filter: blur(3px) !important;
-  display: flex !important;
-  align-items: flex-start !important;
-  justify-content: center !important;
-  padding: 24px !important;
-  border-radius: var(--ent-radius-lg) !important;
-  animation: meal-ticket-modal-fade .18s ease-out;
-}
-
-.meal-ticket-loading-dialog {
-  position: sticky !important;
-  top: 32vh !important;
-  margin: 0 auto !important;
-  width: min(440px, calc(100% - 32px)) !important;
-  max-width: 100% !important;
-  box-sizing: border-box !important;
-  padding: 24px 28px !important;
-  background: var(--ent-bg) !important;
-  border: 1px solid var(--ent-border-strong) !important;
-  border-radius: var(--ent-radius-lg) !important;
-  box-shadow: 0 20px 30px -8px rgba(0, 0, 0, 0.18), 0 8px 12px -4px rgba(0, 0, 0, 0.08) !important;
-  animation: meal-ticket-dialog-zoom .2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-}
-
-@keyframes meal-ticket-modal-fade {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
 @keyframes meal-ticket-dialog-zoom {
   from { opacity: 0; transform: scale(.94); }
   to { opacity: 1; transform: scale(1); }
-}
-
-.meal-ticket-loading-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
-}
-
-.meal-ticket-loading-heading > span {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-weight: 500;
-}
-
-.meal-ticket-loading-heading strong {
-  flex-shrink: 0;
-  font-size: 17px;
-  font-variant-numeric: tabular-nums;
-  color: var(--ent-blue);
-}
-
-.meal-ticket-loading-dot {
-  width: 8px;
-  height: 8px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--ent-blue);
-  box-shadow: 0 0 0 4px var(--ent-blue-light);
-}
-
-.meal-ticket-progress-track {
-  height: 8px;
-  overflow: hidden;
-  margin-top: 16px;
-  border-radius: 999px;
-  background: var(--ent-border-strong);
-}
-
-.meal-ticket-progress-track > span {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--ent-blue);
-  transition: width .2s ease;
-}
-
-.meal-ticket-progress-track.is-indeterminate > span {
-  width: 35%;
-  animation: meal-ticket-progress-wait 1.4s ease-in-out infinite;
-}
-
-.meal-ticket-loading p {
-  margin: 10px 0 0;
-  color: var(--ent-text-secondary);
-  font-size: 12px;
-}
-
-@keyframes meal-ticket-progress-wait {
-  from { transform: translateX(-100%); }
-  to { transform: translateX(290%); }
 }
 
 .meal-ticket-empty {
@@ -1793,27 +1689,6 @@
   border-top: 1px solid var(--ent-border-strong);
 }
 
-.meal-ticket-operation-progress .meal-ticket-loading-heading {
-  font-size: 13px;
-  color: var(--ent-text-secondary);
-}
-
-.meal-ticket-operation-progress .meal-ticket-loading-heading strong {
-  color: var(--ent-blue);
-  font-size: 20px;
-}
-
-.meal-ticket-operation-progress .meal-ticket-progress-track {
-  margin-top: 10px;
-  height: 6px;
-}
-
-.meal-ticket-operation-progress p {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: var(--ent-text-tertiary);
-}
-
 .meal-ticket-operation-dialog .meal-ticket-actions {
   padding-top: 14px;
   flex-direction: row-reverse;
@@ -2054,12 +1929,6 @@
   .meal-ticket-page select,
   .meal-ticket-page textarea {
     transition: none;
-  }
-  .meal-ticket-progress-track > span {
-    transition: none;
-  }
-  .meal-ticket-progress-track.is-indeterminate > span {
-    animation: none;
   }
 }
 
@@ -2517,24 +2386,6 @@
   color: var(--ent-blue);
   font-size: 11px;
   font-weight: 700;
-}
-
-.meal-followup-progress-bar {
-  width: 100%;
-  height: 6px;
-  background: var(--ent-secondary-bg);
-  border: 1px solid var(--ent-border);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-
-.meal-followup-progress-fill {
-  display: block;
-  height: 100%;
-  background: linear-gradient(90deg, var(--ent-blue), #60a5fa);
-  border-radius: 999px;
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .meal-followup-progress p {

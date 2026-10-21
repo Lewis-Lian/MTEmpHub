@@ -87,7 +87,7 @@ export default function IndividualAttendancePage() {
 
   return (
     <div className="individual-attendance-page employee-dashboard-page query-page-shell">
-      <QueryProgressOverlay active={isQuerying} progress={isQuerying ? 75 : 0} text="正在加载考勤档案与明细..." />
+      <QueryProgressOverlay active={isQuerying} progress={null} text="正在加载考勤档案与明细..." />
       {/* 极光背景流动球 */}
       <div className="qh-glow-sphere sphere-1" />
       <div className="qh-glow-sphere sphere-2" />
