@@ -159,7 +159,8 @@ export default function MealLedgerPage({ kind }: { kind: View }) {
     await operate(async () => {
       const body = { ...form, month, date: form.date || (kind === "annual" || kind === "department" ? `${month}-01` : "") };
       const signature = JSON.stringify(body);
-      if (request.current.signature !== signature) request.current = { signature, key: crypto.randomUUID() };
+      if (request.current.signature !== signature) request.current = { signature,
+        key: Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, "0")).join("") };
       await saveLedger(recordKind, { ...body, request_key: request.current.key });
       if (kind === "external") {
         setExternalStep(form.category === "card" && form.guest_card_key ? "recharge" : "ledger");
