@@ -10,7 +10,7 @@ from openpyxl.utils import get_column_letter
 
 from models.meal_ticket import MealTicketBatch
 from services import meal_ledger_service as ledger
-from services.meal_ticket_service import MealError, serialize_batch
+from services.meal_ticket_service import MealError, serialize_batch, shift_month
 
 
 def sheet(book, name, title, headers, rows, status='有效记录'):
@@ -60,6 +60,76 @@ def sheet(book, name, title, headers, rows, status='有效记录'):
     return ws
 
 
+def department_sheet(book, month, items, status, layout=None):
+    from services.meal_department_layout import DEFAULT_LAYOUT, print_department_totals
+    layout = layout or DEFAULT_LAYOUT
+    items = print_department_totals(items)
+    ws = book.create_sheet(month[5:] + '月')
+    attendance_month = shift_month(month, -1)
+    ws.append([f'{int(attendance_month[:4])}年{int(attendance_month[5:])}月份菜票登记'])
+    ws.merge_cells('A1:G1')
+    ws['A1'].font = Font(name='等线', size=14, bold=True)
+    ws['A1'].alignment = Alignment(horizontal='center', vertical='center')
+    ws.row_dimensions[1].height = 25.5
+    ws.append(['部门', '金额', '备注', None, '部门', '金额', '备注'])
+    by_name = {item['dept_name']: item for item in items}
+    known = set(layout['left'] + layout['right'])
+    left_names = [name for name in layout['left'] if name in by_name]
+    right_names = [name for name in layout['right'] if name in by_name] + sorted(by_name.keys() - known)
+    entries = {'left': [], 'right': []}
+    for side, names in (('left', left_names), ('right', right_names)):
+        for name in names:
+            item = by_name[name]
+            if (item['count'] or item.get('remark') or item.get('registrar') or item.get('historical_amount') is not None
+                    or not (item['external_card_amount'] or item['external_paper_amount'])):
+                entries[side].append([name, item['paid_amount'], item['remark']])
+    for name in right_names + left_names:
+        item = by_name[name]
+        for key, prefix in (('external_card_amount', '客人-'), ('external_paper_amount', '客人纸质-')):
+            if item[key]:
+                entries['right'].append([prefix + name, item[key], ''])
+    count = max(len(entries['left']), len(entries['right']))
+    for index in range(count):
+        ws.append((entries['left'][index] if index < len(entries['left']) else [None] * 3) + [None]
+                  + (entries['right'][index] if index < len(entries['right']) else []))
+    total_row = max(23, count + 5)
+    ws.cell(total_row, 5, '合计：')
+    ws.cell(total_row, 6, sum(ledger.cents(item['total_paid_amount']) for item in items) / 100)
+    for col, width in zip('ABCDEFG', (30, 10, 5, 2, 38, 10, 5)):
+        ws.column_dimensions[col].width = width
+    side = Side(style='thin', color='000000')
+    border = Border(left=side, right=side, top=side, bottom=side)
+    for row in ws.iter_rows(min_row=2, max_row=total_row, max_col=7):
+        height = 26.1
+        for cell in row:
+            if cell.column == 4:
+                continue
+            cell.font = Font(name='等线', size=12 if cell.row == 2 or cell.column in (1, 5) else 11,
+                             bold=cell.row == 2)
+            cell.alignment = Alignment(horizontal='center', vertical='center',
+                                       wrap_text=cell.column not in (1, 5), shrink_to_fit=False)
+            cell.border = border
+            if isinstance(cell.value, str):
+                if cell.value.startswith(('=', '+', '-', '@')):
+                    cell.data_type = 's'
+                if cell.column not in (1, 5):
+                    width = ws.column_dimensions[cell.column_letter].width - 2
+                    lines = sum(max(1, ceil(sum(2 if east_asian_width(c) in ('W', 'F') else 1 for c in part) / width))
+                                for part in cell.value.split('\n'))
+                    height = max(height, 16 * lines)
+        ws.row_dimensions[row[0].row].height = height
+    ws.freeze_panes = 'A3'
+    ws.print_title_rows = '1:2'
+    ws.print_options.horizontalCentered = True
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    ws.page_setup.orientation = 'portrait'
+    ws.page_setup.paperSize = ws.PAPERSIZE_A4
+    ws.page_setup.fitToWidth, ws.page_setup.fitToHeight = 1, 0
+    ws.page_margins.left = ws.page_margins.right = 0.3
+    ws.print_area = f'A1:G{total_row}'
+    ws.oddFooter.center.text = status
+
+
 def export(report, month=None, year=None, accessible=None, filters=None):
     book = Workbook()
     book.remove(book.active)
@@ -105,19 +175,13 @@ def export(report, month=None, year=None, accessible=None, filters=None):
                 [[i['dept_name'], i['emp_no'], i['name'], i['days'], i['days'], i['adjustment_amount'], i['paid_amount'],
                     '实际发放金额；' + '；'.join(a['reason'] for a in i['adjustments'])] for i in items if i['is_manager']], status)
         elif report == 'department':
+            from services.meal_department_layout import load_layout
+            layout = load_layout()
             for selected in periods:
                 data = ledger.departments(selected, accessible)
                 items = [r for r in data['items'] if not filters.get('dept_name') or r['dept_name'] == filters['dept_name']]
-                entries = [[r['dept_name'], r['total_paid_amount'], r['registrar'], r['remark']] for r in items]
-                split = (len(entries) + 1) // 2
-                rows = [entries[index] + [''] + (entries[index + split] if index + split < len(entries) else ['', '', '', ''])
-                        for index in range(split)]
-                rows.append(['合计', round(sum(r['total_paid_amount'] for r in items), 2), '', '员工净发放＋客人充卡＋纸质菜票；不含月底清零'])
-                ws = sheet(book, selected[5:] + '月', f'{selected}月份部门菜票发放汇总', ['部门', '金额', '登记人', '备注', '', '部门', '金额', '登记人', '备注'], rows,
-                    '草稿' if data['status'] == 'draft' else '无核算数据' if data['status'] == 'no_batch' else '已确认核算')
-                ws.column_dimensions['E'].width = 3
-                ws.auto_filter.ref = None
-                ws.freeze_panes = 'A4'
+                department_sheet(book, selected, items,
+                    '草稿' if data['status'] == 'draft' else '无核算数据' if data['status'] == 'no_batch' else '已确认核算', layout)
                 details = [[r['dept_name'], r['paid_amount'], r['external_card_amount'],
                     r['external_paper_amount'], r['total_paid_amount']] for r in items]
                 details.append(['合计', *[round(sum(r[key] for r in items), 2) for key in

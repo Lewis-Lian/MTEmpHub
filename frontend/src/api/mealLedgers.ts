@@ -43,6 +43,8 @@ export const saveLedger = (kind: LedgerKind, body: object) => apiRequest<LedgerR
 export const voidLedger = (id: number, reason: string) => apiRequest<LedgerRecord>(`/api/meal-ledgers/records/${id}/void`, { method: "POST", body: { reason } });
 export const ledgerExportUrl = (report: string, month: string, year: string, extra?: Record<string, string>) =>
   buildApiUrl(`/api/meal-ledgers/export?${new URLSearchParams({ report, month, year, ...extra })}`);
+export const ledgerBatchExportUrl = (reports: string[], month: string, year: string) =>
+  buildApiUrl(`/api/meal-ledgers/export-batch?${new URLSearchParams({ reports: reports.join(","), month, year })}`);
 export function businessMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;

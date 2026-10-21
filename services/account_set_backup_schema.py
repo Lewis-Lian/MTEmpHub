@@ -207,4 +207,4 @@ _exclude('account_set_backup_origins', 'id local_id', '目标来源映射身份�
 _exclude('account_set_backup_origins', 'dataset origin_key provenance', '随 imports/sync_history/override_history 行携带，不整体覆盖映射表')
 _exclude('account_set_backup_restores', 'id month operator_id operator_username task_id backup_digest counts created_at', '目标本地恢复审计；不属于可覆盖业务内容')
 _exclude('messages', 'id sender_id recipient_id title content created_at read_at', '独立消息与已读状态，不在确认的月度备份范围')
-_exclude('system_settings', 'id key value', '安装级配置可能包含凭证，不整表导出；业务使用的月度配置已冻结在 snapshots.payload')
+_exclude('system_settings', 'id key value', '安装级配置可能包含凭证，不整表导出；菜票部门打印排版为安装级展示偏好，不随月度业务恢复；业务使用的月度配置已冻结在 snapshots.payload')

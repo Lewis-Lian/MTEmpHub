@@ -1,0 +1,47 @@
+.meal-download-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.meal-download-toolbar h2 { margin: 0; font-size: 18px; }
+.meal-download-toolbar p { margin: 8px 0 0; color: var(--ent-text-secondary); font-size: 13px; }
+.meal-download-toolbar label, .meal-download-more label { display: grid; gap: 6px; font-size: 13px; font-weight: 600; }
+.meal-download-toolbar input { min-width: 155px; }
+.meal-download-selection { display: flex; align-items: center; gap: 12px; margin: 22px 0 14px; flex-wrap: wrap; font-size: 13px; }
+.meal-download-selection > span { color: var(--ent-text-secondary); margin-right: auto; }
+.meal-download-selection button { border: 0; background: none; padding: 4px; color: var(--ent-blue); cursor: pointer; }
+.meal-download-selection button:disabled { opacity: .5; cursor: default; }
+.meal-download-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.meal-download-card { padding: 20px; border: 1px solid var(--ent-border-strong); border-radius: 14px; min-width: 0; background: var(--ent-bg); transition: border-color .15s, background .15s, box-shadow .15s; }
+.meal-download-card:hover { border-color: var(--ent-blue); box-shadow: 0 3px 12px rgb(15 23 42 / .04); }
+.meal-download-card.is-selected { border-color: var(--ent-blue); background: var(--ent-blue-light); box-shadow: inset 0 0 0 1px var(--ent-blue); }
+.meal-download-page .meal-download-card-choice { display: flex; flex-direction: row; align-items: center; gap: 10px; cursor: pointer; font-size: 15px; }
+.meal-download-card-choice input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--ent-blue); margin: 0 0 0 auto; }
+.meal-download-card > p { color: var(--ent-text-secondary); font-size: 13px; line-height: 1.65; min-height: 42px; margin: 12px 0 16px; }
+.meal-download-card-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.meal-download-card-actions > span { color: var(--ent-text-secondary); font-size: 12px; margin-right: auto; }
+.meal-download-card-actions .meal-ticket-button { padding: 4px 8px; font-size: 12px; }
+.meal-download-annual > .meal-download-toolbar { margin-bottom: 16px; }
+.meal-download-annual .meal-download-card > p { min-height: 0; }
+.meal-download-page .meal-download-bar { position: sticky; bottom: 12px; z-index: 5; padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; box-shadow: 0 8px 30px rgb(15 23 42 / .10); }
+.meal-download-bar > div { display: grid; gap: 6px; }
+.meal-download-bar span, .meal-download-bar p { font-size: 13px; color: var(--ent-text-secondary); }
+.meal-download-bar p { flex-basis: 100%; margin: 0; }
+.meal-download-more summary { cursor: pointer; font-size: 13px; color: var(--ent-text-secondary); }
+.meal-download-more p { font-size: 13px; color: var(--ent-text-secondary); line-height: 1.7; }
+.meal-download-more > button { margin: 4px 8px 4px 0; }
+@media (max-width: 700px) { .meal-download-grid { grid-template-columns: 1fr; } .meal-download-bar > button { width: 100%; } }
+.meal-download-page { padding-bottom: 112px; }
+.meal-download-page > .meal-ticket-heading { padding: 4px 0; }
+.meal-download-page > .meal-ticket-heading h1 { letter-spacing: -.025em; }
+.meal-download-monthly, .meal-download-annual { border-radius: 18px; }
+.meal-download-toolbar { padding-bottom: 18px; border-bottom: 1px solid var(--ent-border-strong); }
+.meal-download-toolbar input { background: var(--ent-bg); border-radius: 10px; }
+.meal-download-selection { margin-top: 16px; }
+.meal-download-card-top { display: flex; align-items: center; gap: 12px; }
+.meal-download-report-icon { display: grid; place-items: center; flex: 0 0 38px; height: 38px; color: var(--ent-blue); background: var(--ent-blue-light); border: 1px solid var(--ent-border-strong); border-radius: 11px; }
+.meal-download-page .meal-download-card-choice { flex: 1; min-width: 0; color: var(--ent-text); }
+.meal-download-card-choice strong { font-size: 15px; font-weight: 650; }
+.meal-download-card-actions { padding-top: 12px; border-top: 1px solid var(--ent-border-strong); }
+.meal-download-card-actions > span { font-variant-numeric: tabular-nums; }
+.meal-download-card-actions button { min-height: 30px; }
+.meal-download-annual .meal-download-card { margin-top: 18px; }
+.meal-download-bar .meal-ticket-button { min-height: 42px; border-radius: 10px; padding-inline: 20px; }
+.meal-download-more { box-shadow: none; }
+@media (prefers-reduced-motion: reduce) { .meal-download-card { transition: none; } }

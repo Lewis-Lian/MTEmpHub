@@ -17,6 +17,43 @@ class MealLedgerTests(unittest.TestCase):
             'month': '2026-09', 'date': '2026-09-30', 'request_key': kind + '-1',
             **values}, headers=self.headers)
 
+    def test_batch_download_keeps_workbooks_and_independent_annual_year(self):
+        import zipfile
+        self.confirm(self.generate())
+        response = self.client.get('/api/meal-ledgers/export-batch?reports=recharge,department,annual&month=2026-09&year=2025', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.mimetype, 'application/zip')
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            self.assertEqual(archive.namelist(), ['菜票_recharge_2026-09.xlsx', '菜票_department_2026-09.xlsx', '菜票_annual_2025.xlsx'])
+            recharge = load_workbook(io.BytesIO(archive.read(archive.namelist()[0])))
+            self.assertEqual(recharge.sheetnames, ['员工异常查询1', '员工充值记录', '管理人员查询'])
+            department = load_workbook(io.BytesIO(archive.read(archive.namelist()[1])))
+            self.assertEqual(department.active['A1'].value, '2026年8月份菜票登记')
+            annual = load_workbook(io.BytesIO(archive.read(archive.namelist()[2])))
+            self.assertIn('2025年', annual.active['A1'].value)
+
+    def test_batch_download_rejects_unauthorized_invalid_or_missing_reports(self):
+        viewer = {'Authorization': 'Bearer ' + self.viewer_token}
+        for reports in ('', 'unknown', 'department,department'):
+            response = self.client.get(f'/api/meal-ledgers/export-batch?reports={reports}&month=2026-09', headers=self.headers)
+            self.assertEqual(response.status_code, 400)
+        response = self.client.get('/api/meal-ledgers/export-batch?reports=department,external&month=2026-09', headers=viewer)
+        self.assertEqual(response.status_code, 403)
+        missing = self.client.get('/api/meal-ledgers/export-batch?reports=department,recharge&month=2026-09', headers=self.headers)
+        self.assertEqual(missing.status_code, 404)
+        self.assertIn('月度充值记录', missing.get_json()['error'])
+
+    def test_batch_download_keeps_personal_department_scope(self):
+        import zipfile
+        self.confirm(self.generate())
+        response = self.client.get('/api/meal-ledgers/export-batch?reports=recharge,department&month=2026-09',
+            headers={'Authorization': 'Bearer ' + self.viewer_token})
+        self.assertEqual(response.status_code, 200)
+        with zipfile.ZipFile(io.BytesIO(response.data)) as archive:
+            recharge = load_workbook(io.BytesIO(archive.read('菜票_recharge_2026-09.xlsx')))
+            self.assertEqual(recharge['员工充值记录'].max_row, 4)
+            self.assertEqual(recharge['员工充值记录']['B4'].value, '001')
+
     def test_clearance_does_not_reopen_settled_subsidy(self):
         batch = self.confirm(self.generate())
         paid = self.post('/payments', {'batch_id': batch['id'], 'version': batch['version'],
@@ -65,7 +102,12 @@ class MealLedgerTests(unittest.TestCase):
         self.assertEqual(rows['行政部']['total_paid_amount'], 50)
         export = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09', headers=self.headers)
         book = load_workbook(io.BytesIO(export.data))
-        self.assertEqual(book.active.cell(book.active.max_row, 2).value, 526)
+        self.assertEqual(book.active.cell(book.active.max_row, 6).value, 526)
+        summary = {book.active.cell(row, col).value: book.active.cell(row, col + 1).value
+            for row in range(3, book.active.max_row) for col in (1, 5)
+            if book.active.cell(row, col).value}
+        self.assertEqual(summary, {'未分配部门': 176, '客人-未分配部门': 200,
+            '客人纸质-未分配部门': 100, '客人-行政部': 50})
         detail = book['09月明细']
         self.assertEqual([detail.cell(3, n).value for n in range(1, 6)],
             ['部门', '员工净实际发放', '客人卡充值', '客人纸质菜票', '部门发放合计'])
@@ -74,6 +116,9 @@ class MealLedgerTests(unittest.TestCase):
             headers={'Authorization':'Bearer ' + self.viewer_token})
         self.assertEqual(restricted.status_code, 200)
         restricted_book = load_workbook(io.BytesIO(restricted.data))
+        self.assertEqual(restricted_book.active['E3'].value, '未分配部门')
+        self.assertEqual(restricted_book.active['F3'].value, 176)
+        self.assertEqual(restricted_book.active['F23'].value, 176)
         restricted_detail = restricted_book['09月明细']
         self.assertEqual(list(restricted_detail.values)[3], ('未分配部门', 176, 0, 0, 176))
         self.assertEqual(restricted_detail.max_row, 5)
@@ -184,13 +229,129 @@ class MealLedgerTests(unittest.TestCase):
         response = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09', headers=self.headers)
         book = load_workbook(io.BytesIO(response.data))
         sheet = book.active
-        self.assertEqual([sheet.cell(3, n).value for n in (1, 2, 3, 4, 6, 7, 8, 9)],
-                         ['部门', '金额', '登记人', '备注'] * 2)
-        names = [sheet.cell(row, col).value for row in range(4, sheet.max_row) for col in (1, 6)]
+        self.assertEqual(sheet['A1'].value, '2026年8月份菜票登记')
+        self.assertEqual(str(sheet.merged_cells), 'A1:G1')
+        self.assertEqual([sheet.cell(2, n).value for n in range(1, 8)],
+                         ['部门', '金额', '备注', None, '部门', '金额', '备注'])
+        self.assertEqual(sheet.max_column, 7)
+        self.assertEqual(sheet.page_setup.orientation, 'portrait')
+        self.assertEqual(str(sheet.page_setup.paperSize), sheet.PAPERSIZE_A4)
+        names = [sheet.cell(row, col).value for row in range(3, sheet.max_row) for col in (1, 5)]
         self.assertIn('行政部', names)
         self.assertIn('财务部', names)
-        self.assertEqual(sheet.cell(sheet.max_row, 1).value, '合计')
-        self.assertEqual(sheet.cell(sheet.max_row, 2).value, 0)
+        self.assertEqual(sheet['E23'].value, '合计：')
+        self.assertEqual(sheet['F23'].value, 0)
+
+    def test_department_archive_year_uses_each_recharge_month_and_separate_guest_rows(self):
+        self.ledger('external', name='访客', dept_name='行政部', category='card', amount='225')
+        self.ledger('external', name='访客', dept_name='行政部', category='card', amount='12.50',
+            month='2026-10', date='2026-10-01', request_key='oct-guest')
+        response = self.client.get('/api/meal-ledgers/export?report=department&year=2026', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        book = load_workbook(io.BytesIO(response.data))
+        self.assertEqual(book['09月']['A1'].value, '2026年8月份菜票登记')
+        self.assertEqual(book['09月']['E3'].value, '客人-行政部')
+        self.assertEqual(book['09月']['F3'].value, 225)
+        self.assertEqual(book['09月']['F23'].value, 225)
+        self.assertEqual(book['10月']['A1'].value, '2026年9月份菜票登记')
+        self.assertEqual(book['10月']['F3'].value, 12.5)
+        self.assertEqual(book['10月']['F23'].value, 12.5)
+        self.assertEqual(book['01月']['F23'].value, 0)
+        self.assertEqual(book['01月']['A1'].value, '2025年12月份菜票登记')
+
+    def test_department_layout_persists_fixed_sides_order_and_guests_on_right(self):
+        from models import db
+        from models.department import Department
+        with self.app.app_context():
+            db.session.add(Department(dept_no='new', dept_name='新增部门'))
+            db.session.commit()
+        url = '/api/meal-ledgers/department-layout'
+        initial = self.client.get(url, headers=self.headers)
+        self.assertEqual(initial.status_code, 200)
+        self.assertEqual(initial.get_json()['left'][0], '胡存寿-木皮线')
+        self.assertEqual(initial.get_json()['right'][0], '总经办')
+        self.assertIn('新增部门', initial.get_json()['unassigned'])
+        layout = {'left': ['财务部', '新增部门'], 'right': ['行政部']}
+        saved = self.client.put(url, json=layout, headers=self.headers)
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(self.client.get(url, headers=self.headers).get_json(), {**layout, 'unassigned': []})
+        for i, name in enumerate(('行政部', '财务部', '新增部门')):
+            self.ledger('department', dept_name=name, remark='原备注', request_key=f'layout-{i}')
+        self.ledger('external', name='客人', dept_name='财务部', category='card', amount='225')
+        self.ledger('external', name='客人', dept_name='行政部', category='paper', amount='12.5', request_key='layout-paper')
+        result = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09', headers=self.headers)
+        sheet = load_workbook(io.BytesIO(result.data)).active
+        self.assertEqual([sheet[f'A{row}'].value for row in (3, 4)], ['财务部', '新增部门'])
+        self.assertEqual([sheet[f'E{row}'].value for row in (3, 4, 5)],
+            ['行政部', '客人纸质-行政部', '客人-财务部'])
+        self.assertEqual(sheet['C3'].value, '原备注')
+        self.assertEqual(sheet['F23'].value, 237.5)
+        self.assertEqual(sheet['A3'].font.sz, 12)
+        self.assertFalse(sheet['A3'].alignment.wrap_text)
+        self.assertFalse(sheet['A3'].alignment.shrinkToFit)
+        self.assertEqual(sheet.page_setup.fitToHeight, 0)
+
+    def test_department_layout_rejects_duplicate_placements_and_non_admin_edits(self):
+        url = '/api/meal-ledgers/department-layout'
+        self.assertEqual(self.client.put(url, json={'left': ['行政部'], 'right': ['行政部']}, headers=self.headers).status_code, 400)
+        self.assertEqual(self.client.put(url, json={'left': '行政部', 'right': []}, headers=self.headers).status_code, 400)
+        viewer = {'Authorization': 'Bearer ' + self.viewer_token}
+        self.assertEqual(self.client.get(url, headers=viewer).status_code, 403)
+        self.assertEqual(self.client.put(url, json={'left': [], 'right': []}, headers=viewer).status_code, 403)
+
+    def test_department_aliases_share_layout_positions_and_merge_export_amounts(self):
+        import json
+        from models import db
+        from models.department import Department
+        from models.employee import Employee
+        from models.system_setting import SystemSetting
+        with self.app.app_context():
+            departments = [Department(dept_no=str(index), dept_name=name) for index, name in
+                enumerate(('保洁', '计划下单', '计划物控', '计划部', '新增部门'))]
+            db.session.add_all(departments)
+            db.session.flush()
+            db.session.get(Employee, self.emp_id).dept_id = departments[1].id
+            from services.meal_department_layout import layout_options
+            self.assertEqual(layout_options()['unassigned'], ['新增部门'])
+            # Existing saved layouts may already contain the aliases as separate entries.
+            SystemSetting.set_value('meal_department_print_layout', json.dumps({
+                'left': [], 'right': ['行政部-保洁', '计划部', '保洁', '计划下单', '计划物控']}))
+            db.session.commit()
+        url = '/api/meal-ledgers/department-layout'
+        result = self.client.get(url, headers=self.headers).get_json()
+        self.assertEqual(result, {'left': [], 'right': ['行政部-保洁', '计划部'], 'unassigned': ['新增部门']})
+        batch = self.confirm(self.generate())
+        employee_item = next(item for item in batch['items'] if item['emp_id'] == self.emp_id)
+        payment = self.post('/payments', {'batch_id': batch['id'], 'version': batch['version'],
+            'item_id': employee_item['id'], 'amount': '176', 'kind': 'recharge',
+            'date': '2026-09-01', 'reference': '计划下单充值', 'request_key': 'alias-paid'})
+        self.assertEqual(payment.status_code, 200, payment.get_json())
+        self.ledger('department', dept_name='计划下单', remark='下单备注', request_key='alias-note1')
+        self.ledger('department', dept_name='计划物控', remark='物控备注', request_key='alias-note2')
+        for index, (name, amount, category) in enumerate((('保洁', '20', 'card'),
+                ('计划下单', '50', 'card'), ('计划物控', '75', 'card'), ('计划部', '25', 'paper'))):
+            self.ledger('external', name='访客', dept_name=name, category=category,
+                amount=amount, request_key=f'alias-guest-{index}')
+        response = self.client.get('/api/meal-ledgers/export?report=department&month=2026-09', headers=self.headers)
+        book = load_workbook(io.BytesIO(response.data))
+        sheet = book.active
+        summary = {sheet.cell(row, column).value: (sheet.cell(row, column + 1).value,
+            sheet.cell(row, column + 2).value) for row in range(3, sheet.max_row) for column in (1, 5)
+            if sheet.cell(row, column).value}
+        self.assertEqual(summary['计划部'][0], 176)
+        self.assertEqual(set(summary['计划部'][1].split('；')), {'下单备注', '物控备注'})
+        self.assertEqual(summary['客人-计划部'][0], 125)
+        self.assertEqual(summary['客人纸质-计划部'][0], 25)
+        self.assertEqual(summary['客人-行政部-保洁'][0], 20)
+        self.assertNotIn('计划下单', summary)
+        self.assertNotIn('计划物控', summary)
+        self.assertNotIn('保洁', summary)
+        self.assertEqual(sheet['F23'].value, 346)
+        detail_names = [row[0] for row in list(book['09月明细'].values)[3:]]
+        self.assertIn('计划下单', detail_names)
+        self.assertIn('计划物控', detail_names)
+        self.assertEqual(self.client.put(url, json={'left': ['计划下单'], 'right': ['计划部']},
+            headers=self.headers).status_code, 400)
 
     def test_navigation_separates_query_operations_and_downloads(self):
         modules = self.client.get('/api/query/navigation', headers=self.headers).get_json()['modules']

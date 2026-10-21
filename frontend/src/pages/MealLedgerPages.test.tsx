@@ -83,9 +83,9 @@ describe("菜票查询与台账页面", () => {
   it("只有人员查询权限时下载页不暴露年度及外来台账报表", async () => {
     request.mockResolvedValue({ role: "readonly", page_permissions: { meal_ticket_query: true } });
     render(<MemoryRouter><MealDownloadPage /></MemoryRouter>);
-    await screen.findByRole("option", { name: "月度充值记录" });
-    expect(screen.queryByRole("option", { name: "全年菜票汇总" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("option", { name: "外来人员领用" })).not.toBeInTheDocument();
+    await screen.findByRole("checkbox", { name: "月度充值记录" });
+    expect(screen.queryByRole("checkbox", { name: "全年菜票汇总" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "外来人员领用" })).not.toBeInTheDocument();
   });
 
   it.each(["card", "paper"])("客人 %s 发放登记需承担费用的部门并保存所选类别", async category => {

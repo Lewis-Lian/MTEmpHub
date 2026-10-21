@@ -1,3 +1,6 @@
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
+
 from flask import Blueprint, g, jsonify, request, send_file
 
 from models import db
@@ -9,6 +12,27 @@ from services import meal_ledger_service as ledger
 from services.meal_ticket_service import MealError, begin_write
 
 meal_ledgers_bp = Blueprint('meal_ledgers', __name__, url_prefix='/api/meal-ledgers')
+REPORT_LABELS = {'recharge': '月度充值记录', 'department': '部门菜票发放汇总',
+    'external': '外来人员领用', 'annual': '全年菜票汇总', 'clearance': '月末取款明细'}
+
+
+@meal_ledgers_bp.get('/department-layout')
+@admin_required
+@handled
+def department_layout():
+    from services.meal_department_layout import layout_options
+    return jsonify(layout_options())
+
+
+@meal_ledgers_bp.put('/department-layout')
+@admin_required
+@handled
+def update_department_layout():
+    from services.meal_department_layout import save_layout, layout_options
+    begin_write()
+    save_layout(request.get_json(silent=True))
+    db.session.commit()
+    return jsonify(layout_options())
 
 
 @meal_ledgers_bp.get('/guest-cards')
@@ -156,19 +180,48 @@ def imports():
     return jsonify([serialized(r) for r in MealLedgerImport.query.order_by(MealLedgerImport.id.desc()).all()])
 
 
-@meal_ledgers_bp.get('/export')
-@any_page_permission_required(('meal_ticket_query', 'meal_ledger_query'))
-@handled
-def export():
-    from services.meal_ledger_export import export as build
+def export_scope(report):
     from routes.meal_tickets import accessible
-    report = request.args.get('report')
+    if report not in REPORT_LABELS:
+        raise MealError('报表类型无效')
     user = g.current_user
     person_report = report in ('recharge', 'department')
     full_department = report == 'department' and user.can_access_page('meal_ledger_query')
     if user.role != 'admin' and not full_department and not user.can_access_page('meal_ticket_query' if person_report else 'meal_ledger_query'):
         raise MealError('无此报表下载权限', 403)
+    return accessible() if person_report and not full_department else None
+
+
+@meal_ledgers_bp.get('/export')
+@any_page_permission_required(('meal_ticket_query', 'meal_ledger_query'))
+@handled
+def export():
+    from services.meal_ledger_export import export as build
+    report = request.args.get('report')
     output, filename = build(report, request.args.get('month'), request.args.get('year'),
-        accessible() if person_report and not full_department else None, request.args)
+        export_scope(report), request.args)
     return send_file(output, as_attachment=True, download_name=filename,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+
+
+@meal_ledgers_bp.get('/export-batch')
+@any_page_permission_required(('meal_ticket_query', 'meal_ledger_query'))
+@handled
+def export_batch():
+    from services.meal_ledger_export import export as build
+    reports = request.args.get('reports', '').split(',')
+    if (not reports or len(reports) > len(REPORT_LABELS) or len(set(reports)) != len(reports)
+            or any(report not in REPORT_LABELS for report in reports)):
+        raise MealError('请选择有效且不重复的报表')
+    scopes = {report: export_scope(report) for report in reports}
+    output = BytesIO()
+    with ZipFile(output, 'w', ZIP_DEFLATED) as archive:
+        for report in reports:
+            try:
+                data, filename = build(report, None if report == 'annual' else request.args.get('month'),
+                    request.args.get('year'), scopes[report], request.args)
+            except MealError as exc:
+                raise MealError(f'{REPORT_LABELS[report]}：{exc}', exc.status) from exc
+            archive.writestr(filename, data.getvalue())
+    output.seek(0)
+    return send_file(output, as_attachment=True, download_name='菜票存档.zip', mimetype='application/zip')
