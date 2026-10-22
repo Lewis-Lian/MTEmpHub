@@ -268,6 +268,16 @@ def reconcile_batch():
     return jsonify(result)
 
 
+@meal_tickets_bp.post('/funds-audit')
+@admin_required
+@handled
+def audit_all_funds():
+    from services.meal_funds_audit import audit_funds
+    response = jsonify(audit_funds(request.get_json(silent=True) or {}))
+    response.headers['Cache-Control'] = 'no-store'
+    return response
+
+
 @meal_tickets_bp.get('/export-recharge')
 @page_permission_required('meal_ticket_query')
 @handled

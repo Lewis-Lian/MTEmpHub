@@ -90,7 +90,7 @@ it('月度结清后保留摘要和唯一下载入口，明细按需展开', asyn
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
     {...batch,items:[{...item,paid_amount:176,difference:0}]}));
   page();
-  await screen.findByText('本月账目已结清');
+  await screen.findByText('员工账目已结清');
   const completion=screen.getByRole('region',{name:'整月结清检查'});
   expect(completion).toHaveClass('is-settled');
   expect(completion.closest('main')).toHaveClass('is-settlement-complete');
@@ -139,10 +139,10 @@ it('取款流水需分类，月末清零不会显示为核算扣回', async () =
     { ...batch, items: [{ ...item, paid_amount: 176, difference: 0 }], reconciliation: { ...report, pending_refunds: [] } } : { ...batch, reconciliation: report }));
   page();
   await screen.findByLabelText('流水 12 分类');
-  expect(screen.queryByText('本月账目已结清')).not.toBeInTheDocument();
+  expect(screen.queryByText('员工账目已结清')).not.toBeInTheDocument();
   fireEvent.change(screen.getByLabelText('流水 12 分类'), { target: { value: 'clearance' } });
   fireEvent.click(screen.getByRole('button', { name: '核对到账' }));
-  expect(await screen.findByText('本月账目已结清')).toBeInTheDocument();
+  expect(await screen.findByText('员工账目已结清')).toBeInTheDocument();
 });
 it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
   request.mockImplementation((path:string)=>Promise.resolve(path==='/api/auth/me'?{role:'admin'}:
@@ -157,7 +157,7 @@ it('读取数据库后全部结清，自动隐藏操作区域',async()=>{
   expect(screen.getByRole('region',{name:'人员明细'})).toBeInTheDocument();
   expect(screen.getByRole('region',{name:'充值表导出'})).toBeInTheDocument();
   fireEvent.click(within(panel).getByRole('button',{name:/已完成充值，核对到账|^核对到账$/}));
-  await screen.findByText('本月账目已结清');
+  await screen.findByText('员工账目已结清');
   expect(screen.queryByRole('region',{name:'到账核对'})).not.toBeInTheDocument();
   expect(screen.getByRole('region',{name:'人员明细'})).not.toBeVisible();
   expect(screen.getAllByRole('link',{name:'导出充值表（.xls）'})).toHaveLength(1);

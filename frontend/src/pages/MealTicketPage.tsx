@@ -1,4 +1,5 @@
 import QueryProgressOverlay, { TaskProgress } from "../components/feedback/QueryProgressOverlay";
+import MealFundsAudit from "../components/meal/MealFundsAudit";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { fetchMe } from "../api/auth";
@@ -626,7 +627,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         <div className="meal-ticket-reconciliation-header">
         <div className="meal-ticket-settlement-message">
           <svg className="meal-ticket-notice-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle className={settled ? "meal-ticket-check-ring" : undefined} cx="12" cy="12" r="9" pathLength={settled ? 1 : undefined} />{settled ? <path className="meal-ticket-checkmark" d="m7 12 3 3 7-7" pathLength="1" /> : <><path d="M12 7v6" /><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none" /></>}</svg>
-          <strong>{!confirmed ? "草稿待核算" : reconciliationFailed ? "数据库核对未完成" : settled ? "本月账目已结清" : "还有差额需要处理"}</strong>
+          <strong>{!confirmed ? "草稿待核算" : reconciliationFailed ? "数据库核对未完成" : settled ? databaseEnabled ? "员工账目已结清" : "本月账目已结清" : "还有差额需要处理"}</strong>
+          {settled && databaseEnabled && <span>仅表示本批次员工应发与实发结清；全部流水请在后续补扣与对账页核对。</span>}
           {!settled && <span>{!confirmed ? `异常 ${errorCount} 人；完成核对并处理全部异常后，方可点击“确认核算”。` : `待充值 ${pendingCount} 人 · 待扣回 ${refundCount} 人 · 异常 ${errorCount} 人`}</span>}
         </div>
         {!settled && <div className="meal-ticket-actions"><button className={`meal-ticket-button ${isError ? "is-danger" : "is-primary"}`} disabled={busy || errorCount === 0} onClick={showIssues}>查看异常（{errorCount} 人）</button>
@@ -677,6 +679,8 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       </div>}
       {reviewing && !registering && personnelPanel}
     </>}
+    {paymentView && admin && <MealFundsAudit key={month} month={month} disabled={busy}
+      revision={`${batch?.version ?? ""}:${batch?.reconciliation?.checked_at ?? ""}`} />}
     {(target || bulk) && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog" role="dialog" aria-modal="true" aria-busy={busy} aria-label={bulk ? participationForm ? "批量核算处理" : action === "adjustments" ? "批量补扣" : "批量充值" : participationForm ? "核算处理" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
       <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">{bulk ? "批量操作" : "菜票登记"}</span><h2>{bulk ? `${busy && loadProgress ? loadProgress.total : bulkItems.length} 人 · ${participationForm ? participationLabel : action === "adjustments" ? "批量补发 / 扣除" : "登记实际充值"}` : `${target?.name} · ${participationForm ? participationLabel : action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2><p>核对人员和操作内容后提交，完成后自动更新账目。</p></header>
       {bulk && <div className="meal-ticket-operation-selection">

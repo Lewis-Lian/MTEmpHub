@@ -99,6 +99,16 @@ export async function fetchMealBatch(month: string, onProgress?: (progress: Meal
   }
 }
 export const mutateMealBatch = (action: string, body: object) => apiRequest<MealBatch>(`/api/meal-tickets/${action}`, { method: "POST", body });
+export interface MealFundsAudit {
+  start_date: string; end_date: string; checked_at: string; complete: boolean;
+  database_net_cents: number; recorded_net_cents: number;
+  sources: Array<{ source: string; database_count: number; database_cents: number; recorded_count: number;
+    recorded_cents: number; employee_cents: number; guest_cents: number; clearance_cents: number }>;
+  issues: Array<{ source_key: string | null; source: string; status: string; date: string; emp_no: string;
+    amount_cents: number; recorded_cents: number; owners: string[] }>;
+}
+export const auditMealFunds = (start_date: string, end_date: string) => apiRequest<MealFundsAudit>(
+  "/api/meal-tickets/funds-audit", { method: "POST", body: { start_date, end_date } });
 export const mealRechargeExportUrl = (month: string) => buildApiUrl(`/api/meal-tickets/export-recharge?recharge_month=${month}`);
 export const fetchMealImports = () => apiRequest<MealImport[]>("/api/meal-tickets/imports");
 export const previewMealImport = (body: FormData) => apiRequest<MealImport>("/api/meal-tickets/imports", { method: "POST", body });
