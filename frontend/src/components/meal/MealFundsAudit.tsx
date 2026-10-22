@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { auditMealFunds, type MealFundsAudit as Audit } from "../../api/mealTickets";
 
@@ -7,13 +8,52 @@ const statuses: Record<string, string> = { unassigned:"待归属", unlinked:"登
   duplicate:"重复归属", changed:"流水或登记内容变化", missing:"数据库原流水缺失", invalid:"登记已作废或归属无效" };
 const money = (value: number) => (value / 100).toFixed(2);
 
-export default function MealFundsAudit({ month, revision, disabled }: { month: string; revision: string; disabled: boolean }) {
+type Props = { month: string; revision: string; disabled: boolean };
+
+export default function MealFundsAudit(props: Props) {
+  const [open, setOpen] = useState(false);
+  return <>
+    <button className="meal-ticket-button" disabled={props.disabled} aria-haspopup="dialog" aria-expanded={open}
+      onClick={() => setOpen(true)}>核对全部资金</button>
+    {open && <FundsAuditDialog {...props} onClose={() => setOpen(false)} />}
+  </>;
+}
+
+function FundsAuditDialog({ month, revision, disabled, onClose }: Props & { onClose: () => void }) {
   const [start, setStart] = useState(`${month}-01`);
   const [end, setEnd] = useState(`${month}-${String(new Date(Number(month.slice(0,4)), Number(month.slice(5,7)), 0).getDate()).padStart(2,"0")}`);
   const [result, setResult] = useState<Audit | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const generation = useRef(0);
+  const dialog = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    dialog.current?.querySelector<HTMLInputElement>("input")?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeRef.current(); }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(dialog.current?.querySelectorAll<HTMLElement>(
+        'input, button, a[href]',
+      ) ?? []).filter(control => !control.hasAttribute("disabled"));
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && (document.activeElement === first || !dialog.current?.contains(document.activeElement))) {
+        event.preventDefault(); last?.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !dialog.current?.contains(document.activeElement))) {
+        event.preventDefault(); first?.focus();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+      opener?.focus();
+    };
+  }, []);
   useEffect(() => {
     generation.current += 1;
     setResult(null); setError(""); setLoading(false);
@@ -33,14 +73,18 @@ export default function MealFundsAudit({ month, revision, disabled }: { month: s
     }
   }
 
-  return <section className="meal-ticket-panel meal-ticket-reconciliation" aria-label="全部资金核对" aria-busy={loading}>
+  return createPortal(<div className="meal-ticket-modal" onClick={event => {
+    if (event.target === event.currentTarget) onClose();
+  }}><section ref={dialog} className="meal-ticket-panel meal-ticket-reconciliation meal-funds-audit-dialog"
+    role="dialog" aria-modal="true" aria-label="全部资金核对" aria-busy={loading}>
     <div className="meal-ticket-section-heading"><div><h2>全部资金核对</h2>
-      <p>覆盖范围内全部人员和卡的补贴、充值、取款；逐笔核查员工发放、客人领用及清零归属。</p></div></div>
+      <p>覆盖范围内全部人员和卡的补贴、充值、取款；逐笔核查员工发放、客人领用及清零归属。</p></div>
+      <button className="meal-ticket-button" onClick={onClose}>关闭</button></div>
     <div className="meal-ticket-reconciliation-controls">
       <label>资金核对开始日期<input type="date" value={start} onChange={e => setStart(e.target.value)} /></label>
       <label>资金核对结束日期<input type="date" min={start} value={end} onChange={e => setEnd(e.target.value)} /></label>
       <button className="meal-ticket-button is-primary" disabled={disabled || loading || !start || !end || end < start}
-        onClick={() => void check()}>{loading ? "核对中…" : "核对全部资金"}</button>
+        onClick={() => void check()}>{loading ? "核对中…" : "开始核对"}</button>
     </div>
     <div className="meal-ticket-reconciliation-result" role="status">
       <strong>{loading ? "正在核对全部资金" : error ? "全部资金核对失败" : result
@@ -70,5 +114,5 @@ export default function MealFundsAudit({ month, revision, disabled }: { month: s
         <p className="meal-ticket-reconciliation-note">员工补入及补扣在本页办理；客人领用请先<Link to="/meal-tickets/external">登记并匹配充值</Link>；取款请核实扣回或<Link to="/meal-tickets/clearance">月末清零</Link>用途。重复、变化或缺失的流水须核查原始记录，再重新核对。</p>
       </>}
     </>}
-  </section>;
+  </section></div>, document.body);
 }

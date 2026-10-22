@@ -546,6 +546,10 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         </div>
       )}
     </header>}
+    {paymentView && admin && <div className="meal-ticket-actions" aria-label="资金核对操作">
+      <MealFundsAudit key={month} month={month} disabled={busy}
+        revision={`${batch?.version ?? ""}:${batch?.reconciliation?.checked_at ?? ""}`} />
+    </div>}
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
         {steps.map((step, index) => <li key={step.id} className={step.id === activeStage ? "is-current" : step.complete ? "is-complete" : ""} aria-current={step.id === activeStage ? "step" : undefined}>
@@ -679,8 +683,6 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
       </div>}
       {reviewing && !registering && personnelPanel}
     </>}
-    {paymentView && admin && <MealFundsAudit key={month} month={month} disabled={busy}
-      revision={`${batch?.version ?? ""}:${batch?.reconciliation?.checked_at ?? ""}`} />}
     {(target || bulk) && <div className="meal-ticket-modal"><section className="meal-ticket-operation-dialog" role="dialog" aria-modal="true" aria-busy={busy} aria-label={bulk ? participationForm ? "批量核算处理" : action === "adjustments" ? "批量补扣" : "批量充值" : participationForm ? "核算处理" : action === "adjustments" ? "额外补扣" : "实际发放登记"}>
       <header className="meal-ticket-operation-heading"><span className="meal-ticket-operation-eyebrow">{bulk ? "批量操作" : "菜票登记"}</span><h2>{bulk ? `${busy && loadProgress ? loadProgress.total : bulkItems.length} 人 · ${participationForm ? participationLabel : action === "adjustments" ? "批量补发 / 扣除" : "登记实际充值"}` : `${target?.name} · ${participationForm ? participationLabel : action === "adjustments" ? "额外补扣" : action === "reversal" ? "冲正" : "实际发放"}`}</h2><p>核对人员和操作内容后提交，完成后自动更新账目。</p></header>
       {bulk && <div className="meal-ticket-operation-selection">
