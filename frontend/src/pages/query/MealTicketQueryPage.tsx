@@ -2,12 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { fetchMealQueryOptions, queryMealTickets, type MealBatch, type MealItem, type MealQueryOptions } from "../../api/mealTickets";
 import { businessMonth, money } from "../../api/mealLedgers";
 import QueryTable from "../../components/query/QueryTable";
+import QueryResultPanel from "../../components/query/QueryResultPanel";
+import QueryEmptyState from "../../components/query/QueryEmptyState";
+import QueryProgressOverlay from "../../components/feedback/QueryProgressOverlay";
 import EmployeePicker from "../../components/query/EmployeePicker";
 import DepartmentMultiPicker from "../../components/query/DepartmentMultiPicker";
 import LoadingState from "../../components/feedback/LoadingState";
 import { SearchIcon } from "../../components/icons";
 import "../meal-ticket.css";
-import "../meal-ledger.css";
+import "./dashboard-shared.css";
+import "./meal-ticket-query.css";
 
 export default function MealTicketQueryPage() {
   const [month, setMonth] = useState(businessMonth);
@@ -65,127 +69,108 @@ export default function MealTicketQueryPage() {
   const totalDiff = rows.reduce((s, r) => s + r.difference, 0);
 
   return (
-    <section className="meal-ticket-page meal-ledger-page">
-      <header className="meal-ticket-heading">
-        <div>
-          <p className="meal-ticket-eyebrow"><SearchIcon /> 查询中心 · 菜票数据</p>
-          <h1>菜票查询</h1>
-          <p>独立查看菜票核算、补扣与实际发放。月底余额清零单独记账，不改变发放结清状态。</p>
-        </div>
-      </header>
+    <div className="query-page-shell employee-dashboard-page meal-ticket-query-page">
+      <div className="qh-glow-sphere sphere-1" />
+      <div className="qh-glow-sphere sphere-2" />
+      <div className="qh-glow-sphere sphere-3" />
 
-      {/* 筛选工具栏 */}
-      <div className="meal-ticket-panel meal-ledger-filter-panel">
-        <div className="meal-ledger-form">
-          <label>充值月份<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label>
-          <div className="meal-ticket-picker-field">
-            <span>搜索人员</span>
+      <aside className="query-filter-rail">
+        <div className="query-filter-heading">
+          <span className="query-filter-kicker">Query Filters</span>
+          <h2>查询条件</h2>
+          <p>按充值月份、人员和核算部门组合查询菜票数据。</p>
+        </div>
+        <div className="query-filter-body">
+          <div className="query-filter-field">
+            <label className="form-label">搜索人员</label>
             <EmployeePicker departments={pickerDepartments} employees={options?.employees ?? []} selectedIds={employeeIds}
               onChange={ids => { setEmployeeIds(ids); resetResults(); }} label="搜索人员" showFieldChrome={false} emptyHint="未选择时查询本月全部人员。" />
           </div>
-          <div className="meal-ticket-picker-field">
-            <span>核算部门</span>
+          <div className="query-filter-field">
+            <label className="form-label" htmlFor="meal-query-month">充值月份</label>
+            <input className="form-control" id="meal-query-month" type="month" value={month} onChange={e => setMonth(e.target.value)} />
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label">核算部门</label>
             <DepartmentMultiPicker departments={pickerDepartments}
               selectedIds={pickerDepartments.filter(dept => departmentNames.includes(dept.dept_name)).map(dept => dept.id)}
               onChange={ids => { setDepartmentNames(pickerDepartments.filter(dept => ids.includes(dept.id)).map(dept => dept.dept_name)); resetResults(); }}
               label="核算部门" showFieldChrome={false} />
           </div>
-          <label>
-            人员类型
-            <select value={personType} onChange={e => { setPersonType(e.target.value); resetResults(); }}>
+          <div className="query-filter-field">
+            <label className="form-label" htmlFor="meal-query-person-type">人员类型</label>
+            <select className="form-select" id="meal-query-person-type" value={personType} onChange={e => { setPersonType(e.target.value); resetResults(); }}>
               <option value="">全部人员</option>
               <option value="employee">员工</option>
               <option value="manager">管理人员</option>
             </select>
-          </label>
-          <label>
-            核对状态
-            <select value={state} onChange={e => { setState(e.target.value); resetResults(); }}>
+          </div>
+          <div className="query-filter-field">
+            <label className="form-label" htmlFor="meal-query-state">核对状态</label>
+            <select className="form-select" id="meal-query-state" value={state} onChange={e => { setState(e.target.value); resetResults(); }}>
               <option value="">全部状态</option>
               <option value="settled">结清</option>
               <option value="unpaid">待发放</option>
               <option value="refund">待扣回</option>
               <option value="error">待核对</option>
             </select>
-          </label>
-          <button className="meal-ticket-button is-primary" type="button" disabled={optionsBusy || !options || busy || !month} onClick={handleQuery}>
-            {busy ? "查询中…" : "查询"}
-          </button>
-        </div>
-      </div>
-
-      {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
-
-      {busy || optionsBusy ? (
-        <LoadingState message={optionsBusy ? "正在加载人员与部门选项…" : "正在读取菜票账目…"} />
-      ) : !hasQueried ? (
-        <div className="meal-ticket-empty meal-ticket-panel">
-          <h2>请选择条件后点击查询</h2>
-          <p>按充值月份、人员和核算部门查询菜票数据；不选人员和部门时查询本月全部可见人员。</p>
-        </div>
-      ) : batch ? (
-        <>
-          {/* KPI 指标卡片 */}
-          <section className="meal-ledger-stats" aria-label="菜票汇总统计">
-            <div className="meal-ledger-stat-card is-blue">
-              <span className="meal-ledger-stat-label">筛选人数</span>
-              <strong className="meal-ledger-stat-value">{rows.length}<small>人</small></strong>
-              <p className="meal-ledger-stat-sub">当前筛选范围内人员</p>
-            </div>
-            <div className="meal-ledger-stat-card is-blue">
-              <span className="meal-ledger-stat-label">应发合计</span>
-              <strong className="meal-ledger-stat-value">¥{money(totalDue)}</strong>
-              <p className="meal-ledger-stat-sub">应发金额总和</p>
-            </div>
-            <div className="meal-ledger-stat-card is-green">
-              <span className="meal-ledger-stat-label">净已发合计</span>
-              <strong className="meal-ledger-stat-value">¥{money(totalPaid)}</strong>
-              <p className="meal-ledger-stat-sub">实际已充值扣除退回</p>
-            </div>
-            <div className={`meal-ledger-stat-card ${totalDiff === 0 ? "is-green" : "is-amber"}`}>
-              <span className="meal-ledger-stat-label">差额合计</span>
-              <strong className="meal-ledger-stat-value">¥{money(totalDiff)}</strong>
-              <p className="meal-ledger-stat-sub">{totalDiff === 0 ? "账目已平衡结清" : "待处理差额"}</p>
-            </div>
-          </section>
-
-          <div className="meal-ticket-panel">
-            <div className="meal-ticket-section-heading">
-              <div>
-                <h2>菜票人员明细</h2>
-                <p>考勤月份 {batch.month} · 充值月份 {batch.recharge_month} · {batch.status === "draft" ? "草稿" : "已确认"} · 当前范围 {rows.length} 人</p>
-                <p style={{ marginTop: "4px" }}>应发 {money(totalDue)} 元 · 净已发 {money(totalPaid)} 元</p>
-              </div>
-              <span className="meal-ticket-count">{rows.length} 人</span>
-            </div>
-
-            <QueryTable
-              headers={["工号", "姓名", "核算部门", "人员类型", "实际打卡天数", "基础金额", "额外补扣", "应发", "净已发", "差额", "核对说明", "明细"]}
-              rows={rows.map(i => [
-                i.emp_no,
-                i.name,
-                i.dept_name,
-                i.is_manager ? "管理人员" : "员工",
-                i.days,
-                money(i.base_amount),
-                money(i.adjustment_amount),
-                money(i.due_amount),
-                money(i.paid_amount),
-                money(i.difference),
-                i.excluded ? `本月不发：${i.participation_history?.slice(-1)[0]?.reason ?? ""}` : i.error || (i.difference === 0 ? "结清" : i.difference > 0 ? "待发放" : "待扣回"),
-                <button className="meal-ticket-button is-link" onClick={() => setDetail(i)}>
-                  查看明细
-                </button>
-              ])}
-            />
           </div>
-        </>
-      ) : (
-        <div className="meal-ticket-empty meal-ticket-panel">
-          <h2>本充值月份没有核算数据</h2>
-          <p>当前月份暂未建立菜票核算批次，请核对充值月份或前往菜票中心生成核算。</p>
+          <div className="query-filter-actions">
+            <button className="btn btn-primary" type="button" disabled={optionsBusy || !options || busy || !month} onClick={handleQuery}>
+              {busy ? "查询中…" : "查询"}
+            </button>
+          </div>
         </div>
-      )}
+        {error && <p role="alert" className="legacy-inline-error">{error}</p>}
+      </aside>
+
+      <section className="query-workspace">
+        <QueryProgressOverlay active={busy} progress={null} text="正在读取菜票账目…" />
+        {optionsBusy ? (
+          <LoadingState message="正在加载人员与部门选项…" />
+        ) : !hasQueried ? (
+          <QueryEmptyState icon={<SearchIcon />} title="请选择条件后点击查询"
+            description="按充值月份、人员和核算部门查询菜票数据；不选人员和部门时查询本月全部可见人员。" />
+        ) : batch ? (
+          <>
+            <header className="meal-query-summary">
+              <h2>菜票人员明细</h2>
+              <p>考勤月份 {batch.month} · 充值月份 {batch.recharge_month} · {batch.status === "draft" ? "草稿" : "已确认"} · 当前范围 {rows.length} 人</p>
+              <div className="meal-query-totals" role="region" aria-label="菜票汇总统计">
+                <span>筛选人数 <strong>{rows.length} 人</strong></span>
+                <span>应发合计 <strong>¥{money(totalDue)}</strong></span>
+                <span>净已发合计 <strong>¥{money(totalPaid)}</strong></span>
+                <span>差额合计 <strong>¥{money(totalDiff)}</strong></span>
+              </div>
+            </header>
+            <QueryResultPanel>
+              <QueryTable
+                headers={["工号", "姓名", "核算部门", "人员类型", "实际打卡天数", "基础金额", "额外补扣", "应发", "净已发", "差额", "核对说明", "明细"]}
+                rows={rows.map(i => [
+                  i.emp_no,
+                  i.name,
+                  i.dept_name,
+                  i.is_manager ? "管理人员" : "员工",
+                  i.days,
+                  money(i.base_amount),
+                  money(i.adjustment_amount),
+                  money(i.due_amount),
+                  money(i.paid_amount),
+                  money(i.difference),
+                  i.excluded ? `本月不发：${i.participation_history?.slice(-1)[0]?.reason ?? ""}` : i.error || (i.difference === 0 ? "结清" : i.difference > 0 ? "待发放" : "待扣回"),
+                  <button className="query-table-click-cell" type="button" onClick={() => setDetail(i)}>
+                    查看明细
+                    <span className="query-table-click-icon" aria-hidden="true">↗</span>
+                  </button>
+                ])}
+              />
+            </QueryResultPanel>
+          </>
+        ) : (
+          <QueryEmptyState icon={<SearchIcon />} title="本充值月份没有核算数据"
+            description="当前月份暂未建立菜票核算批次，请核对充值月份或前往菜票中心生成核算。" />
+        )}
+      </section>
 
       {/* 明细模态框 */}
       {detail && (
@@ -239,6 +224,6 @@ export default function MealTicketQueryPage() {
           </section>
         </div>
       )}
-    </section>
+    </div>
   );
 }

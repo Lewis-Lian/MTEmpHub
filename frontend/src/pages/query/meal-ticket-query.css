@@ -1,0 +1,58 @@
+.meal-ticket-query-page .meal-query-summary {
+  flex-shrink: 0;
+  padding: 4px 4px 16px;
+}
+
+.meal-ticket-query-page .meal-query-summary h2 {
+  margin: 0 0 8px;
+  color: var(--qh-text-main);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.meal-ticket-query-page .meal-query-summary p {
+  margin: 0 0 12px;
+  color: var(--qh-text-muted);
+  font-size: 12px;
+}
+
+.meal-ticket-query-page .meal-query-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  color: var(--qh-text-muted);
+  font-size: 13px;
+}
+
+.meal-ticket-query-page .meal-query-totals strong {
+  color: var(--qh-text-main);
+}
+.meal-ticket-query-page .query-filter-body {
+  grid-template-columns: minmax(220px, 1.6fr) minmax(160px, 1fr) minmax(220px, 1.3fr) minmax(140px, 0.8fr) minmax(140px, 0.8fr) auto;
+}
+
+.meal-ticket-query-page .query-filter-field {
+  min-width: 0;
+}
+
+.meal-ticket-query-page input[type="month"] {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+}
+
+
+@media (max-width: 1200px) {
+  .meal-ticket-query-page .query-filter-body {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .meal-ticket-query-page .query-filter-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
