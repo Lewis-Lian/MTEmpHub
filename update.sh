@@ -24,12 +24,23 @@ cd "$PROJECT_DIR"
 echo "=========================================="
 echo "1. 拉取最新代码..."
 echo "=========================================="
+echo "请选择拉取来源："
+echo "1. 内网 GitLab（默认）"
+echo "2. GitHub"
+read -r -t 2 -p "请输入 [1/2]，2 秒后默认选择 1：" PULL_CHOICE || PULL_CHOICE=1
+echo ""
+if [ "$PULL_CHOICE" = "2" ]; then
+    PULL_URL="https://github.com/Lewis-Lian/MTEmpHub.git"
+else
+    PULL_URL="http://172.16.20.17/Lewis/MTEmpHub.git"
+fi
+echo "拉取来源：$PULL_URL"
 # package-lock.json 是平台相关的：不同机器 npm install 会按本地平台补全/重写
 # （如 esbuild 平台子包），差异不应入 git。上一次 npm install 产生的本地改动
 # 会挡住本次 pull，这里先丢弃它（npm 会按 package.json 重新生成，无损失）。
 git checkout -- frontend/package-lock.json 2>/dev/null || true
 # --ff-only：仅允许快进合并，遇到本地改动冲突时会失败而非自动合并
-if ! git pull --ff-only origin master; then
+if ! git pull --ff-only "$PULL_URL" master; then
     echo "❌ git pull 失败，可能有本地改动冲突或网络问题"
     echo "   排查: cd $PROJECT_DIR && git status"
     exit 1
