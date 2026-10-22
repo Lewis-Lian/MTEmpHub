@@ -1,0 +1,136 @@
+.meal-ticket-modal > .meal-funds-audit-dialog {
+  width: min(1180px, calc(100vw - 32px));
+  max-height: min(920px, calc(100dvh - 48px));
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ent-border);
+}
+
+.funds-audit-header,
+.funds-audit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 16px;
+  padding: 22px 28px;
+}
+.funds-audit-header { border-bottom: 1px solid var(--ent-border); }
+.funds-audit-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.funds-audit-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  color: var(--ent-blue);
+  background: color-mix(in srgb, var(--ent-blue) 8%, var(--ent-bg));
+}
+.meal-funds-audit-dialog .funds-audit-header h2 { margin: 0 0 5px; font-size: 20px; }
+.meal-funds-audit-dialog .funds-audit-header p { margin: 0; font-size: 12px; }
+.funds-audit-header > button { flex-shrink: 0; }
+
+.funds-audit-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  padding: 24px 28px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.funds-audit-body > * { flex-shrink: 0; min-width: 0; }
+.funds-audit-query {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.funds-audit-query label { display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: var(--ent-text-secondary); }
+.funds-audit-query input {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid var(--ent-border);
+  border-radius: 8px;
+  background: var(--ent-bg);
+  color: var(--ent-text);
+  font: inherit;
+}
+.funds-audit-query input:focus-visible { outline: 1px solid var(--ent-blue); outline-offset: 2px; }
+.funds-audit-range-separator { padding-bottom: 11px; color: var(--ent-text-tertiary); font-size: 12px; }
+.funds-audit-query-note { margin-left: auto; padding-bottom: 10px; font-size: 12px; color: var(--ent-text-secondary); }
+.funds-audit-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; font-size: 12px; color: var(--ent-text-secondary); }
+.funds-audit-status strong { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 500; }
+.funds-audit-status-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: currentColor; }
+.funds-audit-status[data-state="complete"] strong { color: #15803d; }
+.funds-audit-status[data-state="issues"] strong { color: #b45309; }
+.funds-audit-status[data-state="error"] strong { color: #b91c1c; }
+.funds-audit-status[data-state="loading"] strong { color: var(--ent-blue); }
+.funds-audit-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; }
+.funds-audit-totals > div { padding: 18px 20px; border-radius: 12px; background: var(--ent-secondary-bg); }
+.funds-audit-totals dt { color: var(--ent-text-secondary); font-size: 12px; }
+.funds-audit-total-value { display: flex; align-items: baseline; gap: 5px; margin: 8px 0 4px; font-size: 27px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.funds-audit-total-value small { color: var(--ent-text-secondary); font-size: 14px; font-weight: 400; }
+.funds-audit-total-caption { margin: 0; color: var(--ent-text-secondary); font-size: 11px; }
+.funds-audit-totals > [data-different="true"] { background: color-mix(in srgb, #d97706 7%, var(--ent-bg)); }
+.funds-audit-totals > [data-different="true"] .funds-audit-total-value,
+.funds-audit-table [data-different="true"] { color: #b45309; }
+.funds-audit-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.meal-funds-audit-dialog .funds-audit-section h3 { margin: 0; padding: 0; border: 0; font-size: 14px; font-weight: 600; }
+.funds-audit-section-heading > span { color: var(--ent-text-secondary); font-size: 12px; }
+.funds-audit-section-heading .funds-audit-count { color: #b45309; }
+.funds-audit-table-wrap { overflow: auto; border: 1px solid var(--ent-border); border-radius: 10px; }
+.funds-audit-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+.funds-audit-table th,
+.funds-audit-table td { padding: 12px 14px; border-bottom: 1px solid var(--ent-border); text-align: right; white-space: nowrap; }
+.funds-audit-table th { background: var(--ent-secondary-bg); color: var(--ent-text-secondary); font-size: 11px; font-weight: 500; }
+.funds-audit-table th:first-child,
+.funds-audit-table td:first-child,
+.funds-audit-issues th,
+.funds-audit-issues td { text-align: left; }
+.funds-audit-issues th:nth-child(5),
+.funds-audit-issues th:nth-child(6),
+.funds-audit-issues td:nth-child(5),
+.funds-audit-issues td:nth-child(6) { text-align: right; }
+.funds-audit-table tr:last-child td { border-bottom: 0; }
+.funds-audit-issue-tag { display: inline-block; padding: 3px 7px; border-radius: 5px; background: color-mix(in srgb, #d97706 8%, var(--ent-bg)); color: #b45309; font-size: 11px; }
+.meal-funds-audit-dialog .funds-audit-help { margin: 10px 0 0; font-size: 12px; }
+.funds-audit-footer { flex-wrap: wrap; padding: 14px 28px; border-top: 1px solid var(--ent-border); color: var(--ent-text-secondary); font-size: 11px; }
+.meal-funds-audit-dialog .funds-audit-error { margin: 0; padding: 12px 14px; border-radius: 8px; background: color-mix(in srgb, #dc2626 6%, var(--ent-bg)); color: #b91c1c; }
+.funds-audit-empty { padding: 42px 16px 48px; text-align: center; color: var(--ent-text-secondary); }
+.funds-audit-empty > span { display: inline-grid; place-items: center; width: 48px; height: 48px; margin-bottom: 12px; border-radius: 14px; background: var(--ent-secondary-bg); }
+.meal-funds-audit-dialog .funds-audit-empty h3 { margin: 0 0 8px; padding: 0; border: 0; color: var(--ent-text); font-size: 14px; font-weight: 500; }
+.meal-funds-audit-dialog .funds-audit-empty p { margin: 0; font-size: 12px; }
+
+[data-theme="dark"] .funds-audit-status[data-state="complete"] strong { color: #86efac; }
+[data-theme="dark"] .funds-audit-status[data-state="issues"] strong,
+[data-theme="dark"] .funds-audit-totals > [data-different="true"] .funds-audit-total-value,
+[data-theme="dark"] .funds-audit-table [data-different="true"],
+[data-theme="dark"] .funds-audit-section-heading .funds-audit-count,
+[data-theme="dark"] .funds-audit-issue-tag { color: #fcd34d; }
+[data-theme="dark"] .funds-audit-status[data-state="error"] strong,
+[data-theme="dark"] .meal-funds-audit-dialog .funds-audit-error { color: #fca5a5; }
+
+@media (max-width: 640px) {
+  .meal-ticket-modal > .meal-funds-audit-dialog { max-height: calc(100dvh - 32px); }
+  .funds-audit-header { padding: 18px; }
+  .funds-audit-body { padding: 18px; gap: 18px; }
+  .funds-audit-heading { gap: 9px; }
+  .funds-audit-mark { width: 34px; height: 34px; border-radius: 9px; }
+  .meal-funds-audit-dialog .funds-audit-header h2 { font-size: 17px; }
+  .meal-funds-audit-dialog .funds-audit-header p { font-size: 11px; }
+  .funds-audit-query { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+  .funds-audit-query input { width: 100%; }
+  .funds-audit-range-separator,
+  .funds-audit-query-note { display: none; }
+  .funds-audit-query > button { grid-column: 1 / -1; }
+  .funds-audit-totals { grid-template-columns: 1fr; gap: 8px; }
+  .funds-audit-totals > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 5px 10px; padding: 14px; }
+  .funds-audit-total-value { grid-row: span 2; grid-column: 2; margin: 0; font-size: 24px; }
+  .funds-audit-footer { padding: 12px 18px; gap: 5px; }
+}

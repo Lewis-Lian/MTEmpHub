@@ -72,6 +72,24 @@ it("员工结清后仍可核对全部资金，名单外充值展示明细且不�
   expect(request.mock.calls.some(([path]) => path === "/api/meal-tickets/reconcile")).toBe(false);
 });
 
+it("金额摘要分别展示数据库、项目净额和带方向的差额", async () => {
+  page();
+  const panel = await openAudit();
+  fireEvent.click(within(panel).getByRole("button", {name:"开始核对"}));
+  const summary = await within(panel).findByRole("group", {name:"资金金额摘要"});
+  expect(within(summary).getByText("201.00")).toBeInTheDocument();
+  expect(within(summary).getByText("176.00")).toBeInTheDocument();
+  expect(within(summary).getByText("25.00")).toBeInTheDocument();
+  request.mockResolvedValue({ ...clear, complete:false, database_net_cents:17500,
+    sources:[{...clear.sources[0],database_cents:17500}],
+    issues:[{source_key:"card-meal:test:subsidy:1",source:"subsidy",status:"changed",date:"2026-09-20",
+      emp_no:"001",amount_cents:17500,recorded_cents:17600,owners:["employee"]}] });
+  fireEvent.click(within(panel).getByRole("button", {name:"开始核对"}));
+  const updated = await within(panel).findByRole("group", {name:"资金金额摘要"});
+  expect(within(updated).getByText("-1.00")).toBeInTheDocument();
+  expect(within(panel).queryByText("全部资金已核清")).not.toBeInTheDocument();
+});
+
 it("核清后再次查询会发现新增流水，查询失败不保留旧的成功状态", async () => {
   request.mockImplementation((path: string) => Promise.resolve(path === "/api/auth/me" ? {role:"admin"}
     : path.includes("followup-tasks") ? {batch_id:1, batch_version:2, baseline_required:false, tasks:[]}

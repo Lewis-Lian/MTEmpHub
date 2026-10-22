@@ -1474,14 +1474,6 @@
 }
 
 /* 模态弹窗 */
-.meal-ticket-modal > .meal-funds-audit-dialog {
-  width: min(1180px, calc(100vw - 32px));
-}
-
-.meal-funds-audit-dialog > * {
-  flex-shrink: 0;
-}
-
 .meal-ticket-modal {
   position: fixed;
   inset: 0;
