@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { fetchMealBatch, type MealBatch, type MealItem } from "../../api/mealTickets";
+import { useEffect, useRef, useState } from "react";
+import { fetchMealQueryOptions, queryMealTickets, type MealBatch, type MealItem, type MealQueryOptions } from "../../api/mealTickets";
 import { businessMonth, money } from "../../api/mealLedgers";
 import QueryTable from "../../components/query/QueryTable";
+import EmployeePicker from "../../components/query/EmployeePicker";
+import DepartmentMultiPicker from "../../components/query/DepartmentMultiPicker";
 import LoadingState from "../../components/feedback/LoadingState";
 import { SearchIcon } from "../../components/icons";
 import "../meal-ticket.css";
@@ -10,29 +12,53 @@ import "../meal-ledger.css";
 export default function MealTicketQueryPage() {
   const [month, setMonth] = useState(businessMonth);
   const [batch, setBatch] = useState<MealBatch | null>(null);
-  const [busy, setBusy] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [optionsBusy, setOptionsBusy] = useState(true);
+  const [options, setOptions] = useState<MealQueryOptions | null>(null);
+  const [hasQueried, setHasQueried] = useState(false);
+  const queryVersion = useRef(0);
   const [error, setError] = useState("");
-  const [search, setSearch] = useState("");
-  const [department, setDepartment] = useState("");
+  const [employeeIds, setEmployeeIds] = useState<number[]>([]);
+  const [departmentNames, setDepartmentNames] = useState<string[]>([]);
   const [personType, setPersonType] = useState("");
   const [state, setState] = useState("");
   const [detail, setDetail] = useState<MealItem | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setBusy(true); setError(""); setBatch(null); setDetail(null);
-    fetchMealBatch(month).then(data => { if (!cancelled) setBatch(data); })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : "查询失败"); })
-      .finally(() => { if (!cancelled) setBusy(false); });
-    return () => { cancelled = true; };
+    resetResults();
+    setOptions(null); setOptionsBusy(true); setEmployeeIds([]); setDepartmentNames([]);
+    if (!month) {
+      setOptionsBusy(false);
+      return;
+    }
+    fetchMealQueryOptions(month).then(data => { if (!cancelled) setOptions(data); })
+      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : "选择器选项加载失败"); })
+      .finally(() => { if (!cancelled) setOptionsBusy(false); });
+    return () => { cancelled = true; queryVersion.current += 1; };
   }, [month]);
 
-  const rows = useMemo(() => (batch?.items ?? []).filter(i =>
-    (!search || `${i.emp_no}${i.name}`.toLowerCase().includes(search.toLowerCase())) &&
-    (!department || i.dept_name === department) &&
-    (!personType || i.is_manager === (personType === "manager")) &&
-    (!state || (state === "error" ? Boolean(i.error) : !i.error && (state === "settled" ? i.difference === 0 : state === "unpaid" ? i.difference > 0 : i.difference < 0)))),
-    [batch, search, department, personType, state]);
+  function resetResults() {
+    queryVersion.current += 1;
+    setBusy(false); setError(""); setBatch(null); setDetail(null); setHasQueried(false);
+  }
+
+  async function handleQuery() {
+    const version = ++queryVersion.current;
+    setBusy(true); setError(""); setBatch(null); setDetail(null); setHasQueried(false);
+    try {
+      const data = await queryMealTickets(month, { employeeIds, departmentNames, personType, state });
+      if (version !== queryVersion.current) return;
+      setBatch(data); setHasQueried(true);
+    } catch (e) {
+      if (version === queryVersion.current) setError(e instanceof Error ? e.message : "查询失败");
+    } finally {
+      if (version === queryVersion.current) setBusy(false);
+    }
+  }
+
+  const pickerDepartments = options?.departments ?? [];
+  const rows = batch?.items ?? [];
 
   const totalDue = rows.reduce((s, r) => s + r.due_amount, 0);
   const totalPaid = rows.reduce((s, r) => s + r.paid_amount, 0);
@@ -52,17 +78,21 @@ export default function MealTicketQueryPage() {
       <div className="meal-ticket-panel meal-ledger-filter-panel">
         <div className="meal-ledger-form">
           <label>充值月份<input type="month" value={month} onChange={e => setMonth(e.target.value)} /></label>
-          <label>搜索人员<input placeholder="工号或姓名" value={search} onChange={e => setSearch(e.target.value)} /></label>
-          <label>
-            核算部门
-            <select value={department} onChange={e => setDepartment(e.target.value)}>
-              <option value="">全部部门</option>
-              {[...new Set(batch?.items.map(i => i.dept_name))].map(d => <option key={d}>{d}</option>)}
-            </select>
-          </label>
+          <div className="meal-ticket-picker-field">
+            <span>搜索人员</span>
+            <EmployeePicker departments={pickerDepartments} employees={options?.employees ?? []} selectedIds={employeeIds}
+              onChange={ids => { setEmployeeIds(ids); resetResults(); }} label="搜索人员" showFieldChrome={false} emptyHint="未选择时查询本月全部人员。" />
+          </div>
+          <div className="meal-ticket-picker-field">
+            <span>核算部门</span>
+            <DepartmentMultiPicker departments={pickerDepartments}
+              selectedIds={pickerDepartments.filter(dept => departmentNames.includes(dept.dept_name)).map(dept => dept.id)}
+              onChange={ids => { setDepartmentNames(pickerDepartments.filter(dept => ids.includes(dept.id)).map(dept => dept.dept_name)); resetResults(); }}
+              label="核算部门" showFieldChrome={false} />
+          </div>
           <label>
             人员类型
-            <select value={personType} onChange={e => setPersonType(e.target.value)}>
+            <select value={personType} onChange={e => { setPersonType(e.target.value); resetResults(); }}>
               <option value="">全部人员</option>
               <option value="employee">员工</option>
               <option value="manager">管理人员</option>
@@ -70,7 +100,7 @@ export default function MealTicketQueryPage() {
           </label>
           <label>
             核对状态
-            <select value={state} onChange={e => setState(e.target.value)}>
+            <select value={state} onChange={e => { setState(e.target.value); resetResults(); }}>
               <option value="">全部状态</option>
               <option value="settled">结清</option>
               <option value="unpaid">待发放</option>
@@ -78,13 +108,21 @@ export default function MealTicketQueryPage() {
               <option value="error">待核对</option>
             </select>
           </label>
+          <button className="meal-ticket-button is-primary" type="button" disabled={optionsBusy || !options || busy || !month} onClick={handleQuery}>
+            {busy ? "查询中…" : "查询"}
+          </button>
         </div>
       </div>
 
       {error && <p role="alert" className="meal-ticket-alert is-error">{error}</p>}
 
-      {busy ? (
-        <LoadingState message="正在读取菜票账目…" />
+      {busy || optionsBusy ? (
+        <LoadingState message={optionsBusy ? "正在加载人员与部门选项…" : "正在读取菜票账目…"} />
+      ) : !hasQueried ? (
+        <div className="meal-ticket-empty meal-ticket-panel">
+          <h2>请选择条件后点击查询</h2>
+          <p>按充值月份、人员和核算部门查询菜票数据；不选人员和部门时查询本月全部可见人员。</p>
+        </div>
       ) : batch ? (
         <>
           {/* KPI 指标卡片 */}

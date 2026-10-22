@@ -10,7 +10,7 @@ import xlwt
 from sqlalchemy.exc import IntegrityError
 
 from models import db
-from models.meal_ticket import MealTicketBatch, MealTicketImport, MealTicketImportRow
+from models.meal_ticket import MealTicketBatch, MealTicketItem, MealTicketImport, MealTicketImportRow
 from models.account_set import AccountSet
 from routes.auth_helpers import admin_required, page_permission_required
 from services.meal_ticket_service import (
@@ -72,6 +72,50 @@ def get_batch():
         if progress:
             progress('月度核算数据读取失败', status='failed')
         raise
+
+
+@meal_tickets_bp.get('/query-options')
+@page_permission_required('meal_ticket_query')
+@handled
+def query_options():
+    batch = selected_batch()
+    if not batch:
+        return jsonify({'employees': [], 'departments': []})
+    query = MealTicketItem.query.filter_by(batch_key=batch.key)
+    scope = accessible()
+    if scope is not None:
+        query = query.filter(MealTicketItem.emp_id.in_(scope))
+    rows = query.with_entities(MealTicketItem.emp_id, MealTicketItem.emp_no_snapshot,
+        MealTicketItem.name, MealTicketItem.dept_name, MealTicketItem.is_manager
+        ).order_by(MealTicketItem.emp_no_snapshot).all()
+    departments = [{'id':index + 1, 'dept_name':name, 'dept_no':'', 'parent_id':None}
+                   for index, name in enumerate(sorted({row.dept_name for row in rows}))]
+    department_ids = {row['dept_name']:row['id'] for row in departments}
+    return jsonify({'employees':[{'id':row.emp_id, 'emp_no':row.emp_no_snapshot,
+        'name':row.name, 'dept_name':row.dept_name, 'dept_id':department_ids[row.dept_name],
+        'is_manager':row.is_manager} for row in rows], 'departments':departments})
+
+
+@meal_tickets_bp.get('/query')
+@page_permission_required('meal_ticket_query')
+@handled
+def query_batch():
+    try:
+        emp_ids = [int(value) for value in request.args.getlist('emp_ids')]
+        if any(value <= 0 for value in emp_ids):
+            raise ValueError()
+    except ValueError:
+        raise MealError('员工编号无效')
+    person_type = request.args.get('person_type', '')
+    state = request.args.get('state', '')
+    if person_type not in ('', 'employee', 'manager'):
+        raise MealError('人员类型无效')
+    if state not in ('', 'settled', 'unpaid', 'refund', 'error'):
+        raise MealError('核对状态无效')
+    batch = selected_batch()
+    return jsonify(serialize_batch(batch, accessible(), query_filters={
+        'emp_ids':emp_ids, 'dept_names':request.args.getlist('dept_names'),
+        'person_type':person_type, 'state':state}) if batch else None)
 
 
 @meal_tickets_bp.get('/progress')

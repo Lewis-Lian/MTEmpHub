@@ -450,7 +450,7 @@ def payment(body, operator):
     return batch
 
 
-def serialize_batch(batch, accessible=None, check_source=False, progress=None):
+def serialize_batch(batch, accessible=None, check_source=False, progress=None, query_filters=None):
     from models.meal_ledger import MealLedgerRecord
     clearances = {}
     if progress:
@@ -461,6 +461,13 @@ def serialize_batch(batch, accessible=None, check_source=False, progress=None):
     query = MealTicketItem.query.filter_by(batch_key=batch.key).order_by(MealTicketItem.emp_no_snapshot)
     if accessible is not None:
         query = query.filter(MealTicketItem.emp_id.in_(accessible))
+    filters = query_filters or {}
+    if filters.get('emp_ids'):
+        query = query.filter(MealTicketItem.emp_id.in_(filters['emp_ids']))
+    if filters.get('dept_names'):
+        query = query.filter(MealTicketItem.dept_name.in_(filters['dept_names']))
+    if filters.get('person_type'):
+        query = query.filter(MealTicketItem.is_manager == (filters['person_type'] == 'manager'))
     items, departments = [], {}
     records = query.with_entities(
             MealTicketItem, Employee.id, Employee.resigned_at).outerjoin(
@@ -469,6 +476,10 @@ def serialize_batch(batch, accessible=None, check_source=False, progress=None):
         progress(stage='汇总人员补扣与充值', completed=0, total=len(records))
     for item, employee_id, resigned_at in records:
         due, paid, adjustments, payments = totals(item)
+        state = filters.get('state')
+        if state and not (bool(item.error) if state == 'error' else not item.error and (
+                due == paid if state == 'settled' else due > paid if state == 'unpaid' else due < paid)):
+            continue
         excluded = bool(participation_state(item).get('excluded'))
         base = 0 if excluded else item.base_cents
         row = {'id':item.id, 'emp_id':item.emp_id, 'emp_no':item.emp_no_snapshot, 'name':item.name,

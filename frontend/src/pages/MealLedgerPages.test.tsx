@@ -4,13 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import MealTicketQueryPage from "./query/MealTicketQueryPage";
 import MealLedgerPage from "./MealLedgerPage";
 import MealDownloadPage from "./MealDownloadPage";
+import { ConfirmProvider } from "../components/feedback/ConfirmDialog";
 
 const departmentRows = [{id:1,dept_no:"D01",dept_name:"接待部",parent_id:null}, {id:2,dept_no:"D02",dept_name:"工程部",parent_id:null}];
 const request = vi.hoisted(() => vi.fn());
 vi.mock("../api/client", () => ({ apiRequest: request, buildApiUrl: (p: string) => p }));
 
 describe("菜票查询与台账页面", () => {
-  beforeEach(() => request.mockReset());
+  beforeEach(() => { request.mockReset(); });
   it("台账月份面板切换业务月份后重新读取记录并清空处理日期", async () => {
     request.mockImplementation((path: string) => Promise.resolve(path === "/api/admin/departments" ? departmentRows : path === "/api/meal-ledgers/guest-cards" ? [] : path === "/api/auth/me" ? {role:"admin"} : []));
     render(<MemoryRouter><MealLedgerPage kind="external" /></MemoryRouter>);
@@ -32,13 +33,20 @@ describe("菜票查询与台账页面", () => {
     expect(screen.getByLabelText("处理日期")).toHaveValue("2026-10-08");
   });
   it("菜票查询独立展示并按人员类型筛选，不提供发放操作", async () => {
-    request.mockResolvedValue({ month: "2026-08", recharge_month: "2026-09", status: "confirmed", items: [
+    const batch = { month: "2026-08", recharge_month: "2026-09", status: "confirmed", items: [
       { id: 1, emp_no: "001", name: "员工甲", dept_name: "生产部", is_manager: false, days: 22, base_amount: 176, adjustment_amount: 0, due_amount: 176, paid_amount: 176, difference: 0, adjustments: [], payments: [], error: "" },
       { id: 2, emp_no: "002", name: "经理乙", dept_name: "生产部", is_manager: true, days: 20, base_amount: 160, adjustment_amount: 0, due_amount: 160, paid_amount: 160, difference: 0, adjustments: [], payments: [], error: "" },
-    ] });
-    render(<MemoryRouter><MealTicketQueryPage /></MemoryRouter>);
+    ] };
+    request.mockImplementation((path: string) => Promise.resolve(path.includes("/query-options?")
+      ? { employees: [], departments: [] }
+      : { ...batch, items: path.includes("person_type=manager") ? [batch.items[1]] : batch.items }));
+    render(<MemoryRouter><ConfirmProvider><MealTicketQueryPage /></ConfirmProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("button", { name: "查询" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
     await screen.findByText("员工甲");
     fireEvent.change(screen.getByLabelText("人员类型"), { target: { value: "manager" } });
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
+    await screen.findByText("经理乙");
     expect(screen.queryByText("员工甲")).not.toBeInTheDocument();
     expect(screen.getByText("经理乙")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "登记实际充值" })).not.toBeInTheDocument();
@@ -68,13 +76,17 @@ describe("菜票查询与台账页面", () => {
   });
 
   it("独立查询保留本月不发原因与处理历史", async () => {
-    request.mockResolvedValue({ month: "2026-08", recharge_month: "2026-09", status: "confirmed", items: [
+    const batch = { month: "2026-08", recharge_month: "2026-09", status: "confirmed", items: [
       { id: 1, emp_no: "001", name: "员工甲", dept_name: "生产部", is_manager: false, days: 22,
         base_amount: 0, adjustment_amount: 0, due_amount: 0, paid_amount: 0, difference: 0, error: "",
         excluded: true, participation_history: [{ excluded: true, reason: "离职不结算", operator: "admin", created_at: "2026-09-01" }],
         adjustments: [], payments: [] },
-    ] });
-    render(<MemoryRouter><MealTicketQueryPage /></MemoryRouter>);
+    ] };
+    request.mockImplementation((path: string) => Promise.resolve(path.includes("/query-options?")
+      ? { employees: [], departments: [] } : batch));
+    render(<MemoryRouter><ConfirmProvider><MealTicketQueryPage /></ConfirmProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("button", { name: "查询" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "查询" }));
     await screen.findByText("本月不发：离职不结算");
     fireEvent.click(screen.getByRole("button", { name: "查看明细" }));
     expect(screen.getByText(/2026-09-01.*离职不结算/)).toBeInTheDocument();

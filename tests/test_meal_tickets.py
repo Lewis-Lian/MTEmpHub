@@ -67,6 +67,66 @@ class MealTicketTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200, r.get_json())
         return r.get_json()
 
+    def test_query_options_are_lightweight_and_permission_scoped(self):
+        from unittest.mock import patch
+        self.generate()
+        with patch('services.meal_ticket_service.totals', side_effect=AssertionError('不应读取金额明细')):
+            response = self.client.get('/api/meal-tickets/query-options?recharge_month=2026-09', headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual([row['id'] for row in response.get_json()['employees']], [self.emp_id, self.other_id])
+            self.assertEqual(response.get_json()['departments'][0]['dept_name'], '未分配部门')
+            viewer = {'Authorization': 'Bearer ' + self.viewer_token}
+            scoped = self.client.get('/api/meal-tickets/query-options?recharge_month=2026-09', headers=viewer)
+            self.assertEqual([row['id'] for row in scoped.get_json()['employees']], [self.emp_id])
+        self.assertEqual(self.client.get('/api/meal-tickets/query-options?recharge_month=2026-09').status_code, 401)
+
+    def test_query_filters_before_computing_totals_without_checking_attendance_source(self):
+        from unittest.mock import patch
+        from models.meal_ticket import MealTicketItem
+        from services.meal_ticket_service import totals
+        self.generate()
+        with self.app.app_context():
+            item = MealTicketItem.query.filter_by(emp_id=self.emp_id).one()
+            item.dept_name = '历史部门'
+            db.session.commit()
+        with patch('services.meal_ticket_service.totals', wraps=totals) as calculate, \
+                patch('services.meal_ticket_service.source_snapshot', side_effect=AssertionError('不应重新计算考勤')):
+            response = self.client.get('/api/meal-tickets/query', query_string={
+                'recharge_month': '2026-09', 'emp_ids': [self.emp_id, self.other_id],
+                'dept_names': '历史部门', 'person_type': 'employee', 'state': 'unpaid'}, headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            result = response.get_json()
+            self.assertEqual([row['emp_id'] for row in result['items']], [self.emp_id])
+            self.assertEqual(result['departments'][0]['due_amount'], 176)
+            self.assertEqual(calculate.call_count, 1)
+
+    def test_query_preserves_permissions_and_unselected_means_all_visible_people(self):
+        self.generate()
+        url = '/api/meal-tickets/query?recharge_month=2026-09'
+        self.assertEqual(len(self.client.get(url, headers=self.headers).get_json()['items']), 2)
+        viewer = {'Authorization': 'Bearer ' + self.viewer_token}
+        self.assertEqual(len(self.client.get(url, headers=viewer).get_json()['items']), 1)
+        result = self.client.get(url + '&emp_ids=' + str(self.other_id), headers=viewer).get_json()
+        self.assertEqual(result['items'], [])
+        self.assertEqual(result['departments'], [])
+
+    def test_query_status_filters_and_invalid_conditions(self):
+        self.generate()
+        url = '/api/meal-tickets/query?recharge_month=2026-09'
+        for state, expected in [('settled', [self.other_id]), ('unpaid', [self.emp_id]), ('refund', []), ('error', [])]:
+            result = self.client.get(url + '&state=' + state, headers=self.headers).get_json()
+            self.assertEqual([row['emp_id'] for row in result['items']], expected)
+        for extra in ('&emp_ids=bad', '&person_type=bad', '&state=bad'):
+            self.assertEqual(self.client.get(url + extra, headers=self.headers).status_code, 400)
+
+    def test_query_without_monthly_batch_has_empty_options_and_no_results(self):
+        response = self.client.get('/api/meal-tickets/query-options?recharge_month=2026-09', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {'employees': [], 'departments': []})
+        response = self.client.get('/api/meal-tickets/query?recharge_month=2026-09', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.get_json())
+
     def adjustment(self, batch, amount):
         r = self.post('/adjustments', {'batch_id': batch['id'], 'version': batch['version'],
             'item_id': batch['items'][0]['id'], 'amount': amount, 'reason': '额外情况'})

@@ -1,4 +1,5 @@
 import { apiRequest, buildApiUrl } from "./client";
+import type { DepartmentOption, QueryEmployee } from "../types/query";
 
 export interface MealTicketRule {
   abnormal_deduction_enabled: boolean; as_manager: boolean; abnormal_dates: string[]; deduction_cents: number;
@@ -99,6 +100,26 @@ export async function fetchMealBatch(month: string, onProgress?: (progress: Meal
   }
 }
 export const mutateMealBatch = (action: string, body: object) => apiRequest<MealBatch>(`/api/meal-tickets/${action}`, { method: "POST", body });
+export interface MealQueryOptions {
+  employees: QueryEmployee[];
+  departments: DepartmentOption[];
+}
+export interface MealQueryFilters {
+  employeeIds: number[];
+  departmentNames: string[];
+  personType: string;
+  state: string;
+}
+export const fetchMealQueryOptions = (month: string) => apiRequest<MealQueryOptions>(
+  `/api/meal-tickets/query-options?${new URLSearchParams({ recharge_month: month })}`);
+export function queryMealTickets(month: string, filters: MealQueryFilters) {
+  const query = new URLSearchParams({ recharge_month: month });
+  filters.employeeIds.forEach(id => query.append("emp_ids", String(id)));
+  filters.departmentNames.forEach(name => query.append("dept_names", name));
+  if (filters.personType) query.set("person_type", filters.personType);
+  if (filters.state) query.set("state", filters.state);
+  return apiRequest<MealBatch | null>(`/api/meal-tickets/query?${query}`);
+}
 export interface MealFundsAudit {
   start_date: string; end_date: string; checked_at: string; complete: boolean;
   database_net_cents: number; recorded_net_cents: number;
