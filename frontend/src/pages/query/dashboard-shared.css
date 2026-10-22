@@ -400,6 +400,18 @@
   flex: 1;
 }
 
+/* 考勤修正表格随内容收缩，超出工作区时仍在表格内部滚动。 */
+.attendance-override-page .query-workspace .query-result-panel,
+.attendance-override-page .query-workspace .query-result-table,
+.attendance-override-page .query-workspace .attendance-override-table-panel,
+.attendance-override-page .query-workspace .legacy-table-wrap {
+  flex: 0 1 auto;
+}
+
+.attendance-override-page .query-workspace .query-result-table {
+  height: auto;
+}
+
 /* 打卡查询：紧凑筛选栏与一体式日期范围 */
 .query-collapsible-filters .query-filter-body {
   grid-template-columns: minmax(250px, 1fr) auto minmax(260px, 1fr);
