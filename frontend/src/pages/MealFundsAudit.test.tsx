@@ -42,9 +42,10 @@ async function openAudit() {
   return screen.findByRole("dialog", {name:"全部资金核对"});
 }
 
-it("默认只显示核对按钮，弹窗关闭后不占用页面下方空间并返回焦点", async () => {
+it("步骤卡片内显示核对按钮，弹窗关闭后不占用页面下方空间并返回焦点", async () => {
   page();
   const trigger = await screen.findByRole("button", {name:"核对全部资金"});
+  expect(trigger.closest(".meal-ticket-flow")).not.toBeNull();
   expect(screen.queryByRole("dialog", {name:"全部资金核对"})).not.toBeInTheDocument();
   expect(screen.queryByRole("region", {name:"全部资金核对"})).not.toBeInTheDocument();
   expect(screen.queryByLabelText("资金核对开始日期")).not.toBeInTheDocument();

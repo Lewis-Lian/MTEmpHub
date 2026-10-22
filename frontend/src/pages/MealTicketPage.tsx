@@ -546,10 +546,6 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
         </div>
       )}
     </header>}
-    {paymentView && admin && <div className="meal-ticket-actions" aria-label="资金核对操作">
-      <MealFundsAudit key={month} month={month} disabled={busy}
-        revision={`${batch?.version ?? ""}:${batch?.reconciliation?.checked_at ?? ""}`} />
-    </div>}
     {!historical && <div className="meal-ticket-flow">
       <ol className="meal-ticket-workflow" aria-label={paymentView ? "后续补扣流程" : "月度发放流程"}>
         {steps.map((step, index) => <li key={step.id} className={step.id === activeStage ? "is-current" : step.complete ? "is-complete" : ""} aria-current={step.id === activeStage ? "step" : undefined}>
@@ -558,14 +554,16 @@ export default function MealTicketPage({ view = "calculation" }: { view?: "calcu
           <div className="meal-ticket-step-action">{step.id === "settlement" && settlementComplete ? <span className="meal-ticket-badge is-success">已完成</span> : step.control}</div>
         </li>)}
       </ol>
-      {paymentView && admin && confirmed && <div className="meal-ticket-actions" aria-label="后续流程切换">
-        {registering ? <button className="meal-ticket-button is-primary" disabled={busy || !queueReady || errorCount > 0}
+      {paymentView && admin && <div className="meal-ticket-actions" aria-label="后续流程切换">
+        {confirmed && <>{registering ? <button className="meal-ticket-button is-primary" disabled={busy || !queueReady || errorCount > 0}
           onClick={() => setFollowupStep(followupStage === "payments" ? null : "settlement")}>
           {followupStage === "payments" ? "下一步：逐人办理" : "下一步：核对结果"}
         </button> : <button className="meal-ticket-button" disabled={busy} onClick={() => setFollowupStep("adjustments")}>返回登记补扣</button>}
         {activeStage === "settlement" && followupStage === "payments" && <button className="meal-ticket-button is-primary" disabled={busy} onClick={() => setFollowupStep(null)}>继续逐人办理</button>}
         {activeStage === "payments" && followupState?.tasks.some(task => task.status === "awaiting" || task.status === "partial") &&
-          <button className="meal-ticket-button" disabled={busy} onClick={() => setFollowupStep("settlement")}>核对已办理任务</button>}
+          <button className="meal-ticket-button" disabled={busy} onClick={() => setFollowupStep("settlement")}>核对已办理任务</button>}</>}
+        <MealFundsAudit key={month} month={month} disabled={busy}
+          revision={`${batch?.version ?? ""}:${batch?.reconciliation?.checked_at ?? ""}`} />
       </div>}
       {!paymentView && !confirmed && admin && <section className="meal-ticket-panel meal-ticket-monthly-actions" aria-label="计算与核对">
         <div><h2>计算与核对</h2><p>{batch ? "重算保留补扣和本月不发选择；核对金额变化后确认核算。" : "按所选充值月份的上月考勤计算菜票。"}</p></div>
