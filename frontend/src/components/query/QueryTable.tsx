@@ -220,7 +220,7 @@ export default function QueryTable({
     }
   }
 
-  const modalDialog = isModalOpen ? (
+  const modalDialog = isModalOpen && !isModalLoading ? (
     <div
       aria-label="查询详情"
       aria-modal="true"
@@ -240,13 +240,7 @@ export default function QueryTable({
           </button>
         </div>
         <div className="master-modal-body">
-          {isModalLoading ? (
-            <div className="query-modal-loading-wrap">
-              <QueryProgressOverlay active progress={null} text="正在加载详情，请稍后..." />
-            </div>
-          ) : null}
-          {!isModalLoading && modalError ? <p className="legacy-inline-error">{modalError}</p> : null}
-          {!isModalLoading && !modalError ? modalBodyContent : null}
+          {modalError ? <p className="legacy-inline-error">{modalError}</p> : modalBodyContent}
         </div>
       </div>
     </div>
@@ -409,6 +403,7 @@ export default function QueryTable({
         </div>
       ) : null}
     </div>
+    <QueryProgressOverlay active={isModalLoading} progress={null} text="正在加载详情，请稍后..." />
     {isModalOpen ? (isTestEnv ? modalDialog : createPortal(modalDialog, document.body)) : null}
     </>
   );

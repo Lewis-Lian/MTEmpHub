@@ -4391,18 +4391,6 @@ input[type="checkbox"] {
   z-index: var(--z-modal) !important;
 }
 
-/* 3. 弹窗极光 Loading 样式 */
-.query-modal-loading-wrap {
-  display: flex !important;
-  flex-direction: column !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 48px 24px !important;
-  gap: 16px !important;
-  width: 100% !important;
-  min-height: 200px !important;
-}
-
 .query-modal-loading-text {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   font-size: 13.5px !important;

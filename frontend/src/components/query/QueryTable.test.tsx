@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import QueryTable from "./QueryTable";
 
@@ -7,6 +7,37 @@ afterEach(() => {
 });
 
 describe("QueryTable", () => {
+  it("详情加载时只显示页面进度，准备好内容后才打开弹窗", async () => {
+    let finish!: (content: string) => void;
+    const pending = new Promise<string>(resolve => { finish = resolve; });
+    const { container } = render(<div className="app-tab-pane is-active">
+      <QueryTable headers={["考勤天数"]} rows={[[20]]} cellModal={{ getModal: () => ({
+        title: "原始刷卡记录", triggerLabel: "查看打卡详情", loadContent: () => pending,
+      }) }} />
+    </div>);
+    fireEvent.click(screen.getByRole("button", { name: "查看打卡详情" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status").parentElement).toBe(container.querySelector(".app-tab-pane"));
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuetext", "正在加载详情，请稍后...");
+    await act(async () => { finish("08:00,17:30"); });
+    expect(screen.getByRole("dialog", { name: "查询详情" })).toHaveTextContent("08:00,17:30");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("详情加载失败后收起页面进度并在弹窗显示错误", async () => {
+    let fail!: (error: Error) => void;
+    const pending = new Promise<string>((_resolve, reject) => { fail = reject; });
+    render(<QueryTable headers={["出勤天数"]} rows={[[20]]} cellModal={{ getModal: () => ({
+      title: "出勤打卡明细", triggerLabel: "查看出勤详情", loadContent: () => pending,
+    }) }} />);
+    fireEvent.click(screen.getByRole("button", { name: "查看出勤详情" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    await act(async () => { fail(new Error("详情读取失败")); });
+    expect(screen.getByRole("dialog", { name: "查询详情" })).toHaveTextContent("详情读取失败");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
   it("表格底部分页按旧版结构显示总数、页数和跳转", () => {
     const rows = Array.from({ length: 101 }, (_, index) => [`员工${index + 1}`]);
     const { container } = render(<QueryTable headers={["姓名"]} rows={rows} />);
