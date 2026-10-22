@@ -400,15 +400,20 @@
   flex: 1;
 }
 
-/* 考勤修正表格随内容收缩，超出工作区时仍在表格内部滚动。 */
-.attendance-override-page .query-workspace .query-result-panel,
-.attendance-override-page .query-workspace .query-result-table,
-.attendance-override-page .query-workspace .attendance-override-table-panel,
-.attendance-override-page .query-workspace .legacy-table-wrap {
+/* 表格查询页限制在视口内；个人考勤等多区块页面保持原有布局。 */
+.app-layout:has(.app-tab-pane.is-active > .employee-dashboard-page > .query-workspace) {
+  height: 100dvh;
+}
+
+/* 少量数据随内容收缩，超出工作区时只滚动表格，分页栏保持可见。 */
+.employee-dashboard-page .query-workspace .query-result-panel,
+.employee-dashboard-page .query-workspace .query-result-table,
+.employee-dashboard-page .query-workspace .legacy-table-panel,
+.employee-dashboard-page .query-workspace .legacy-table-wrap {
   flex: 0 1 auto;
 }
 
-.attendance-override-page .query-workspace .query-result-table {
+.employee-dashboard-page .query-workspace .query-result-table {
   height: auto;
 }
 
